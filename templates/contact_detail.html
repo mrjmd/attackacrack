@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Details: {{ contact.first_name }} {{ contact.last_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .section-header {
+            @apply text-xl font-semibold text-gray-800 mb-4 border-b pb-2;
+        }
+        .detail-item {
+            @apply mb-2;
+        }
+        .detail-label {
+            @apply font-semibold text-gray-700;
+        }
+        .detail-value {
+            @apply text-gray-900;
+        }
+        .card {
+            @apply bg-white rounded-lg shadow-md p-6 mb-6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 p-6">
+    <div class="container mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-4xl font-bold text-blue-700">
+                {{ contact.first_name }} {{ contact.last_name }}
+            </h1>
+            <div class="space-x-4">
+                <a href="{{ url_for('edit_existing_contact', contact_id=contact.id) }}" 
+                   class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                    Edit Contact
+                </a>
+                <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                    Back to List
+                </a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="mb-4">
+                {% for category, message in messages %}
+                    <li class="flash-message {{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {# Basic Contact Info #}
+            <div class="card">
+                <h2 class="section-header">Basic Information</h2>
+                <div class="detail-item"><span class="detail-label">Type:</span> <span class="detail-value capitalize">{{ contact.contact_type.replace('_', ' ') }}</span></div>
+                <div class="detail-item"><span class="detail-label">Contact Status:</span> <span class="detail-value capitalize">{{ contact.contact_status.replace('_', ' ') }}</span></div>
+                <div class="detail-item"><span class="detail-label">Customer Status:</span> <span class="detail-value capitalize">{{ contact.customer_status.replace('_', ' ') }}</span></div>
+                <div class="detail-item"><span class="detail-label">Payment Status:</span> <span class="detail-value capitalize">{{ contact.payment_status.replace('_', ' ') }}</span></div>
+                <div class="detail-item"><span class="detail-label">Notes:</span> <span class="detail-value">{{ contact.notes if contact.notes else 'N/A' }}</span></div>
+                <div class="detail-item"><span class="detail-label">Created:</span> <span class="detail-value">{{ contact.created_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
+                <div class="detail-item"><span class="detail-label">Last Updated:</span> <span class="detail-value">{{ contact.updated_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
+            </div>
+
+            {# Contact Details (Phone/Email) #}
+            <div class="card">
+                <h2 class="section-header">Contact Details</h2>
+                {% if contact.contact_details %}
+                    {% for detail in contact.contact_details %}
+                        <div class="detail-item">
+                            <span class="detail-label capitalize">{{ detail.type }}:</span> 
+                            <span class="detail-value">{{ detail.value }} ({{ detail.label | capitalize }})</span>
+                            <span class="text-xs text-gray-500 ml-2">({{ detail.status | capitalize }})</span>
+                            {% if detail.last_attempt_date %}<span class="text-xs text-gray-500 ml-2">Last Attempt: {{ detail.last_attempt_date.strftime('%Y-%m-%d') }}</span>{% endif %}
+                            {% if detail.delivery_status %}<span class="text-xs text-gray-500 ml-2">Delivery: {{ detail.delivery_status | capitalize }}</span>{% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-gray-600">No contact details available.</p>
+                {% endif %}
+            </div>
+
+            {# Associated Properties #}
+            <div class="card md:col-span-2">
+                <h2 class="section-header">Associated Properties</h2>
+                {% if contact.properties %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-sm">
+                            <thead class="bg-gray-200 text-gray-700">
+                                <tr>
+                                    <th class="py-2 px-3 text-left font-semibold">Address</th>
+                                    <th class="py-2 px-3 text-left font-semibold">Role</th>
+                                    <th class="py-2 px-3 text-left font-semibold">APN</th>
+                                    <th class="py-2 px-3 text-left font-semibold">Est. Value</th>
+                                    <th class="py-2 px-3 text-left font-semibold">Yr Built</th>
+                                    <th class="py-2 px-3 text-left font-semibold">Listing Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for prop in contact.properties %}
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-2 px-3">{{ prop.address }}, {{ prop.city }}</td>
+                                    {# Find the corresponding role from contact_property_links #}
+                                    {% set role = 'N/A' %}
+                                    {% for cp_link in contact.contact_property_links %}
+                                        {% if cp_link.property_id == prop.id %}
+                                            {% set role = cp_link.role %}
+                                            {# Removed 'break' as it's not supported in Jinja2 #}
+                                        {% endif %}
+                                    {% endfor %}
+                                    <td class="py-2 px-3 capitalize">{{ role.replace('_', ' ') }}</td>
+                                    <td class="py-2 px-3">{{ prop.apn }}</td>
+                                    <td class="py-2 px-3">${{ "{:,.0f}".format(prop.est_value) if prop.est_value else 'N/A' }}</td>
+                                    <td class="py-2 px-3">{{ prop.year_built if prop.year_built else 'N/A' }}</td>
+                                    <td class="py-2 px-3 capitalize">{{ prop.listing_status.replace('_', ' ') if prop.listing_status else 'N/A' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-gray-600">No properties associated with this contact.</p>
+                {% endif %}
+            </div>
+
+            {# Jobs #}
+            <div class="card">
+                <h2 class="section-header">Jobs</h2>
+                {% if contact.jobs %}
+                    <ul class="list-disc pl-5">
+                        {% for job in contact.jobs %}
+                            <li>{{ job.job_name }} ({{ job.job_status | capitalize }}) - ${{ "{:,.2f}".format(job.total_amount) }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-gray-600">No jobs associated.</p>
+                {% endif %}
+            </div>
+
+            {# Appointments #}
+            <div class="card">
+                <h2 class="section-header">Appointments</h2>
+                {% if contact.appointments %}
+                    <ul class="list-disc pl-5">
+                        {% for appt in contact.appointments %}
+                            <li>{{ appt.appointment_type | capitalize }} on {{ appt.scheduled_time.strftime('%Y-%m-%d %H:%M') }} ({{ appt.status | capitalize }})</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-gray-600">No appointments scheduled.</p>
+                {% endif %}
+            </div>
+
+            {# Quotes #}
+            <div class="card">
+                <h2 class="section-header">Quotes / Estimates</h2>
+                {% if contact.quotes %}
+                    <ul class="list-disc pl-5">
+                        {% for quote in contact.quotes %}
+                            <li>Quote #{{ quote.quote_number }} - ${{ "{:,.2f}".format(quote.amount) }} ({{ quote.status | capitalize }})</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-gray-600">No quotes/estimates issued.</p>
+                {% endif %}
+            </div>
+
+            {# Invoices #}
+            <div class="card">
+                <h2 class="section-header">Invoices</h2>
+                {% if contact.invoices %}
+                    <ul class="list-disc pl-5">
+                        {% for invoice in contact.invoices %}
+                            <li>Invoice #{{ invoice.invoice_number }} - ${{ "{:,.2f}".format(invoice.amount) }} ({{ invoice.status | capitalize }})</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-gray-600">No invoices issued.</p>
+                {% endif %}
+            </div>
+
+            {# Campaign History #}
+            <div class="card md:col-span-2">
+                <h2 class="section-header">Campaign History</h2>
+                {% if contact.campaign_contacts %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-sm">
+                            <thead class="bg-gray-200 text-gray-700">
+                                <tr>
+                                    <th class="py-2 px-3 text-left font-semibold">Campaign Name</th>
+                                    <th class="py-2 px-3 text-left font-semibold">Type</th>
+                                    <th class="py-2 px-3 text-left font-semibold">Message Status</th>
+                                    <th class="py-2 px-3 text-left font-semibold">Sent At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cc in contact.campaign_contacts %}
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-2 px-3">{{ cc.campaign.name if cc.campaign else 'N/A' }}</td>
+                                    <td class="py-2 px-3 capitalize">{{ cc.campaign.type if cc.campaign else 'N/A' }}</td>
+                                    <td class="py-2 px-3 capitalize">{{ cc.message_status.replace('_', ' ') }}</td>
+                                    <td class="py-2 px-3">{{ cc.sent_at.strftime('%Y-%m-%d %H:%M') if cc.sent_at else 'N/A' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-gray-600">No campaign history.</p>
+                {% endif %}
+            </div>
+
+            {# Contact Sources #}
+            <div class="card md:col-span-2">
+                <h2 class="section-header">Contact Sources</h2>
+                {% if contact.contact_sources %}
+                    <ul class="list-disc pl-5">
+                        {% for source in contact.contact_sources %}
+                            <li>{{ source.source_type.replace('_', ' ') | capitalize }} - {{ source.property_radar_query.description if source.source_type == 'PropertyRadar_Query' and source.property_radar_query else source.original_data.filename if source.source_type == 'CSV_Import' and source.original_data else 'Manual Entry' }} (Imported: {{ source.import_date.strftime('%Y-%m-%d') }})</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-gray-600">No source information.</p>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); padding: 1.5rem; }
+        .icon-wrapper { display: flex; align-items: center; justify-content: center; border-radius: 9999px; width: 3rem; height: 3rem; }
+        .auth-button { background-color: #4f46e5; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; text-decoration: none; font-weight: 500; display: inline-block; margin-top: 0.5rem; }
+        .auth-button:hover { background-color: #4338ca; }
+    </style>
+</head>
+<body class="text-gray-800">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="hidden md:flex flex-col w-64 bg-gray-800 text-white">
+            <div class="flex items-center justify-center h-16 border-b border-gray-700">
+                <h1 class="text-2xl font-bold">Custom CRM</h1>
+            </div>
+            <div class="flex flex-col flex-grow p-4">
+                <nav class="flex-grow">
+                    <a href="{{ url_for('index') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold bg-gray-900 rounded-lg">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5 mr-3"></i> Dashboard
+                    </a>
+                    <a href="{{ url_for('customers_page') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold hover:bg-gray-700 rounded-lg">
+                        <i data-lucide="users" class="w-5 h-5 mr-3"></i> Customers
+                    </a>
+                    <a href="{{ url_for('marketing_page') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold hover:bg-gray-700 rounded-lg">
+                        <i data-lucide="volume-2" class="w-5 h-5 mr-3"></i> Marketing
+                    </a>
+                    <a href="{{ url_for('finances_page') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold hover:bg-gray-700 rounded-lg">
+                        <i data-lucide="dollar-sign" class="w-5 h-5 mr-3"></i> Finances
+                    </a>
+                    <a href="{{ url_for('settings_page') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold hover:bg-gray-700 rounded-lg">
+                        <i data-lucide="settings" class="w-5 h-5 mr-3"></i> Settings
+                    </a>
+                </nav>
+            </div>
+        </div>
+        <!-- Main Content -->
+        <div class="flex flex-col flex-grow bg-gray-100">
+            <header class="flex items-center justify-between h-16 px-6 bg-white border-b">
+                <h2 class="text-2xl font-semibold text-gray-800">Dashboard</h2>
+                <div class="flex items-center">
+                    <button class="p-2 text-gray-500 rounded-full hover:bg-gray-200 hover:text-gray-700"><i data-lucide="bell" class="w-6 h-6"></i></button>
+                    <div class="ml-4"><span class="font-semibold">Admin User</span></div>
+                </div>
+            </header>
+            <main class="flex-grow p-6 overflow-y-auto">
+                <!-- Key Metrics -->
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    <div class="card"><div class="flex items-center"><div class="icon-wrapper bg-blue-100 text-blue-500"><i data-lucide="users-round" class="w-6 h-6"></i></div><div class="ml-4"><p class="text-sm font-medium text-gray-500">New Leads</p><p class="text-2xl font-bold" id="new-leads">--</p></div></div></div>
+                    <div class="card"><div class="flex items-center"><div class="icon-wrapper bg-green-100 text-green-500"><i data-lucide="target" class="w-6 h-6"></i></div><div class="ml-4"><p class="text-sm font-medium text-gray-500">Deals Won</p><p class="text-2xl font-bold" id="deals-won">--</p></div></div></div>
+                    <div class="card"><div class="flex items-center"><div class="icon-wrapper bg-yellow-100 text-yellow-500"><i data-lucide="dollar-sign" class="w-6 h-6"></i></div><div class="ml-4"><p class="text-sm font-medium text-gray-500">Revenue (Month)</p><p class="text-2xl font-bold" id="revenue">--</p></div></div></div>
+                    <div class="card"><div class="flex items-center"><div class="icon-wrapper bg-red-100 text-red-500"><i data-lucide="trending-up" class="w-6 h-6"></i></div><div class="ml-4"><p class="text-sm font-medium text-gray-500">Conversion Rate</p><p class="text-2xl font-bold" id="conversion-rate">--</p></div></div></div>
+                </div>
+                <!-- Main Grid -->
+                <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-6">
+                    <div class="card lg:col-span-6 xl:col-span-4"><h3 class="text-lg font-semibold">Sales Pipeline</h3><div class="mt-4 space-y-4" id="sales-pipeline"></div></div>
+                    <div class="card lg:col-span-6 xl:col-span-2"><h3 class="text-lg font-semibold">My Tasks</h3><ul class="mt-4 space-y-3" id="task-list"></ul></div>
+                    <div class="card lg:col-span-3 xl:col-span-2"><h3 class="text-lg font-semibold flex items-center"><i data-lucide="calendar" class="w-5 h-5 mr-2 text-indigo-500"></i> Upcoming Appointments</h3><div class="mt-4 space-y-4" id="appointments-list"></div></div>
+                    <div class="card lg:col-span-3 xl:col-span-2"><h3 class="text-lg font-semibold flex items-center"><i data-lucide="message-square" class="w-5 h-5 mr-2 text-purple-500"></i> Recent Texts</h3><div class="mt-4 space-y-2" id="texts-list"></div></div>
+                    <div class="card lg:col-span-6 xl:col-span-2"><h3 class="text-lg font-semibold flex items-center"><i data-lucide="mail" class="w-5 h-5 mr-2 text-cyan-500"></i> Recent Emails</h3><div class="mt-4 space-y-2" id="emails-list"></div></div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script>
+        lucide.createIcons();
+        const API_BASE_URL = 'https://127.0.0.1:5000';
+
+        function populateAppointments() {
+            const appointmentsList = document.getElementById('appointments-list');
+            console.log("--- DEBUG: Fetching calendar events from /api/calendar-events ---");
+            fetch(`${API_BASE_URL}/api/calendar-events`)
+                .then(response => {
+                    console.log("--- DEBUG: Received response from API. Status:", response.status);
+                    if (response.status === 401) {
+                       renderError(appointmentsList, 'Google');
+                       return null;
+                    }
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok, status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(appointments => {
+                    if (!appointments) return; // Stop if auth error occurred
+                    console.log("--- DEBUG: Parsed JSON data:", appointments);
+
+                    let appointmentsHTML = '';
+                    if (appointments && appointments.length > 0) {
+                        console.log(`--- DEBUG: Rendering ${appointments.length} appointments. ---`);
+                        appointments.forEach(appt => {
+                            appointmentsHTML += `
+                                <div class="flex items-start p-3 rounded-lg hover:bg-gray-50">
+                                    <div class="flex-shrink-0 w-1.5 h-10 bg-indigo-500 rounded-full"></div>
+                                    <div class="ml-4">
+                                        <p class="font-semibold text-gray-800">${appt.title}</p>
+                                        <p class="text-sm text-gray-500">${appt.time}</p>
+                                        <p class="text-sm text-gray-500">With: ${appt.with}</p>
+                                    </div>
+                                </div>`;
+                        });
+                    } else {
+                        console.log("--- DEBUG: No appointments to render. ---");
+                        appointmentsHTML = `<p class="text-sm text-gray-500">No upcoming appointments found.</p>`;
+                    }
+                    appointmentsList.innerHTML = appointmentsHTML;
+                })
+                .catch(error => {
+                    console.error('--- ERROR: Fetching appointments failed:', error);
+                    appointmentsList.innerHTML = `<p class="text-sm text-red-500">Could not load appointments. Check console for errors.</p>`;
+                });
+        }
+        
+        // ... (rest of the javascript functions are unchanged) ...
+        document.addEventListener('DOMContentLoaded', function() {
+            populateDashboard();
+        });
+
+        function populateDashboard() {
+            populateMetrics();
+            populatePipeline();
+            populateTasks();
+            populateAppointments();
+            populateEmails();
+            populateTexts();
+        }
+
+        function renderError(container, serviceName) {
+            let authUrl = '';
+            if (serviceName === 'Google') {
+                authUrl = `${API_BASE_URL}/authorize/google`;
+                container.innerHTML = `<p class="text-sm text-gray-500">Please connect your Google account.</p><a href="${authUrl}" class="auth-button">Connect Google</a>`;
+            } else if (serviceName === 'OpenPhone') {
+                 container.innerHTML = `<p class="text-sm text-gray-500">OpenPhone API key not configured.</p><a href="{{ url_for('settings_page') }}" class="auth-button">Configure</a>`;
+            } else {
+                 container.innerHTML = `<p class="text-sm text-red-500">Could not load data for ${serviceName}.</p>`;
+            }
+        }
+
+        function populateMetrics() {
+            fetch(`${API_BASE_URL}/api/metrics`)
+                .then(response => response.json())
+                .then(data => {
+                    if(data.error) {
+                        console.error('Error fetching metrics:', data.error);
+                        return;
+                    }
+                    document.getElementById('new-leads').textContent = data.new_leads || '0';
+                    document.getElementById('deals-won').textContent = data.deals_won || '0';
+                    document.getElementById('revenue').textContent = data.revenue ? `$${data.revenue.toLocaleString()}` : '$0';
+                    document.getElementById('conversion-rate').textContent = data.conversion_rate ? `${data.conversion_rate}%` : '0%';
+                })
+                .catch(error => console.error('Error fetching metrics:', error));
+        }
+
+        function populatePipeline() {
+            const pipelineContainer = document.getElementById('sales-pipeline');
+            fetch(`${API_BASE_URL}/api/pipeline`)
+                .then(response => response.json())
+                .then(pipelineData => {
+                    if(pipelineData.error) {
+                        console.error('Error fetching pipeline:', pipelineData.error);
+                        pipelineContainer.innerHTML = `<p class="text-sm text-red-500">Could not load pipeline data.</p>`;
+                        return;
+                    }
+                    let pipelineHTML = '';
+                    if (pipelineData && pipelineData.length > 0) {
+                        const total = pipelineData.reduce((sum, stage) => sum + stage.value, 0);
+                        pipelineData.forEach(stage => {
+                            const percentage = total > 0 ? (stage.value / total) * 100 : 0;
+                            pipelineHTML += `
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-sm font-medium text-gray-700">${stage.name}</span>
+                                        <span class="text-sm font-medium text-gray-500">${stage.value} Items</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                        <div class="${stage.color || 'bg-blue-500'} h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                                    </div>
+                                </div>`;
+                        });
+                    } else {
+                        pipelineHTML = `<p class="text-sm text-gray-500">No pipeline data available.</p>`;
+                    }
+                    pipelineContainer.innerHTML = pipelineHTML;
+                })
+                .catch(error => {
+                    console.error('Error fetching pipeline data:', error);
+                    pipelineContainer.innerHTML = `<p class="text-sm text-red-500">Could not load pipeline data.</p>`;
+                });
+        }
+
+        function populateTasks() {
+            const taskList = document.getElementById('task-list');
+            fetch(`${API_BASE_URL}/api/tasks`)
+                .then(response => response.json())
+                .then(tasks => {
+                    let tasksHTML = '';
+                    if (tasks && tasks.length > 0) {
+                        tasks.forEach(task => {
+                            tasksHTML += `
+                                <li class="flex items-center">
+                                    <input type="checkbox" ${task.completed ? 'checked' : ''} class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="ml-3 text-sm ${task.completed ? 'line-through text-gray-400' : ''}">${task.text}</span>
+                                    <span class="ml-auto text-xs font-semibold text-gray-500">${task.due}</span>
+                                </li>`;
+                        });
+                    } else {
+                        tasksHTML = `<p class="text-sm text-gray-500">You have no pending tasks.</p>`;
+                    }
+                    taskList.innerHTML = tasksHTML;
+                })
+                .catch(error => {
+                    console.error('Error fetching tasks:', error);
+                    taskList.innerHTML = `<p class="text-sm text-red-500">Could not load tasks.</p>`;
+                });
+        }
+        
+        function populateTexts() {
+            const textsList = document.getElementById('texts-list');
+            fetch(`${API_BASE_URL}/api/texts`)
+                .then(response => {
+                    if (response.status === 401) {
+                       renderError(textsList, 'OpenPhone');
+                       return null;
+                    }
+                    return response.json();
+                })
+                .then(texts => {
+                    if (!texts) return;
+                    let textsHTML = '';
+                    if (texts.length > 0) {
+                        texts.forEach(text => {
+                            textsHTML += `
+                                <div class="flex items-center p-3 rounded-lg hover:bg-gray-50 border-b last:border-b-0">
+                                    <div class="flex-shrink-0">
+                                        <img class="w-10 h-10 rounded-full" src="https://placehold.co/40x40/E9D5FF/5B21B6?text=${text.from.charAt(0).toUpperCase()}" alt="Avatar">
+                                    </div>
+                                    <div class="ml-4 flex-grow overflow-hidden">
+                                        <div class="flex justify-between">
+                                            <p class="font-semibold text-sm">${text.from}</p>
+                                            <p class="text-xs text-gray-500">${text.time}</p>
+                                        </div>
+                                        <p class="text-sm text-gray-600 truncate">${text.snippet}</p>
+                                    </div>
+                                </div>`;
+                        });
+                    } else {
+                         textsHTML = `<p class="text-sm text-gray-500">No recent text messages.</p>`;
+                    }
+                    textsList.innerHTML = textsHTML;
+                })
+                .catch(error => {
+                    console.error('Error fetching texts:', error);
+                    textsList.innerHTML = `<p class="text-sm text-red-500">Could not load texts.</p>`;
+                });
+        }
+
+        function populateEmails() {
+            const emailsList = document.getElementById('emails-list');
+            fetch(`${API_BASE_URL}/api/emails`)
+                .then(response => {
+                    if (response.status === 401) {
+                       renderError(emailsList, 'Google');
+                       return null;
+                    }
+                    return response.json();
+                })
+                .then(emails => {
+                    if (!emails) return;
+                    let emailsHTML = '';
+                    if (emails.length > 0) {
+                        emails.forEach(email => {
+                            emailsHTML += `
+                                <div class="flex items-center p-3 rounded-lg hover:bg-gray-50 border-b last:border-b-0">
+                                    <div class="flex-shrink-0">
+                                        <img class="w-10 h-10 rounded-full" src="https://placehold.co/40x40/E2E8F0/4A5568?text=${email.from.charAt(0).toUpperCase()}" alt="Avatar">
+                                    </div>
+                                    <div class="ml-4 flex-grow overflow-hidden">
+                                        <div class="flex justify-between">
+                                            <p class="font-semibold text-sm">${email.from}</p>
+                                            <p class="text-xs text-gray-500">${email.time}</p>
+                                        </div>
+                                        <p class="text-sm text-gray-800 truncate">${email.subject}</p>
+                                        <p class="text-sm text-gray-500 truncate">${email.snippet}</p>
+                                    </div>
+                                </div>`;
+                        });
+                    } else {
+                        emailsHTML = `<p class="text-sm text-gray-500">No recent emails.</p>`;
+                    }
+                    emailsList.innerHTML = emailsHTML;
+                })
+                .catch(error => {
+                    console.error('Error fetching emails:', error);
+                    emailsList.innerHTML = `<p class="text-sm text-red-500">Could not load emails.</p>`;
+                });
+        }
+    </script>
+</body>
+</html>

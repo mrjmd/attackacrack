@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .flash-message {
+            padding: 0.75rem 1.25rem;
+            margin-bottom: 1rem;
+            border: 1px solid transparent;
+            border-radius: 0.25rem;
+        }
+        .flash-message.success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .flash-message.error {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 p-6">
+    <div class="container mx-auto bg-white rounded-lg shadow-xl p-8">
+        <h1 class="text-4xl font-bold text-center mb-8 text-blue-700">Your Custom CRM</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="mb-4">
+                {% for category, message in messages %}
+                    <li class="flash-message {{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">All Contacts</h2>
+            <div class="space-x-4 flex flex-wrap justify-end"> {# Added flex-wrap and justify-end for better layout on smaller screens #}
+                <a href="{{ url_for('add_new_contact') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2">
+                    Add New Contact
+                </a>
+                <a href="{{ url_for('import_property_radar_data') }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2">
+                    Import PropertyRadar Data
+                </a>
+                <a href="{{ url_for('import_csv_data') }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2">
+                    Import CSV
+                </a>
+                <a href="{{ url_for('property_list') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2">
+                    View Properties
+                </a>
+                <a href="{{ url_for('job_list') }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2">
+                    View Jobs
+                </a>
+                <a href="{{ url_for('appointment_list') }}" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2" style="background-color: #047857; color: white;">
+                    View Appointments
+                </a>
+                <a href="{{ url_for('quote_list') }}" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2" style="background-color: #ea580c; color: white;">
+                    View Quotes
+                </a>
+                <a href="{{ url_for('invoice_list') }}" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out mb-2">
+                    View Invoices
+                </a>
+            </div>
+        </div>
+
+        {# Filter Form #}
+        <div class="bg-gray-50 p-6 rounded-lg shadow-inner mb-6">
+            <h3 class="text-xl font-semibold mb-4 text-gray-800">Filter Contacts</h3>
+            <form id="filter-form" method="GET" action="{{ url_for('index') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                    <label for="search_name" class="block text-gray-700 text-sm font-bold mb-2">Search by Name:</label>
+                    <input type="text" id="search_name" name="search_name" value="{{ current_search_name if current_search_name else '' }}"
+                           placeholder="Type to search..."
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                           onkeyup="debounceSubmit()">
+                </div>
+                <div>
+                    <label for="contact_type" class="block text-gray-700 text-sm font-bold mb-2">Contact Type:</label>
+                    <select id="contact_type" name="contact_type" onchange="this.form.submit()"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        {% for type in contact_types %}
+                            <option value="{{ type }}" {% if current_contact_type == type %}selected{% endif %}>{{ type.replace('_', ' ').title() }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="contact_status" class="block text-gray-700 text-sm font-bold mb-2">Contact Status:</label>
+                    <select id="contact_status" name="contact_status" onchange="this.form.submit()"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        {% for status in contact_statuses %}
+                            <option value="{{ status }}" {% if current_contact_status == status %}selected{% endif %}>{{ status.replace('_', ' ').title() }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="customer_status" class="block text-gray-700 text-sm font-bold mb-2">Customer Status:</label>
+                    <select id="customer_status" name="customer_status" onchange="this.form.submit()"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        {% for status in customer_statuses %}
+                            <option value="{{ status }}" {% if current_customer_status == status %}selected{% endif %}>{{ status.replace('_', ' ').title() }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="payment_status" class="block text-gray-700 text-sm font-bold mb-2">Payment Status:</label>
+                    <select id="payment_status" name="payment_status" onchange="this.form.submit()"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        {% for status in payment_statuses %}
+                            <option value="{{ status }}" {% if current_payment_status == status %}selected{% endif %}>{{ status.replace('_', ' ').title() }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-center mt-6">
+                    <input type="checkbox" id="has_open_estimates" name="has_open_estimates" value="true" {% if current_has_open_estimates %}checked{% endif %}
+                           class="form-checkbox h-5 w-5 text-blue-600 rounded" onchange="this.form.submit()">
+                    <label for="has_open_estimates" class="ml-2 text-gray-700 text-sm font-bold">Has Open Estimates</label>
+                </div>
+                <div class="flex items-center mt-6">
+                    <input type="checkbox" id="has_unpaid_invoices" name="has_unpaid_invoices" value="true" {% if current_has_unpaid_invoices %}checked{% endif %}
+                           class="form-checkbox h-5 w-5 text-blue-600 rounded" onchange="this.form.submit()">
+                    <label for="has_unpaid_invoices" class="ml-2 text-gray-700 text-sm font-bold">Has Unpaid Invoices</label>
+                </div>
+                <div class="flex items-center mt-6 col-span-full md:col-span-1">
+                    <button type="button" onclick="clearFilters()" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">
+                        Clear Filters
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        {% if contacts %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg shadow-md">
+                    <thead class="bg-blue-600 text-white">
+                        <tr>
+                            <th class="py-3 px-4 text-left font-semibold rounded-tl-lg">Name</th>
+                            <th class="py-3 px-4 text-left font-semibold">Type</th>
+                            <th class="py-3 px-4 text-left font-semibold">Contact Status</th>
+                            <th class="py-3 px-4 text-left font-semibold">Customer Status</th>
+                            <th class="py-3 px-4 text-left font-semibold">Payment Status</th>
+                            <th class="py-3 px-4 text-left font-semibold">Phone</th>
+                            <th class="py-3 px-4 text-left font-semibold">Email</th>
+                            <th class="py-3 px-4 text-left font-semibold rounded-tr-lg">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contact in contacts %}
+                        <tr class="border-b border-gray-200 hover:bg-blue-50 transition duration-150 ease-in-out">
+                            <td class="py-3 px-4">
+                                <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="text-blue-600 hover:underline font-medium">
+                                    {{ contact.first_name }} {{ contact.last_name }}
+                                </a>
+                            </td>
+                            <td class="py-3 px-4 capitalize">{{ contact.contact_type.replace('_', ' ') }}</td>
+                            <td class="py-3 px-4 capitalize">{{ contact.contact_status.replace('_', ' ') }}</td>
+                            <td class="py-3 px-4 capitalize">{{ contact.customer_status.replace('_', ' ') }}</td>
+                            <td class="py-3 px-4 capitalize">{{ contact.payment_status.replace('_', ' ') }}</td>
+                            <td class="py-3 px-4">
+                                {% for detail in contact.contact_details %}
+                                    {% if detail.type == 'phone' %}
+                                        {{ detail.value }} ({{ detail.label }})<br>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td class="py-3 px-4">
+                                {% for detail in contact.contact_details %}
+                                    {% if detail.type == 'email' %}
+                                        {{ detail.value }} ({{ detail.label }})<br>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td class="py-3 px-4 flex space-x-2">
+                                <a href="{{ url_for('edit_existing_contact', contact_id=contact.id) }}" 
+                                   class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded-lg text-sm transition duration-150 ease-in-out">
+                                    Edit
+                                </a>
+                                <form action="{{ url_for('delete_existing_contact', contact_id=contact.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete {{ contact.first_name }} {{ contact.last_name }}?');">
+                                    <button type="submit" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-sm transition duration-150 ease-in-out">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-center text-gray-600">No contacts found matching your criteria. Try clearing filters or adding new contacts!</p>
+        {% endif %}
+    </div>
+
+    <script>
+        let typingTimer;               // Timer identifier
+        const doneTypingInterval = 500; // Time in ms (0.5 seconds)
+
+        // Function to clear all filters and submit the form
+        function clearFilters() {
+            document.getElementById('search_name').value = '';
+            document.getElementById('contact_type').value = 'All';
+            document.getElementById('contact_status').value = 'All';
+            document.getElementById('customer_status').value = 'All';
+            document.getElementById('payment_status').value = 'All';
+            document.getElementById('has_open_estimates').checked = false;
+            document.getElementById('has_unpaid_invoices').checked = false;
+            document.getElementById('filter-form').submit();
+        }
+
+        // Debounce function for search input
+        function debounceSubmit() {
+            clearTimeout(typingTimer); // Clear previous timer
+            typingTimer = setTimeout(function() {
+                document.getElementById('filter-form').submit();
+            }, doneTypingInterval);
+        }
+    </script>
+</body>
+</html>
