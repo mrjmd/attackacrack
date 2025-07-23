@@ -68,6 +68,7 @@ def import_csv():
             filepath = os.path.join('/tmp', filename)
             file.save(filepath)
             
+            # Correctly initialize the importer with the ContactService
             importer = CsvImporter(contact_service)
             importer.import_data(filepath)
             
@@ -91,6 +92,7 @@ def import_property_radar():
             filepath = os.path.join('/tmp', filename)
             file.save(filepath)
 
+            # Correctly initialize the importer with both required services
             importer = PropertyRadarImporter(contact_service, property_service)
             importer.import_data(filepath)
 

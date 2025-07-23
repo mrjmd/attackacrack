@@ -1,6 +1,7 @@
 # app.py
 
 from flask import Flask
+from flask_migrate import Migrate
 from config import Config
 from extensions import db
 from datetime import datetime
@@ -14,34 +15,26 @@ def create_app(config_class=Config):
 
     # Initialize extensions with the app
     db.init_app(app)
+    migrate = Migrate(app, db)
 
     # --- CUSTOM TEMPLATE FILTER ---
-    # This filter will be available in all Jinja2 templates.
     @app.template_filter('format_google_date')
     def format_google_date(date_string):
-        """
-        Parses Google API's date or dateTime string and formats it nicely.
-        """
-        if not date_string:
-            return ""
+        if not date_string: return ""
         try:
-            # Handle dateTime with timezone offset (e.g., -04:00 or Z)
             if 'T' in date_string:
-                # The googleapiclient can return offsets with ':', which some Python versions dislike.
                 if ":" == date_string[-3:-2]:
                      date_string = date_string[:-3]+date_string[-2:]
-                # Handle 'Z' for UTC
                 if date_string.endswith('Z'):
                     dt_obj = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
                 else:
                     dt_obj = datetime.fromisoformat(date_string)
                 return dt_obj.strftime('%A, %b %d at %I:%M %p')
-            # Handle all-day date
             else:
                 dt_obj = datetime.fromisoformat(date_string)
                 return dt_obj.strftime('%A, %B %d (All-day)')
         except (ValueError, TypeError):
-            return date_string # Return original string if parsing fails
+            return date_string
     # --- END CUSTOM FILTER ---
 
     # Register blueprints for routes
@@ -63,9 +56,9 @@ def create_app(config_class=Config):
     app.register_blueprint(invoice_bp, url_prefix='/invoices')
     app.register_blueprint(api_bp, url_prefix='/api')
 
-    with app.app_context():
-        # Create database tables if they do not exist
-        db.create_all()
+    # We no longer need db.create_all() as migrations will handle the schema
+    # with app.app_context():
+    #     db.create_all()
 
     return app
 

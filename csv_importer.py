@@ -1,12 +1,12 @@
 import csv
-from crm_manager import CrmManager
+from services.contact_service import ContactService
 
 class CsvImporter:
-    def __init__(self, crm_manager: CrmManager):
+    def __init__(self, contact_service: ContactService):
         """
-        Initializes the importer with a CrmManager instance.
+        Initializes the importer with a ContactService instance.
         """
-        self.crm_manager = crm_manager
+        self.contact_service = contact_service
 
     def import_data(self, filepath):
         """
@@ -17,8 +17,8 @@ class CsvImporter:
             with open(filepath, mode='r', encoding='utf-8') as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
-                    # Use the CrmManager to add the contact
-                    self.crm_manager.add_contact(
+                    # Use the ContactService to add the contact
+                    self.contact_service.add_contact(
                         first_name=row.get('first_name'),
                         last_name=row.get('last_name'),
                         email=row.get('email'),
@@ -29,4 +29,3 @@ class CsvImporter:
             print(f"Error: The file {filepath} was not found.")
         except Exception as e:
             print(f"An error occurred during CSV import: {e}")
-
