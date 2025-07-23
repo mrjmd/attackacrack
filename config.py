@@ -17,7 +17,8 @@ class Config:
     FLASK_ENV = os.environ.get('FLASK_ENV')
 
     # Database settings
-    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
+    # Prioritize Postgres, but fall back to SQLite if it's not set
+    SQLALCHEMY_DATABASE_URI = os.environ.get('POSTGRES_URI')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # OpenPhone API
@@ -29,4 +30,3 @@ class Config:
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
     GOOGLE_PROJECT_ID = os.environ.get('GOOGLE_PROJECT_ID')
-

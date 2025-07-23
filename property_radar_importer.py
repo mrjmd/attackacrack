@@ -1,12 +1,14 @@
 import csv
-from crm_manager import CrmManager
+from services.contact_service import ContactService
+from services.property_service import PropertyService
 
 class PropertyRadarImporter:
-    def __init__(self, crm_manager: CrmManager):
+    def __init__(self, contact_service: ContactService, property_service: PropertyService):
         """
-        Initializes the importer with a CrmManager instance.
+        Initializes the importer with ContactService and PropertyService instances.
         """
-        self.crm_manager = crm_manager
+        self.contact_service = contact_service
+        self.property_service = property_service
 
     def import_data(self, filepath):
         """
@@ -17,17 +19,17 @@ class PropertyRadarImporter:
             with open(filepath, mode='r', encoding='utf-8') as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
-                    # 1. Create the contact
-                    new_contact = self.crm_manager.add_contact(
+                    # 1. Create the contact using the ContactService
+                    new_contact = self.contact_service.add_contact(
                         first_name=row.get('Owner First Name'),
                         last_name=row.get('Owner Last Name'),
                         email=row.get('Owner Email'),
                         phone=row.get('Owner Phone')
                     )
                     
-                    # 2. Create the property and link it to the new contact
+                    # 2. Create the property and link it to the new contact using the PropertyService
                     if new_contact:
-                        self.crm_manager.add_property(
+                        self.property_service.add_property(
                             address=row.get('Address'),
                             contact_id=new_contact.id
                         )
