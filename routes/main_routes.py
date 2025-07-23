@@ -1,51 +1,93 @@
-# routes/main_routes.py
-
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash
-from integrations import IntegrationManager
+from flask import Blueprint, render_template, current_app, redirect, url_for, request, flash
+from extensions import db
+from crm_database import Contact, Property, Job, Appointment, Invoice, Quote
+from crm_manager import CrmManager
+from csv_importer import CsvImporter
+from property_radar_importer import PropertyRadarImporter
+from werkzeug.utils import secure_filename
 import os
+from datetime import datetime
 
 main_bp = Blueprint('main', __name__)
-
-# This needs to be instantiated here or passed in, but for simplicity,
-# we'll create an instance. In a larger app, you might use a factory pattern.
-integration_manager = IntegrationManager()
+crm_manager = CrmManager(db.session)
 
 @main_bp.route('/')
 def index():
-    """Renders the main dashboard page."""
-    return render_template('dashboard.html')
+    return redirect(url_for('main.dashboard'))
+
+@main_bp.route('/dashboard')
+def dashboard():
+    stats = {
+        'contact_count': db.session.query(Contact).count(),
+        'property_count': db.session.query(Property).count(),
+        'active_jobs': db.session.query(Job).filter(Job.status == 'Active').count(),
+        'pending_quotes': db.session.query(Quote).filter(Quote.status == 'Sent').count()
+    }
+    upcoming_appointments = db.session.query(Appointment).filter(
+        Appointment.date >= datetime.utcnow().date()
+    ).order_by(Appointment.date, Appointment.time).limit(5).all()
+    return render_template('dashboard.html', stats=stats, appointments=upcoming_appointments)
 
 @main_bp.route('/settings')
-def settings_page():
-    """Renders the settings page for API configurations."""
+def settings():
     return render_template('settings.html')
 
-# --- Google Authentication Routes ---
-@main_bp.route('/authorize/google')
-def authorize_google():
-    try:
-        flow = integration_manager.get_google_auth_flow()
-        authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true')
-        session['state'] = state
-        return redirect(authorization_url)
-    except FileNotFoundError as e:
-        flash(str(e), 'error')
-        return redirect(url_for('main.settings_page'))
-    except Exception as e:
-        flash(f"An error occurred during Google authorization: {e}", 'error')
-        return redirect(url_for('main.settings_page'))
+@main_bp.route('/import_csv', methods=['GET', 'POST'])
+def import_csv():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        if file:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join('/tmp', filename)
+            file.save(filepath)
+            
+            importer = CsvImporter(crm_manager)
+            importer.import_data(filepath)
+            
+            flash('CSV data imported successfully!')
+            return redirect(url_for('contact.list_all'))
+            
+    return render_template('import_csv.html')
+
+@main_bp.route('/import_property_radar', methods=['GET', 'POST'])
+def import_property_radar():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        if file:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join('/tmp', filename)
+            file.save(filepath)
+
+            importer = PropertyRadarImporter(crm_manager)
+            importer.import_data(filepath)
+
+            flash('Property Radar data imported successfully!')
+            return redirect(url_for('property.properties'))
+
+    return render_template('import_property_radar.html')
 
 
-@main_bp.route('/oauth2callback')
-def oauth2callback():
-    state = session['state']
-    flow = integration_manager.get_google_auth_flow()
-    # Specify the absolute redirect_uri to prevent mismatch error in production
-    flow.redirect_uri = url_for('main.oauth2callback', _external=True, _scheme='https')
-    flow.fetch_token(authorization_response=request.url)
-    
-    credentials = flow.credentials
-    integration_manager.save_google_credentials(credentials)
-    
-    flash('Google Account connected successfully!', 'success')
-    return redirect(url_for('main.index'))
+# --- Placeholder routes from original file ---
+@main_bp.route('/customers')
+def customers():
+    return render_template('customers.html')
+
+@main_bp.route('/finances')
+def finances():
+    return render_template('finances.html')
+
+@main_bp.route('/marketing')
+def marketing():
+    return render_template('marketing.html')

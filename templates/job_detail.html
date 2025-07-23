@@ -1,184 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Details: {{ job.job_name }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .section-header {
-            @apply text-xl font-semibold text-gray-800 mb-4 border-b pb-2;
-        }
-        .detail-item {
-            @apply mb-2;
-        }
-        .detail-label {
-            @apply font-semibold text-gray-700;
-        }
-        .detail-value {
-            @apply text-gray-900;
-        }
-        .card {
-            @apply bg-white rounded-lg shadow-md p-6 mb-6;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-4xl font-bold text-blue-700">
-                Job: {{ job.job_name }}
-            </h1>
-            <div class="space-x-4">
-                <a href="{{ url_for('edit_existing_job', job_id=job.id) }}" 
-                   class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Edit Job
-                </a>
-                <a href="{{ url_for('job_list') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Back to Job List
-                </a>
-            </div>
-        </div>
+{% extends "base.html" %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+{% block title %}Job Details{% endblock %}
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {# Basic Job Info #}
-            <div class="card">
-                <h2 class="section-header">Job Details</h2>
-                <div class="detail-item"><span class="detail-label">Name:</span> <span class="detail-value">{{ job.job_name }}</span></div>
-                <div class="detail-item"><span class="detail-label">Status:</span> <span class="detail-value capitalize">{{ job.job_status.replace('_', ' ') }}</span></div>
-                <div class="detail-item"><span class="detail-label">Description:</span> <span class="detail-value">{{ job.description if job.description else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Total Amount:</span> <span class="detail-value">${{ "{:,.2f}".format(job.total_amount) if job.total_amount else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Start Date:</span> <span class="detail-value">{{ job.start_date.strftime('%Y-%m-%d') if job.start_date else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">End Date:</span> <span class="detail-value">{{ job.end_date.strftime('%Y-%m-%d') if job.end_date else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Created:</span> <span class="detail-value">{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
-                <div class="detail-item"><span class="detail-label">Last Updated:</span> <span class="detail-value">{{ job.updated_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
-            </div>
-
-            {# Associated Property #}
-            <div class="card">
-                <h2 class="section-header">Associated Property</h2>
-                {% if job.property %}
-                    <div class="detail-item">
-                        <span class="detail-label">Address:</span> 
-                        <span class="detail-value">
-                            <a href="{{ url_for('property_detail', property_id=job.property.id) }}" class="text-blue-600 hover:underline">
-                                {{ job.property.address }}, {{ job.property.city }}
-                            </a>
-                        </span>
-                    </div>
-                    <div class="detail-item"><span class="detail-label">APN:</span> <span class="detail-value">{{ job.property.apn }}</span></div>
-                    <div class="detail-item"><span class="detail-label">Est. Value:</span> <span class="detail-value">${{ "{:,.0f}".format(job.property.est_value) if job.property.est_value else 'N/A' }}</span></div>
-                {% else %}
-                    <p class="text-gray-600">No property associated with this job.</p>
-                {% endif %}
-            </div>
-
-            {# Primary Contact for Job #}
-            <div class="card">
-                <h2 class="section-header">Primary Contact</h2>
-                {% if job.primary_contact %}
-                    <div class="detail-item">
-                        <span class="detail-label">Name:</span> 
-                        <span class="detail-value">
-                            <a href="{{ url_for('contact_detail', contact_id=job.primary_contact.id) }}" class="text-blue-600 hover:underline">
-                                {{ job.primary_contact.first_name }} {{ job.primary_contact.last_name }}
-                            </a>
-                        </span>
-                    </div>
-                    <div class="detail-item"><span class="detail-label">Type:</span> <span class="detail-value capitalize">{{ job.primary_contact.contact_type.replace('_', ' ') }}</span></div>
-                    {# You can add phone/email details here if needed, might require eager loading in get_job_by_id #}
-                {% else %}
-                    <p class="text-gray-600">No primary contact associated with this job.</p>
-                {% endif %}
-            </div>
-
-            {# Related Appointments #}
-            <div class="card md:col-span-2">
-                <h2 class="section-header">Related Appointments</h2>
-                {% if job.appointments %}
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white rounded-lg shadow-sm">
-                            <thead class="bg-gray-200 text-gray-700">
-                                <tr>
-                                    <th class="py-2 px-3 text-left font-semibold">Type</th>
-                                    <th class="py-2 px-3 text-left font-semibold">Scheduled Time</th>
-                                    <th class="py-2 px-3 text-left font-semibold">Status</th>
-                                    <th class="py-2 px-3 text-left font-semibold">Contact</th>
-                                    <th class="py-2 px-3 text-left font-semibold">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for appt in job.appointments %}
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-2 px-3 capitalize">{{ appt.appointment_type.replace('_', ' ') }}</td>
-                                    <td class="py-2 px-3">{{ appt.scheduled_time.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td class="py-2 px-3 capitalize">{{ appt.status.replace('_', ' ') }}</td>
-                                    <td class="py-2 px-3">
-                                        {% if appt.contact %}
-                                            <a href="{{ url_for('contact_detail', contact_id=appt.contact.id) }}" class="text-blue-600 hover:underline">
-                                                {{ appt.contact.first_name }} {{ appt.contact.last_name }}
-                                            </a>
-                                        {% else %}
-                                            N/A
-                                        {% endif %}
-                                    </td>
-                                    <td class="py-2 px-3">
-                                        {# Future: Link to edit appointment #}
-                                        <a href="#" class="text-blue-500 hover:underline">View/Edit</a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="text-gray-600">No appointments associated with this job.</p>
-                {% endif %}
-            </div>
-
-            {# Related Quotes #}
-            <div class="card">
-                <h2 class="section-header">Related Quotes</h2>
-                {% if job.quotes %}
-                    <ul class="list-disc pl-5">
-                        {% for quote in job.quotes %}
-                            <li>Quote #{{ quote.quote_number }} - ${{ "{:,.2f}".format(quote.amount) }} ({{ quote.status | capitalize }})</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-gray-600">No quotes associated with this job.</p>
-                {% endif %}
-            </div>
-
-            {# Related Invoices #}
-            <div class="card">
-                <h2 class="section-header">Related Invoices</h2>
-                {% if job.invoices %}
-                    <ul class="list-disc pl-5">
-                        {% for invoice in job.invoices %}
-                            <li>Invoice #{{ invoice.invoice_number }} - ${{ "{:,.2f}".format(invoice.amount) }} ({{ invoice.status | capitalize }})</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-gray-600">No invoices associated with this job.</p>
-                {% endif %}
-            </div>
-
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">Job Details</h2>
+        <div class="flex items-center space-x-2">
+            <a href="{{ url_for('job.edit_job', job_id=job.id) }}" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg">Edit Job</a>
+            <form method="POST" action="{{ url_for('job.delete_job', job_id=job.id) }}" onsubmit="return confirm('Are you sure?');">
+                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg">Delete Job</button>
+            </form>
         </div>
     </div>
-</body>
-</html>
+
+    <div class="bg-gray-900 rounded-lg shadow p-6 mb-6">
+        <p><strong>Description:</strong> {{ job.description }}</p>
+        <p><strong>Property:</strong> <a href="{{ url_for('property.property_detail', property_id=job.property.id) }}" class="text-blue-400 hover:underline">{{ job.property.address }}</a></p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Quotes -->
+        <div class="bg-gray-900 rounded-lg shadow p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Quotes</h3>
+                <a href="{{ url_for('quote.add_quote', job_id=job.id) }}" class="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg">Add Quote</a>
+            </div>
+            <ul>
+                {% for quote in job.quotes %}
+                    <li class="border-b border-gray-700 py-2"><a href="{{ url_for('quote.quote_detail', quote_id=quote.id) }}" class="hover:text-blue-400">Quote for ${{ "%.2f"|format(quote.amount) }} - Status: {{ quote.status }}</a></li>
+                {% else %}
+                    <li>No quotes found for this job.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Invoices -->
+        <div class="bg-gray-900 rounded-lg shadow p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Invoices</h3>
+                <a href="{{ url_for('invoice.add_invoice', job_id=job.id) }}" class="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg">Add Invoice</a>
+            </div>
+            <ul>
+                {% for invoice in job.invoices %}
+                     <li class="border-b border-gray-700 py-2"><a href="{{ url_for('invoice.invoice_detail', invoice_id=invoice.id) }}" class="hover:text-blue-400">Invoice for ${{ "%.2f"|format(invoice.amount) }} - Status: {{ invoice.status }}</a></li>
+                {% else %}
+                    <li>No invoices found for this job.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

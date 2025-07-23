@@ -1,5 +1,13 @@
+# Environment variables
 .env
-.DS_Store
 .env.save
+
+# Other ignores...
+*.pyc
+__pycache__/
+crm.db
+client_secret.json
+token.pickle
+openphone.key
+.DS_Store
 .python-version
-__pycache__
