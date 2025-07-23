@@ -7,6 +7,8 @@ from property_radar_importer import PropertyRadarImporter
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
+# Import the new integration functions
+from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages, get_recent_openphone_texts
 
 main_bp = Blueprint('main', __name__)
 crm_manager = CrmManager(db.session)
@@ -17,17 +19,36 @@ def index():
 
 @main_bp.route('/dashboard')
 def dashboard():
+    # CRM Stats
     stats = {
         'contact_count': db.session.query(Contact).count(),
         'property_count': db.session.query(Property).count(),
         'active_jobs': db.session.query(Job).filter(Job.status == 'Active').count(),
         'pending_quotes': db.session.query(Quote).filter(Quote.status == 'Sent').count()
     }
-    upcoming_appointments = db.session.query(Appointment).filter(
+    
+    # Internal CRM Appointments
+    internal_appointments = db.session.query(Appointment).filter(
         Appointment.date >= datetime.utcnow().date()
     ).order_by(Appointment.date, Appointment.time).limit(5).all()
-    return render_template('dashboard.html', stats=stats, appointments=upcoming_appointments)
 
+    # External API Data
+    google_events = get_upcoming_calendar_events()
+    gmail_messages = get_recent_gmail_messages()
+    # Unpack the data and potential error message
+    openphone_texts, openphone_error = get_recent_openphone_texts()
+
+    return render_template(
+        'dashboard.html', 
+        stats=stats, 
+        appointments=internal_appointments,
+        google_events=google_events,
+        gmail_messages=gmail_messages,
+        openphone_texts=openphone_texts,
+        openphone_error=openphone_error # Pass the error to the template
+    )
+
+# ... rest of the routes in main_routes.py ...
 @main_bp.route('/settings')
 def settings():
     return render_template('settings.html')
@@ -74,12 +95,11 @@ def import_property_radar():
             importer.import_data(filepath)
 
             flash('Property Radar data imported successfully!')
-            return redirect(url_for('property.properties'))
+            return redirect(url_for('property.list_all'))
 
     return render_template('import_property_radar.html')
 
 
-# --- Placeholder routes from original file ---
 @main_bp.route('/customers')
 def customers():
     return render_template('customers.html')
