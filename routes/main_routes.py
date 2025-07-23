@@ -1,17 +1,24 @@
-from flask import Blueprint, render_template, current_app, redirect, url_for, request, flash
-from extensions import db
-from crm_database import Contact, Property, Job, Appointment, Invoice, Quote
-from crm_manager import CrmManager
-from csv_importer import CsvImporter
-from property_radar_importer import PropertyRadarImporter
+from flask import Blueprint, render_template, redirect, url_for, request, flash
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
-# Import the new integration functions
+
+from services.contact_service import ContactService
+from services.property_service import PropertyService
+from services.job_service import JobService
+from services.quote_service import QuoteService
+from services.appointment_service import AppointmentService
+from csv_importer import CsvImporter
+from property_radar_importer import PropertyRadarImporter
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages, get_recent_openphone_texts
 
 main_bp = Blueprint('main', __name__)
-crm_manager = CrmManager(db.session)
+contact_service = ContactService()
+property_service = PropertyService()
+job_service = JobService()
+quote_service = QuoteService()
+appointment_service = AppointmentService()
+
 
 @main_bp.route('/')
 def index():
@@ -19,23 +26,17 @@ def index():
 
 @main_bp.route('/dashboard')
 def dashboard():
-    # CRM Stats
     stats = {
-        'contact_count': db.session.query(Contact).count(),
-        'property_count': db.session.query(Property).count(),
-        'active_jobs': db.session.query(Job).filter(Job.status == 'Active').count(),
-        'pending_quotes': db.session.query(Quote).filter(Quote.status == 'Sent').count()
+        'contact_count': len(contact_service.get_all_contacts()),
+        'property_count': len(property_service.get_all_properties()),
+        'active_jobs': len([j for j in job_service.get_all_jobs() if j.status == 'Active']),
+        'pending_quotes': len([q for q in quote_service.get_all_quotes() if q.status == 'Sent'])
     }
     
-    # Internal CRM Appointments
-    internal_appointments = db.session.query(Appointment).filter(
-        Appointment.date >= datetime.utcnow().date()
-    ).order_by(Appointment.date, Appointment.time).limit(5).all()
+    internal_appointments = appointment_service.get_all_appointments()
 
-    # External API Data
     google_events = get_upcoming_calendar_events()
     gmail_messages = get_recent_gmail_messages()
-    # Unpack the data and potential error message
     openphone_texts, openphone_error = get_recent_openphone_texts()
 
     return render_template(
@@ -45,10 +46,9 @@ def dashboard():
         google_events=google_events,
         gmail_messages=gmail_messages,
         openphone_texts=openphone_texts,
-        openphone_error=openphone_error # Pass the error to the template
+        openphone_error=openphone_error
     )
 
-# ... rest of the routes in main_routes.py ...
 @main_bp.route('/settings')
 def settings():
     return render_template('settings.html')
@@ -68,7 +68,7 @@ def import_csv():
             filepath = os.path.join('/tmp', filename)
             file.save(filepath)
             
-            importer = CsvImporter(crm_manager)
+            importer = CsvImporter(contact_service)
             importer.import_data(filepath)
             
             flash('CSV data imported successfully!')
@@ -91,7 +91,7 @@ def import_property_radar():
             filepath = os.path.join('/tmp', filename)
             file.save(filepath)
 
-            importer = PropertyRadarImporter(crm_manager)
+            importer = PropertyRadarImporter(contact_service, property_service)
             importer.import_data(filepath)
 
             flash('Property Radar data imported successfully!')
@@ -100,6 +100,7 @@ def import_property_radar():
     return render_template('import_property_radar.html')
 
 
+# --- Placeholder routes from original file ---
 @main_bp.route('/customers')
 def customers():
     return render_template('customers.html')
