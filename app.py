@@ -2,7 +2,8 @@
 
 from flask import Flask
 from config import Config
-from extensions import db # Import db from the new extensions.py file
+from extensions import db
+from datetime import datetime
 
 def create_app(config_class=Config):
     """Create and configure an instance of the Flask application."""
@@ -12,8 +13,36 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     # Initialize extensions with the app
-    # This connects the db object from extensions.py to your app
     db.init_app(app)
+
+    # --- CUSTOM TEMPLATE FILTER ---
+    # This filter will be available in all Jinja2 templates.
+    @app.template_filter('format_google_date')
+    def format_google_date(date_string):
+        """
+        Parses Google API's date or dateTime string and formats it nicely.
+        """
+        if not date_string:
+            return ""
+        try:
+            # Handle dateTime with timezone offset (e.g., -04:00 or Z)
+            if 'T' in date_string:
+                # The googleapiclient can return offsets with ':', which some Python versions dislike.
+                if ":" == date_string[-3:-2]:
+                     date_string = date_string[:-3]+date_string[-2:]
+                # Handle 'Z' for UTC
+                if date_string.endswith('Z'):
+                    dt_obj = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+                else:
+                    dt_obj = datetime.fromisoformat(date_string)
+                return dt_obj.strftime('%A, %b %d at %I:%M %p')
+            # Handle all-day date
+            else:
+                dt_obj = datetime.fromisoformat(date_string)
+                return dt_obj.strftime('%A, %B %d (All-day)')
+        except (ValueError, TypeError):
+            return date_string # Return original string if parsing fails
+    # --- END CUSTOM FILTER ---
 
     # Register blueprints for routes
     from routes.main_routes import main_bp

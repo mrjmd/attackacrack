@@ -13,7 +13,7 @@ class Config:
     and settings applicable to all environments.
     """
     # Flask settings
-    SECRET_KEY = os.environ.get('SECRET_KEY')
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     FLASK_ENV = os.environ.get('FLASK_ENV')
 
     # Database settings
@@ -22,6 +22,8 @@ class Config:
 
     # OpenPhone API
     OPENPHONE_API_KEY = os.environ.get('OPENPHONE_API_KEY')
+    OPENPHONE_PHONE_NUMBER = os.environ.get('OPENPHONE_PHONE_NUMBER')
+    OPENPHONE_PHONE_NUMBER_ID = os.environ.get('OPENPHONE_PHONE_NUMBER_ID')
 
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
