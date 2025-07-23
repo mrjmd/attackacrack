@@ -1,197 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Property Details: {{ property.address }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .section-header {
-            @apply text-xl font-semibold text-gray-800 mb-4 border-b pb-2;
-        }
-        .detail-item {
-            @apply mb-2;
-        }
-        .detail-label {
-            @apply font-semibold text-gray-700;
-        }
-        .detail-value {
-            @apply text-gray-900;
-        }
-        .card {
-            @apply bg-white rounded-lg shadow-md p-6 mb-6;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-4xl font-bold text-blue-700">
-                Property: {{ property.address }}, {{ property.city }}
-            </h1>
-            <div class="space-x-4">
-                <a href="{{ url_for('edit_existing_property', property_id=property.id) }}" 
-                   class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Edit Property
-                </a>
-                <a href="{{ url_for('property_list') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Back to Property List
-                </a>
-            </div>
-        </div>
+{% extends "base.html" %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+{% block title %}Property: {{ property.address }}{% endblock %}
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {# Basic Property Info #}
-            <div class="card">
-                <h2 class="section-header">Basic Property Information</h2>
-                <div class="detail-item"><span class="detail-label">APN:</span> <span class="detail-value">{{ property.apn }}</span></div>
-                <div class="detail-item"><span class="detail-label">Address:</span> <span class="detail-value">{{ property.address }}</span></div>
-                <div class="detail-item"><span class="detail-label">City:</span> <span class="detail-value">{{ property.city }}</span></div>
-                <div class="detail-item"><span class="detail-label">ZIP Code:</span> <span class="detail-value">{{ property.zip_code }}</span></div>
-                <div class="detail-item"><span class="detail-label">Subdivision:</span> <span class="detail-value">{{ property.subdivision if property.subdivision else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Year Built:</span> <span class="detail-value">{{ property.year_built if property.year_built else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Sq Ft:</span> <span class="detail-value">{{ property.sq_ft if property.sq_ft else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Bedrooms:</span> <span class="detail-value">{{ property.beds if property.beds else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Bathrooms:</span> <span class="detail-value">{{ property.baths if property.baths else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Est. Value:</span> <span class="detail-value">${{ "{:,.0f}".format(property.est_value) if property.est_value else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Est. Equity ($):</span> <span class="detail-value">${{ "{:,.0f}".format(property.est_equity_dollars) if property.est_equity_dollars else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Est. Equity (%):</span> <span class="detail-value">{{ "{:,.2f}%".format(property.est_equity_percent) if property.est_equity_percent else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Owner Occupied:</span> <span class="detail-value">{{ 'Yes' if property.owner_occupied else 'No' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Listed for Sale:</span> <span class="detail-value">{{ 'Yes' if property.listed_for_sale else 'No' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Listing Status:</span> <span class="detail-value capitalize">{{ property.listing_status.replace('_', ' ') if property.listing_status else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Foreclosure:</span> <span class="detail-value">{{ 'Yes' if property.foreclosure else 'No' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Purchase Date:</span> <span class="detail-value">{{ property.purchase_date.strftime('%Y-%m-%d') if property.purchase_date else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Purchase Mos Since:</span> <span class="detail-value">{{ property.purchase_months_since if property.purchase_months_since else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Latitude:</span> <span class="detail-value">{{ property.latitude if property.latitude else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Longitude:</span> <span class="detail-value">{{ property.longitude if property.longitude else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">PropertyRadar ID:</span> <span class="detail-value">{{ property.property_radar_id if property.property_radar_id else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Created:</span> <span class="detail-value">{{ property.created_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
-                <div class="detail-item"><span class="detail-label">Last Updated:</span> <span class="detail-value">{{ property.updated_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
-            </div>
-
-            {# Mailing Address Info #}
-            <div class="card">
-                <h2 class="section-header">Mailing Address</h2>
-                <div class="detail-item"><span class="detail-label">Address:</span> <span class="detail-value">{{ property.mail_address if property.mail_address else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">City:</span> <span class="detail-value">{{ property.mail_city if property.mail_city else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">State:</span> <span class="detail-value">{{ property.mail_state if property.mail_state else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">ZIP:</span> <span class="detail-value">{{ property.mail_zip if property.mail_zip else 'N/A' }}</span></div>
-            </div>
-
-            {# Associated Contacts #}
-            <div class="card md:col-span-2">
-                <h2 class="section-header">Associated Contacts</h2>
-                {% if property.contacts %}
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white rounded-lg shadow-sm">
-                            <thead class="bg-gray-200 text-gray-700">
-                                <tr>
-                                    <th class="py-2 px-3 text-left font-semibold">Name</th>
-                                    <th class="py-2 px-3 text-left font-semibold">Role</th>
-                                    <th class="py-2 px-3 text-left font-semibold">Type</th>
-                                    <th class="py-2 px-3 text-left font-semibold">Contact Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for contact in property.contacts %}
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-2 px-3">
-                                        <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="text-blue-600 hover:underline font-medium">
-                                            {{ contact.first_name }} {{ contact.last_name }}
-                                        </a>
-                                    </td>
-                                    {# Find the corresponding role from contact_property_links #}
-                                    {% set role = 'N/A' %}
-                                    {% for cp_link in property.contact_property_links %}
-                                        {% if cp_link.contact_id == contact.id %}
-                                            {% set role = cp_link.role %}
-                                            {# Removed 'break' as it's not supported in Jinja2 #}
-                                        {% endif %}
-                                    {% endfor %}
-                                    <td class="py-2 px-3 capitalize">{{ role.replace('_', ' ') }}</td>
-                                    <td class="py-2 px-3 capitalize">{{ contact.contact_type.replace('_', ' ') }}</td>
-                                    <td class="py-2 px-3 capitalize">{{ contact.contact_status.replace('_', ' ') }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="text-gray-600">No contacts associated with this property.</p>
-                {% endif %}
-            </div>
-
-            {# Jobs for this Property #}
-            <div class="card">
-                <h2 class="section-header">Jobs at this Property</h2>
-                {% if property.jobs %}
-                    <ul class="list-disc pl-5">
-                        {% for job in property.jobs %}
-                            <li>{{ job.job_name }} ({{ job.job_status | capitalize }}) - ${{ "{:,.2f}".format(job.total_amount) }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-gray-600">No jobs associated with this property.</p>
-                {% endif %}
-            </div>
-
-            {# Appointments for this Property #}
-            <div class="card">
-                <h2 class="section-header">Appointments for this Property</h2>
-                {% if property.appointments %}
-                    <ul class="list-disc pl-5">
-                        {% for appt in property.appointments %}
-                            <li>{{ appt.appointment_type | capitalize }} on {{ appt.scheduled_time.strftime('%Y-%m-%d %H:%M') }} ({{ appt.status | capitalize }})</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-gray-600">No appointments for this property.</p>
-                {% endif %}
-            </div>
-
-            {# Quotes for this Property #}
-            <div class="card">
-                <h2 class="section-header">Quotes for this Property</h2>
-                {% if property.quotes %}
-                    <ul class="list-disc pl-5">
-                        {% for quote in property.quotes %}
-                            <li>Quote #{{ quote.quote_number }} - ${{ "{:,.2f}".format(quote.amount) }} ({{ quote.status | capitalize }})</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-gray-600">No quotes for this property.</p>
-                {% endif %}
-            </div>
-
-            {# Invoices for this Property #}
-            <div class="card">
-                <h2 class="section-header">Invoices for this Property</h2>
-                {% if property.invoices %}
-                    <ul class="list-disc pl-5">
-                        {% for invoice in property.invoices %}
-                            <li>Invoice #{{ invoice.invoice_number }} - ${{ "{:,.2f}".format(invoice.amount) }} ({{ invoice.status | capitalize }})</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-gray-600">No invoices for this property.</p>
-                {% endif %}
-            </div>
-
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">{{ property.address }}</h2>
+        <div class="flex items-center space-x-2">
+            <a href="{{ url_for('property.edit_property', property_id=property.id) }}" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg">Edit Property</a>
+            <form method="POST" action="{{ url_for('property.delete_property', property_id=property.id) }}" onsubmit="return confirm('Are you sure?');">
+                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg">Delete Property</button>
+            </form>
         </div>
     </div>
-</body>
-</html>
+
+    <div class="bg-gray-900 rounded-lg shadow p-6 mb-6">
+        <h3 class="text-xl font-bold mb-4">Owner Information</h3>
+        <p>
+            <a href="{{ url_for('contact.contact_detail', contact_id=property.contact.id) }}" class="text-blue-400 hover:underline">
+                {{ property.contact.first_name }} {{ property.contact.last_name }}
+            </a>
+        </p>
+    </div>
+
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Jobs at this Property</h3>
+            <a href="{{ url_for('job.add_job', property_id=property.id) }}" class="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg">Add Job</a>
+        </div>
+        <ul>
+            {% for job in property.jobs %}
+                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('job.job_detail', job_id=job.id) }}" class="hover:text-blue-400">{{ job.description }}</a></li>
+            {% else %}
+                <li>No jobs found for this property.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

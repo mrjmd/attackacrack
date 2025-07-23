@@ -1,149 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice Details: {{ invoice.invoice_number }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .section-header {
-            @apply text-xl font-semibold text-gray-800 mb-4 border-b pb-2;
-        }
-        .detail-item {
-            @apply mb-2;
-        }
-        .detail-label {
-            @apply font-semibold text-gray-700;
-        }
-        .detail-value {
-            @apply text-gray-900;
-        }
-        .card {
-            @apply bg-white rounded-lg shadow-md p-6 mb-6;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-4xl font-bold text-blue-700">
-                Invoice: {{ invoice.invoice_number }}
-            </h1>
-            <div class="space-x-4">
-                <a href="{{ url_for('edit_existing_invoice', invoice_id=invoice.id) }}" 
-                   class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Edit Invoice
-                </a>
-                <a href="{{ url_for('invoice_list') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Back to Invoice List
-                </a>
-            </div>
-        </div>
+{% extends "base.html" %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+{% block title %}Invoice #{{ invoice.id }}{% endblock %}
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {# Basic Invoice Info #}
-            <div class="card">
-                <h2 class="section-header">Invoice Details</h2>
-                <div class="detail-item"><span class="detail-label">Invoice Number:</span> <span class="detail-value">{{ invoice.invoice_number }}</span></div>
-                <div class="detail-item"><span class="detail-label">Amount:</span> <span class="detail-value">${{ "{:,.2f}".format(invoice.amount) }}</span></div>
-                <div class="detail-item"><span class="detail-label">Status:</span> <span class="detail-value capitalize">{{ invoice.status.replace('_', ' ') }}</span></div>
-                <div class="detail-item"><span class="detail-label">Issue Date:</span> <span class="detail-value">{{ invoice.issue_date.strftime('%Y-%m-%d') }}</span></div>
-                <div class="detail-item"><span class="detail-label">Due Date:</span> <span class="detail-value">{{ invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Paid Date:</span> <span class="detail-value">{{ invoice.paid_date.strftime('%Y-%m-%d') if invoice.paid_date else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Payment Method:</span> <span class="detail-value">{{ invoice.payment_method if invoice.payment_method else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Details:</span> <span class="detail-value">{{ invoice.details if invoice.details else 'N/A' }}</span></div>
-                <div class="detail-item"><span class="detail-label">Created:</span> <span class="detail-value">{{ invoice.created_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
-                <div class="detail-item"><span class="detail-label">Last Updated:</span> <span class="detail-value">{{ invoice.updated_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
-            </div>
-
-            {# Associated Contact #}
-            <div class="card">
-                <h2 class="section-header">Associated Contact</h2>
-                {% if invoice.contact %}
-                    <div class="detail-item">
-                        <span class="detail-label">Name:</span> 
-                        <span class="detail-value">
-                            <a href="{{ url_for('contact_detail', contact_id=invoice.contact.id) }}" class="text-blue-600 hover:underline">
-                                {{ invoice.contact.first_name }} {{ invoice.contact.last_name }}
-                            </a>
-                        </span>
-                    </div>
-                    <div class="detail-item"><span class="detail-label">Type:</span> <span class="detail-value capitalize">{{ invoice.contact.contact_type.replace('_', ' ') }}</span></div>
-                {% else %}
-                    <p class="text-gray-600">No contact associated with this invoice.</p>
-                {% endif %}
-            </div>
-
-            {# Associated Property #}
-            <div class="card">
-                <h2 class="section-header">Associated Property</h2>
-                {% if invoice.property %}
-                    <div class="detail-item">
-                        <span class="detail-label">Address:</span> 
-                        <span class="detail-value">
-                            <a href="{{ url_for('property_detail', property_id=invoice.property.id) }}" class="text-blue-600 hover:underline">
-                                {{ invoice.property.address }}, {{ invoice.property.city }}
-                            </a>
-                        </span>
-                    </div>
-                    <div class="detail-item"><span class="detail-label">APN:</span> <span class="detail-value">{{ invoice.property.apn }}</span></div>
-                {% else %}
-                    <p class="text-gray-600">No property associated with this invoice.</p>
-                {% endif %}
-            </div>
-
-            {# Associated Job #}
-            <div class="card">
-                <h2 class="section-header">Associated Job</h2>
-                {% if invoice.job %}
-                    <div class="detail-item">
-                        <span class="detail-label">Job Name:</span> 
-                        <span class="detail-value">
-                            <a href="{{ url_for('job_detail', job_id=invoice.job.id) }}" class="text-blue-600 hover:underline">
-                                {{ invoice.job.job_name }}
-                            </a>
-                        </span>
-                    </div>
-                    <div class="detail-item"><span class="detail-label">Status:</span> <span class="detail-value capitalize">{{ invoice.job.job_status.replace('_', ' ') }}</span></div>
-                {% else %}
-                    <p class="text-gray-600">No job associated with this invoice.</p>
-                {% endif %}
-            </div>
-
-            {# Associated Quote #}
-            <div class="card md:col-span-2">
-                <h2 class="section-header">Associated Quote</h2>
-                {% if invoice.quote %}
-                    <div class="detail-item">
-                        <span class="detail-label">Quote Number:</span> 
-                        <span class="detail-value">
-                            <a href="{{ url_for('quote_detail', quote_id=invoice.quote.id) }}" class="text-blue-600 hover:underline">
-                                {{ invoice.quote.quote_number }}
-                            </a>
-                        </span>
-                    </div>
-                    <div class="detail-item"><span class="detail-label">Amount:</span> <span class="detail-value">${{ "{:,.2f}".format(invoice.quote.amount) }}</span></div>
-                    <div class="detail-item"><span class="detail-label">Status:</span> <span class="detail-value capitalize">{{ invoice.quote.status.replace('_', ' ') }}</span></div>
-                {% else %}
-                    <p class="text-gray-600">No quote associated with this invoice.</p>
-                {% endif %}
-            </div>
-
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">Invoice #{{ invoice.id }}</h2>
+        <div class="flex items-center space-x-2">
+            <a href="{{ url_for('invoice.edit_invoice', invoice_id=invoice.id) }}" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg">Edit</a>
+            <form method="POST" action="{{ url_for('invoice.delete_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Are you sure?');">
+                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg">Delete</button>
+            </form>
         </div>
     </div>
-</body>
-</html>
+
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <p><strong>Amount:</strong> ${{ "%.2f"|format(invoice.amount) }}</p>
+        <p><strong>Due Date:</strong> {{ invoice.due_date }}</p>
+        <p><strong>Status:</strong> {{ invoice.status }}</p>
+        <p><strong>Job:</strong> <a href="{{ url_for('job.job_detail', job_id=invoice.job.id) }}" class="text-blue-400 hover:underline">{{ invoice.job.description }}</a></p>
+    </div>
+{% endblock %}

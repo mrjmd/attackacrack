@@ -1,6 +1,7 @@
 # routes/api_routes.py
 
 from flask import Blueprint, jsonify, g, session, redirect, url_for, request, flash, current_app
+from extensions import db
 from crm_database import Contact, Quote, Job, Invoice
 from sqlalchemy import func
 from datetime import datetime

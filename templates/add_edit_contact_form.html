@@ -1,186 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ form_title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .flash-message {
-            padding: 0.75rem 1.25rem;
-            margin-bottom: 1rem;
-            border: 1px solid transparent;
-            border-radius: 0.25rem;
-        }
-        .flash-message.success {
-            color: #155724;
-            background-color: #d4edda;
-            border-color: #c3e6cb;
-        }
-        .flash-message.error {
-            color: #721c24;
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto bg-white rounded-lg shadow-xl p-8 max-w-2xl">
-        <h1 class="text-3xl font-bold text-center mb-8 text-blue-700">{{ form_title }}</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+{% extends "base.html" %}
 
-        <form method="POST" action="{{ url_for('add_new_contact') if contact is none else url_for('edit_existing_contact', contact_id=contact.id) }}">
-            <div class="mb-4">
-                <label for="first_name" class="block text-gray-700 text-sm font-bold mb-2">First Name:</label>
-                <input type="text" id="first_name" name="first_name" value="{{ contact.first_name if contact else '' }}" required
-                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-            </div>
-            <div class="mb-4">
-                <label for="last_name" class="block text-gray-700 text-sm font-bold mb-2">Last Name:</label>
-                <input type="text" id="last_name" name="last_name" value="{{ contact.last_name if contact else '' }}" required
-                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-            </div>
-            <div class="mb-4">
-                <label for="contact_type" class="block text-gray-700 text-sm font-bold mb-2">Contact Type:</label>
-                <select id="contact_type" name="contact_type" required
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    {% for type in contact_types %}
-                        <option value="{{ type }}" {% if contact and contact.contact_type == type %}selected{% endif %}>{{ type.replace('_', ' ').title() }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+{% block title %}{% if contact %}Edit{% else %}Add{% endif %} Contact{% endblock %}
 
-            {% if contact %} {# Only show status fields for editing existing contacts #}
-            <div class="mb-4">
-                <label for="contact_status" class="block text-gray-700 text-sm font-bold mb-2">Contact Status:</label>
-                <select id="contact_status" name="contact_status"
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    {% for status in contact_statuses %}
-                        <option value="{{ status }}" {% if contact.contact_status == status %}selected{% endif %}>{{ status.replace('_', ' ').title() }}</option>
-                    {% endfor %}
-                </select>
+{% block content %}
+    <h2 class="text-3xl font-bold mb-6">{% if contact %}Edit{% else %}Add{% endif %} Contact</h2>
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <form method="POST" class="space-y-4">
+            <div>
+                <label for="first_name" class="block text-sm font-medium">First Name:</label>
+                <input type="text" id="first_name" name="first_name" value="{{ contact.first_name if contact else '' }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
             </div>
-            <div class="mb-4">
-                <label for="customer_status" class="block text-gray-700 text-sm font-bold mb-2">Customer Status:</label>
-                <select id="customer_status" name="customer_status"
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    {% for status in customer_statuses %}
-                        <option value="{{ status }}" {% if contact.customer_status == status %}selected{% endif %}>{{ status.replace('_', ' ').title() }}</option>
-                    {% endfor %}
-                </select>
+            <div>
+                <label for="last_name" class="block text-sm font-medium">Last Name:</label>
+                <input type="text" id="last_name" name="last_name" value="{{ contact.last_name if contact else '' }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
             </div>
-            <div class="mb-6">
-                <label for="payment_status" class="block text-gray-700 text-sm font-bold mb-2">Payment Status:</label>
-                <select id="payment_status" name="payment_status"
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    {% for status in payment_statuses %}
-                        <option value="{{ status }}" {% if contact.payment_status == status %}selected{% endif %}>{{ status.replace('_', ' ').title() }}</option>
-                    {% endfor %}
-                </select>
+            <div>
+                <label for="email" class="block text-sm font-medium">Email:</label>
+                <input type="email" id="email" name="email" value="{{ contact.email if contact else '' }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
             </div>
-            {% endif %}
-
-            <h3 class="text-xl font-semibold mb-4 text-gray-800">Phone Numbers</h3>
-            <div id="phone-numbers-container" class="space-y-3 mb-6">
-                {% if contact and contact.contact_details %}
-                    {% for detail in contact.contact_details if detail.type == 'phone' %}
-                        <div class="flex space-x-2 items-center phone-entry">
-                            <input type="text" name="phone_value[]" value="{{ detail.value }}" placeholder="Phone Number (E.164)"
-                                   class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow">
-                            <input type="text" name="phone_label[]" value="{{ detail.label }}" placeholder="Label (e.g., mobile)"
-                                   class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/4">
-                            <button type="button" onclick="removeField(this)" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full text-sm">X</button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                <div class="flex space-x-2 items-center phone-entry">
-                    <input type="text" name="phone_value[]" value="" placeholder="Phone Number (E.164)"
-                           class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow">
-                    <input type="text" name="phone_label[]" value="mobile" placeholder="Label (e.g., mobile)"
-                           class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/4">
-                    <button type="button" onclick="removeField(this)" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full text-sm">X</button>
-                </div>
+            <div>
+                <label for="phone" class="block text-sm font-medium">Phone:</label>
+                <input type="text" id="phone" name="phone" value="{{ contact.phone if contact else '' }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
             </div>
-            <button type="button" onclick="addField('phone')" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg mb-6">Add Phone Number</button>
-
-            <h3 class="text-xl font-semibold mb-4 text-gray-800">Email Addresses</h3>
-            <div id="email-addresses-container" class="space-y-3 mb-6">
-                {% if contact and contact.contact_details %}
-                    {% for detail in contact.contact_details if detail.type == 'email' %}
-                        <div class="flex space-x-2 items-center email-entry">
-                            <input type="email" name="email_value[]" value="{{ detail.value }}" placeholder="Email Address"
-                                   class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow">
-                            <input type="text" name="email_label[]" value="{{ detail.label }}" placeholder="Label (e.g., personal)"
-                                   class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/4">
-                            <button type="button" onclick="removeField(this)" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full text-sm">X</button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                <div class="flex space-x-2 items-center email-entry">
-                    <input type="email" name="email_value[]" value="" placeholder="Email Address"
-                           class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow">
-                    <input type="text" name="email_label[]" value="personal" placeholder="Label (e.g., personal)"
-                           class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/4">
-                    <button type="button" onclick="removeField(this)" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full text-sm">X</button>
-                </div>
-            </div>
-            <button type="button" onclick="addField('email')" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg mb-6">Add Email Address</button>
-
-            <div class="mb-6">
-                <label for="notes" class="block text-gray-700 text-sm font-bold mb-2">Notes:</label>
-                <textarea id="notes" name="notes" rows="4"
-                          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ contact.notes if contact else '' }}</textarea>
-            </div>
-
-            <div class="flex items-center justify-between">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">
-                    {{ 'Add Contact' if contact is none else 'Update Contact' }}
-                </button>
-                <a href="{{ url_for('index') }}" class="inline-block align-baseline font-bold text-sm text-blue-600 hover:text-blue-800">
-                    Cancel
-                </a>
+            <div class="flex items-center space-x-4">
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Save</button>
+                <a href="{{ url_for('contact.contacts') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
             </div>
         </form>
     </div>
-
-    <script>
-        function addField(type) {
-            const container = document.getElementById(type === 'phone' ? 'phone-numbers-container' : 'email-addresses-container');
-            const newDiv = document.createElement('div');
-            newDiv.className = 'flex space-x-2 items-center ' + type + '-entry';
-            
-            let inputType = type === 'phone' ? 'text' : 'email';
-            let placeholderValue = type === 'phone' ? 'Phone Number (E.164)' : 'Email Address';
-            let placeholderLabel = type === 'phone' ? 'Label (e.g., mobile)' : 'Label (e.g., personal)';
-            let defaultValue = type === 'phone' ? 'mobile' : 'personal';
-
-            newDiv.innerHTML = `
-                <input type="${inputType}" name="${type}_value[]" value="" placeholder="${placeholderValue}"
-                       class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow">
-                <input type="text" name="${type}_label[]" value="${defaultValue}" placeholder="${placeholderLabel}"
-                       class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/4">
-                <button type="button" onclick="removeField(this)" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full text-sm">X</button>
-            `;
-            container.appendChild(newDiv);
-        }
-
-        function removeField(button) {
-            const entryDiv = button.parentNode;
-            entryDiv.parentNode.removeChild(entryDiv);
-        }
-    </script>
-</body>
-</html>
+{% endblock %}

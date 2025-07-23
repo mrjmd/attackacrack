@@ -1,78 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ form_title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .flash-message {
-            padding: 0.75rem 1.25rem;
-            margin-bottom: 1rem;
-            border: 1px solid transparent;
-            border-radius: 0.25rem;
-        }
-        .flash-message.success {
-            color: #155724;
-            background-color: #d4edda;
-            border-color: #c3e6cb;
-        }
-        .flash-message.error {
-            color: #721c24;
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto bg-white rounded-lg shadow-xl p-8 max-w-2xl">
-        <h1 class="text-3xl font-bold text-center mb-8 text-blue-700">{{ form_title }}</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+{% extends "base.html" %}
 
-        <form method="POST" action="{{ url_for('import_csv_data') }}" enctype="multipart/form-data">
-            <div class="mb-4">
-                <label for="csv_file" class="block text-gray-700 text-sm font-bold mb-2">Select CSV File:</label>
-                <input type="file" id="csv_file" name="csv_file" accept=".csv" required
-                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <p class="text-xs text-gray-500 mt-1">Expected columns: First Name, Last Name, Phone Number, Email, Notes. (Column names are flexible)</p>
-            </div>
-            <div class="mb-4">
-                <label for="contact_type" class="block text-gray-700 text-sm font-bold mb-2">Assign Contact Type:</label>
-                <select id="contact_type" name="contact_type" required
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    {% for type in contact_types %}
-                        <option value="{{ type }}">{{ type.replace('_', ' ').title() }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="mb-6">
-                <label for="source_description" class="block text-gray-700 text-sm font-bold mb-2">Import Description (for your logs):</label>
-                <input type="text" id="source_description" name="source_description" placeholder="e.g., 'Realtor List Q3 2024'"
-                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-            </div>
+{% block title %}Import from CSV{% endblock %}
 
-            <div class="flex items-center justify-between">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">
-                    Import CSV
-                </button>
-                <a href="{{ url_for('index') }}" class="inline-block align-baseline font-bold text-sm text-blue-600 hover:text-blue-800">
-                    Cancel
-                </a>
+{% block content %}
+    <h2 class="text-3xl font-bold mb-6">Import Contacts from CSV</h2>
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <form method="POST" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label for="file" class="block text-sm font-medium">CSV File:</label>
+                <input type="file" id="file" name="file" accept=".csv" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
+            </div>
+            <div class="flex items-center space-x-4">
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Upload and Import</button>
+                <a href="{{ url_for('main.settings') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
             </div>
         </form>
     </div>
-</body>
-</html>
+{% endblock %}

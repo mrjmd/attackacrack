@@ -1,142 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Property List</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .flash-message {
-            padding: 0.75rem 1.25rem;
-            margin-bottom: 1rem;
-            border: 1px solid transparent;
-            border-radius: 0.25rem;
-        }
-        .flash-message.success {
-            color: #155724;
-            background-color: #d4edda;
-            border-color: #c3e6cb;
-        }
-        .flash-message.error {
-            color: #721c24;
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto bg-white rounded-lg shadow-xl p-8">
-        <h1 class="text-4xl font-bold text-center mb-8 text-blue-700">Property Management</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+{% extends "base.html" %}
 
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-semibold text-gray-800">All Properties</h2>
-            <div class="space-x-4">
-                <a href="{{ url_for('add_new_property') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Add New Property
-                </a>
-                <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Back to Contacts
-                </a>
-            </div>
-        </div>
+{% block title %}Properties{% endblock %}
 
-        {# Filter Form #}
-        <div class="bg-gray-50 p-6 rounded-lg shadow-inner mb-6">
-            <h3 class="text-xl font-semibold mb-4 text-gray-800">Filter Properties</h3>
-            <form method="GET" action="{{ url_for('property_list') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                    <label for="city" class="block text-gray-700 text-sm font-bold mb-2">City:</label>
-                    <input type="text" id="city" name="city" value="{{ current_city if current_city else '' }}"
-                           class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <div>
-                    <label for="zip_code" class="block text-gray-700 text-sm font-bold mb-2">Zip Code:</label>
-                    <input type="text" id="zip_code" name="zip_code" value="{{ current_zip_code if current_zip_code else '' }}"
-                           class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <div>
-                    <label for="min_value" class="block text-gray-700 text-sm font-bold mb-2">Min. Est. Value ($):</label>
-                    <input type="number" id="min_value" name="min_value" value="{{ current_min_value if current_min_value else '' }}"
-                           class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <div class="flex items-center mt-6">
-                    <input type="checkbox" id="has_foreclosure" name="has_foreclosure" value="true" {% if current_has_foreclosure %}checked{% endif %}
-                           class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                    <label for="has_foreclosure" class="ml-2 text-gray-700 text-sm font-bold">Has Foreclosure</label>
-                </div>
-                <div class="flex items-center mt-6 col-span-full md:col-span-1">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline mr-2">
-                        Apply Filters
-                    </button>
-                    <a href="{{ url_for('property_list') }}" class="text-blue-600 hover:text-blue-800 font-bold text-sm">Clear Filters</a>
-                </div>
-            </form>
-        </div>
-        
-        {% if properties %}
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded-lg shadow-md">
-                    <thead class="bg-blue-600 text-white">
-                        <tr>
-                            <th class="py-3 px-4 text-left font-semibold rounded-tl-lg">Address</th>
-                            <th class="py-3 px-4 text-left font-semibold">City</th>
-                            <th class="py-3 px-4 text-left font-semibold">ZIP</th>
-                            <th class="py-3 px-4 text-left font-semibold">APN</th>
-                            <th class="py-3 px-4 text-left font-semibold">Est. Value</th>
-                            <th class="py-3 px-4 text-left font-semibold">Yr Built</th>
-                            <th class="py-3 px-4 text-left font-semibold">Listed for Sale?</th>
-                            <th class="py-3 px-4 text-left font-semibold">Foreclosure?</th>
-                            <th class="py-3 px-4 text-left font-semibold rounded-tr-lg">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for prop in properties %}
-                        <tr class="border-b border-gray-200 hover:bg-blue-50 transition duration-150 ease-in-out">
-                            <td class="py-3 px-4">
-                                <a href="{{ url_for('property_detail', property_id=prop.id) }}" class="text-blue-600 hover:underline font-medium">
-                                    {{ prop.address }}
-                                </a>
-                            </td>
-                            <td class="py-3 px-4">{{ prop.city }}</td>
-                            <td class="py-3 px-4">{{ prop.zip_code }}</td>
-                            <td class="py-3 px-4">{{ prop.apn }}</td>
-                            <td class="py-3 px-4">${{ "{:,.0f}".format(prop.est_value) if prop.est_value else 'N/A' }}</td>
-                            <td class="py-3 px-4">{{ prop.year_built if prop.year_built else 'N/A' }}</td>
-                            <td class="py-3 px-4">{{ 'Yes' if prop.listed_for_sale else 'No' }}</td>
-                            <td class="py-3 px-4">{{ 'Yes' if prop.foreclosure else 'No' }}</td>
-                            <td class="py-3 px-4 flex space-x-2">
-                                <a href="{{ url_for('edit_existing_property', property_id=prop.id) }}" 
-                                   class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded-lg text-sm transition duration-150 ease-in-out">
-                                    Edit
-                                </a>
-                                <form action="{{ url_for('delete_existing_property', property_id=prop.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete property at {{ prop.address }}?');">
-                                    <button type="submit" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-sm transition duration-150 ease-in-out">
-                                        Delete
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <p class="text-center text-gray-600">No properties found matching your criteria. Add new properties or import from PropertyRadar!</p>
-        {% endif %}
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">Properties</h2>
+        <a href="{{ url_for('property.add_property') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Add New Property</a>
     </div>
-</body>
-</html>
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <ul>
+            {% for property in properties %}
+                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="hover:text-blue-400">{{ property.address }}</a> (Owner: {{ property.contact.first_name }} {{ property.contact.last_name }})</li>
+            {% else %}
+                <li>No properties found.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

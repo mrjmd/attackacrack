@@ -2,134 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ form_title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .flash-message {
-            padding: 0.75rem 1.25rem;
-            margin-bottom: 1rem;
-            border: 1px solid transparent;
-            border-radius: 0.25rem;
-        }
-        .flash-message.success {
-            color: #155724;
-            background-color: #d4edda;
-            border-color: #c3e6cb;
-        }
-        .flash-message.error {
-            color: #721c24;
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-        }
-    </style>
+    <title>Appointment</title>
 </head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto bg-white rounded-lg shadow-xl p-8 max-w-2xl">
-        <h1 class="text-3xl font-bold text-center mb-8 text-blue-700">{{ form_title }}</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
-
-        <form method="POST" action="{{ url_for('add_new_appointment') if appointment is none else url_for('edit_existing_appointment', appointment_id=appointment.id) }}">
-            <div class="mb-4">
-                <label for="contact_id" class="block text-gray-700 text-sm font-bold mb-2">Associated Contact:</label>
-                <select id="contact_id" name="contact_id" required
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="">-- Select Contact --</option>
-                    {% for contact in contacts %}
-                        <option value="{{ contact.id }}" {% if appointment and appointment.contact_id == contact.id %}selected{% endif %}>{{ contact.first_name }} {{ contact.last_name }} ({{ contact.contact_type.replace('_', ' ') | capitalize }})</option>
-                    {% endfor %}
-                </select>
-                {% if not contacts %}<p class="text-xs text-red-500">No contacts available. Add contacts first!</p>{% endif %}
-            </div>
-
-            <div class="mb-4">
-                <label for="appointment_type" class="block text-gray-700 text-sm font-bold mb-2">Appointment Type:</label>
-                <select id="appointment_type" name="appointment_type" required
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="">-- Select Type --</option>
-                    {% for type in appointment_types %}
-                        <option value="{{ type }}" {% if appointment and appointment.appointment_type == type %}selected{% endif %}>{{ type.replace('_', ' ').title() }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label for="scheduled_date" class="block text-gray-700 text-sm font-bold mb-2">Scheduled Date:</label>
-                    <input type="date" id="scheduled_date" name="scheduled_date" value="{{ appointment.scheduled_time.strftime('%Y-%m-%d') if appointment and appointment.scheduled_time else '' }}" required
-                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <div>
-                    <label for="scheduled_time" class="block text-gray-700 text-sm font-bold mb-2">Scheduled Time:</label>
-                    <input type="time" id="scheduled_time" name="scheduled_time" value="{{ appointment.scheduled_time.strftime('%H:%M') if appointment and appointment.scheduled_time else '' }}"
-                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <p class="text-xs text-gray-500 mt-1">Format: HH:MM (e.g., 14:30 for 2:30 PM)</p>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <label for="property_id" class="block text-gray-700 text-sm font-bold mb-2">Associated Property (Optional):</label>
-                <select id="property_id" name="property_id"
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="">-- Select Property --</option>
-                    {% for prop in properties %}
-                        <option value="{{ prop.id }}" {% if appointment and appointment.property_id == prop.id %}selected{% endif %}>{{ prop.address }}, {{ prop.city }} (APN: {{ prop.apn }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            {# Removed job_id field as it's now auto-linked/created #}
-            {#
-            <div class="mb-4">
-                <label for="job_id" class="block text-gray-700 text-sm font-bold mb-2">Associated Job (Optional):</label>
-                <select id="job_id" name="job_id"
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="">-- Select Job --</option>
-                    {% for job in jobs %}
-                        <option value="{{ job.id }}" {% if appointment and appointment.job_id == job.id %}selected{% endif %}>{{ job.job_name }} ({{ job.property.address if job.property else 'N/A' }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-            #}
-
-            <div class="mb-4">
-                <label for="status" class="block text-gray-700 text-sm font-bold mb-2">Status:</label>
-                <select id="status" name="status" required
-                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    {% for status_option in appointment_statuses %}
-                        <option value="{{ status_option }}" {% if appointment and appointment.status == status_option %}selected{% endif %}>{{ status_option.replace('_', ' ').title() }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="mb-6">
-                <label for="notes" class="block text-gray-700 text-sm font-bold mb-2">Notes:</label>
-                <textarea id="notes" name="notes" rows="3"
-                          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ appointment.notes if appointment else '' }}</textarea>
-            </div>
-
-            <div class="flex items-center justify-between mt-6">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">
-                    {{ 'Add Appointment' if appointment is none else 'Update Appointment' }}
-                </button>
-                <a href="{{ url_for('appointment_list') }}" class="inline-block align-baseline font-bold text-sm text-blue-600 hover:text-blue-800">
-                    Cancel
-                </a>
-            </div>
-        </form>
-    </div>
+<body>
+    <h1>{% if appointment %}Edit{% else %}Add{% endif %} Appointment</h1>
+    <form method="POST">
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" value="{{ appointment.title if appointment else '' }}" required>
+        <br>
+        <label for="date">Date:</label>
+        <input type="date" id="date" name="date" value="{{ appointment.date if appointment else '' }}" required>
+        <br>
+        <label for="time">Time:</label>
+        <input type="time" id="time" name="time" value="{{ appointment.time if appointment else '' }}" required>
+        <br>
+        <label for="contact_id">Contact:</label>
+        <select id="contact_id" name="contact_id">
+            {% for contact in contacts %}
+                <option value="{{ contact.id }}" {% if appointment and appointment.contact_id == contact.id %}selected{% endif %}>{{ contact.first_name }} {{ contact.last_name }}</option>
+            {% endfor %}
+        </select>
+        <br>
+        <button type="submit">Save</button>
+    </form>
+    <a href="{{ url_for('appointment.appointments') }}">Cancel</a>
 </body>
 </html>

@@ -1,167 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job List</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .flash-message {
-            padding: 0.75rem 1.25rem;
-            margin-bottom: 1rem;
-            border: 1px solid transparent;
-            border-radius: 0.25rem;
-        }
-        .flash-message.success {
-            color: #155724;
-            background-color: #d4edda;
-            border-color: #c3e6cb;
-        }
-        .flash-message.error {
-            color: #721c24;
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-    <div class="container mx-auto bg-white rounded-lg shadow-xl p-8">
-        <h1 class="text-4xl font-bold text-center mb-8 text-blue-700">Job Management</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+{% extends "base.html" %}
 
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-semibold text-gray-800">All Jobs</h2>
-            <div class="space-x-4">
-                <a href="{{ url_for('add_new_job') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Add New Job
-                </a>
-                <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    Back to Contacts
-                </a>
-            </div>
-        </div>
+{% block title %}Jobs{% endblock %}
 
-        {# Filter Form #}
-        <div class="bg-gray-50 p-6 rounded-lg shadow-inner mb-6">
-            <h3 class="text-xl font-semibold mb-4 text-gray-800">Filter Jobs</h3>
-            <form id="job-filter-form" method="GET" action="{{ url_for('job_list') }}" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label for="job_status" class="block text-gray-700 text-sm font-bold mb-2">Job Status:</label>
-                    <select id="job_status" name="job_status" onchange="this.form.submit()"
-                            class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        {% for status in job_statuses %}
-                            <option value="{{ status }}" {% if current_job_status == status %}selected{% endif %}>{{ status.replace('_', ' ').title() }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="search_name" class="block text-gray-700 text-sm font-bold mb-2">Search by Job Name:</label>
-                    <input type="text" id="search_name" name="search_name" value="{{ current_search_name if current_search_name else '' }}"
-                           placeholder="Type to search..."
-                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                           onkeyup="debounceJobSubmit()">
-                </div>
-                <div class="flex items-center mt-6 col-span-full md:col-span-1">
-                    <button type="button" onclick="clearJobFilters()" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">
-                        Clear Filters
-                    </button>
-                </div>
-            </form>
-        </div>
-        
-        {% if jobs %}
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded-lg shadow-md">
-                    <thead class="bg-blue-600 text-white">
-                        <tr>
-                            <th class="py-3 px-4 text-left font-semibold rounded-tl-lg">Job Name</th>
-                            <th class="py-3 px-4 text-left font-semibold">Status</th>
-                            <th class="py-3 px-4 text-left font-semibold">Property Address</th>
-                            <th class="py-3 px-4 text-left font-semibold">Primary Contact</th>
-                            <th class="py-3 px-4 text-left font-semibold">Total Amount</th>
-                            <th class="py-3 px-4 text-left font-semibold">Start Date</th>
-                            <th class="py-3 px-4 text-left font-semibold rounded-tr-lg">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for job in jobs %}
-                        <tr class="border-b border-gray-200 hover:bg-blue-50 transition duration-150 ease-in-out">
-                            <td class="py-3 px-4">
-                                <a href="{{ url_for('job_detail', job_id=job.id) }}" class="text-blue-600 hover:underline font-medium">
-                                    {{ job.job_name }}
-                                </a>
-                            </td>
-                            <td class="py-3 px-4 capitalize">{{ job.job_status.replace('_', ' ') }}</td>
-                            <td class="py-3 px-4">
-                                {% if job.property %}
-                                    <a href="{{ url_for('property_detail', property_id=job.property.id) }}" class="text-blue-600 hover:underline">
-                                        {{ job.property.address }}, {{ job.property.city }}
-                                    </a>
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td class="py-3 px-4">
-                                {% if job.primary_contact %}
-                                    <a href="{{ url_for('contact_detail', contact_id=job.primary_contact.id) }}" class="text-blue-600 hover:underline">
-                                        {{ job.primary_contact.first_name }} {{ job.primary_contact.last_name }}
-                                    </a>
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td class="py-3 px-4">${{ "{:,.2f}".format(job.total_amount) if job.total_amount else 'N/A' }}</td>
-                            <td class="py-3 px-4">{{ job.start_date.strftime('%Y-%m-%d') if job.start_date else 'N/A' }}</td>
-                            <td class="py-3 px-4 flex space-x-2">
-                                <a href="{{ url_for('edit_existing_job', job_id=job.id) }}" 
-                                   class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded-lg text-sm transition duration-150 ease-in-out">
-                                    Edit
-                                </a>
-                                <form action="{{ url_for('delete_existing_job', job_id=job.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete job: {{ job.job_name }}?');">
-                                    <button type="submit" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-sm transition duration-150 ease-in-out">
-                                        Delete
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <p class="text-center text-gray-600">No jobs found matching your criteria. Add new jobs!</p>
-        {% endif %}
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">Jobs</h2>
+        <a href="{{ url_for('job.add_job') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Add New Job</a>
     </div>
-
-    <script>
-        let jobTypingTimer;               // Timer identifier for job search
-        const jobDoneTypingInterval = 500; // Time in ms (0.5 seconds)
-
-        function clearJobFilters() {
-            document.getElementById('job_status').value = 'All';
-            document.getElementById('search_name').value = '';
-            document.getElementById('job-filter-form').submit();
-        }
-
-        function debounceJobSubmit() {
-            clearTimeout(jobTypingTimer); // Clear previous timer
-            jobTypingTimer = setTimeout(function() {
-                document.getElementById('job-filter-form').submit();
-            }, jobDoneTypingInterval);
-        }
-    </script>
-</body>
-</html>
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <ul>
+            {% for job in jobs %}
+                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('job.job_detail', job_id=job.id) }}" class="hover:text-blue-400">{{ job.description }}</a> (Property: {{ job.property.address }})</li>
+            {% else %}
+                <li>No jobs found.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}
