@@ -19,14 +19,11 @@ class MessageService:
     def get_latest_conversations(self, limit=5):
         """
         Gets the most recent message for the N most recent conversations.
-        (Reverted to the previous working version)
         """
-        # This subquery finds the most recent message ID for each contact
         latest_message_subquery = self.session.query(
             db.func.max(Message.id)
         ).group_by(Message.contact_id).subquery()
 
-        # We make the subquery explicit by calling .select()
         latest_messages = self.session.query(Message).filter(
             Message.id.in_(latest_message_subquery.select())
         ).order_by(Message.timestamp.desc()).limit(limit).all()
@@ -38,13 +35,8 @@ class MessageService:
         Processes the incoming message data from an OpenPhone webhook.
         """
         message_type = webhook_data.get('type')
-        
-        # --- THIS IS THE FIX ---
-        # The webhook type from OpenPhone is 'message.received', not 'message.new'.
         if message_type not in ['message.new', 'message.received']:
-            print(f"Ignoring webhook of type: {message_type}")
             return None
-        # --- END FIX ---
 
         message_payload = webhook_data.get('data', {}).get('object', {})
         if not message_payload or message_payload.get('direction') != 'incoming':
@@ -73,10 +65,8 @@ class MessageService:
         
         existing_message = self.session.query(Message).filter_by(openphone_id=openphone_id).first()
         if existing_message:
-            print(f"Message {openphone_id} already exists. Skipping.")
             return contact
 
-        print(f"Adding new message {openphone_id} to database.")
         new_message = Message(
             openphone_id=openphone_id,
             contact_id=contact.id,
@@ -101,8 +91,13 @@ class MessageService:
         if error:
             return None, error
 
+        # --- THIS IS THE FIX ---
+        # The message ID is nested inside the 'data' object in the API response.
+        message_id_from_api = response_data.get('data', {}).get('id')
+        # -------------------------
+
         new_message = Message(
-            openphone_id=response_data.get('id'),
+            openphone_id=message_id_from_api,
             contact_id=contact.id,
             body=message_body,
             direction='outgoing',
