@@ -1,26 +1,40 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from services.contact_service import ContactService
 from services.message_service import MessageService
+from api_integrations import get_emails_for_contact # Import the new function
 
 contact_bp = Blueprint('contact', __name__)
-contact_service = ContactService()
-message_service = MessageService()
 
 @contact_bp.route('/')
 def list_all():
+    contact_service = ContactService()
     all_contacts = contact_service.get_all_contacts()
     return render_template('contact_list.html', contacts=all_contacts)
 
 @contact_bp.route('/conversations')
 def conversation_list():
-    # We can show a longer list here, e.g., the last 25 conversations
+    message_service = MessageService()
     latest_messages = message_service.get_latest_conversations(limit=25)
     return render_template('conversation_list.html', messages=latest_messages)
 
 @contact_bp.route('/<int:contact_id>')
 def contact_detail(contact_id):
+    contact_service = ContactService()
+    message_service = MessageService()
     contact = contact_service.get_contact_by_id(contact_id)
-    return render_template('contact_detail.html', contact=contact)
+    
+    # Fetch recent messages from our DB
+    recent_messages = message_service.get_messages_for_contact(contact_id)[-5:] # Get last 5
+    
+    # Fetch recent emails from Gmail API
+    recent_emails = get_emails_for_contact(contact.email)
+
+    return render_template(
+        'contact_detail.html', 
+        contact=contact,
+        recent_messages=recent_messages,
+        recent_emails=recent_emails
+    )
 
 @contact_bp.route('/<int:contact_id>/conversation', methods=['GET', 'POST'])
 def conversation(contact_id):

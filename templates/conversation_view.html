@@ -10,28 +10,8 @@
 
 <div class="bg-gray-900 rounded-lg shadow">
     <!-- Message Display Area -->
-    <div class="p-6 h-96 overflow-y-auto flex flex-col space-y-4">
-        {% for message in messages %}
-            {% if message.direction == 'outgoing' %}
-            <!-- Outgoing Message -->
-            <div class="flex justify-end">
-                <div class="bg-blue-600 text-white p-3 rounded-lg max-w-xs">
-                    <p>{{ message.body }}</p>
-                    <p class="text-xs text-blue-200 text-right mt-1">{{ message.timestamp.strftime('%b %d, %I:%M %p') }}</p>
-                </div>
-            </div>
-            {% else %}
-            <!-- Incoming Message -->
-            <div class="flex justify-start">
-                <div class="bg-gray-700 text-white p-3 rounded-lg max-w-xs">
-                    <p>{{ message.body }}</p>
-                    <p class="text-xs text-gray-400 text-right mt-1">{{ message.timestamp.strftime('%b %d, %I:%M %p') }}</p>
-                </div>
-            </div>
-            {% endif %}
-        {% else %}
-            <p class="text-gray-400 text-center">No messages yet. Start the conversation!</p>
-        {% endfor %}
+    <div id="message-container" class="p-6 h-96 overflow-y-auto flex flex-col space-y-4">
+        <!-- Messages will be dynamically inserted here -->
     </div>
 
     <!-- Message Input Form -->
@@ -44,4 +24,58 @@
         </form>
     </div>
 </div>
+
+<script>
+    const contactId = {{ contact.id }};
+    const messageContainer = document.getElementById('message-container');
+
+    function renderMessages(messages) {
+        messageContainer.innerHTML = ''; // Clear existing messages
+        if (messages.length === 0) {
+            messageContainer.innerHTML = '<p class="text-gray-400 text-center">No messages yet. Start the conversation!</p>';
+            return;
+        }
+
+        messages.forEach(message => {
+            const messageClass = message.direction === 'outgoing' 
+                ? 'flex justify-end' 
+                : 'flex justify-start';
+            
+            const bubbleClass = message.direction === 'outgoing'
+                ? 'bg-blue-600'
+                : 'bg-gray-700';
+
+            const timeClass = message.direction === 'outgoing'
+                ? 'text-blue-200'
+                : 'text-gray-400';
+
+            const messageHtml = `
+                <div class="${messageClass}">
+                    <div class="${bubbleClass} text-white p-3 rounded-lg max-w-xs">
+                        <p>${message.body}</p>
+                        <p class="text-xs ${timeClass} text-right mt-1">${message.timestamp}</p>
+                    </div>
+                </div>
+            `;
+            messageContainer.innerHTML += messageHtml;
+        });
+        // Auto-scroll to the bottom
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+
+    function fetchAndRenderMessages() {
+        const apiUrl = "{{ url_for('api.get_contact_messages', contact_id=0) }}".replace('0', contactId);
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                renderMessages(data);
+            })
+            .catch(error => console.error('Error fetching messages:', error));
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchAndRenderMessages(); // Initial load
+        setInterval(fetchAndRenderMessages, 5000); // Poll every 5 seconds
+    });
+</script>
 {% endblock %}

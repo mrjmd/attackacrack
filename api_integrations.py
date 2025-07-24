@@ -107,6 +107,37 @@ def get_recent_gmail_messages(count=5):
         print(f"Error fetching Gmail messages: {e}")
         return []
 
+def get_emails_for_contact(email_address, count=5):
+    """
+    Searches Gmail for messages to or from a specific email address.
+    """
+    if not email_address:
+        return []
+        
+    creds = get_google_creds()
+    if not creds: return []
+    try:
+        service = build('gmail', 'v1', credentials=creds)
+        
+        # Construct a search query for the Gmail API
+        query = f"from:{email_address} OR to:{email_address}"
+        
+        results = service.users().messages().list(userId='me', q=query, maxResults=count).execute()
+        messages_info = results.get('messages', [])
+        
+        emails = []
+        for msg_info in messages_info:
+            msg = service.users().messages().get(userId='me', id=msg_info['id'], format='metadata', metadataHeaders=['From', 'Subject', 'Date']).execute()
+            headers = msg['payload']['headers']
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+            date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+            emails.append({'subject': subject, 'sender': sender, 'date': date})
+        return emails
+    except Exception as e:
+        print(f"Error fetching emails for contact {email_address}: {e}")
+        return []
+
 def get_recent_openphone_texts(count=5):
     """
     Fetches and processes recent conversations from OpenPhone, including the latest message body.
