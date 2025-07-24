@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from services.contact_service import ContactService
 from services.message_service import MessageService
-from api_integrations import get_emails_for_contact # Import the new function
 
 contact_bp = Blueprint('contact', __name__)
 
@@ -23,10 +22,9 @@ def contact_detail(contact_id):
     message_service = MessageService()
     contact = contact_service.get_contact_by_id(contact_id)
     
-    # Fetch recent messages from our DB
-    recent_messages = message_service.get_messages_for_contact(contact_id)[-5:] # Get last 5
+    recent_messages = message_service.get_messages_for_contact(contact_id)[-5:]
     
-    # Fetch recent emails from Gmail API
+    from api_integrations import get_emails_for_contact
     recent_emails = get_emails_for_contact(contact.email)
 
     return render_template(
@@ -38,11 +36,16 @@ def contact_detail(contact_id):
 
 @contact_bp.route('/<int:contact_id>/conversation', methods=['GET', 'POST'])
 def conversation(contact_id):
+    # --- THIS IS THE FIX ---
+    # Instantiate the services inside this function
+    contact_service = ContactService()
+    message_service = MessageService()
+    # --- END FIX ---
+    
     contact = contact_service.get_contact_by_id(contact_id)
     
     if request.method == 'POST':
         message_body = request.form.get('body')
-        # Get the Phone Number ID from your .env config
         from_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
         if message_body and from_number_id:
             message_service.send_and_save_message(contact, message_body, from_number_id)
@@ -51,9 +54,9 @@ def conversation(contact_id):
     messages = message_service.get_messages_for_contact(contact_id)
     return render_template('conversation_view.html', contact=contact, messages=messages)
 
-
 @contact_bp.route('/add', methods=['GET', 'POST'])
 def add_contact():
+    contact_service = ContactService()
     if request.method == 'POST':
         contact_service.add_contact(
             first_name=request.form['first_name'],
@@ -66,6 +69,7 @@ def add_contact():
 
 @contact_bp.route('/<int:contact_id>/edit', methods=['GET', 'POST'])
 def edit_contact(contact_id):
+    contact_service = ContactService()
     contact = contact_service.get_contact_by_id(contact_id)
     if request.method == 'POST':
         contact_service.update_contact(
@@ -80,6 +84,7 @@ def edit_contact(contact_id):
 
 @contact_bp.route('/<int:contact_id>/delete', methods=['POST'])
 def delete_contact(contact_id):
+    contact_service = ContactService()
     contact = contact_service.get_contact_by_id(contact_id)
     contact_service.delete_contact(contact)
     return redirect(url_for('contact.list_all'))
