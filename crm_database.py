@@ -30,9 +30,11 @@ class Job(db.Model):
 class Appointment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
     date = db.Column(db.Date, nullable=False)
     time = db.Column(db.Time, nullable=False)
     contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
+    google_calendar_event_id = db.Column(db.String(200), nullable=True)
 
 class ProductService(db.Model):
     id = db.Column(db.Integer, primary_key=True)

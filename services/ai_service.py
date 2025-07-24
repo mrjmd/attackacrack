@@ -105,4 +105,36 @@ class AIService:
         except Exception as e:
             print(f"Error calling Gemini API for name parsing: {e}")
             return None, None
+
+    # --- NEW METHOD ---
+    def summarize_conversation_for_appointment(self, messages: list) -> str:
+        """
+        Uses the Gemini API to create a concise summary of a conversation
+        for use in an appointment description.
+        """
+        self._configure_model()
+        if not self.model or not messages:
+            return ""
+
+        # Format the conversation history for the prompt
+        history = "\n".join([f"- {msg.direction}: {msg.body}" for msg in messages])
+
+        prompt = f"""
+        You are an assistant for a foundation repair company.
+        Summarize the following SMS conversation into a concise, one-paragraph description
+        suitable for a work appointment calendar event.
+        Focus on the customer's reported problem and the property address if mentioned.
+        Do not include conversational pleasantries.
+
+        Conversation History:
+        {history}
+
+        Summary:
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error calling Gemini API for summary: {e}")
+            return "Could not generate summary."
     # --- END NEW METHOD ---

@@ -21,7 +21,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 # Define the scopes for all Google services we'll use
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/calendar.readonly'
+    'https://www.googleapis.com/auth/calendar'
 ]
 TOKEN_FILE = 'token.pickle'
 
@@ -199,3 +199,61 @@ def get_recent_openphone_texts(count=5):
         error_msg = f"An unexpected error occurred: {e}"
         print(error_msg)
         return ([], error_msg)
+
+def create_google_calendar_event(title, description, start_time, end_time, attendees: list, location: str = None):
+    """
+    Creates a new event on the user's primary Google Calendar.
+    attendees is a list of email addresses.
+    Location is an optional string for the event's location.
+    """
+    creds = get_google_creds()
+    if not creds:
+        print("Could not create Google Calendar event: invalid credentials.")
+        return None
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        
+        event = {
+            'summary': title,
+            'description': description,
+            'start': {
+                'dateTime': start_time.isoformat(),
+                'timeZone': 'America/New_York', # Should be configurable in the future
+            },
+            'end': {
+                'dateTime': end_time.isoformat(),
+                'timeZone': 'America/New_York',
+            },
+            'attendees': [{'email': email} for email in attendees],
+        }
+        
+        # --- ADDED LOGIC ---
+        if location:
+            event['location'] = location
+        # --- END ADDED LOGIC ---
+
+        created_event = service.events().insert(calendarId='primary', body=event).execute()
+        print(f"Event created: {created_event.get('htmlLink')}")
+        return created_event
+    except Exception as e:
+        print(f"Error creating Google Calendar event: {e}")
+        return None
+
+def delete_google_calendar_event(event_id: str):
+    """
+    Deletes an event from the user's primary Google Calendar using its ID.
+    """
+    creds = get_google_creds()
+    if not creds:
+        print("Could not delete Google Calendar event: invalid credentials.")
+        return False
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        
+        service.events().delete(calendarId='primary', eventId=event_id).execute()
+        print(f"Successfully deleted Google Calendar event: {event_id}")
+        return True
+    except Exception as e:
+        # It's possible the event was already deleted, so we don't treat all errors as fatal.
+        print(f"Error deleting Google Calendar event {event_id}: {e}")
+        return False
