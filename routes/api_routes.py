@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from services.contact_service import ContactService
 from services.message_service import MessageService
+from services.ai_service import AIService
 
 api_bp = Blueprint('api', __name__)
 
@@ -44,6 +45,19 @@ def get_contact_messages(contact_id):
     ]
     return jsonify(messages_json)
 # --- END NEW ENDPOINT ---
+
+@api_bp.route('/appointments/generate_summary/<int:contact_id>')
+def generate_appointment_summary(contact_id):
+    """
+    Generates an AI summary of the conversation for a given contact.
+    """
+    message_service = MessageService()
+    ai_service = AIService()
+    
+    messages = message_service.get_messages_for_contact(contact_id)
+    summary = ai_service.summarize_conversation_for_appointment(messages)
+    
+    return jsonify({'summary': summary})
 
 @api_bp.route('/webhooks/openphone', methods=['POST'])
 def openphone_webhook():

@@ -8,9 +8,21 @@
             <h2 class="text-3xl font-bold">Conversation with {{ contact.first_name }} {{ contact.last_name }}</h2>
             <a href="{{ url_for('contact.contact_detail', contact_id=contact.id) }}" class="text-sm text-gray-400 hover:text-white">Back to Contact Details</a>
         </div>
-        <div>
-            <!-- Update the link to pass the contact_id -->
+        <div class="flex items-center space-x-2">
             <a href="{{ url_for('quote.add_quote', contact_id=contact.id) }}" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-bold">Create Quote</a>
+            
+            <!-- NEW DROPDOWN BUTTON -->
+            <div class="relative" x-data="{ open: false }">
+                <button @click="open = !open" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-bold flex items-center">
+                    <span>Schedule Appointment</span>
+                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl z-10">
+                    <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id, type='Assessment') }}" class="block px-4 py-2 text-sm text-white hover:bg-gray-700">Assessment</a>
+                    <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id, type='Repair') }}" class="block px-4 py-2 text-sm text-white hover:bg-gray-700">Repair</a>
+                    <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id, type='Callback') }}" class="block px-4 py-2 text-sm text-white hover:bg-gray-700">Callback</a>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -80,4 +92,6 @@
             setInterval(fetchAndRenderMessages, 5000); // Poll every 5 seconds
         });
     </script>
+    <!-- We need to add Alpine.js for the dropdown to work -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 {% endblock %}

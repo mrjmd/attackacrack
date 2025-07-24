@@ -1,19 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Appointment Details</title>
-</head>
-<body>
-    <h1>{{ appointment.title }}</h1>
-    <p><strong>Date:</strong> {{ appointment.date }}</p>
-    <p><strong>Time:</strong> {{ appointment.time }}</p>
-    <p><strong>Contact:</strong> <a href="{{ url_for('contact.contact_detail', contact_id=appointment.contact.id) }}">{{ appointment.contact.first_name }} {{ appointment.contact.last_name }}</a></p>
-    <a href="{{ url_for('appointment.edit_appointment', appointment_id=appointment.id) }}">Edit</a>
-    <form method="POST" action="{{ url_for('appointment.delete_appointment', appointment_id=appointment.id) }}" style="display:inline;">
-        <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
-    </form>
-    <br>
-    <a href="{{ url_for('appointment.appointments') }}">Back to Appointments</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Appointment: {{ appointment.title }}{% endblock %}
+
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">{{ appointment.title }}</h2>
+        <div class="flex items-center space-x-2">
+            <!-- Edit button would require a new route and template, disabling for now -->
+            <!-- <a href="#" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg">Edit</a> -->
+            <form method="POST" action="{{ url_for('appointment.delete_appointment', appointment_id=appointment.id) }}" onsubmit="return confirm('Are you sure?');">
+                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg">Delete</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <p class="mb-2"><strong>Contact:</strong> <a href="{{ url_for('contact.contact_detail', contact_id=appointment.contact.id) }}" class="text-blue-400 hover:underline">{{ appointment.contact.first_name }} {{ appointment.contact.last_name }}</a></p>
+        <p class="mb-2"><strong>Date:</strong> {{ appointment.date.strftime('%A, %B %d, %Y') }}</p>
+        <p class="mb-2"><strong>Time:</strong> {{ appointment.time.strftime('%I:%M %p') }}</p>
+        <div class="mt-4 border-t border-gray-700 pt-4">
+            <h4 class="font-bold mb-2">Notes / Description:</h4>
+            <p class="text-gray-300 whitespace-pre-wrap">{{ appointment.description or 'No description provided.' }}</p>
+        </div>
+    </div>
+    
+    <div class="mt-6">
+        <!-- THIS IS THE FIX -->
+        <a href="{{ url_for('appointment.list_all') }}" class="text-sm text-gray-400 hover:text-white">&larr; Back to All Appointments</a>
+    </div>
+{% endblock %}

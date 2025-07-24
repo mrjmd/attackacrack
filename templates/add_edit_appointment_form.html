@@ -1,30 +1,72 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Appointment</title>
-</head>
-<body>
-    <h1>{% if appointment %}Edit{% else %}Add{% endif %} Appointment</h1>
-    <form method="POST">
-        <label for="title">Title:</label>
-        <input type="text" id="title" name="title" value="{{ appointment.title if appointment else '' }}" required>
-        <br>
-        <label for="date">Date:</label>
-        <input type="date" id="date" name="date" value="{{ appointment.date if appointment else '' }}" required>
-        <br>
-        <label for="time">Time:</label>
-        <input type="time" id="time" name="time" value="{{ appointment.time if appointment else '' }}" required>
-        <br>
-        <label for="contact_id">Contact:</label>
-        <select id="contact_id" name="contact_id">
-            {% for contact in contacts %}
-                <option value="{{ contact.id }}" {% if appointment and appointment.contact_id == contact.id %}selected{% endif %}>{{ contact.first_name }} {{ contact.last_name }}</option>
-            {% endfor %}
-        </select>
-        <br>
-        <button type="submit">Save</button>
-    </form>
-    <a href="{{ url_for('appointment.appointments') }}">Cancel</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Add Appointment{% endblock %}
+
+{% block content %}
+    <h2 class="text-3xl font-bold mb-6">Add Appointment</h2>
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <form method="POST" class="space-y-4">
+            <!-- Hidden input to store the appointment type -->
+            <input type="hidden" name="appt_type" value="{{ prefilled.appt_type or 'General' }}">
+
+            <div>
+                <label for="contact_id" class="block text-sm font-medium">Contact:</label>
+                <select id="contact_id" name="contact_id" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
+                    <option value="">-- Select a Contact --</option>
+                    {% for contact in contacts %}
+                        <option value="{{ contact.id }}" {% if prefilled and prefilled.contact_id == contact.id %}selected{% endif %}>
+                            {{ contact.first_name }} {{ contact.last_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="title" class="block text-sm font-medium">Title:</label>
+                <input type="text" id="title" name="title" value="{{ prefilled.title if prefilled else '' }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
+            </div>
+            <div>
+                <label for="description" class="block text-sm font-medium">Description / Notes:</label>
+                <textarea id="description" name="description" rows="5" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="date" class="block text-sm font-medium">Date:</label>
+                    <input type="date" id="date" name="date" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
+                </div>
+                <div>
+                    <label for="time" class="block text-sm font-medium">Time:</label>
+                    <input type="time" id="time" name="time" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Save Appointment</button>
+                <a href="{{ url_for('appointment.list_all') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Use tojson to safely handle the value, which might be null
+            const contactId = {{ prefilled.contact_id|tojson }};
+            const descriptionTextarea = document.getElementById('description');
+
+            if (contactId) {
+                descriptionTextarea.value = "Generating AI summary...";
+                const apiUrl = "{{ url_for('api.generate_appointment_summary', contact_id=0) }}".replace('0', contactId);
+
+                fetch(apiUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        const technicianNote = "Technician: Mike Harrington";
+                        const fullDescription = `${data.summary || 'Could not generate summary.'}\n\n${technicianNote}`;
+                        descriptionTextarea.value = fullDescription;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching summary:', error);
+                        descriptionTextarea.value = "Error generating summary. Please enter manually.";
+                    });
+            }
+        });
+    </script>
+{% endblock %}
