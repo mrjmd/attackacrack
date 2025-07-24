@@ -51,7 +51,10 @@
         
         <!-- OpenPhone Card -->
         <div id="openphone-card" class="bg-gray-900 p-6 rounded-lg shadow">
-            <h3 class="text-xl font-bold mb-4 text-purple-400">Recent Texts</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-purple-400">Recent Texts</h3>
+                <a href="{{ url_for('contact.conversation_list') }}" class="text-sm text-gray-400 hover:text-white">See All</a>
+            </div>
             <div id="openphone-content">
                 <p class="text-gray-400 text-sm">Loading latest texts...</p>
             </div>
@@ -60,36 +63,34 @@
 
     <script>
         function updateRecentTexts() {
-            console.log("Fetching latest texts..."); // Debug: Check if function is running
             fetch("{{ url_for('api.get_latest_conversations') }}")
-                .then(response => {
-                    console.log("Received response from server:", response); // Debug: Check the response object
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log("Parsed JSON data:", data); // Debug: Check the actual data
                     const contentDiv = document.getElementById('openphone-content');
                     contentDiv.innerHTML = '';
 
-                    if (!data || data.length === 0) {
-                        console.log("Data is empty, showing 'No recent texts'."); // Debug
+                    if (data.length === 0) {
                         contentDiv.innerHTML = '<p class="text-gray-400 text-sm">No recent texts found.</p>';
                         return;
                     }
 
-                    console.log("Data found, building HTML..."); // Debug
                     data.forEach(text => {
+                        // The URL for the specific conversation view
+                        const conversationUrl = "{{ url_for('contact.conversation', contact_id=0) }}".replace('0', text.contact_id);
+                        
                         const messageHtml = `
-                            <div class="text-sm mb-3 border-b border-gray-800 pb-2">
-                                <p class="truncate"><strong>With:</strong> ${text.contact_name || text.contact_number}</p>
-                                <p class="truncate text-gray-300">${text.latest_message_body || ''}</p>
-                            </div>
+                            <a href="${conversationUrl}" class="block hover:bg-gray-800 p-2 rounded-lg">
+                                <div class="text-sm">
+                                    <p class="truncate"><strong>With:</strong> ${text.contact_name || text.contact_number}</p>
+                                    <p class="truncate text-gray-300">${text.latest_message_body || ''}</p>
+                                </div>
+                            </a>
                         `;
                         contentDiv.innerHTML += messageHtml;
                     });
                 })
                 .catch(error => {
-                    console.error('Error in fetch chain:', error); // Debug: Catch any errors
+                    console.error('Error fetching recent texts:', error);
                     const contentDiv = document.getElementById('openphone-content');
                     contentDiv.innerHTML = '<p class="text-red-400 text-sm">Could not load texts.</p>';
                 });

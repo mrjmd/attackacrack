@@ -11,12 +11,17 @@ def list_all():
     all_contacts = contact_service.get_all_contacts()
     return render_template('contact_list.html', contacts=all_contacts)
 
+@contact_bp.route('/conversations')
+def conversation_list():
+    # We can show a longer list here, e.g., the last 25 conversations
+    latest_messages = message_service.get_latest_conversations(limit=25)
+    return render_template('conversation_list.html', messages=latest_messages)
+
 @contact_bp.route('/<int:contact_id>')
 def contact_detail(contact_id):
     contact = contact_service.get_contact_by_id(contact_id)
     return render_template('contact_detail.html', contact=contact)
 
-# New Route for Conversations
 @contact_bp.route('/<int:contact_id>/conversation', methods=['GET', 'POST'])
 def conversation(contact_id):
     contact = contact_service.get_contact_by_id(contact_id)
