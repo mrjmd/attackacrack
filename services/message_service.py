@@ -49,18 +49,17 @@ class MessageService:
         message_body = message_payload.get('body')
         openphone_id = message_payload.get('id')
 
-        # Step 1: Find or create the contact.
         contact = self.session.query(Contact).filter_by(phone=from_number).first()
-        if not contact:
-            contact = self.contact_service.add_contact(
-                first_name=from_number,
-                last_name="(New SMS Contact)",
-                phone=from_number
-            )
         
-        # Step 2: Save the message immediately. This is the most critical step.
         existing_message = self.session.query(Message).filter_by(openphone_id=openphone_id).first()
         if not existing_message:
+            if not contact:
+                contact = self.contact_service.add_contact(
+                    first_name=from_number,
+                    last_name="(New SMS Contact)",
+                    phone=from_number
+                )
+            
             new_message = Message(
                 openphone_id=openphone_id,
                 contact_id=contact.id,
@@ -72,22 +71,35 @@ class MessageService:
             self.session.commit()
             print(f"Successfully saved new message {openphone_id} to database.")
         
-        # Step 3: Now that the message is safe, attempt the "enhancements" (AI, etc.).
+        # --- ENHANCEMENTS (AI, etc.) ---
+        
+        # 1. Parse Name with AI
+        print("--- Attempting to extract name with AI... ---")
+        first_name, last_name = self.ai_service.extract_name_from_text(message_body)
+        print(f"--- AI name extraction result: first_name='{first_name}', last_name='{last_name}' ---")
+        
+        if contact:
+            print(f"--- Checking contact before update: ID={contact.id}, FirstName='{contact.first_name}', LastName='{contact.last_name}' ---")
+
+        # --- THIS IS THE FIX ---
+        # Update the contact's name if the AI found a name AND the current name is a placeholder.
+        is_placeholder_name = contact and (contact.last_name in ["(New SMS Contact)", "(from backfill)"] or contact.first_name == contact.phone)
+        if first_name and is_placeholder_name:
+            print(f"Updating contact name for {from_number} via AI to {first_name} {last_name or ''}")
+            self.contact_service.update_contact(contact, first_name=first_name, last_name=(last_name or ''))
+        # --- END FIX ---
+
+        # 2. Parse Email
         email = self._parse_email_from_text(message_body)
-
-        # --- ADDED DEBUGGING ---
-        print("--- Attempting to extract address with AI... ---")
-        address = self.ai_service.extract_address_from_text(message_body)
-        print(f"--- AI extraction result: {address} ---")
-        # --- END DEBUGGING ---
-
-        # Update contact with email if found
-        if email and not contact.email:
+        if email and contact and not contact.email:
             print(f"Updating contact email for {from_number} to {email}")
             self.contact_service.update_contact(contact, email=email)
         
-        # Create property if an address is found
-        if address:
+        # 3. Parse Address with AI
+        print("--- Attempting to extract address with AI... ---")
+        address = self.ai_service.extract_address_from_text(message_body)
+        print(f"--- AI address extraction result: {address} ---")
+        if address and contact:
             existing_property = self.session.query(Property).filter_by(
                 contact_id=contact.id, 
                 address=address
