@@ -1,6 +1,7 @@
 # crm_database.py
 
-from extensions import db # Import db from the new extensions.py file
+from extensions import db
+from datetime import datetime
 
 # Define your database models using the single db instance
 class Contact(db.Model):
@@ -8,9 +9,11 @@ class Contact(db.Model):
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)
-    phone = db.Column(db.String(20), nullable=True)
+    phone = db.Column(db.String(20), nullable=True, unique=True)
     properties = db.relationship('Property', backref='contact', lazy=True, cascade="all, delete-orphan")
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
+    # Add relationship to messages
+    messages = db.relationship('Message', backref='contact', lazy=True, cascade="all, delete-orphan")
 
 class Property(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -45,3 +48,14 @@ class Invoice(db.Model):
     due_date = db.Column(db.Date, nullable=False)
     status = db.Column(db.String(20), default='Draft') # e.g., Draft, Sent, Paid, Overdue
     job_id = db.Column(db.Integer, db.ForeignKey('job.id'), nullable=False)
+
+# New Message Model
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    openphone_id = db.Column(db.String(100), unique=True, nullable=False)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
+    body = db.Column(db.Text, nullable=True)
+    direction = db.Column(db.String(10), nullable=False) # 'incoming' or 'outgoing'
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    # We can add media URLs here later
+    # media_url = db.Column(db.String(500), nullable=True)

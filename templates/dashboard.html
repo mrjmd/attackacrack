@@ -19,20 +19,16 @@
         <!-- Appointments & Events Card -->
         <div class="bg-gray-900 p-6 rounded-lg shadow">
             <h3 class="text-xl font-bold mb-4">Upcoming Schedule</h3>
-            <!-- Internal CRM Appointments -->
             {% for appt in appointments %}
             <div class="border-b border-gray-700 py-3">
                 <p class="font-semibold"><a href="{{ url_for('appointment.appointment_detail', appointment_id=appt.id) }}" class="hover:text-blue-400 text-cyan-400">[CRM] {{ appt.title }}</a></p>
                 <p class="text-sm text-gray-400">{{ appt.date.strftime('%A, %B %d') }} at {{ appt.time.strftime('%I:%M %p') }} with {{ appt.contact.first_name }}</p>
             </div>
             {% endfor %}
-            <!-- Google Calendar Events -->
             {% for event in google_events %}
             <div class="border-b border-gray-700 py-3">
                  <p class="font-semibold"><a href="{{ event.htmlLink }}" target="_blank" class="hover:text-blue-400 text-green-400">[GCal] {{ event.summary }}</a></p>
-                 <p class="text-sm text-gray-400">
-                    {{ (event.start.dateTime or event.start.date) | format_google_date }}
-                 </p>
+                 <p class="text-sm text-gray-400">{{ (event.start.dateTime or event.start.date) | format_google_date }}</p>
             </div>
             {% endfor %}
             {% if not appointments and not google_events %}
@@ -54,23 +50,55 @@
         </div>
         
         <!-- OpenPhone Card -->
-        <div class="bg-gray-900 p-6 rounded-lg shadow">
+        <div id="openphone-card" class="bg-gray-900 p-6 rounded-lg shadow">
             <h3 class="text-xl font-bold mb-4 text-purple-400">Recent Texts</h3>
-            {% if openphone_error %}
-                <div class="text-red-400 text-sm">
-                    <p><strong>Could not load texts:</strong></p>
-                    <p>{{ openphone_error }}</p>
-                </div>
-            {% else %}
-                {% for text in openphone_texts %}
-                 <div class="text-sm mb-3 border-b border-gray-800 pb-2">
-                    <p class="truncate"><strong>With:</strong> {{ text.contact_name or text.contact_number }}</p>
-                    <p class="truncate text-gray-300">{{ text.latest_message_body }}</p>
-                </div>
-                {% else %}
-                <p class="text-gray-400 text-sm">No recent texts found.</p>
-                {% endfor %}
-            {% endif %}
+            <div id="openphone-content">
+                <p class="text-gray-400 text-sm">Loading latest texts...</p>
+            </div>
         </div>
     </div>
+
+    <script>
+        function updateRecentTexts() {
+            console.log("Fetching latest texts..."); // Debug: Check if function is running
+            fetch("{{ url_for('api.get_latest_conversations') }}")
+                .then(response => {
+                    console.log("Received response from server:", response); // Debug: Check the response object
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Parsed JSON data:", data); // Debug: Check the actual data
+                    const contentDiv = document.getElementById('openphone-content');
+                    contentDiv.innerHTML = '';
+
+                    if (!data || data.length === 0) {
+                        console.log("Data is empty, showing 'No recent texts'."); // Debug
+                        contentDiv.innerHTML = '<p class="text-gray-400 text-sm">No recent texts found.</p>';
+                        return;
+                    }
+
+                    console.log("Data found, building HTML..."); // Debug
+                    data.forEach(text => {
+                        const messageHtml = `
+                            <div class="text-sm mb-3 border-b border-gray-800 pb-2">
+                                <p class="truncate"><strong>With:</strong> ${text.contact_name || text.contact_number}</p>
+                                <p class="truncate text-gray-300">${text.latest_message_body || ''}</p>
+                            </div>
+                        `;
+                        contentDiv.innerHTML += messageHtml;
+                    });
+                })
+                .catch(error => {
+                    console.error('Error in fetch chain:', error); // Debug: Catch any errors
+                    const contentDiv = document.getElementById('openphone-content');
+                    contentDiv.innerHTML = '<p class="text-red-400 text-sm">Could not load texts.</p>';
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateRecentTexts();
+            setInterval(updateRecentTexts, 10000);
+        });
+    </script>
+
 {% endblock %}
