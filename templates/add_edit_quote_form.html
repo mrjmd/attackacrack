@@ -1,24 +1,146 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Quote</title>
-</head>
-<body>
-    <h1>{% if quote %}Edit{% else %}Add{% endif %} Quote</h1>
-    <form method="POST">
-        <label for="amount">Amount:</label>
-        <input type="number" step="0.01" id="amount" name="amount" value="{{ quote.amount if quote else '' }}" required>
-        <br>
-        <label for="job_id">Job:</label>
-        <select id="job_id" name="job_id">
-            {% for job in jobs %}
-                <option value="{{ job.id }}" {% if quote and quote.job_id == job.id %}selected{% endif %}>{{ job.description }}</option>
-            {% endfor %}
-        </select>
-        <br>
-        <button type="submit">Save</button>
-    </form>
-    <a href="{{ url_for('quote.quotes') }}">Cancel</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Create Quote{% endblock %}
+
+{% block content %}
+    <h2 class="text-3xl font-bold mb-6">Create Quote</h2>
+    
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <!-- Property Selection -->
+        <div class="mb-6">
+            <label for="property_id" class="block text-sm font-medium mb-1">Select Property:</label>
+            <select id="property_id" name="property_id" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                <option value="">-- Select a Property --</option>
+                {% for prop in properties %}
+                    <option value="{{ prop.id }}" {% if properties|length == 1 %}selected{% endif %}>
+                        {{ prop.address }} ({{ prop.contact.first_name }} {{ prop.contact.last_name }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Line Item Builder -->
+        <div class="mb-6">
+            <h3 class="text-xl font-bold mb-4">Line Items</h3>
+            <div id="line-items-container" class="space-y-4">
+                <!-- Line items will be added here by JavaScript -->
+            </div>
+            <div class="mt-4">
+                <select id="product-selector" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                    <option value="">-- Add a product or service --</option>
+                    {% for p in products %}
+                        <option value="{{ p.id }}" data-price="{{ p.price }}" data-description="{{ p.description or '' }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+                <button id="add-line-item-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg ml-2">Add Item</button>
+            </div>
+        </div>
+
+        <!-- Quote Total -->
+        <div class="text-right border-t border-gray-700 pt-4">
+            <h3 class="text-2xl font-bold">Total: $<span id="quote-total">0.00</span></h3>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center space-x-4 mt-6">
+            <button id="save-quote-btn" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold">Save Quote</button>
+            <a href="{{ url_for('quote.list_all') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addBtn = document.getElementById('add-line-item-btn');
+            const saveBtn = document.getElementById('save-quote-btn');
+            const productSelector = document.getElementById('product-selector');
+            const lineItemsContainer = document.getElementById('line-items-container');
+            const quoteTotalEl = document.getElementById('quote-total');
+
+            function calculateTotal() {
+                let total = 0;
+                document.querySelectorAll('.line-item').forEach(item => {
+                    const quantity = parseFloat(item.querySelector('.quantity-input').value) || 0;
+                    const price = parseFloat(item.querySelector('.price-input').value) || 0;
+                    total += quantity * price;
+                });
+                quoteTotalEl.textContent = total.toFixed(2);
+            }
+
+            addBtn.addEventListener('click', function() {
+                const selectedOption = productSelector.options[productSelector.selectedIndex];
+                if (!selectedOption.value) return;
+
+                const productId = selectedOption.value;
+                const productPrice = selectedOption.dataset.price;
+                const productDescription = selectedOption.dataset.description;
+
+                const lineItemHtml = `
+                    <div class="line-item bg-gray-800 rounded-lg p-3" data-product-id="${productId}">
+                        <div class="flex items-center space-x-2">
+                            <button class="remove-item-btn text-red-500 hover:text-red-400 font-bold text-xl">&times;</button>
+                            <textarea class="description-input flex-grow bg-gray-700 border border-gray-600 rounded-lg px-2 py-1" rows="2">${productDescription}</textarea>
+                            <input type="number" value="1" min="1" class="quantity-input w-20 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-center">
+                            <input type="number" value="${parseFloat(productPrice).toFixed(2)}" step="0.01" class="price-input w-24 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-right">
+                        </div>
+                    </div>
+                `;
+                lineItemsContainer.insertAdjacentHTML('beforeend', lineItemHtml);
+                calculateTotal();
+            });
+
+            lineItemsContainer.addEventListener('input', function(e) {
+                if (e.target.classList.contains('quantity-input') || e.target.classList.contains('price-input')) {
+                    calculateTotal();
+                }
+            });
+
+            lineItemsContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-item-btn')) {
+                    e.target.closest('.line-item').remove();
+                    calculateTotal();
+                }
+            });
+
+            saveBtn.addEventListener('click', function() {
+                const propertyId = document.getElementById('property_id').value;
+                if (!propertyId) {
+                    alert('Please select a property first.');
+                    return;
+                }
+
+                const lineItems = [];
+                document.querySelectorAll('.line-item').forEach(item => {
+                    lineItems.push({
+                        product_id: parseInt(item.dataset.productId),
+                        description: item.querySelector('.description-input').value,
+                        quantity: parseInt(item.querySelector('.quantity-input').value),
+                        price: parseFloat(item.querySelector('.price-input').value)
+                    });
+                });
+
+                if (lineItems.length === 0) {
+                    alert('Please add at least one line item to the quote.');
+                    return;
+                }
+
+                fetch("{{ url_for('quote.add_quote') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ property_id: propertyId, line_items: lineItems })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = "{{ url_for('quote.quote_detail', quote_id=0) }}".replace('0', data.quote_id);
+                    } else {
+                        alert('Error saving quote: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('A network error occurred. Please try again.');
+                });
+            });
+        });
+    </script>
+{% endblock %}
