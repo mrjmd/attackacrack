@@ -1,5 +1,6 @@
 import google.generativeai as genai
 from flask import current_app
+import json
 
 class AIService:
     def __init__(self):
@@ -36,7 +37,6 @@ class AIService:
         if not self.model or not text:
             return None
 
-        # --- THIS IS THE NEW, MORE POWERFUL PROMPT ---
         prompt = f"""
         You are an address standardization assistant for a business that operates primarily in the greater Boston, Massachusetts area.
         Analyze the following text message to see if it contains a physical street address.
@@ -52,7 +52,6 @@ class AIService:
 
         Text to analyze: "{text}"
         """
-        # --- END NEW PROMPT ---
 
         try:
             response = self.model.generate_content(prompt)
@@ -65,3 +64,45 @@ class AIService:
         except Exception as e:
             print(f"Error calling Gemini API for address parsing: {e}")
             return None
+
+    # --- NEW METHOD FOR NAME DETECTION ---
+    def extract_name_from_text(self, text: str) -> tuple[str | None, str | None]:
+        """
+        Uses the Gemini API to extract a person's name from a text message.
+        Returns a tuple of (first_name, last_name).
+        """
+        self._configure_model()
+
+        if not self.model or not text:
+            return None, None
+
+        prompt = f"""
+        Analyze the following text message to see if it contains a person's name.
+        The name might be introduced with phrases like "My name is", "This is", or it might just be signed at the end.
+        If a name is found, return a JSON object with "first_name" and "last_name" keys.
+        If no name is found, return a JSON object with "first_name" and "last_name" keys set to null.
+
+        Examples:
+        - Text: "Hi, my name is John Doe and I need a quote." -> {{"first_name": "John", "last_name": "Doe"}}
+        - Text: "This is Jane, I have a question." -> {{"first_name": "Jane", "last_name": null}}
+        - Text: "I need a quote for my foundation. -Bob Smith" -> {{"first_name": "Bob", "last_name": "Smith"}}
+        - Text: "Can you come by later today?" -> {{"first_name": null, "last_name": null}}
+
+        Text to analyze: "{text}"
+        """
+
+        try:
+            response = self.model.generate_content(prompt)
+            # Clean up the response to ensure it's valid JSON
+            cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
+            name_data = json.loads(cleaned_response)
+            
+            first_name = name_data.get("first_name")
+            last_name = name_data.get("last_name")
+
+            return first_name, last_name
+            
+        except Exception as e:
+            print(f"Error calling Gemini API for name parsing: {e}")
+            return None, None
+    # --- END NEW METHOD ---

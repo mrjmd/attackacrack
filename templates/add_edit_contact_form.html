@@ -24,7 +24,8 @@
             </div>
             <div class="flex items-center space-x-4">
                 <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Save</button>
-                <a href="{{ url_for('contact.contacts') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
+                <!-- THIS IS THE FIX -->
+                <a href="{{ url_for('contact.list_all') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
             </div>
         </form>
     </div>
