@@ -1,40 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Contact Details</title>
-</head>
-<body>
-    <h1>{{ contact.first_name }} {{ contact.last_name }}</h1>
-    <p><strong>Email:</strong> {{ contact.email }}</p>
-    <p><strong>Phone:</strong> {{ contact.phone }}</p>
-    
-    <h2>Properties</h2>
-    <ul>
-        {% for property in contact.properties %}
-            <li><a href="{{ url_for('property.property_detail', property_id=property.id) }}">{{ property.address }}</a></li>
-        {% else %}
-            <li>No properties found.</li>
-        {% endfor %}
-    </ul>
-    <a href="{{ url_for('property.add_property', contact_id=contact.id) }}">Add Property</a>
+{% extends "base.html" %}
 
-    <h2>Appointments</h2>
-    <ul>
-        {% for appointment in contact.appointments %}
-            <li><a href="{{ url_for('appointment.appointment_detail', appointment_id=appointment.id) }}">{{ appointment.title }}</a></li>
-        {% else %}
-            <li>No appointments found.</li>
-        {% endfor %}
-    </ul>
-    <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id) }}">Add Appointment</a>
+{% block title %}Contact: {{ contact.first_name }} {{ contact.last_name }}{% endblock %}
 
-    <br><br>
-    <a href="{{ url_for('contact.edit_contact', contact_id=contact.id) }}">Edit Contact</a>
-    <form method="POST" action="{{ url_for('contact.delete_contact', contact_id=contact.id) }}" style="display:inline;">
-        <button type="submit" onclick="return confirm('Are you sure?')">Delete Contact</button>
-    </form>
-    <br>
-    <a href="{{ url_for('contact.contacts') }}">Back to Contacts</a>
-</body>
-</html>
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">{{ contact.first_name }} {{ contact.last_name }}</h2>
+        <div class="flex items-center space-x-2">
+            <!-- Add this link -->
+            <a href="{{ url_for('contact.conversation', contact_id=contact.id) }}" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">View Conversation</a>
+            <a href="{{ url_for('contact.edit_contact', contact_id=contact.id) }}" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg">Edit Contact</a>
+            <form method="POST" action="{{ url_for('contact.delete_contact', contact_id=contact.id) }}" onsubmit="return confirm('Are you sure you want to delete this contact?');">
+                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg">Delete Contact</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="bg-gray-900 rounded-lg shadow p-6 mb-6">
+        <h3 class="text-xl font-bold mb-4">Contact Information</h3>
+        <p><strong>Email:</strong> {{ contact.email or 'N/A' }}</p>
+        <p><strong>Phone:</strong> {{ contact.phone or 'N/A' }}</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Properties -->
+        <div class="bg-gray-900 rounded-lg shadow p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Properties</h3>
+                <a href="{{ url_for('property.add_property', contact_id=contact.id) }}" class="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg">Add Property</a>
+            </div>
+            <ul>
+                {% for property in contact.properties %}
+                    <li class="border-b border-gray-700 py-2"><a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="hover:text-blue-400">{{ property.address }}</a></li>
+                {% else %}
+                    <li>No properties found for this contact.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Appointments -->
+        <div class="bg-gray-900 rounded-lg shadow p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Appointments</h3>
+                <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id) }}" class="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg">Add Appointment</a>
+            </div>
+            <ul>
+                {% for appointment in contact.appointments %}
+                     <li class="border-b border-gray-700 py-2"><a href="{{ url_for('appointment.appointment_detail', appointment_id=appointment.id) }}" class="hover:text-blue-400">{{ appointment.title }} on {{ appointment.date }}</a></li>
+                {% else %}
+                    <li>No appointments found for this contact.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

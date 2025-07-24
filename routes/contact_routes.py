@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from services.contact_service import ContactService
+from services.message_service import MessageService
 
 contact_bp = Blueprint('contact', __name__)
 contact_service = ContactService()
+message_service = MessageService()
 
 @contact_bp.route('/')
 def list_all():
@@ -13,6 +15,23 @@ def list_all():
 def contact_detail(contact_id):
     contact = contact_service.get_contact_by_id(contact_id)
     return render_template('contact_detail.html', contact=contact)
+
+# New Route for Conversations
+@contact_bp.route('/<int:contact_id>/conversation', methods=['GET', 'POST'])
+def conversation(contact_id):
+    contact = contact_service.get_contact_by_id(contact_id)
+    
+    if request.method == 'POST':
+        message_body = request.form.get('body')
+        # Get the Phone Number ID from your .env config
+        from_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
+        if message_body and from_number_id:
+            message_service.send_and_save_message(contact, message_body, from_number_id)
+        return redirect(url_for('contact.conversation', contact_id=contact.id))
+
+    messages = message_service.get_messages_for_contact(contact_id)
+    return render_template('conversation_view.html', contact=contact, messages=messages)
+
 
 @contact_bp.route('/add', methods=['GET', 'POST'])
 def add_contact():

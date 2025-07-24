@@ -10,7 +10,7 @@ from services.quote_service import QuoteService
 from services.appointment_service import AppointmentService
 from csv_importer import CsvImporter
 from property_radar_importer import PropertyRadarImporter
-from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages, get_recent_openphone_texts
+from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 
 main_bp = Blueprint('main', __name__)
 contact_service = ContactService()
@@ -37,16 +37,14 @@ def dashboard():
 
     google_events = get_upcoming_calendar_events()
     gmail_messages = get_recent_gmail_messages()
-    openphone_texts, openphone_error = get_recent_openphone_texts()
+    # We no longer fetch OpenPhone texts here; the front end will do it.
 
     return render_template(
         'dashboard.html', 
         stats=stats, 
         appointments=internal_appointments,
         google_events=google_events,
-        gmail_messages=gmail_messages,
-        openphone_texts=openphone_texts,
-        openphone_error=openphone_error
+        gmail_messages=gmail_messages
     )
 
 @main_bp.route('/settings')
