@@ -23,6 +23,7 @@ class Job(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     description = db.Column(db.Text, nullable=False)
     status = db.Column(db.String(20), default='Active')
+    completed_at = db.Column(db.DateTime, nullable=True)
     property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=False)
     quotes = db.relationship('Quote', backref='job', lazy=True, cascade="all, delete-orphan")
     invoices = db.relationship('Invoice', backref='job', lazy=True, cascade="all, delete-orphan")
@@ -80,3 +81,8 @@ class MediaAttachment(db.Model):
     source_url = db.Column(db.String(500), nullable=False)
     local_path = db.Column(db.String(500), nullable=True)
     content_type = db.Column(db.String(100), nullable=True)
+
+class Setting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)
+    value = db.Column(db.Text, nullable=False)

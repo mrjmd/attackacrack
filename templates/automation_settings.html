@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Automation Settings{% endblock %}
+
+{% block content %}
+    <h2 class="text-3xl font-bold mb-6">Automation Settings</h2>
+
+    <div class="bg-gray-900 rounded-lg shadow p-6">
+        <!-- Appointment Reminder Form -->
+        <form method="POST" class="mb-8 border-b border-gray-700 pb-8">
+            <input type="hidden" name="form_type" value="reminder">
+            <h3 class="text-xl font-bold mb-4">Appointment Reminder Template</h3>
+            <p class="text-sm text-gray-400 mb-2">
+                This message will be sent automatically the day before a scheduled appointment.
+            </p>
+            <textarea name="reminder_template" rows="6" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">{{ reminder_template_text or '' }}</textarea>
+            
+            <div class="mt-4">
+                <h4 class="font-semibold mb-2">Available Placeholders:</h4>
+                <div class="flex flex-wrap gap-2 text-sm">
+                    <code class="bg-gray-700 px-2 py-1 rounded">[contact_first_name]</code>
+                    <code class="bg-gray-700 px-2 py-1 rounded">[contact_last_name]</code>
+                    <code class="bg-gray-700 px-2 py-1 rounded">[appointment_date]</code>
+                    <code class="bg-gray-700 px-2 py-1 rounded">[appointment_time]</code>
+                    <code class="bg-gray-700 px-2 py-1 rounded">[property_address]</code>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold">Save Reminder Template</button>
+            </div>
+        </form>
+
+        <!-- Review Request Form -->
+        <form method="POST">
+            <input type="hidden" name="form_type" value="review">
+            <h3 class="text-xl font-bold mb-4">Post-Job Review Request Template</h3>
+            <p class="text-sm text-gray-400 mb-2">
+                This message will be sent automatically 1-2 days after a job is marked as "Complete".
+            </p>
+            <textarea name="review_template" rows="6" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">{{ review_template_text or '' }}</textarea>
+            
+            <div class="mt-4">
+                <h4 class="font-semibold mb-2">Available Placeholders:</h4>
+                <div class="flex flex-wrap gap-2 text-sm">
+                    <code class="bg-gray-700 px-2 py-1 rounded">[contact_first_name]</code>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold">Save Review Template</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
