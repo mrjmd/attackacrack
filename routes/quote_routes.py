@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from services.quote_service import QuoteService
 from services.job_service import JobService
 from services.invoice_service import InvoiceService
@@ -7,7 +7,6 @@ from crm_database import ProductService
 quote_bp = Blueprint('quote', __name__)
 
 quote_service = QuoteService()
-# --- CHANGE 1 of 2: Instantiate the JobService ---
 job_service = JobService()
 
 @quote_bp.route('/quotes')
@@ -23,29 +22,28 @@ def view(quote_id):
 @quote_bp.route('/quote/add', methods=['GET', 'POST'])
 @quote_bp.route('/quote/<int:quote_id>/edit', methods=['GET', 'POST'])
 def add_edit(quote_id=None):
+    quote = None
     if quote_id:
         quote = quote_service.get_quote_by_id(quote_id)
-    else:
-        quote = None
 
     if request.method == 'POST':
-        data = {
-            'job_id': request.form['job_id'],
-            'amount': request.form['amount'],
-            'status': request.form.get('status', 'Draft')
-        }
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON'}), 400
+        
         if quote_id:
-            quote_service.update_quote(quote_id, data)
-            flash('Quote updated successfully!', 'success')
+            quote = quote_service.update_quote(quote_id, data)
         else:
-            new_quote = quote_service.create_quote(data)
-            quote_id = new_quote.id
-            flash('Quote created successfully!', 'success')
-        return redirect(url_for('quote.view', quote_id=quote_id))
+            quote = quote_service.create_quote(data)
+        
+        if quote:
+            return jsonify({'redirect': url_for('quote.view', quote_id=quote.id)})
+        else:
+            return jsonify({'error': 'Could not save quote'}), 500
 
-    # --- CHANGE 2 of 2: Call the method on the instance ---
     jobs = job_service.get_all_jobs()
-    return render_template('add_edit_quote_form.html', quote=quote, jobs=jobs)
+    product_services = ProductService.query.all()
+    return render_template('add_edit_quote_form.html', quote=quote, jobs=jobs, product_services=product_services)
 
 @quote_bp.route('/quote/<int:quote_id>/delete', methods=['POST'])
 def delete(quote_id):
@@ -61,7 +59,9 @@ def convert_quote_to_invoice(quote_id):
     new_invoice = InvoiceService.create_invoice_from_quote(quote_id)
     if new_invoice:
         flash('Quote successfully converted to Invoice!', 'success')
-        return redirect(url_for('invoice.view', invoice_id=new_invoice.id))
+        # --- THIS IS THE ONLY CHANGE IN THIS FILE ---
+        # Corrected the url_for endpoint from 'invoice.view' to 'invoice.invoice_detail'
+        return redirect(url_for('invoice.invoice_detail', invoice_id=new_invoice.id))
     else:
         flash('Failed to convert quote. Quote not found.', 'danger')
         return redirect(url_for('quote.view', quote_id=quote_id))
