@@ -1,24 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Job</title>
-</head>
-<body>
-    <h1>{% if job %}Edit{% else %}Add{% endif %} Job</h1>
-    <form method="POST">
-        <label for="description">Description:</label>
-        <textarea id="description" name="description" required>{{ job.description if job else '' }}</textarea>
-        <br>
-        <label for="property_id">Property:</label>
-        <select id="property_id" name="property_id">
-            {% for property in properties %}
-                <option value="{{ property.id }}" {% if job and job.property_id == property.id %}selected{% endif %}>{{ property.address }}</option>
-            {% endfor %}
-        </select>
-        <br>
-        <button type="submit">Save</button>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if job %}Edit Job{% else %}Add Job{% endif %}</h2>
+    <form method="POST" action="">
+        <div class="mb-3">
+            <label for="property_id" class="form-label">Property</label>
+            <select class="form-control" id="property_id" name="property_id" required>
+                {% for prop in properties %}
+                    <option value="{{ prop.id }}" {% if job and job.property_id == prop.id %}selected{% endif %}>
+                        {{ prop.address }} ({{ prop.contact.first_name }} {{ prop.contact.last_name }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3" required>{{ job.description if job }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Job</button>
+        <!-- --- FIX --- -->
+        <a href="{{ url_for('job.list_all') }}" class="btn btn-secondary">Cancel</a>
     </form>
-    <a href="{{ url_for('job.jobs') }}">Cancel</a>
-</body>
-</html>
+</div>
+{% endblock %}

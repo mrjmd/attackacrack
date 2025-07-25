@@ -30,18 +30,15 @@
                 {% endfor %}
             </ul>
 
-            <a href="{{ url_for('quote_routes.quote_list') }}" class="btn btn-secondary">Back to List</a>
-            <a href="{{ url_for('quote_routes.add_edit_quote', quote_id=quote.id) }}" class="btn btn-primary">Edit Quote</a>
+            <a href="{{ url_for('quote.list_all') }}" class="btn btn-secondary">Back to List</a>
+            <a href="{{ url_for('quote.add_edit', quote_id=quote.id) }}" class="btn btn-primary">Edit Quote</a>
             
-            <!-- --- CHANGE START --- -->
-            <!-- Add a button to convert the Quote to an Invoice -->
-            <!-- This button is only shown if the quote has not already been accepted or converted. -->
             {% if quote.status == 'Draft' %}
-            <form action="{{ url_for('quote_routes.convert_quote_to_invoice', quote_id=quote.id) }}" method="POST" style="display: inline;">
+            <!-- --- FIX --- -->
+            <form action="{{ url_for('quote.convert_quote_to_invoice', quote_id=quote.id) }}" method="POST" style="display: inline;">
                 <button type="submit" class="btn btn-success">Convert to Invoice</button>
             </form>
             {% endif %}
-            <!-- --- CHANGE END --- -->
 
         </div>
     </div>
