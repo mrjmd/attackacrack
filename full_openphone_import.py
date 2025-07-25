@@ -20,7 +20,7 @@ MEDIA_UPLOAD_FOLDER = 'uploads/media'
 def run_full_import():
     """
     Performs a comprehensive import of all contacts and full conversation histories
-    from OpenPhone, including de-duplication and media downloading.
+    from OpenPhone, using the correct /v1/messages endpoint.
     """
     print("--- Starting Comprehensive OpenPhone Import ---")
     
@@ -29,8 +29,9 @@ def run_full_import():
     with app.app_context():
         api_key = app.config.get('OPENPHONE_API_KEY')
         user_phone_number = app.config.get('OPENPHONE_PHONE_NUMBER')
+        phone_number_id = app.config.get('OPENPHONE_PHONE_NUMBER_ID')
 
-        if not all([api_key, user_phone_number]):
+        if not all([api_key, user_phone_number, phone_number_id]):
             print("ERROR: Missing OpenPhone configuration. Aborting.")
             return
 
@@ -40,73 +41,21 @@ def run_full_import():
         os.makedirs(MEDIA_UPLOAD_FOLDER, exist_ok=True)
         print(f"Media will be saved to: {os.path.abspath(MEDIA_UPLOAD_FOLDER)}")
 
-        # 1. Fetch ALL Contacts from the Address Book
-        print("\n--- Phase 1: Syncing All Contacts ---")
-        all_contacts_api = []
-        page_token = None
-        while True:
-            url = f"https://api.openphone.com/v1/contacts?maxResults=100"
-            if page_token:
-                url += f"&pageToken={page_token}"
-            try:
-                response = requests.get(url, headers=headers, verify=False)
-                response.raise_for_status()
-                data = response.json()
-                all_contacts_api.extend(data.get('data', []))
-                page_token = data.get('nextPageToken')
-                if not page_token:
-                    break
-            except Exception as e:
-                print(f"ERROR: Could not fetch contacts: {e}")
-                return
-        
-        print(f"Found {len(all_contacts_api)} total contact entries in OpenPhone address book.")
-
-        # --- NEW LOGIC: Pre-scan for duplicate numbers ---
-        print("Pre-scanning for duplicate phone numbers...")
-        phone_number_counts = Counter()
-        for contact_data in all_contacts_api:
-            phone_number = next((p['value'] for p in contact_data.get('phoneNumbers', []) if p.get('value')), None)
-            if phone_number:
-                phone_number_counts[phone_number] += 1
-        print("Pre-scan complete.")
-        # --- END NEW LOGIC ---
-        
-        contacts_processed = 0
-        for contact_data in all_contacts_api:
-            phone_number = next((p['value'] for p in contact_data.get('phoneNumbers', []) if p.get('value')), None)
-            if not phone_number:
-                continue
-
-            contacts_processed += 1
-            if contacts_processed % 100 == 0:
-                print(f"  -> Processed {contacts_processed}/{len(all_contacts_api)} contact entries...")
-
-            existing_contact = db.session.query(Contact).filter_by(phone=phone_number).first()
-            if not existing_contact:
-                last_name = contact_data.get('lastName') or "(from import)"
-                # Flag potential office numbers
-                if phone_number_counts[phone_number] > 3:
-                    last_name += " (Office Number?)"
-
-                contact_service.add_contact(
-                    first_name=contact_data.get('firstName') or phone_number,
-                    last_name=last_name,
-                    phone=phone_number,
-                    email=next((e['value'] for e in contact_data.get('emails', []) if e.get('value')), None)
-                )
-        print("Contact sync complete.")
-
-        # 2. Fetch ALL Conversations
-        print("\n--- Phase 2: Fetching All Conversation Histories ---")
+        # 1. Fetch ALL Conversations
+        print("\n--- Fetching All Conversations ---")
         all_conversations = []
         page_token = None
         while True:
-            url = f"https://api.openphone.com/v1/conversations?phoneNumbers[]={user_phone_number}&maxResults=100"
+            url = "https://api.openphone.com/v1/conversations"
+            params = {
+                'phoneNumbers[]': user_phone_number,
+                'maxResults': 100
+            }
             if page_token:
-                url += f"&pageToken={page_token}"
+                params['pageToken'] = page_token
+            
             try:
-                response = requests.get(url, headers=headers, verify=False)
+                response = requests.get(url, headers=headers, params=params, verify=False)
                 response.raise_for_status()
                 data = response.json()
                 all_conversations.extend(data.get('data', []))
@@ -119,28 +68,66 @@ def run_full_import():
         
         print(f"Found {len(all_conversations)} conversations to process.")
 
-        # 3. Process each conversation to get full message history
-        total_messages_added = 0
+        # Pre-scan for duplicate numbers
+        phone_number_counts = Counter()
         for convo in all_conversations:
-            phone_number = convo.get('contact', {}).get('phoneNumber')
-            if not phone_number:
-                continue
-            
-            print(f"\nProcessing conversation with {phone_number}...")
-            contact = db.session.query(Contact).filter_by(phone=phone_number).first()
-            if not contact:
-                print(f"  -> WARNING: Contact for {phone_number} not found in DB, skipping conversation.")
-                continue
+            other_participants = [p for p in convo.get('participants', []) if p != user_phone_number]
+            if other_participants:
+                phone_number_counts[other_participants[0]] += 1
 
-            # Fetch all messages for this conversation
+        # 2. Process each conversation
+        total_messages_added = 0
+        for i, convo in enumerate(all_conversations):
+            # --- THIS IS THE FIX for Group Chats ---
+            # Filter out our own number to find the other participant(s)
+            other_participants = [p for p in convo.get('participants', []) if p != user_phone_number]
+            if not other_participants:
+                continue # Skip conversations with no other participants
+            
+            # For now, we'll treat the first other participant as the primary contact for this conversation
+            other_participant_phone = other_participants[0]
+            # --- END FIX ---
+            
+            contact_id_from_convo = convo.get('contact', {}).get('id')
+
+            if (i + 1) % 50 == 0:
+                print(f"  -> Processing conversation {i+1}/{len(all_conversations)} with {other_participant_phone}...")
+
+            contact = db.session.query(Contact).filter_by(phone=other_participant_phone).first()
+            if not contact:
+                # ... (Contact creation logic is unchanged)
+                first_name = convo.get('name') or other_participant_phone
+                last_name = "(from import)"
+                email = None
+                if contact_id_from_convo:
+                    try:
+                        contact_url = f"https://api.openphone.com/v1/contacts/{contact_id_from_convo}"
+                        contact_response = requests.get(contact_url, headers=headers, verify=False)
+                        if contact_response.status_code == 200:
+                            full_contact_data = contact_response.json().get('data', {})
+                            first_name = full_contact_data.get('firstName') or first_name
+                            last_name = full_contact_data.get('lastName') or last_name
+                            email = next((e['value'] for e in full_contact_data.get('emails', []) if e.get('isPrimary')), None)
+                    except Exception as e:
+                        print(f"  -> WARN: Could not enrich contact {contact_id_from_convo}: {e}")
+                if phone_number_counts[other_participant_phone] > 3:
+                    last_name += " (Office Number?)"
+                contact = contact_service.add_contact(first_name=first_name, last_name=last_name, phone=other_participant_phone, email=email)
+
+            # Fetch all messages for this conversation using the correct /v1/messages endpoint
             all_messages = []
             page_token = None
             while True:
-                messages_url = f"https://api.openphone.com/v1/conversations/{convo['id']}/messages?maxResults=100"
+                url = "https://api.openphone.com/v1/messages"
+                params = {
+                    'phoneNumberId': phone_number_id,
+                    'participants[]': other_participant_phone,
+                    'maxResults': 100
+                }
                 if page_token:
-                    messages_url += f"&pageToken={page_token}"
+                    params['pageToken'] = page_token
                 try:
-                    messages_response = requests.get(messages_url, headers=headers, verify=False)
+                    messages_response = requests.get(url, headers=headers, params=params, verify=False)
                     messages_response.raise_for_status()
                     data = messages_response.json()
                     all_messages.extend(data.get('data', []))
@@ -148,10 +135,10 @@ def run_full_import():
                     if not page_token:
                         break
                 except Exception as e:
-                    print(f"  -> ERROR: Could not fetch messages: {e}")
-                    break # Stop trying for this conversation if an error occurs
+                    print(f"  -> ERROR: Could not fetch messages for conversation with {other_participant_phone}: {e}")
+                    break
 
-            # 4. Save messages and download media
+            # Save messages and download media
             messages_added_this_convo = 0
             for msg_data in reversed(all_messages): # Save oldest first
                 openphone_id = msg_data.get('id')
@@ -160,7 +147,7 @@ def run_full_import():
                     new_message = Message(
                         openphone_id=openphone_id,
                         contact_id=contact.id,
-                        body=msg_data.get('body'),
+                        body=msg_data.get('body') or msg_data.get('text'),
                         direction=msg_data.get('direction'),
                         timestamp=datetime.fromisoformat(msg_data.get('createdAt').replace('Z', '+00:00'))
                     )
@@ -168,13 +155,12 @@ def run_full_import():
                     db.session.flush()
 
                     for media_url in msg_data.get('media', []):
-                        # Media handling logic here...
-                        pass # Placeholder for media download logic from previous version
+                        # Media handling logic can be added here
+                        pass 
 
                     messages_added_this_convo += 1
             
             if messages_added_this_convo > 0:
-                print(f"  -> Added {messages_added_this_convo} new messages to the database.")
                 total_messages_added += messages_added_this_convo
 
         db.session.commit()
