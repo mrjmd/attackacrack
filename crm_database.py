@@ -72,3 +72,11 @@ class Message(db.Model):
     body = db.Column(db.Text, nullable=True)
     direction = db.Column(db.String(10), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    media_attachments = db.relationship('MediaAttachment', backref='message', lazy=True, cascade="all, delete-orphan")
+
+class MediaAttachment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=False)
+    source_url = db.Column(db.String(500), nullable=False)
+    local_path = db.Column(db.String(500), nullable=True)
+    content_type = db.Column(db.String(100), nullable=True)
