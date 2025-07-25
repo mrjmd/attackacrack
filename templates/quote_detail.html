@@ -1,52 +1,49 @@
 {% extends "base.html" %}
 
-{% block title %}Quote #{{ quote.id }}{% endblock %}
-
 {% block content %}
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-3xl font-bold">Quote #{{ quote.id }}</h2>
-        <div class="flex items-center space-x-2">
-            <form method="POST" action="{{ url_for('quote.delete_quote', quote_id=quote.id) }}" onsubmit="return confirm('Are you sure?');">
-                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg">Delete</button>
-            </form>
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h2>Quote Details</h2>
         </div>
-    </div>
+        <div class="card-body">
+            <h5 class="card-title">Quote for Job #{{ quote.job_id }}</h5>
+            <p><strong>Status:</strong> <span class="badge bg-primary">{{ quote.status }}</span></p>
+            <p><strong>Amount:</strong> ${{ "%.2f"|format(quote.amount) }}</p>
+            <p><strong>Job Description:</strong> {{ quote.job.description }}</p>
+            <p><strong>Customer:</strong> {{ quote.job.property.contact.first_name }} {{ quote.job.property.contact.last_name }}</p>
+            <p><strong>Property Address:</strong> {{ quote.job.property.address }}</p>
 
-    <div class="bg-gray-900 rounded-lg shadow p-6">
-        <div class="mb-4">
-            <p><strong>Status:</strong> <span class="px-2 py-1 text-sm rounded-full bg-yellow-900 text-yellow-300">{{ quote.status }}</span></p>
-            <p><strong>Job:</strong> <a href="{{ url_for('job.job_detail', job_id=quote.job.id) }}" class="text-blue-400 hover:underline">{{ quote.job.description }}</a></p>
-            <p><strong>Property:</strong> <a href="{{ url_for('property.property_detail', property_id=quote.job.property.id) }}" class="text-blue-400 hover:underline">{{ quote.job.property.address }}</a></p>
-        </div>
-        
-        <table class="w-full text-left">
-            <thead class="border-b border-gray-700">
-                <tr>
-                    <th class="py-2">Item / Description</th>
-                    <th class="w-24 text-center">Quantity</th>
-                    <th class="w-32 text-right">Unit Price</th>
-                    <th class="w-32 text-right">Total</th>
-                </tr>
-            </thead>
-            <tbody>
+            <hr>
+
+            <h6>Line Items</h6>
+            <ul class="list-group mb-3">
                 {% for item in quote.line_items %}
-                <tr class="border-b border-gray-800">
-                    <td class="py-2">
-                        <p class="font-semibold">{{ item.product_service.name if item.product_service else 'Custom Item' }}</p>
-                        <p class="text-sm text-gray-400">{{ item.description }}</p>
-                    </td>
-                    <td class="text-center">{{ item.quantity }}</td>
-                    <td class="text-right">${{ "%.2f"|format(item.price) }}</td>
-                    <td class="text-right">${{ "%.2f"|format(item.price * item.quantity) }}</td>
-                </tr>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ item.description }}</strong>
+                        </div>
+                        <span>{{ item.quantity }} x ${{ "%.2f"|format(item.price) }}</span>
+                    </li>
+                {% else %}
+                    <li class="list-group-item">No line items for this quote.</li>
                 {% endfor %}
-            </tbody>
-            <tfoot class="border-t-2 border-gray-700">
-                <tr>
-                    <td colspan="3" class="py-2 text-right font-bold text-lg">Grand Total:</td>
-                    <td class="text-right font-bold text-lg">${{ "%.2f"|format(quote.amount) }}</td>
-                </tr>
-            </tfoot>
-        </table>
+            </ul>
+
+            <a href="{{ url_for('quote_routes.quote_list') }}" class="btn btn-secondary">Back to List</a>
+            <a href="{{ url_for('quote_routes.add_edit_quote', quote_id=quote.id) }}" class="btn btn-primary">Edit Quote</a>
+            
+            <!-- --- CHANGE START --- -->
+            <!-- Add a button to convert the Quote to an Invoice -->
+            <!-- This button is only shown if the quote has not already been accepted or converted. -->
+            {% if quote.status == 'Draft' %}
+            <form action="{{ url_for('quote_routes.convert_quote_to_invoice', quote_id=quote.id) }}" method="POST" style="display: inline;">
+                <button type="submit" class="btn btn-success">Convert to Invoice</button>
+            </form>
+            {% endif %}
+            <!-- --- CHANGE END --- -->
+
+        </div>
     </div>
+</div>
 {% endblock %}
