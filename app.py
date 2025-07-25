@@ -5,6 +5,10 @@ from flask_migrate import Migrate
 from config import Config
 from extensions import db
 from datetime import datetime
+import os
+from apscheduler.schedulers.background import BackgroundScheduler
+
+# The 'commands' import is removed as the file no longer exists.
 
 def create_app(config_class=Config):
     """Create and configure an instance of the Flask application."""
@@ -55,10 +59,23 @@ def create_app(config_class=Config):
     app.register_blueprint(quote_bp, url_prefix='/quotes')
     app.register_blueprint(invoice_bp, url_prefix='/invoices')
     app.register_blueprint(api_bp, url_prefix='/api')
+    
+    # --- INITIALIZE SCHEDULER ---
+    from services.scheduler_service import SchedulerService
+    
+    scheduler = BackgroundScheduler(daemon=True)
+    
+    def job_wrapper():
+        with app.app_context():
+            service = SchedulerService()
+            service.send_appointment_reminders()
 
-    # We no longer need db.create_all() as migrations will handle the schema
-    # with app.app_context():
-    #     db.create_all()
+    scheduler.add_job(job_wrapper, 'cron', hour=8, minute=0)
+    
+    if os.environ.get('WERKZEUG_RUN_MAIN') or app.config.get('FLASK_ENV') == 'production':
+        scheduler.start()
+        print("--- Background scheduler started. ---")
+    # --- END SCHEDULER ---
 
     return app
 
