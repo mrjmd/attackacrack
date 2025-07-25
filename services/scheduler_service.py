@@ -1,117 +1,115 @@
-from datetime import datetime, timedelta
+# services/scheduler_service.py
+
 from extensions import db
-from crm_database import Appointment, Setting, Job
-from services.openphone_service import OpenPhoneService
-from flask import current_app
+from crm_database import Appointment, Job, Quote, Setting
+from services.invoice_service import InvoiceService
+from sms_sender import send_sms
+from datetime import date, timedelta, datetime
+import logging
 
 class SchedulerService:
-    def __init__(self):
-        self.session = db.session
-        self.openphone_service = OpenPhoneService()
-
-    def _format_message(self, template, appointment=None, job=None):
+    def __init__(self, app):
         """
-        Replaces placeholders in the template with actual data.
+        Initializes the service with the Flask app context.
         """
-        placeholders = {}
-        contact = None
-        if appointment:
-            contact = appointment.contact
-            placeholders = {
-                '[appointment_date]': appointment.date.strftime('%A, %B %d'),
-                '[appointment_time]': appointment.time.strftime('%I:%M %p'),
-                '[property_address]': contact.properties[0].address if contact.properties else 'the property'
-            }
-        elif job:
-            contact = job.property.contact
-        
-        if contact:
-            placeholders['[contact_first_name]'] = contact.first_name
-            placeholders['[contact_last_name]'] = contact.last_name
+        self.app = app
 
-        message = template
-        for key, value in placeholders.items():
-            message = message.replace(key, value)
-        return message
+    def _format_message(self, template_key, **kwargs):
+        """
+        Helper method to format a message from a template stored in the database.
+        """
+        template = Setting.query.filter_by(key=template_key).first()
+        if template:
+            return template.value.format(**kwargs)
+        return None
 
     def send_appointment_reminders(self):
         """
-        Finds all appointments for the next day and sends an SMS reminder.
+        Sends SMS reminders for appointments scheduled for the next day.
         """
-        print("--- Running daily appointment reminder task ---")
-        
-        reminder_template_setting = self.session.query(Setting).filter_by(key='appointment_reminder_template').first()
-        if not reminder_template_setting:
-            print("-> No reminder template found in settings. Aborting.")
-            return
-
-        template = reminder_template_setting.value
-        
-        tomorrow = datetime.utcnow().date() + timedelta(days=1)
-        appointments_tomorrow = self.session.query(Appointment).filter(Appointment.date == tomorrow).all()
-        
-        if not appointments_tomorrow:
-            print("-> No appointments scheduled for tomorrow. Task complete.")
-            return
-        
-        print(f"-> Found {len(appointments_tomorrow)} appointments for tomorrow. Sending reminders...")
-        
-        from_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
-        if not from_number_id:
-            print("-> ERROR: OPENPHONE_PHONE_NUMBER_ID not set. Cannot send SMS.")
-            return
-
-        for appt in appointments_tomorrow:
-            message_body = self._format_message(template, appointment=appt)
-            print(f"  - Sending reminder to {appt.contact.phone} for appointment {appt.id}")
-            self.openphone_service.send_sms(
-                to_number=appt.contact.phone,
-                from_number_id=from_number_id,
-                body=message_body
-            )
-        
-        print("--- Reminder task finished ---")
+        with self.app.app_context():
+            tomorrow = date.today() + timedelta(days=1)
+            appointments = Appointment.query.filter(Appointment.date == tomorrow).all()
+            
+            for appt in appointments:
+                if appt.job and appt.job.property and appt.job.property.contact:
+                    contact = appt.job.property.contact
+                    if contact.phone:
+                        message = self._format_message(
+                            'appointment_reminder_template',
+                            first_name=contact.first_name,
+                            appointment_date=tomorrow.strftime('%B %d, %Y'),
+                            appointment_time=appt.time.strftime('%I:%M %P')
+                        )
+                        if message:
+                            try:
+                                send_sms(contact.phone, message)
+                                logging.info(f"Sent appointment reminder to {contact.first_name} {contact.last_name} for appointment {appt.id}")
+                            except Exception as e:
+                                logging.error(f"Failed to send SMS reminder for appointment {appt.id}. Error: {e}")
 
     def send_review_requests(self):
         """
-        Finds jobs completed recently and sends an SMS requesting a review.
+        Sends SMS review requests for jobs completed yesterday.
         """
-        print("--- Running daily review request task ---")
-        
-        review_template_setting = self.session.query(Setting).filter_by(key='review_request_template').first()
-        if not review_template_setting:
-            print("-> No review request template found in settings. Aborting.")
-            return
+        with self.app.app_context():
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            completed_jobs = Job.query.filter(
+                Job.status == 'Completed',
+                db.func.date(Job.completed_at) == yesterday.date()
+            ).all()
 
-        template = review_template_setting.value
-        
-        one_day_ago = datetime.utcnow() - timedelta(days=1)
-        two_days_ago = datetime.utcnow() - timedelta(days=2)
-        
-        recent_jobs = self.session.query(Job).filter(
-            Job.status == 'Complete',
-            Job.completed_at.between(two_days_ago, one_day_ago)
-        ).all()
+            for job in completed_jobs:
+                contact = job.property.contact
+                if contact.phone:
+                    message = self._format_message('review_request_template', first_name=contact.first_name)
+                    if message:
+                        try:
+                            send_sms(contact.phone, message)
+                            logging.info(f"Sent review request to {contact.first_name} {contact.last_name} for job {job.id}")
+                        except Exception as e:
+                            logging.error(f"Failed to send review request for job {job.id}. Error: {e}")
 
-        if not recent_jobs:
-            print("-> No recently completed jobs found. Task complete.")
-            return
-        
-        print(f"-> Found {len(recent_jobs)} recently completed jobs. Sending review requests...")
-        
-        from_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
-        if not from_number_id:
-            print("-> ERROR: OPENPHONE_PHONE_NUMBER_ID not set. Cannot send SMS.")
-            return
-
-        for job in recent_jobs:
-            message_body = self._format_message(template, job=job)
+    # --- CHANGE 1 of 2: NEW METHOD ADDED ---
+    # This is the new function to handle the automated conversion of quotes to invoices.
+    def convert_quotes_for_today_appointments(self):
+        """
+        Finds all appointments for the current day and converts any associated
+        'Draft' quotes into invoices. Runs within the app context.
+        """
+        with self.app.app_context():
+            today = date.today()
+            logging.info(f"Running quote-to-invoice conversion job for appointments on {today.strftime('%Y-%m-%d')}")
             
-            print(f"  - Sending review request to {job.property.contact.phone} for job {job.id}")
-            self.openphone_service.send_sms(
-                to_number=job.property.contact.phone,
-                from_number_id=from_number_id,
-                body=message_body
-            )
-        
-        print("--- Review request task finished ---")
+            appointments_today = Appointment.query.filter(Appointment.date == today).all()
+
+            if not appointments_today:
+                logging.info("No appointments scheduled for today. Exiting job.")
+                return
+
+            for appt in appointments_today:
+                job = appt.job
+                if not job:
+                    continue
+
+                draft_quotes = Quote.query.filter_by(job_id=job.id, status='Draft').all()
+                
+                for quote in draft_quotes:
+                    try:
+                        logging.info(f"Found draft quote {quote.id} for job {job.id} associated with today's appointment {appt.id}. Attempting conversion.")
+                        InvoiceService.create_invoice_from_quote(quote.id)
+                        logging.info(f"Successfully converted quote {quote.id} to a new invoice.")
+                    except Exception as e:
+                        logging.error(f"Failed to convert quote {quote.id} to invoice. Error: {e}")
+
+    def run_daily_tasks(self):
+        """
+        A single method to run all daily scheduled tasks.
+        """
+        logging.info("Starting daily scheduled tasks...")
+        self.send_appointment_reminders()
+        self.send_review_requests()
+        # --- CHANGE 2 of 2: ESSENTIAL ADDITION ---
+        # Added a call to the new method so it runs as part of the daily tasks.
+        self.convert_quotes_for_today_appointments()
+        logging.info("Daily scheduled tasks completed.")

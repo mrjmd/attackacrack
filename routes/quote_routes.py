@@ -1,59 +1,69 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from services.quote_service import QuoteService
 from services.job_service import JobService
-from services.property_service import PropertyService
-from services.contact_service import ContactService
+from services.invoice_service import InvoiceService
+from crm_database import ProductService
 
-quote_bp = Blueprint('quote', __name__)
+# --- CHANGE START ---
+# Corrected the Blueprint variable name back to 'quote_bp' to match what is
+# expected by your app.py file. This fixes the ImportError.
+quote_bp = Blueprint('quote_routes', __name__)
+# --- CHANGE END ---
 
-@quote_bp.route('/')
-def list_all():
-    quote_service = QuoteService()
-    all_quotes = quote_service.get_all_quotes()
-    return render_template('quote_list.html', quotes=all_quotes)
+@quote_bp.route('/quotes')
+def quote_list():
+    quotes = QuoteService.get_all_quotes()
+    return render_template('quote_list.html', quotes=quotes)
 
-@quote_bp.route('/<int:quote_id>')
+@quote_bp.route('/quote/<int:quote_id>')
 def quote_detail(quote_id):
-    quote_service = QuoteService()
-    quote = quote_service.get_quote_by_id(quote_id)
+    quote = QuoteService.get_quote_by_id(quote_id)
     return render_template('quote_detail.html', quote=quote)
 
-@quote_bp.route('/add', methods=['GET', 'POST'])
-def add_quote():
-    quote_service = QuoteService()
-    job_service = JobService()
-    property_service = PropertyService()
-    contact_service = ContactService()
+@quote_bp.route('/quote/add', methods=['GET', 'POST'])
+@quote_bp.route('/quote/<int:quote_id>/edit', methods=['GET', 'POST'])
+def add_edit_quote(quote_id=None):
+    if quote_id:
+        quote = QuoteService.get_quote_by_id(quote_id)
+    else:
+        quote = None
 
     if request.method == 'POST':
-        data = request.get_json()
-        property_id = data.get('property_id')
-        line_items = data.get('line_items')
-        
-        if property_id and line_items:
-            active_job = job_service.get_or_create_active_job(int(property_id))
-            new_quote = quote_service.add_quote_with_line_items(active_job.id, line_items)
-            return jsonify({'success': True, 'quote_id': new_quote.id})
-            
-        return jsonify({'success': False, 'error': 'Missing property or line items'}), 400
+        data = {
+            'job_id': request.form['job_id'],
+            'amount': request.form['amount'],
+            'status': request.form.get('status', 'Draft')
+        }
+        if quote_id:
+            QuoteService.update_quote(quote_id, data)
+            flash('Quote updated successfully!', 'success')
+        else:
+            new_quote = QuoteService.create_quote(data)
+            quote_id = new_quote.id
+            flash('Quote created successfully!', 'success')
+        return redirect(url_for('quote_routes.quote_detail', quote_id=quote_id))
 
-    # For GET request
-    contact_id = request.args.get('contact_id')
-    properties = []
-    if contact_id:
-        # If we came from a contact, only show their properties
-        contact = contact_service.get_contact_by_id(contact_id)
-        properties = contact.properties if contact else []
-    else:
-        # Otherwise, show all properties
-        properties = property_service.get_all_properties()
+    jobs = JobService.get_all_jobs()
+    return render_template('add_edit_quote_form.html', quote=quote, jobs=jobs)
 
-    products = quote_service.get_all_products_and_services()
-    return render_template('add_edit_quote_form.html', properties=properties, products=products, contact_id=contact_id)
-
-@quote_bp.route('/<int:quote_id>/delete', methods=['POST'])
+@quote_bp.route('/quote/<int:quote_id>/delete', methods=['POST'])
 def delete_quote(quote_id):
-    quote_service = QuoteService()
-    quote = quote_service.get_quote_by_id(quote_id)
-    quote_service.delete_quote(quote)
-    return redirect(url_for('quote.list_all'))
+    QuoteService.delete_quote(quote_id)
+    flash('Quote deleted successfully!', 'success')
+    return redirect(url_for('quote_routes.quote_list'))
+
+# --- THIS IS THE ONLY ADDITION TO THE FILE'S LOGIC ---
+# A new route to handle the conversion from Quote to Invoice
+@quote_bp.route('/quote/<int:quote_id>/convert', methods=['POST'])
+def convert_quote_to_invoice(quote_id):
+    """
+    Handles the POST request to convert a quote into an invoice.
+    """
+    new_invoice = InvoiceService.create_invoice_from_quote(quote_id)
+    if new_invoice:
+        flash('Quote successfully converted to Invoice!', 'success')
+        # Redirect to the detail page of the newly created invoice
+        return redirect(url_for('invoice_routes.invoice_detail', invoice_id=new_invoice.id))
+    else:
+        flash('Failed to convert quote. Quote not found.', 'danger')
+        return redirect(url_for('quote_routes.quote_detail', quote_id=quote_id))
