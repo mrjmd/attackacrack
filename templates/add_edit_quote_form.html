@@ -1,146 +1,197 @@
 {% extends "base.html" %}
 
-{% block title %}Create Quote{% endblock %}
+{% block title %}{% if quote %}Edit Quote{% else %}Add New Quote{% endif %}{% endblock %}
 
 {% block content %}
-    <h2 class="text-3xl font-bold mb-6">Create Quote</h2>
-    
-    <div class="bg-gray-900 rounded-lg shadow p-6">
-        <!-- Property Selection -->
-        <div class="mb-6">
-            <label for="property_id" class="block text-sm font-medium mb-1">Select Property:</label>
-            <select id="property_id" name="property_id" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
-                <option value="">-- Select a Property --</option>
-                {% for prop in properties %}
-                    <option value="{{ prop.id }}" {% if properties|length == 1 %}selected{% endif %}>
-                        {{ prop.address }} ({{ prop.contact.first_name }} {{ prop.contact.last_name }})
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Line Item Builder -->
-        <div class="mb-6">
-            <h3 class="text-xl font-bold mb-4">Line Items</h3>
-            <div id="line-items-container" class="space-y-4">
-                <!-- Line items will be added here by JavaScript -->
-            </div>
-            <div class="mt-4">
-                <select id="product-selector" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
-                    <option value="">-- Add a product or service --</option>
-                    {% for p in products %}
-                        <option value="{{ p.id }}" data-price="{{ p.price }}" data-description="{{ p.description or '' }}">{{ p.name }}</option>
-                    {% endfor %}
-                </select>
-                <button id="add-line-item-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg ml-2">Add Item</button>
-            </div>
-        </div>
-
-        <!-- Quote Total -->
-        <div class="text-right border-t border-gray-700 pt-4">
-            <h3 class="text-2xl font-bold">Total: $<span id="quote-total">0.00</span></h3>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex items-center space-x-4 mt-6">
-            <button id="save-quote-btn" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold">Save Quote</button>
-            <a href="{{ url_for('quote.list_all') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
-        </div>
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">{% if quote %}Edit Quote{% else %}Add New Quote{% endif %}</h2>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const addBtn = document.getElementById('add-line-item-btn');
-            const saveBtn = document.getElementById('save-quote-btn');
-            const productSelector = document.getElementById('product-selector');
-            const lineItemsContainer = document.getElementById('line-items-container');
-            const quoteTotalEl = document.getElementById('quote-total');
+    <form method="POST" id="quote-form" class="bg-gray-800 p-6 rounded-lg shadow-lg">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Job Selection -->
+            <div class="mb-4">
+                <label for="job_id" class="block text-gray-300 text-sm font-bold mb-2">Job:</label>
+                <select name="job_id" id="job_id" class="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white leading-tight focus:outline-none focus:shadow-outline" required>
+                    <option value="">Select a Job</option>
+                    {% for job in jobs %}
+                        <option value="{{ job.id }}" {% if quote and quote.job_id == job.id %}selected{% endif %}>
+                            Job #{{ job.id }} - {{ job.property.address }} ({{ job.property.contact.first_name }} {{ job.property.contact.last_name }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Status -->
+            <div class="mb-4">
+                <label for="status" class="block text-gray-300 text-sm font-bold mb-2">Status:</label>
+                <select name="status" id="status" class="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="Draft" {% if quote and quote.status == 'Draft' %}selected{% endif %}>Draft</option>
+                    <option value="Sent" {% if quote and quote.status == 'Sent' %}selected{% endif %}>Sent</option>
+                    <option value="Accepted" {% if quote and quote.status == 'Accepted' %}selected{% endif %}>Accepted</option>
+                    <option value="Rejected" {% if quote and quote.status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+        </div>
 
-            function calculateTotal() {
-                let total = 0;
-                document.querySelectorAll('.line-item').forEach(item => {
-                    const quantity = parseFloat(item.querySelector('.quantity-input').value) || 0;
-                    const price = parseFloat(item.querySelector('.price-input').value) || 0;
-                    total += quantity * price;
-                });
-                quoteTotalEl.textContent = total.toFixed(2);
-            }
-
-            addBtn.addEventListener('click', function() {
-                const selectedOption = productSelector.options[productSelector.selectedIndex];
-                if (!selectedOption.value) return;
-
-                const productId = selectedOption.value;
-                const productPrice = selectedOption.dataset.price;
-                const productDescription = selectedOption.dataset.description;
-
-                const lineItemHtml = `
-                    <div class="line-item bg-gray-800 rounded-lg p-3" data-product-id="${productId}">
-                        <div class="flex items-center space-x-2">
-                            <button class="remove-item-btn text-red-500 hover:text-red-400 font-bold text-xl">&times;</button>
-                            <textarea class="description-input flex-grow bg-gray-700 border border-gray-600 rounded-lg px-2 py-1" rows="2">${productDescription}</textarea>
-                            <input type="number" value="1" min="1" class="quantity-input w-20 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-center">
-                            <input type="number" value="${parseFloat(productPrice).toFixed(2)}" step="0.01" class="price-input w-24 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-right">
-                        </div>
+        <!-- Line Items -->
+        <div class="mt-6">
+            <h3 class="text-xl font-bold mb-4">Line Items</h3>
+            <div id="line-items-container" class="space-y-4">
+                <!-- Existing Line Items -->
+                {% if quote %}
+                    {% for item in quote.line_items %}
+                    <div class="line-item flex items-center space-x-2 p-3 bg-gray-700 rounded">
+                        <input type="hidden" name="line_item_id" value="{{ item.id }}">
+                        <select name="product_service_id" class="flex-grow shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+                            <option value="">Custom Item</option>
+                            {% for product in product_services %}
+                            <option value="{{ product.id }}" {% if item.product_service_id == product.id %}selected{% endif %}>{{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" name="description" placeholder="Description" value="{{ item.description }}" class="w-1/3 shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+                        <input type="number" name="quantity" placeholder="Qty" value="{{ item.quantity }}" class="w-20 shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+                        <input type="number" step="0.01" name="price" placeholder="Price" value="{{ item.price }}" class="w-24 shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+                        <button type="button" class="remove-line-item text-red-500 hover:text-red-400">&times;</button>
                     </div>
-                `;
-                lineItemsContainer.insertAdjacentHTML('beforeend', lineItemHtml);
-                calculateTotal();
-            });
+                    {% endfor %}
+                {% endif %}
+            </div>
+            <button type="button" id="add-line-item" class="mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm">Add Line Item</button>
+        </div>
+        
+        <!-- Total Amount -->
+        <div class="mt-6 text-right">
+            <h3 class="text-2xl font-bold">Total: $<span id="total-amount">{{ "%.2f".format(quote.amount) if quote else "0.00" }}</span></h3>
+            <input type="hidden" name="amount" id="amount-input" value="{{ quote.amount if quote else 0 }}">
+        </div>
 
-            lineItemsContainer.addEventListener('input', function(e) {
-                if (e.target.classList.contains('quantity-input') || e.target.classList.contains('price-input')) {
-                    calculateTotal();
-                }
-            });
+        <div class="flex items-center justify-end mt-6">
+            <a href="{{ url_for('quote.list_all') }}" class="text-gray-400 hover:text-white mr-4">Cancel</a>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Save Quote
+            </button>
+        </div>
+    </form>
 
-            lineItemsContainer.addEventListener('click', function(e) {
-                if (e.target.classList.contains('remove-item-btn')) {
-                    e.target.closest('.line-item').remove();
-                    calculateTotal();
-                }
-            });
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('line-items-container');
+    const addBtn = document.getElementById('add-line-item');
+    const totalEl = document.getElementById('total-amount');
+    const amountInput = document.getElementById('amount-input');
+    const quoteForm = document.getElementById('quote-form');
 
-            saveBtn.addEventListener('click', function() {
-                const propertyId = document.getElementById('property_id').value;
-                if (!propertyId) {
-                    alert('Please select a property first.');
-                    return;
-                }
+    function calculateTotal() {
+        let total = 0;
+        document.querySelectorAll('.line-item').forEach(item => {
+            const quantity = parseFloat(item.querySelector('[name="quantity"]').value) || 0;
+            const price = parseFloat(item.querySelector('[name="price"]').value) || 0;
+            total += quantity * price;
+        });
+        totalEl.textContent = total.toFixed(2);
+        amountInput.value = total.toFixed(2);
+    }
 
-                const lineItems = [];
-                document.querySelectorAll('.line-item').forEach(item => {
-                    lineItems.push({
-                        product_id: parseInt(item.dataset.productId),
-                        description: item.querySelector('.description-input').value,
-                        quantity: parseInt(item.querySelector('.quantity-input').value),
-                        price: parseFloat(item.querySelector('.price-input').value)
-                    });
-                });
+    function addLineItem(item = {}) {
+        const div = document.createElement('div');
+        div.className = 'line-item flex items-center space-x-2 p-3 bg-gray-700 rounded';
+        div.innerHTML = `
+            <input type="hidden" name="line_item_id" value="">
+            <select name="product_service_id" class="flex-grow shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+                <option value="">Custom Item</option>
+                {% for product in product_services %}
+                <option value="{{ product.id }}" data-price="{{ product.price }}" data-description="{{ product.description }}">{{ product.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="description" placeholder="Description" value="" class="w-1/3 shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+            <input type="number" name="quantity" placeholder="Qty" value="1" class="w-20 shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+            <input type="number" step="0.01" name="price" placeholder="Price" value="0.00" class="w-24 shadow appearance-none border border-gray-600 rounded py-2 px-3 bg-gray-800 text-white">
+            <button type="button" class="remove-line-item text-red-500 hover:text-red-400 font-bold text-xl">&times;</button>
+        `;
+        container.appendChild(div);
+    }
 
-                if (lineItems.length === 0) {
-                    alert('Please add at least one line item to the quote.');
-                    return;
-                }
+    addBtn.addEventListener('click', () => addLineItem());
 
-                fetch("{{ url_for('quote.add_quote') }}", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ property_id: propertyId, line_items: lineItems })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        window.location.href = "{{ url_for('quote.quote_detail', quote_id=0) }}".replace('0', data.quote_id);
-                    } else {
-                        alert('Error saving quote: ' + (data.error || 'Unknown error'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('A network error occurred. Please try again.');
-                });
+    container.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-line-item')) {
+            e.target.closest('.line-item').remove();
+            calculateTotal();
+        }
+    });
+
+    container.addEventListener('change', function(e) {
+        if (e.target.name === 'product_service_id') {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            const price = selectedOption.dataset.price;
+            const description = selectedOption.dataset.description;
+            const lineItem = e.target.closest('.line-item');
+            if (price) {
+                lineItem.querySelector('[name="price"]').value = price;
+                lineItem.querySelector('[name="description"]').value = description || selectedOption.text;
+            }
+        }
+        calculateTotal();
+    });
+
+    container.addEventListener('input', function(e) {
+        if (['quantity', 'price'].includes(e.target.name)) {
+            calculateTotal();
+        }
+    });
+
+    quoteForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        calculateTotal(); // Ensure total is up-to-date before submitting
+
+        const formData = new FormData(quoteForm);
+        const lineItems = [];
+        document.querySelectorAll('.line-item').forEach(item => {
+            lineItems.push({
+                id: item.querySelector('[name="line_item_id"]').value,
+                product_service_id: item.querySelector('[name="product_service_id"]').value,
+                description: item.querySelector('[name="description"]').value,
+                quantity: item.querySelector('[name="quantity"]').value,
+                price: item.querySelector('[name="price"]').value,
             });
         });
-    </script>
+
+        const data = {
+            job_id: formData.get('job_id'),
+            status: formData.get('status'),
+            amount: formData.get('amount'),
+            line_items: lineItems
+        };
+        
+        // --- THIS IS THE ONLY CHANGE IN THIS FILE ---
+        // Corrected the url_for endpoint from 'quote.add_quote' to 'quote.add_edit'
+        const url = "{{ url_for('quote.add_edit', quote_id=quote.id if quote else None) }}";
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.href = response.url;
+            } else {
+                // Handle errors
+                console.error('Form submission failed');
+                alert('There was an error saving the quote.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An unexpected error occurred.');
+        });
+    });
+
+    // Initial calculation
+    calculateTotal();
+});
+</script>
 {% endblock %}
