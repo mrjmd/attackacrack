@@ -5,8 +5,6 @@
 {% block content %}
     <div class="flex justify-between items-center mb-6">
         <h2 class="text-3xl font-bold">Quotes</h2>
-        <!-- --- THIS IS THE ONLY CHANGE IN THIS FILE --- -->
-        <!-- Corrected the url_for endpoint from 'quote.add_quote' to 'quote.add_edit' -->
         <a href="{{ url_for('quote.add_edit') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Add New Quote</a>
     </div>
 
@@ -26,6 +24,7 @@
                     <tr class="hover:bg-gray-700">
                         <td class="px-6 py-4 whitespace-nowrap">{{ quote.id }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
+                            <!-- This line now has a valid endpoint to build from -->
                             <a href="{{ url_for('job.view', job_id=quote.job.id) }}" class="text-blue-400 hover:underline">
                                 Job #{{ quote.job.id }} - {{ quote.job.property.address }}
                             </a>
