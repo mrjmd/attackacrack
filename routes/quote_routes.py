@@ -4,26 +4,32 @@ from services.job_service import JobService
 from services.invoice_service import InvoiceService
 from crm_database import ProductService
 
-# --- CHANGE START ---
-# Corrected the Blueprint name and all function names to match your repository exactly.
-# This will fix the BuildError.
 quote_bp = Blueprint('quote', __name__)
+
+# --- FIX START ---
+# Restored the instantiation of the QuoteService.
+# All methods in the service are instance methods and must be called on an instance.
+quote_service = QuoteService()
+# --- FIX END ---
 
 @quote_bp.route('/quotes')
 def list_all():
-    quotes = QuoteService.get_all_quotes()
+    # Correctly call the method on the instance
+    quotes = quote_service.get_all_quotes()
     return render_template('quote_list.html', quotes=quotes)
 
 @quote_bp.route('/quote/<int:quote_id>')
 def view(quote_id):
-    quote = QuoteService.get_quote_by_id(quote_id)
+    # Correctly call the method on the instance
+    quote = quote_service.get_quote_by_id(quote_id)
     return render_template('quote_detail.html', quote=quote)
 
 @quote_bp.route('/quote/add', methods=['GET', 'POST'])
 @quote_bp.route('/quote/<int:quote_id>/edit', methods=['GET', 'POST'])
 def add_edit(quote_id=None):
     if quote_id:
-        quote = QuoteService.get_quote_by_id(quote_id)
+        # Correctly call the method on the instance
+        quote = quote_service.get_quote_by_id(quote_id)
     else:
         quote = None
 
@@ -34,10 +40,12 @@ def add_edit(quote_id=None):
             'status': request.form.get('status', 'Draft')
         }
         if quote_id:
-            QuoteService.update_quote(quote_id, data)
+            # Correctly call the method on the instance
+            quote_service.update_quote(quote_id, data)
             flash('Quote updated successfully!', 'success')
         else:
-            new_quote = QuoteService.create_quote(data)
+            # Correctly call the method on the instance
+            new_quote = quote_service.create_quote(data)
             quote_id = new_quote.id
             flash('Quote created successfully!', 'success')
         return redirect(url_for('quote.view', quote_id=quote_id))
@@ -47,23 +55,21 @@ def add_edit(quote_id=None):
 
 @quote_bp.route('/quote/<int:quote_id>/delete', methods=['POST'])
 def delete(quote_id):
-    QuoteService.delete_quote(quote_id)
+    # Correctly call the method on the instance
+    quote_service.delete_quote(quote_id)
     flash('Quote deleted successfully!', 'success')
     return redirect(url_for('quote.list_all'))
 
-# --- THIS IS THE ONLY NEW LOGIC ---
-# A new route to handle the conversion from Quote to Invoice
 @quote_bp.route('/quote/<int:quote_id>/convert', methods=['POST'])
 def convert_quote_to_invoice(quote_id):
     """
     Handles the POST request to convert a quote into an invoice.
     """
+    # Note: InvoiceService uses static methods, so it's called on the class
     new_invoice = InvoiceService.create_invoice_from_quote(quote_id)
     if new_invoice:
         flash('Quote successfully converted to Invoice!', 'success')
-        # Redirect to the detail page of the newly created invoice
         return redirect(url_for('invoice.view', invoice_id=new_invoice.id))
     else:
         flash('Failed to convert quote. Quote not found.', 'danger')
         return redirect(url_for('quote.view', quote_id=quote_id))
-# --- CHANGE END ---

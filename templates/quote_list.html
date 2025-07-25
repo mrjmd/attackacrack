@@ -5,15 +5,54 @@
 {% block content %}
     <div class="flex justify-between items-center mb-6">
         <h2 class="text-3xl font-bold">Quotes</h2>
-        <a href="{{ url_for('quote.add_quote') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Add New Quote</a>
+        <!-- --- THIS IS THE ONLY CHANGE IN THIS FILE --- -->
+        <!-- Corrected the url_for endpoint from 'quote.add_quote' to 'quote.add_edit' -->
+        <a href="{{ url_for('quote.add_edit') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Add New Quote</a>
     </div>
-    <div class="bg-gray-900 rounded-lg shadow p-6">
-        <ul>
-            {% for quote in quotes %}
-                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('quote.quote_detail', quote_id=quote.id) }}" class="hover:text-blue-400">Quote #{{ quote.id }}</a> - ${{ "%.2f"|format(quote.amount) }} ({{ quote.status }})</li>
-            {% else %}
-                <li>No quotes found.</li>
-            {% endfor %}
-        </ul>
+
+    <div class="bg-gray-800 rounded-lg shadow overflow-hidden">
+        <table class="min-w-full">
+            <thead class="bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Quote ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Job</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Amount</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-700">
+                {% for quote in quotes %}
+                    <tr class="hover:bg-gray-700">
+                        <td class="px-6 py-4 whitespace-nowrap">{{ quote.id }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="{{ url_for('job.view', job_id=quote.job.id) }}" class="text-blue-400 hover:underline">
+                                Job #{{ quote.job.id }} - {{ quote.job.property.address }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">${{ "%.2f".format(quote.amount) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if quote.status == 'Draft' %} bg-yellow-500 text-yellow-900
+                                {% elif quote.status == 'Sent' %} bg-blue-500 text-blue-100
+                                {% elif quote.status == 'Accepted' %} bg-green-500 text-green-900
+                                {% elif quote.status == 'Rejected' %} bg-red-500 text-red-900
+                                {% else %} bg-gray-500 text-gray-100
+                                {% endif %}">
+                                {{ quote.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="{{ url_for('quote.view', quote_id=quote.id) }}" class="text-indigo-400 hover:text-indigo-200">View</a>
+                            <a href="{{ url_for('quote.add_edit', quote_id=quote.id) }}" class="text-indigo-400 hover:text-indigo-200 ml-4">Edit</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 whitespace-nowrap text-center text-gray-400">No quotes found.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 {% endblock %}

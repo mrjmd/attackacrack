@@ -9,7 +9,9 @@
             <a href="{{ url_for('contact.contact_detail', contact_id=contact.id) }}" class="text-sm text-gray-400 hover:text-white">Back to Contact Details</a>
         </div>
         <div class="flex items-center space-x-2">
-            <a href="{{ url_for('quote.add_quote', contact_id=contact.id) }}" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-bold">Create Quote</a>
+            <!-- --- THIS IS THE ONLY CHANGE IN THIS FILE --- -->
+            <!-- Corrected the url_for endpoint from 'quote.add_quote' to 'quote.add_edit' to match the function name in the route file -->
+            <a href="{{ url_for('quote.add_edit', contact_id=contact.id) }}" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-bold">Create Quote</a>
             
             <!-- NEW DROPDOWN BUTTON -->
             <div class="relative" x-data="{ open: false }">
