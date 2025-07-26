@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from services.contact_service import ContactService
-from services.message_service import MessageService
+from services.message_service import MessageService # Re-importing MessageService
 
 contact_bp = Blueprint('contact', __name__)
 
@@ -13,8 +13,9 @@ def list_all():
 @contact_bp.route('/conversations')
 def conversation_list():
     message_service = MessageService()
-    latest_messages = message_service.get_latest_conversations(limit=25)
-    return render_template('conversation_list.html', messages=latest_messages)
+    # Use the new method to get conversations from our database
+    latest_conversations = message_service.get_latest_conversations_from_db()
+    return render_template('conversation_list.html', conversations=latest_conversations)
 
 @contact_bp.route('/<int:contact_id>')
 def contact_detail(contact_id):
@@ -22,7 +23,8 @@ def contact_detail(contact_id):
     message_service = MessageService()
     contact = contact_service.get_contact_by_id(contact_id)
     
-    recent_messages = message_service.get_messages_for_contact(contact_id)[-5:]
+    # Get the rich activity history for this contact
+    activities = message_service.get_activities_for_contact(contact_id)
     
     from api_integrations import get_emails_for_contact
     recent_emails = get_emails_for_contact(contact.email)
@@ -30,30 +32,22 @@ def contact_detail(contact_id):
     return render_template(
         'contact_detail.html', 
         contact=contact,
-        recent_messages=recent_messages,
+        # Pass the new 'activities' object to the template
+        activities=activities,
         recent_emails=recent_emails
     )
 
-@contact_bp.route('/<int:contact_id>/conversation', methods=['GET', 'POST'])
+@contact_bp.route('/<int:contact_id>/conversation')
 def conversation(contact_id):
-    # --- THIS IS THE FIX ---
-    # Instantiate the services inside this function
     contact_service = ContactService()
     message_service = MessageService()
-    # --- END FIX ---
-    
     contact = contact_service.get_contact_by_id(contact_id)
+    activities = message_service.get_activities_for_contact(contact_id)
     
-    if request.method == 'POST':
-        message_body = request.form.get('body')
-        from_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
-        if message_body and from_number_id:
-            message_service.send_and_save_message(contact, message_body, from_number_id)
-        return redirect(url_for('contact.conversation', contact_id=contact.id))
+    # This page will also be refactored to handle sending messages via the new model
+    return render_template('conversation_view.html', contact=contact, activities=activities)
 
-    messages = message_service.get_messages_for_contact(contact_id)
-    return render_template('conversation_view.html', contact=contact, messages=messages)
-
+# ... (add_contact, edit_contact, delete_contact remain the same) ...
 @contact_bp.route('/add', methods=['GET', 'POST'])
 def add_contact():
     contact_service = ContactService()
