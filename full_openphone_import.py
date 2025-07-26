@@ -1,7 +1,7 @@
 import os
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib3.exceptions import InsecureRequestWarning
 from collections import Counter
 
@@ -11,16 +11,18 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 # Import what we need from the main application
 from app import create_app
 from extensions import db
-from crm_database import Contact, Message, MediaAttachment
+from crm_database import Contact, Conversation, Activity, MediaAttachment
 from services.contact_service import ContactService
 
 # --- CONFIGURATION ---
 MEDIA_UPLOAD_FOLDER = 'uploads/media'
+# Set to None for the full import.
+DRY_RUN_LIMIT = None 
 
 def run_full_import():
     """
-    Performs a comprehensive import of all contacts and full conversation histories
-    from OpenPhone, using the correct /v1/messages endpoint.
+    Performs a one-time, comprehensive import of all conversations, messages,
+    calls, and media from OpenPhone into the new data model.
     """
     print("--- Starting Comprehensive OpenPhone Import ---")
     
@@ -41,131 +43,163 @@ def run_full_import():
         os.makedirs(MEDIA_UPLOAD_FOLDER, exist_ok=True)
         print(f"Media will be saved to: {os.path.abspath(MEDIA_UPLOAD_FOLDER)}")
 
-        # 1. Fetch ALL Conversations
-        print("\n--- Fetching All Conversations ---")
+        print("\n--- Step 1: Fetching Conversations ---")
         all_conversations = []
         page_token = None
-        while True:
-            url = "https://api.openphone.com/v1/conversations"
-            params = {
-                'phoneNumbers[]': user_phone_number,
-                'maxResults': 100
-            }
-            if page_token:
-                params['pageToken'] = page_token
-            
+        
+        # --- THIS IS THE FINAL CORRECTED LOGIC ---
+        if DRY_RUN_LIMIT:
+            print(f"\n--- !!! INITIATING DRY RUN: FETCHING ONLY {DRY_RUN_LIMIT} conversations !!! ---")
+            url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}"
+            params = {'maxResults': DRY_RUN_LIMIT}
             try:
                 response = requests.get(url, headers=headers, params=params, verify=False)
                 response.raise_for_status()
-                data = response.json()
-                all_conversations.extend(data.get('data', []))
-                page_token = data.get('nextPageToken')
-                if not page_token:
-                    break
+                all_conversations = response.json().get('data', [])
+                print(f"Fetched {len(all_conversations)} conversations for dry run.")
             except Exception as e:
-                print(f"ERROR: Could not fetch conversations: {e}")
+                print(f"ERROR: Could not fetch conversations for dry run: {e}")
                 return
+        else:
+            print("\n--- INITIATING FULL IMPORT: Fetching all conversations in pages of 100 ---")
+            while True:
+                url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}"
+                params = {'maxResults': 100}
+                if page_token:
+                    params['pageToken'] = page_token
+                try:
+                    response = requests.get(url, headers=headers, params=params, verify=False)
+                    response.raise_for_status()
+                    data = response.json()
+                    all_conversations.extend(data.get('data', []))
+                    page_token = data.get('nextPageToken')
+                    print(f"Fetched a page of conversations, total now: {len(all_conversations)}")
+                    if not page_token:
+                        break
+                except Exception as e:
+                    print(f"ERROR: Could not fetch conversations: {e}")
+                    return
+        # --- END CORRECTED LOGIC ---
         
         print(f"Found {len(all_conversations)} conversations to process.")
 
-        # Pre-scan for duplicate numbers
-        phone_number_counts = Counter()
-        for convo in all_conversations:
-            other_participants = [p for p in convo.get('participants', []) if p != user_phone_number]
-            if other_participants:
-                phone_number_counts[other_participants[0]] += 1
-
-        # 2. Process each conversation
-        total_messages_added = 0
-        for i, convo in enumerate(all_conversations):
-            # --- THIS IS THE FIX for Group Chats ---
-            # Filter out our own number to find the other participant(s)
-            other_participants = [p for p in convo.get('participants', []) if p != user_phone_number]
+        for i, convo_data in enumerate(all_conversations):
+            openphone_convo_id = convo_data.get('id')
+            participants = convo_data.get('participants', [])
+            other_participants = [p for p in participants if p != user_phone_number]
+            
             if not other_participants:
-                continue # Skip conversations with no other participants
-            
-            # For now, we'll treat the first other participant as the primary contact for this conversation
-            other_participant_phone = other_participants[0]
-            # --- END FIX ---
-            
-            contact_id_from_convo = convo.get('contact', {}).get('id')
+                continue
 
-            if (i + 1) % 50 == 0:
-                print(f"  -> Processing conversation {i+1}/{len(all_conversations)} with {other_participant_phone}...")
+            primary_participant = other_participants[0]
+            print(f"\n--- Processing Conversation {i+1}/{len(all_conversations)} with {primary_participant} ---")
 
-            contact = db.session.query(Contact).filter_by(phone=other_participant_phone).first()
+            contact = contact_service.get_contact_by_phone(primary_participant)
             if not contact:
-                # ... (Contact creation logic is unchanged)
-                first_name = convo.get('name') or other_participant_phone
-                last_name = "(from import)"
-                email = None
-                if contact_id_from_convo:
-                    try:
-                        contact_url = f"https://api.openphone.com/v1/contacts/{contact_id_from_convo}"
-                        contact_response = requests.get(contact_url, headers=headers, verify=False)
-                        if contact_response.status_code == 200:
-                            full_contact_data = contact_response.json().get('data', {})
-                            first_name = full_contact_data.get('firstName') or first_name
-                            last_name = full_contact_data.get('lastName') or last_name
-                            email = next((e['value'] for e in full_contact_data.get('emails', []) if e.get('isPrimary')), None)
-                    except Exception as e:
-                        print(f"  -> WARN: Could not enrich contact {contact_id_from_convo}: {e}")
-                if phone_number_counts[other_participant_phone] > 3:
-                    last_name += " (Office Number?)"
-                contact = contact_service.add_contact(first_name=first_name, last_name=last_name, phone=other_participant_phone, email=email)
+                contact_name = convo_data.get('name') or primary_participant
+                contact = contact_service.add_contact(first_name=contact_name, last_name="(from import)", phone=primary_participant)
 
-            # Fetch all messages for this conversation using the correct /v1/messages endpoint
-            all_messages = []
+            conversation = db.session.query(Conversation).filter_by(openphone_id=openphone_convo_id).first()
+            if not conversation:
+                conversation = Conversation(
+                    openphone_id=openphone_convo_id,
+                    contact_id=contact.id,
+                    participants=','.join(participants)
+                )
+                db.session.add(conversation)
+                db.session.commit()
+
+            all_activities = []
+            
             page_token = None
             while True:
                 url = "https://api.openphone.com/v1/messages"
                 params = {
                     'phoneNumberId': phone_number_id,
-                    'participants[]': other_participant_phone,
+                    'participants[]': other_participants,
                     'maxResults': 100
                 }
-                if page_token:
-                    params['pageToken'] = page_token
+                if page_token: params['pageToken'] = page_token
                 try:
-                    messages_response = requests.get(url, headers=headers, params=params, verify=False)
-                    messages_response.raise_for_status()
-                    data = messages_response.json()
-                    all_messages.extend(data.get('data', []))
+                    res = requests.get(url, headers=headers, params=params, verify=False)
+                    res.raise_for_status()
+                    data = res.json()
+                    all_activities.extend(data.get('data', []))
                     page_token = data.get('nextPageToken')
-                    if not page_token:
-                        break
+                    if not page_token: break
                 except Exception as e:
-                    print(f"  -> ERROR: Could not fetch messages for conversation with {other_participant_phone}: {e}")
+                    print(f"  -> ERROR fetching messages: {e}")
+                    break
+            
+            page_token = None
+            while True:
+                url = "https://api.openphone.com/v1/calls"
+                params = {
+                    'phoneNumberId': phone_number_id,
+                    'participants[]': [primary_participant],
+                    'maxResults': 100
+                }
+                if page_token: params['pageToken'] = page_token
+                try:
+                    res = requests.get(url, headers=headers, params=params, verify=False)
+                    res.raise_for_status()
+                    data = res.json()
+                    all_activities.extend(data.get('data', []))
+                    page_token = data.get('nextPageToken')
+                    if not page_token: break
+                except Exception as e:
+                    print(f"  -> ERROR fetching calls: {e}")
                     break
 
-            # Save messages and download media
-            messages_added_this_convo = 0
-            for msg_data in reversed(all_messages): # Save oldest first
-                openphone_id = msg_data.get('id')
+            all_activities.sort(key=lambda x: x.get('createdAt'))
+            print(f"  -> Found {len(all_activities)} total activities (messages and calls).")
+            
+            for activity_data in all_activities:
+                activity_id = activity_data.get('id')
                 
-                if not db.session.query(Message).filter_by(openphone_id=openphone_id).first():
-                    new_message = Message(
-                        openphone_id=openphone_id,
-                        contact_id=contact.id,
-                        body=msg_data.get('body') or msg_data.get('text'),
-                        direction=msg_data.get('direction'),
-                        timestamp=datetime.fromisoformat(msg_data.get('createdAt').replace('Z', '+00:00'))
+                if not db.session.query(Activity).filter_by(openphone_id=activity_id).first():
+                    timestamp = datetime.fromisoformat(activity_data.get('createdAt').replace('Z', '')).replace(tzinfo=timezone.utc)
+                    
+                    new_activity = Activity(
+                        conversation_id=conversation.id,
+                        openphone_id=activity_id,
+                        type=activity_data.get('type'),
+                        direction=activity_data.get('direction'),
+                        status=activity_data.get('status') or activity_data.get('callStatus'),
+                        body=activity_data.get('text') or activity_data.get('body'),
+                        duration=activity_data.get('duration'),
+                        recording_url=activity_data.get('recordingUrl'),
+                        voicemail_url=activity_data.get('voicemailUrl'),
+                        created_at=timestamp
                     )
-                    db.session.add(new_message)
+                    db.session.add(new_activity)
                     db.session.flush()
 
-                    for media_url in msg_data.get('media', []):
-                        # Media handling logic can be added here
-                        pass 
-
-                    messages_added_this_convo += 1
+                    for media_url in activity_data.get('media', []):
+                        try:
+                            media_res = requests.get(media_url, verify=False)
+                            if media_res.status_code == 200:
+                                filename = media_url.split('/')[-1].split('?')[0]
+                                local_path = os.path.join(MEDIA_UPLOAD_FOLDER, filename)
+                                with open(local_path, 'wb') as f:
+                                    f.write(media_res.content)
+                                
+                                new_media = MediaAttachment(
+                                    activity_id=new_activity.id,
+                                    source_url=media_url,
+                                    local_path=local_path,
+                                    content_type=media_res.headers.get('Content-Type')
+                                )
+                                db.session.add(new_media)
+                        except Exception as e:
+                            print(f"    -> ERROR downloading media {media_url}: {e}")
             
-            if messages_added_this_convo > 0:
-                total_messages_added += messages_added_this_convo
+            if all_activities:
+                last_activity_ts = datetime.fromisoformat(all_activities[-1].get('createdAt').replace('Z', '')).replace(tzinfo=timezone.utc)
+                conversation.last_activity_at = last_activity_ts
 
         db.session.commit()
         print("\n--- Full Import Complete ---")
-        print(f"Total new messages added: {total_messages_added}")
 
 if __name__ == '__main__':
     run_full_import()
