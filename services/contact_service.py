@@ -17,6 +17,12 @@ class ContactService:
     def get_contact_by_id(self, contact_id):
         return self.session.get(Contact, contact_id)
 
+    def get_contact_by_phone(self, phone_number):
+        """Finds a contact by their phone number."""
+        if not phone_number:
+            return None
+        return self.session.query(Contact).filter_by(phone=phone_number).first()
+
     def update_contact(self, contact, **kwargs):
         for key, value in kwargs.items():
             setattr(contact, key, value)

@@ -1,18 +1,26 @@
 # docker-compose.yml
 
-# The 'version' tag has been removed.
 services:
-  # The Flask application service
   web:
     build: .
     container_name: crm_web_app
     env_file:
       - .env
+    ports:
+      - "5000:5000"
     expose:
       - 5000
-    command: ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+    # --- THIS IS THE FIX ---
+    # Mount the token.pickle file from your local machine into the container.
+    # This gives the app the Google credentials it needs without a browser.
+    volumes:
+      - ./token.pickle:/app/token.pickle
+    # --- END FIX ---
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
-  # The ngrok service
   ngrok:
     image: ngrok/ngrok:latest
     container_name: crm_ngrok
@@ -21,3 +29,27 @@ services:
     ports:
       - "4040:4040"
     command: "http web:5000"
+    depends_on:
+      - web
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    container_name: crm_database
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    expose:
+      - 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
