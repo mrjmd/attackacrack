@@ -15,7 +15,7 @@ class ContactService:
         return self.session.query(Contact).all()
 
     def get_contact_by_id(self, contact_id):
-        return self.session.query(Contact).get(contact_id)
+        return self.session.get(Contact, contact_id)
 
     def update_contact(self, contact, **kwargs):
         for key, value in kwargs.items():

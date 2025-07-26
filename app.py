@@ -10,12 +10,16 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 # The 'commands' import is removed as the file no longer exists.
 
-def create_app(config_class=Config):
+def create_app(config_class=Config, test_config=None):
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
     
     # Load configuration from the Config object
     app.config.from_object(config_class)
+    
+    # If a test config is passed, update the app config with it
+    if test_config:
+        app.config.update(test_config)
 
     # Initialize extensions with the app
     db.init_app(app)
