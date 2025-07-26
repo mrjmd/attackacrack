@@ -15,7 +15,9 @@ class PropertyService:
         return self.session.query(Property).all()
 
     def get_property_by_id(self, property_id):
-        return self.session.query(Property).get(property_id)
+        # --- THIS IS THE FIX ---
+        return self.session.get(Property, property_id)
+        # --- END FIX ---
     
     def update_property(self, property_obj, **kwargs):
         for key, value in kwargs.items():

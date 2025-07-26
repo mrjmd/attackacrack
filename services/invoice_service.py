@@ -9,7 +9,9 @@ class InvoiceService:
 
     @staticmethod
     def get_invoice_by_id(invoice_id):
-        return Invoice.query.get(invoice_id)
+        # --- THIS IS THE FIX ---
+        return db.session.get(Invoice, invoice_id)
+        # --- END FIX ---
 
     @staticmethod
     def create_invoice(data):
