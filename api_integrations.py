@@ -1,10 +1,8 @@
-# ===================================================================
-print("--- LOADING LATEST api_integrations.py (Final Fix) ---")
-# ===================================================================
+# api_integrations.py
 
 import os
 import pickle
-from datetime import datetime, timedelta, UTC # Import UTC
+from datetime import datetime, timedelta, UTC
 import json
 
 from flask import current_app
@@ -13,12 +11,9 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import requests
-# Suppress the InsecureRequestWarning from urllib3
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-
-# Define the scopes for all Google services we'll use
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/calendar'
@@ -26,9 +21,6 @@ SCOPES = [
 TOKEN_FILE = 'token.pickle'
 
 def get_google_creds():
-    """
-    Gets valid Google API credentials. Handles token refresh and new user login.
-    """
     creds = None
     if os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, 'rb') as token:
@@ -81,9 +73,7 @@ def get_upcoming_calendar_events(count=5):
     if not creds: return []
     try:
         service = build('calendar', 'v3', credentials=creds)
-        # --- THIS IS THE FIX ---
         now = datetime.now(UTC).isoformat()
-        # --- END FIX ---
         events_result = service.events().list(calendarId='primary', timeMin=now, maxResults=count, singleEvents=True, orderBy='startTime').execute()
         return events_result.get('items', [])
     except Exception as e:
@@ -110,9 +100,6 @@ def get_recent_gmail_messages(count=5):
         return []
 
 def get_emails_for_contact(email_address, count=5):
-    """
-    Searches Gmail for messages to or from a specific email address.
-    """
     if not email_address:
         return []
         
@@ -120,10 +107,7 @@ def get_emails_for_contact(email_address, count=5):
     if not creds: return []
     try:
         service = build('gmail', 'v1', credentials=creds)
-        
-        # Construct a search query for the Gmail API
         query = f"from:{email_address} OR to:{email_address}"
-        
         results = service.users().messages().list(userId='me', q=query, maxResults=count).execute()
         messages_info = results.get('messages', [])
         
@@ -141,22 +125,14 @@ def get_emails_for_contact(email_address, count=5):
         return []
 
 def get_recent_openphone_texts(count=5):
-    """
-    Fetches and processes recent conversations from OpenPhone, including the latest message body.
-    Returns a tuple: (processed_data, error_message)
-    """
     try:
         api_key = current_app.config.get('OPENPHONE_API_KEY')
         phone_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
 
-        if not api_key:
-            return ([], "OpenPhone API Key is not configured in config.py.")
-        if not phone_number_id:
-            return ([], "OPENPHONE_PHONE_NUMBER_ID is not configured in config.py.")
+        if not api_key or not phone_number_id:
+            return ([], "OpenPhone API Key or Phone Number ID is not configured.")
 
         headers = {"Authorization": api_key}
-
-        # Step 1: Get the list of recent conversations
         conversations_url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}&limit={count}"
         conversation_response = requests.get(conversations_url, headers=headers, verify=False)
         conversation_response.raise_for_status()
@@ -164,29 +140,38 @@ def get_recent_openphone_texts(count=5):
 
         processed_conversations = []
         for convo in conversations:
+            # --- THIS IS THE FIX ---
+            # We now check the type of the last activity.
             last_activity_id = convo.get('lastActivityId')
-            if not last_activity_id:
-                continue
-
-            message_url = f"https://api.openphone.com/v1/messages/{last_activity_id}"
-            message_response = requests.get(message_url, headers=headers, verify=False)
-            
+            last_activity_type = convo.get('lastActivityType')
             latest_message_body = ""
-            if message_response.status_code == 404:
-                latest_message_body = "[Last activity was not a text message]"
-            else:
-                message_response.raise_for_status()
-                message_data = message_response.json()
-                
-                # --- THIS IS THE FIX ---
-                # The message body is inside the 'data' object, under the key 'text'.
-                latest_message_body = message_data.get('data', {}).get('text', "[Message with no body]")
-                # ------------------------
 
-            other_participant_number = convo.get('participants', [None])[0]
+            if last_activity_type == 'message':
+                # Only if it's a message do we try to fetch it from the messages API.
+                message_url = f"https://api.openphone.com/v1/messages/{last_activity_id}"
+                message_response = requests.get(message_url, headers=headers, verify=False)
+                
+                if message_response.status_code == 200:
+                    message_data = message_response.json()
+                    latest_message_body = message_data.get('data', {}).get('text', "[Message with no body]")
+                else:
+                    # Handle cases where the message fetch might fail for other reasons
+                    latest_message_body = f"[Error fetching message: {message_response.status_code}]"
+            elif last_activity_type == 'call':
+                latest_message_body = "[Last activity was a phone call]"
+            else:
+                latest_message_body = f"[Last activity: {last_activity_type or 'Unknown'}]"
+            # --- END FIX ---
+
+            # Find the contact associated with the conversation
+            from services.contact_service import ContactService
+            contact_service = ContactService()
+            other_participant_number = next((p for p in convo.get('participants', []) if p != current_app.config.get('OPENPHONE_PHONE_NUMBER')), None)
+            contact = contact_service.get_contact_by_phone(other_participant_number) if other_participant_number else None
 
             processed_conversations.append({
-                'contact_name': convo.get('name'),
+                'contact_id': contact.id if contact else None,
+                'contact_name': convo.get('name') or (contact.first_name if contact else None),
                 'contact_number': other_participant_number,
                 'latest_message_body': latest_message_body
             })
@@ -203,37 +188,21 @@ def get_recent_openphone_texts(count=5):
         return ([], error_msg)
 
 def create_google_calendar_event(title, description, start_time, end_time, attendees: list, location: str = None):
-    """
-    Creates a new event on the user's primary Google Calendar.
-    attendees is a list of email addresses.
-    Location is an optional string for the event's location.
-    """
     creds = get_google_creds()
     if not creds:
         print("Could not create Google Calendar event: invalid credentials.")
         return None
     try:
         service = build('calendar', 'v3', credentials=creds)
-        
         event = {
             'summary': title,
             'description': description,
-            'start': {
-                'dateTime': start_time.isoformat(),
-                'timeZone': 'America/New_York', # Should be configurable in the future
-            },
-            'end': {
-                'dateTime': end_time.isoformat(),
-                'timeZone': 'America/New_York',
-            },
+            'start': {'dateTime': start_time.isoformat(), 'timeZone': 'America/New_York'},
+            'end': {'dateTime': end_time.isoformat(), 'timeZone': 'America/New_York'},
             'attendees': [{'email': email} for email in attendees],
         }
-        
-        # --- ADDED LOGIC ---
         if location:
             event['location'] = location
-        # --- END ADDED LOGIC ---
-
         created_event = service.events().insert(calendarId='primary', body=event).execute()
         print(f"Event created: {created_event.get('htmlLink')}")
         return created_event
@@ -242,20 +211,15 @@ def create_google_calendar_event(title, description, start_time, end_time, atten
         return None
 
 def delete_google_calendar_event(event_id: str):
-    """
-    Deletes an event from the user's primary Google Calendar using its ID.
-    """
     creds = get_google_creds()
     if not creds:
         print("Could not delete Google Calendar event: invalid credentials.")
         return False
     try:
         service = build('calendar', 'v3', credentials=creds)
-        
         service.events().delete(calendarId='primary', eventId=event_id).execute()
         print(f"Successfully deleted Google Calendar event: {event_id}")
         return True
     except Exception as e:
-        # It's possible the event was already deleted, so we don't treat all errors as fatal.
         print(f"Error deleting Google Calendar event {event_id}: {e}")
         return False
