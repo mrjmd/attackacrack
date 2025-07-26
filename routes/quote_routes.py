@@ -9,7 +9,7 @@ quote_bp = Blueprint('quote', __name__)
 quote_service = QuoteService()
 job_service = JobService()
 
-@quote_bp.route('/quotes')
+@quote_bp.route('/')
 def list_all():
     quotes = quote_service.get_all_quotes()
     return render_template('quote_list.html', quotes=quotes)

@@ -5,8 +5,6 @@
 {% block content %}
     <div class="flex justify-between items-center mb-6">
         <h2 class="text-3xl font-bold">Jobs</h2>
-        <!-- --- THIS IS THE ONLY CHANGE IN THIS FILE --- -->
-        <!-- Corrected the url_for endpoint from 'job.add_job' to 'job.add_edit' -->
         <a href="{{ url_for('job.add_edit') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Add New Job</a>
     </div>
 
@@ -26,8 +24,8 @@
                     <tr class="hover:bg-gray-700">
                         <td class="px-6 py-4 whitespace-nowrap">{{ job.id }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <a href="{{ url_for('property.view', property_id=job.property.id) }}" class="text-blue-400 hover:underline">
-                                {{ job.property.address }}
+                            <a href="{{ url_for('property.property_detail', property_id=job.property.id) }}" class="text-blue-400 hover:underline">
+                            {{ job.property.address }}
                             </a>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">{{ job.description[:50] }}{% if job.description|length > 50 %}...{% endif %}</td>
