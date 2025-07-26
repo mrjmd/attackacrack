@@ -6,7 +6,7 @@ job_bp = Blueprint('job', __name__)
 job_service = JobService()
 property_service = PropertyService()
 
-@job_bp.route('/jobs')
+@job_bp.route('/')
 def list_all():
     jobs = job_service.get_all_jobs()
     return render_template('job_list.html', jobs=jobs)

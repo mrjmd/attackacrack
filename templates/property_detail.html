@@ -25,11 +25,11 @@
     <div class="bg-gray-900 rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold">Jobs at this Property</h3>
-            <a href="{{ url_for('job.add_job', property_id=property.id) }}" class="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg">Add Job</a>
-        </div>
+            <a href="{{ url_for('job.add_edit', property_id=property.id) }}" class="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg">Add Job</a>
+            </div>
         <ul>
             {% for job in property.jobs %}
-                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('job.job_detail', job_id=job.id) }}" class="hover:text-blue-400">{{ job.description }}</a></li>
+                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('job.view', job_id=job.id) }}" class="hover:text-blue-400">{{ job.description }}</a></li>
             {% else %}
                 <li>No jobs found for this property.</li>
             {% endfor %}

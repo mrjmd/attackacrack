@@ -17,6 +17,6 @@
         <p><strong>Amount:</strong> ${{ "%.2f"|format(invoice.amount) }}</p>
         <p><strong>Due Date:</strong> {{ invoice.due_date }}</p>
         <p><strong>Status:</strong> {{ invoice.status }}</p>
-        <p><strong>Job:</strong> <a href="{{ url_for('job.job_detail', job_id=invoice.job.id) }}" class="text-blue-400 hover:underline">{{ invoice.job.description }}</a></p>
-    </div>
+        <p><strong>Job:</strong> <a href="{{ url_for('job.view', job_id=invoice.job.id) }}" class="text-blue-400 hover:underline">{{ invoice.job.description }}</a></p>
+        </div>
 {% endblock %}

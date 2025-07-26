@@ -4,7 +4,7 @@ print("--- LOADING LATEST api_integrations.py (Final Fix) ---")
 
 import os
 import pickle
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC # Import UTC
 import json
 
 from flask import current_app
@@ -81,7 +81,9 @@ def get_upcoming_calendar_events(count=5):
     if not creds: return []
     try:
         service = build('calendar', 'v3', credentials=creds)
-        now = datetime.utcnow().isoformat() + 'Z'
+        # --- THIS IS THE FIX ---
+        now = datetime.now(UTC).isoformat()
+        # --- END FIX ---
         events_result = service.events().list(calendarId='primary', timeMin=now, maxResults=count, singleEvents=True, orderBy='startTime').execute()
         return events_result.get('items', [])
     except Exception as e:
