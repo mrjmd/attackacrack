@@ -1,6 +1,7 @@
 alembic==1.16.4
 annotated-types==0.7.0
 APScheduler==3.11.0
+-e git+ssh://git@github.com/mrjmd/attackacrack.git@b29b6112d1c0a37e68d194bcdefb7d99800d67b0#egg=attackacrack_crm
 blinker==1.9.0
 cachetools==5.5.2
 certifi==2025.7.14
@@ -46,6 +47,7 @@ pydantic_core==2.33.2
 Pygments==2.19.2
 pyparsing==3.2.3
 pytest==8.4.1
+pytest-mock==3.14.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 pytz==2025.2
