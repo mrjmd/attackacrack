@@ -1,0 +1,27 @@
+# .dockerignore
+
+# Git files
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Python virtual environment and build artifacts
+.venv
+__pycache__
+*.pyc
+*.egg-info
+
+# Local secrets and config
+.env
+*.db
+client_secret.json
+token.pickle
+openphone.key
+
+# IDE and OS-specific files
+.idea/
+.vscode/
+.DS_Store
