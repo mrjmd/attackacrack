@@ -11,10 +11,12 @@ services:
     expose:
       - 5000
     # --- THIS IS THE FIX ---
-    # Mount the token.pickle file from your local machine into the container.
-    # This gives the app the Google credentials it needs without a browser.
+    # We are now mounting two volumes:
+    # 1. The token file, as before.
+    # 2. A bind mount that syncs your entire project directory with the /app directory in the container.
     volumes:
       - ./token.pickle:/app/token.pickle
+      - .:/app
     # --- END FIX ---
     depends_on:
       db:
