@@ -45,7 +45,9 @@ class JobService:
         return self.session.query(Job).all()
 
     def get_job_by_id(self, job_id):
-        return self.session.query(Job).get(job_id)
+        # --- THIS IS THE FIX ---
+        return self.session.get(Job, job_id)
+        # --- END FIX ---
 
     def update_job(self, job, **kwargs):
         for key, value in kwargs.items():

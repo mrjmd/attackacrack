@@ -59,7 +59,9 @@ class AppointmentService:
         return self.session.query(Appointment).all()
 
     def get_appointment_by_id(self, appointment_id):
-        return self.session.query(Appointment).get(appointment_id)
+        # --- THIS IS THE FIX ---
+        return self.session.get(Appointment, appointment_id)
+        # --- END FIX ---
 
     def delete_appointment(self, appointment):
         """

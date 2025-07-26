@@ -3,13 +3,15 @@ from crm_database import Quote, QuoteLineItem
 
 class QuoteService:
     def __init__(self):
-        pass
+        # --- THIS IS THE FIX ---
+        self.session = db.session
+        # --- END FIX ---
 
     def get_all_quotes(self):
         return Quote.query.order_by(Quote.id.desc()).all()
 
     def get_quote_by_id(self, quote_id):
-        return Quote.query.get(quote_id)
+        return self.session.get(Quote, quote_id)
 
     # --- FIX START ---
     # The create_quote and update_quote methods have been completely rewritten
