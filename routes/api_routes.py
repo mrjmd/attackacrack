@@ -15,36 +15,39 @@ def get_contacts():
 @api_bp.route('/messages/latest_conversations')
 def get_latest_conversations():
     message_service = MessageService()
-    latest_messages = message_service.get_latest_conversations(limit=5)
-    conversations_json = [
-        {
-            'contact_id': msg.contact.id,
-            'contact_name': msg.contact.first_name,
-            'contact_number': msg.contact.phone,
-            'latest_message_body': msg.body
-        }
-        for msg in latest_messages
-    ]
+    # This endpoint is now database-driven
+    latest_conversations = message_service.get_latest_conversations_from_db(limit=5)
+    conversations_json = []
+    for conv in latest_conversations:
+        last_activity = conv.activities[-1] if conv.activities else None
+        conversations_json.append({
+            'contact_id': conv.contact.id,
+            'contact_name': conv.contact.first_name,
+            'contact_number': conv.contact.phone,
+            'latest_message_body': last_activity.body if last_activity else "No recent activity"
+        })
     return jsonify(conversations_json)
 
-# --- NEW ENDPOINT FOR CONVERSATION POLLING ---
+# --- THIS IS THE FIX ---
 @api_bp.route('/contacts/<int:contact_id>/messages')
 def get_contact_messages(contact_id):
     """
-    Provides a JSON list of all messages for a specific contact.
+    Provides a JSON list of all activities for a specific contact.
     """
     message_service = MessageService()
-    messages = message_service.get_messages_for_contact(contact_id)
+    # Use the new, correct service method
+    activities = message_service.get_activities_for_contact(contact_id)
+    # Format the data into the JSON structure the frontend expects
     messages_json = [
         {
-            'body': msg.body,
-            'direction': msg.direction,
-            'timestamp': msg.timestamp.strftime('%b %d, %I:%M %p')
+            'body': act.body,
+            'direction': act.direction,
+            'timestamp': act.created_at.strftime('%b %d, %I:%M %p')
         }
-        for msg in messages
+        for act in activities
     ]
     return jsonify(messages_json)
-# --- END NEW ENDPOINT ---
+# --- END FIX ---
 
 @api_bp.route('/appointments/generate_summary/<int:contact_id>')
 def generate_appointment_summary(contact_id):
@@ -54,8 +57,9 @@ def generate_appointment_summary(contact_id):
     message_service = MessageService()
     ai_service = AIService()
     
-    messages = message_service.get_messages_for_contact(contact_id)
-    summary = ai_service.summarize_conversation_for_appointment(messages)
+    # This should now get activities to be summarized
+    activities = message_service.get_activities_for_contact(contact_id)
+    summary = ai_service.summarize_conversation_for_appointment(activities)
     
     return jsonify({'summary': summary})
 

@@ -8,11 +8,14 @@ from services.property_service import PropertyService
 from services.job_service import JobService
 from services.quote_service import QuoteService
 from services.appointment_service import AppointmentService
+from services.message_service import MessageService
 from csv_importer import CsvImporter
 from property_radar_importer import PropertyRadarImporter
-from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages, get_recent_openphone_texts
+from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 from extensions import db
-from crm_database import Setting
+# --- THIS IS A FIX: Import Activity ---
+from crm_database import Setting, Activity, Conversation
+# --- END FIX ---
 
 main_bp = Blueprint('main', __name__)
 
@@ -27,6 +30,7 @@ def dashboard():
     job_service = JobService()
     quote_service = QuoteService()
     appointment_service = AppointmentService()
+    message_service = MessageService()
     
     stats = {
         'contact_count': len(contact_service.get_all_contacts()),
@@ -36,14 +40,23 @@ def dashboard():
     }
     
     internal_appointments = appointment_service.get_all_appointments()
-
     google_events = get_upcoming_calendar_events()
     gmail_messages = get_recent_gmail_messages()
     
-    # --- THIS IS THE FIX ---
-    # We pass the existing contact_service instance into the function.
-    openphone_texts, openphone_error = get_recent_openphone_texts(contact_service)
-    # --- END FIX ---
+    latest_conversations = message_service.get_latest_conversations_from_db()
+    
+    openphone_texts = []
+    for conv in latest_conversations:
+        # --- THIS IS THE FIX: A more robust way to get the last activity ---
+        last_activity = db.session.query(Activity).filter_by(conversation_id=conv.id).order_by(Activity.created_at.desc()).first()
+        # --- END FIX ---
+        openphone_texts.append({
+            'contact_id': conv.contact.id,
+            'contact_name': conv.contact.first_name,
+            'contact_number': conv.contact.phone,
+            'latest_message_body': last_activity.body if last_activity else "No activities yet"
+        })
+    openphone_error = None
 
     return render_template(
         'dashboard.html', 
@@ -54,6 +67,7 @@ def dashboard():
         openphone_texts=openphone_texts,
         openphone_error=openphone_error
     )
+# ... (rest of the file remains the same) ...
 
 # ... (the rest of the file remains the same) ...
 @main_bp.route('/settings')

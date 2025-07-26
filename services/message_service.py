@@ -17,22 +17,18 @@ class MessageService:
 
     def get_or_create_conversation(self, contact_id, openphone_convo_id=None, participants=None):
         """Finds an existing conversation or creates a new one."""
-        # Try to find a conversation with the OpenPhone ID first for accuracy
         if openphone_convo_id:
             conversation = self.session.query(Conversation).filter_by(openphone_id=openphone_convo_id).first()
             if conversation:
                 return conversation
 
-        # If not found, look for any existing conversation with this contact
         conversation = self.session.query(Conversation).filter_by(contact_id=contact_id).first()
         if conversation:
-            # If we now have an openphone_id, we should add it
             if openphone_convo_id and not conversation.openphone_id:
                 conversation.openphone_id = openphone_convo_id
                 self.session.commit()
             return conversation
 
-        # If still no conversation, create a new one
         new_conversation = Conversation(
             contact_id=contact_id,
             openphone_id=openphone_convo_id,
@@ -59,8 +55,6 @@ class MessageService:
         if not activity_type:
             return None
 
-        # This will need to be expanded to handle different webhook event types
-        # For now, we focus on the 'message.new' or 'message.received' type
         if activity_type in ['message.new', 'message.received']:
             message_payload = webhook_data.get('data', {}).get('object', {})
             if not message_payload or message_payload.get('direction') != 'incoming':
@@ -70,7 +64,6 @@ class MessageService:
             openphone_id = message_payload.get('id')
             conversation_id_op = message_payload.get('conversationId')
             
-            # Find or create the contact
             contact = self.contact_service.get_contact_by_phone(from_number)
             if not contact:
                 contact = self.contact_service.add_contact(
@@ -79,10 +72,8 @@ class MessageService:
                     phone=from_number
                 )
             
-            # Find or create the conversation
             conversation = self.get_or_create_conversation(contact.id, conversation_id_op)
             
-            # Check if this activity already exists
             existing_activity = self.session.query(Activity).filter_by(openphone_id=openphone_id).first()
             if not existing_activity:
                 new_activity = Activity(
@@ -97,6 +88,6 @@ class MessageService:
                 self.session.add(new_activity)
                 conversation.last_activity_at = datetime.utcnow()
                 self.session.commit()
-                # AI enrichment logic would be called here
+                # AI enrichment logic would be called here in a future step
             return new_activity
         return None
