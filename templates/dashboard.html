@@ -5,7 +5,6 @@
 {% block content %}
     <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
 
-    <!-- Stats Widgets -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <div class="bg-gray-900 p-6 rounded-lg shadow"><h3 class="text-sm font-medium text-gray-400">Total Contacts</h3><p class="text-3xl font-bold mt-2">{{ stats.contact_count }}</p></div>
         <div class="bg-gray-900 p-6 rounded-lg shadow"><h3 class="text-sm font-medium text-gray-400">Total Properties</h3><p class="text-3xl font-bold mt-2">{{ stats.property_count }}</p></div>
@@ -13,10 +12,8 @@
         <div class="bg-gray-900 p-6 rounded-lg shadow"><h3 class="text-sm font-medium text-gray-400">Pending Quotes</h3><p class="text-3xl font-bold mt-2">{{ stats.pending_quotes }}</p></div>
     </div>
 
-    <!-- Main Content Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Appointments & Events Card -->
         <div class="bg-gray-900 p-6 rounded-lg shadow">
             <h3 class="text-xl font-bold mb-4">Upcoming Schedule</h3>
             {% for appt in appointments %}
@@ -36,7 +33,6 @@
             {% endif %}
         </div>
 
-        <!-- Gmail Card -->
         <div class="bg-gray-900 p-6 rounded-lg shadow">
             <h3 class="text-xl font-bold mb-4 text-red-400">Unread Gmail</h3>
             {% for email in gmail_messages %}
@@ -49,56 +45,57 @@
             {% endfor %}
         </div>
         
-        <!-- OpenPhone Card -->
         <div id="openphone-card" class="bg-gray-900 p-6 rounded-lg shadow">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-bold text-purple-400">Recent Texts</h3>
                 <a href="{{ url_for('contact.conversation_list') }}" class="text-sm text-gray-400 hover:text-white">See All</a>
             </div>
             <div id="openphone-content">
-                <p class="text-gray-400 text-sm">Loading latest texts...</p>
-            </div>
+                </div>
         </div>
     </div>
 
     <script>
-        function updateRecentTexts() {
-            fetch("{{ url_for('api.get_latest_conversations') }}")
-                .then(response => response.json())
-                .then(data => {
-                    const contentDiv = document.getElementById('openphone-content');
-                    contentDiv.innerHTML = '';
+        // --- THIS IS THE FIX ---
+        // This function now takes data as an argument and renders it.
+        function renderRecentTexts(data) {
+            const contentDiv = document.getElementById('openphone-content');
+            contentDiv.innerHTML = ''; // Clear existing content
 
-                    if (data.length === 0) {
-                        contentDiv.innerHTML = '<p class="text-gray-400 text-sm">No recent texts found.</p>';
-                        return;
-                    }
+            if (!data || data.length === 0) {
+                contentDiv.innerHTML = '<p class="text-gray-400 text-sm">No recent texts found.</p>';
+                return;
+            }
 
-                    data.forEach(text => {
-                        // The URL for the specific conversation view
-                        const conversationUrl = "{{ url_for('contact.conversation', contact_id=0) }}".replace('0', text.contact_id);
-                        
-                        const messageHtml = `
-                            <a href="${conversationUrl}" class="block hover:bg-gray-800 p-2 rounded-lg">
-                                <div class="text-sm">
-                                    <p class="truncate"><strong>With:</strong> ${text.contact_name || text.contact_number}</p>
-                                    <p class="truncate text-gray-300">${text.latest_message_body || ''}</p>
-                                </div>
-                            </a>
-                        `;
-                        contentDiv.innerHTML += messageHtml;
-                    });
-                })
-                .catch(error => {
-                    console.error('Error fetching recent texts:', error);
-                    const contentDiv = document.getElementById('openphone-content');
-                    contentDiv.innerHTML = '<p class="text-red-400 text-sm">Could not load texts.</p>';
-                });
+            data.forEach(text => {
+                // The URL for the specific conversation view
+                const conversationUrl = text.contact_id 
+                    ? "{{ url_for('contact.conversation', contact_id=0) }}".replace('0', text.contact_id)
+                    : "#"; // Fallback if no contact_id
+                
+                const messageHtml = `
+                    <a href="${conversationUrl}" class="block hover:bg-gray-800 p-2 rounded-lg border-b border-gray-800 pb-2 mb-2">
+                        <div class="text-sm">
+                            <p class="truncate"><strong>With:</strong> ${text.contact_name || text.contact_number}</p>
+                            <p class="truncate text-gray-300">${text.latest_message_body || ''}</p>
+                        </div>
+                    </a>
+                `;
+                contentDiv.innerHTML += messageHtml;
+            });
         }
+        // --- END FIX ---
 
         document.addEventListener('DOMContentLoaded', function() {
-            updateRecentTexts();
-            setInterval(updateRecentTexts, 10000);
+            // --- THIS IS THE FIX ---
+            // We get the initial data directly from the Python backend using 'tojson'.
+            // This is much faster and more reliable than a separate fetch call on page load.
+            const initialTexts = {{ openphone_texts|tojson }};
+            renderRecentTexts(initialTexts);
+            // --- END FIX ---
+
+            // We can still set up polling for live updates in the future if needed.
+            // setInterval(fetchAndRenderUpdates, 15000); 
         });
     </script>
 

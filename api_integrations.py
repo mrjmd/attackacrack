@@ -11,8 +11,10 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import requests
+from services.contact_service import ContactService
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
 
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -124,7 +126,8 @@ def get_emails_for_contact(email_address, count=5):
         print(f"Error fetching emails for contact {email_address}: {e}")
         return []
 
-def get_recent_openphone_texts(count=5):
+
+def get_recent_openphone_texts(contact_service: ContactService, count=5):
     try:
         api_key = current_app.config.get('OPENPHONE_API_KEY')
         phone_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
@@ -132,40 +135,36 @@ def get_recent_openphone_texts(count=5):
         if not api_key or not phone_number_id:
             return ([], "OpenPhone API Key or Phone Number ID is not configured.")
 
+        # --- THIS IS THE FIX ---
+        # The header is now in the correct format, without "Bearer ".
         headers = {"Authorization": api_key}
+        # --- END FIX ---
+        
         conversations_url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}&limit={count}"
+        
         conversation_response = requests.get(conversations_url, headers=headers, verify=False)
         conversation_response.raise_for_status()
         conversations = conversation_response.json().get('data', [])
 
         processed_conversations = []
         for convo in conversations:
-            # --- THIS IS THE FIX ---
-            # We now check the type of the last activity.
-            last_activity_id = convo.get('lastActivityId')
             last_activity_type = convo.get('lastActivityType')
             latest_message_body = ""
 
             if last_activity_type == 'message':
-                # Only if it's a message do we try to fetch it from the messages API.
+                last_activity_id = convo.get('lastActivityId')
                 message_url = f"https://api.openphone.com/v1/messages/{last_activity_id}"
                 message_response = requests.get(message_url, headers=headers, verify=False)
-                
                 if message_response.status_code == 200:
                     message_data = message_response.json()
                     latest_message_body = message_data.get('data', {}).get('text', "[Message with no body]")
                 else:
-                    # Handle cases where the message fetch might fail for other reasons
                     latest_message_body = f"[Error fetching message: {message_response.status_code}]"
             elif last_activity_type == 'call':
                 latest_message_body = "[Last activity was a phone call]"
             else:
                 latest_message_body = f"[Last activity: {last_activity_type or 'Unknown'}]"
-            # --- END FIX ---
 
-            # Find the contact associated with the conversation
-            from services.contact_service import ContactService
-            contact_service = ContactService()
             other_participant_number = next((p for p in convo.get('participants', []) if p != current_app.config.get('OPENPHONE_PHONE_NUMBER')), None)
             contact = contact_service.get_contact_by_phone(other_participant_number) if other_participant_number else None
 
@@ -178,14 +177,12 @@ def get_recent_openphone_texts(count=5):
         
         return (processed_conversations, None)
 
-    except requests.exceptions.HTTPError as http_err:
-        error_msg = f"HTTP Error: {http_err}"
-        print(error_msg)
-        return ([], error_msg)
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {e}"
-        print(error_msg)
-        return ([], error_msg)
+        # We can leave the detailed exception logging for now, it's useful.
+        print(f"\n--- [DEBUG] An exception occurred in get_recent_openphone_texts ---")
+        print(f"--- [DEBUG] Exception Type: {type(e).__name__}")
+        print(f"--- [DEBUG] Exception Details: {e}")
+        return ([], str(e))
 
 def create_google_calendar_event(title, description, start_time, end_time, attendees: list, location: str = None):
     creds = get_google_creds()

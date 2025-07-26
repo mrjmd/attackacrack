@@ -39,7 +39,11 @@ def dashboard():
 
     google_events = get_upcoming_calendar_events()
     gmail_messages = get_recent_gmail_messages()
-    openphone_texts, openphone_error = get_recent_openphone_texts()
+    
+    # --- THIS IS THE FIX ---
+    # We pass the existing contact_service instance into the function.
+    openphone_texts, openphone_error = get_recent_openphone_texts(contact_service)
+    # --- END FIX ---
 
     return render_template(
         'dashboard.html', 
@@ -51,6 +55,7 @@ def dashboard():
         openphone_error=openphone_error
     )
 
+# ... (the rest of the file remains the same) ...
 @main_bp.route('/settings')
 def settings():
     return render_template('settings.html')
