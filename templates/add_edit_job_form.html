@@ -1,12 +1,15 @@
 {% extends "base.html" %}
 
+{% block title %}{% if job %}Edit Job{% else %}Add Job{% endif %}{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-    <h2>{% if job %}Edit Job{% else %}Add Job{% endif %}</h2>
-    <form method="POST" action="">
-        <div class="mb-3">
-            <label for="property_id" class="form-label">Property</label>
-            <select class="form-control" id="property_id" name="property_id" required>
+    <h2 class="text-3xl font-bold mb-6">{% if job %}Edit Job{% else %}Add Job{% endif %}</h2>
+
+    <form method="POST" class="bg-gray-800 p-6 rounded-lg shadow-lg">
+        <div class="mb-4">
+            <label for="property_id" class="block text-gray-300 text-sm font-bold mb-2">Property:</label>
+            <select name="property_id" id="property_id" class="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white leading-tight focus:outline-none focus:shadow-outline" required>
+                <option value="">-- Select a Property --</option>
                 {% for prop in properties %}
                     <option value="{{ prop.id }}" {% if job and job.property_id == prop.id %}selected{% endif %}>
                         {{ prop.address }} ({{ prop.contact.first_name }} {{ prop.contact.last_name }})
@@ -14,13 +17,18 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="mb-3">
-            <label for="description" class="form-label">Description</label>
-            <textarea class="form-control" id="description" name="description" rows="3" required>{{ job.description if job }}</textarea>
+        <div class="mb-4">
+            <label for="description" class="block text-gray-300 text-sm font-bold mb-2">Description:</label>
+            <textarea name="description" id="description" rows="4" class="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white leading-tight focus:outline-none focus:shadow-outline" required>{{ job.description if job }}</textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Save Job</button>
-        <!-- --- FIX --- -->
-        <a href="{{ url_for('job.list_all') }}" class="btn btn-secondary">Cancel</a>
+        
+        <div class="flex items-center justify-between mt-6">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Save Job
+            </button>
+            <a href="{{ url_for('job.list_all') }}" class="inline-block align-baseline font-bold text-sm text-blue-400 hover:text-blue-200">
+                Cancel
+            </a>
+        </div>
     </form>
-</div>
 {% endblock %}
