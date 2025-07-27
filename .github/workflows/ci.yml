@@ -22,9 +22,9 @@ jobs:
         image: postgres:13
         # Environment variables for the PostgreSQL container
         env:
-          POSTGRES_DB: test_db         # Database name for tests
-          POSTGRES_USER: test_user     # User for the test database
-          POSTGRES_PASSWORD: test_password # Password for the test user
+          POSTGRES_DB: attackacrack_dev         # Database name for tests
+          POSTGRES_USER: matt     # User for the test database
+          POSTGRES_PASSWORD: postgres # Password for the test user
         # Map container port 5432 to host port 5432 (for the runner to connect)
         ports:
           - 5432:5432
@@ -41,11 +41,11 @@ jobs:
         # Action to check out your repository code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10 # Changed from 3.9 to 3.10
+      - name: Set up Python 3.11 # Changed from 3.10 to 3.11
         # Action to set up a specific Python version
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Matches the requirement for click==8.2.1
+          python-version: '3.11' # Matches the requirement for numpy==2.3.1
 
       - name: Install dependencies
         run: |
