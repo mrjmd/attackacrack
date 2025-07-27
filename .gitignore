@@ -12,3 +12,4 @@ openphone.key
 .DS_Store
 .python-version
 *.egg-info
+.coverage
