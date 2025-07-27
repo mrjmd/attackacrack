@@ -6,8 +6,9 @@ Fixtures defined here are automatically available to all tests.
 import pytest
 from app import create_app
 from extensions import db
-from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Setting # Import Setting
+from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Setting
 from datetime import date, time
+from unittest.mock import MagicMock # Import MagicMock
 
 @pytest.fixture(scope='module')
 def app():
@@ -38,7 +39,7 @@ def app():
         job = Job(id=1, description="Test Job", property=prop, status='Active')
         quote = Quote(id=1, amount=100.0, job=job, status='Sent')
         invoice = Invoice(id=1, amount=100.0, due_date=date(2025, 1, 1), job=job, status='Unpaid')
-        appointment = Appointment(id=1, title="Test Appt", date=date(2025, 1, 1), time=time(12, 0), contact=contact)
+        appointment = Appointment(id=1, title="Test Appt", date=date(2025, 1, 1), time=time(12, 0), contact=contact, job_id=job.id) # Use job_id
         
         # Seed common settings templates here
         reminder_template = Setting(key='appointment_reminder_template', value='Hi {first_name}, reminder for {appointment_date} at {appointment_time}.')
@@ -76,3 +77,14 @@ def db_session(app):
     with app.app_context():
         yield db.session
         db.session.rollback() # Rollback any changes after each test
+
+# ADDED THIS FIXTURE: To globally mock get_google_creds for application_pages tests
+@pytest.fixture(autouse=True)
+def mock_get_google_creds_globally(mocker):
+    """
+    Globally mocks api_integrations.get_google_creds to prevent actual Google API calls
+    and token.pickle issues in application_pages tests.
+    """
+    mock_creds = MagicMock()
+    mock_creds.valid = True
+    mocker.patch('api_integrations.get_google_creds', return_value=mock_creds)
