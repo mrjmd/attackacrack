@@ -13,9 +13,7 @@ from csv_importer import CsvImporter
 from property_radar_importer import PropertyRadarImporter
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 from extensions import db
-# --- THIS IS A FIX: Import Activity ---
 from crm_database import Setting, Activity, Conversation
-# --- END FIX ---
 
 main_bp = Blueprint('main', __name__)
 
@@ -43,13 +41,14 @@ def dashboard():
     google_events = get_upcoming_calendar_events()
     gmail_messages = get_recent_gmail_messages()
     
+    # --- THIS IS THE FIX ---
+    # This one call now gets all the data we need, efficiently.
     latest_conversations = message_service.get_latest_conversations_from_db()
     
     openphone_texts = []
     for conv in latest_conversations:
-        # --- THIS IS THE FIX: A more robust way to get the last activity ---
-        last_activity = db.session.query(Activity).filter_by(conversation_id=conv.id).order_by(Activity.created_at.desc()).first()
-        # --- END FIX ---
+        # We no longer need a new query here. The activities are already loaded.
+        last_activity = max(conv.activities, key=lambda act: act.created_at) if conv.activities else None
         openphone_texts.append({
             'contact_id': conv.contact.id,
             'contact_name': conv.contact.first_name,
@@ -57,6 +56,7 @@ def dashboard():
             'latest_message_body': last_activity.body if last_activity else "No activities yet"
         })
     openphone_error = None
+    # --- END FIX ---
 
     return render_template(
         'dashboard.html', 
@@ -67,9 +67,8 @@ def dashboard():
         openphone_texts=openphone_texts,
         openphone_error=openphone_error
     )
-# ... (rest of the file remains the same) ...
 
-# ... (the rest of the file remains the same) ...
+# ... (rest of file is unchanged) ...
 @main_bp.route('/settings')
 def settings():
     return render_template('settings.html')

@@ -4,7 +4,7 @@
 
 {% block content %}
     <div class="flex justify-between items-center mb-6">
-        <h2 class="text-3xl font-bold">{{ contact.first_name }} {{ contact.last_name }}</h2>
+        <h1 class="text-3xl font-bold">{{ contact.first_name }} {{ contact.last_name }}</h1>
         <div class="flex items-center space-x-2">
             <a href="{{ url_for('contact.conversation', contact_id=contact.id) }}" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">View Conversation</a>
             <a href="{{ url_for('contact.edit_contact', contact_id=contact.id) }}" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg">Edit Contact</a>
@@ -41,16 +41,16 @@
 
         <!-- Right Column (Communication History) -->
         <div class="space-y-6">
-            <!-- SMS History Card -->
+            <!-- Activity History Card -->
             <div class="bg-gray-900 rounded-lg shadow p-6">
-                <h3 class="text-xl font-bold mb-4 text-purple-400">Recent Texts</h3>
-                {% for message in recent_messages|reverse %}
+                <h3 class="text-xl font-bold mb-4 text-purple-400">Recent Activity</h3>
+                {% for activity in activities | sort(attribute='created_at', reverse=True) | limit(5) %}
                     <div class="text-sm mb-3 border-b border-gray-800 pb-2">
-                        <p class="truncate text-gray-300">{{ message.body }}</p>
-                        <p class="text-xs text-gray-500">{{ message.timestamp.strftime('%b %d, %I:%M %p') }} - {{ message.direction }}</p>
+                        <p class="truncate text-gray-300">{{ activity.body }}</p>
+                        <p class="text-xs text-gray-500">{{ activity.created_at.strftime('%b %d, %I:%M %p') }} - {{ activity.direction }}</p>
                     </div>
                 {% else %}
-                    <p class="text-gray-400 text-sm">No messages found.</p>
+                    <p class="text-gray-400 text-sm">No activity found.</p>
                 {% endfor %}
             </div>
             <!-- Email History Card -->

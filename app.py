@@ -7,25 +7,27 @@ from extensions import db
 from datetime import datetime
 import os
 from apscheduler.schedulers.background import BackgroundScheduler
-
-# The 'commands' import is removed as the file no longer exists.
+# --- THIS IS THE FIX ---
+from werkzeug.middleware.proxy_fix import ProxyFix
+# --- END FIX ---
 
 def create_app(config_class=Config, test_config=None):
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
     
-    # Load configuration from the Config object
     app.config.from_object(config_class)
     
-    # If a test config is passed, update the app config with it
     if test_config:
         app.config.update(test_config)
 
-    # Initialize extensions with the app
+    # --- THIS IS THE FIX ---
+    # Apply the proxy fix to make the app aware of the ngrok proxy.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    # --- END FIX ---
+
     db.init_app(app)
     migrate = Migrate(app, db)
 
-    # --- CUSTOM TEMPLATE FILTER ---
     @app.template_filter('format_google_date')
     def format_google_date(date_string):
         if not date_string: return ""
@@ -43,7 +45,6 @@ def create_app(config_class=Config, test_config=None):
                 return dt_obj.strftime('%A, %B %d (All-day)')
         except (ValueError, TypeError):
             return date_string
-    # --- END CUSTOM FILTER ---
 
     # Register blueprints for routes
     from routes.main_routes import main_bp
@@ -64,7 +65,6 @@ def create_app(config_class=Config, test_config=None):
     app.register_blueprint(invoice_bp, url_prefix='/invoices')
     app.register_blueprint(api_bp, url_prefix='/api')
     
-    # --- INITIALIZE SCHEDULER ---
     from services.scheduler_service import SchedulerService
     
     scheduler = BackgroundScheduler(daemon=True)
@@ -79,11 +79,9 @@ def create_app(config_class=Config, test_config=None):
     if os.environ.get('WERKZEUG_RUN_MAIN') or app.config.get('FLASK_ENV') == 'production':
         scheduler.start()
         print("--- Background scheduler started. ---")
-    # --- END SCHEDULER ---
 
     return app
 
-# This part is for running directly (e.g., python app.py)
 if __name__ == '__main__':
     app = create_app()
     app.run(debug=True, ssl_context='adhoc')

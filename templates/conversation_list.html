@@ -4,16 +4,17 @@
 
 {% block content %}
     <div class="flex justify-between items-center mb-6">
-        <h2 class="text-3xl font-bold">Recent Conversations</h2>
+        <h1 class="text-3xl font-bold">Recent Conversations</h1>
     </div>
     <div class="bg-gray-900 rounded-lg shadow p-6">
         <ul>
-            {% for message in messages %}
+            {% for convo in conversations %}
+                {% set last_activity = convo.activities | sort(attribute='created_at', reverse=True) | first %}
                 <li class="border-b border-gray-700 py-3">
-                    <a href="{{ url_for('contact.conversation', contact_id=message.contact.id) }}" class="block hover:bg-gray-800 p-2 rounded-lg">
-                        <p class="font-semibold text-white">{{ message.contact.first_name }} {{ message.contact.last_name }}</p>
-                        <p class="text-sm text-gray-400 truncate">{{ message.body }}</p>
-                        <p class="text-xs text-gray-500 text-right mt-1">{{ message.timestamp.strftime('%b %d, %I:%M %p') }}</p>
+                    <a href="{{ url_for('contact.conversation', contact_id=convo.contact.id) }}" class="block hover:bg-gray-800 p-2 rounded-lg">
+                        <p class="font-semibold text-white">{{ convo.contact.first_name }} {{ convo.contact.last_name }}</p>
+                        <p class="text-sm text-gray-400 truncate">{{ last_activity.body if last_activity else 'No activities yet' }}</p>
+                        <p class="text-xs text-gray-500 text-right mt-1">{{ convo.last_activity_at.strftime('%b %d, %I:%M %p') }}</p>
                     </a>
                 </li>
             {% else %}
