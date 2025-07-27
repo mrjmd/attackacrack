@@ -1,0 +1,80 @@
+# Name of the workflow, displayed in the GitHub Actions tab
+name: Attack-a-Crack CI Tests
+
+# Define when this workflow should run
+on:
+  push:
+    # This workflow will trigger on pushes to the 'main' branch
+    branches:
+      - main
+
+# Define the jobs that will run as part of this workflow
+jobs:
+  test:
+    # The operating system environment for this job
+    runs-on: ubuntu-latest
+
+    # Define services required for the tests (e.g., PostgreSQL database)
+    services:
+      # PostgreSQL service
+      postgres:
+        # Use a specific PostgreSQL image version
+        image: postgres:13
+        # Environment variables for the PostgreSQL container
+        env:
+          POSTGRES_DB: attackacrack_dev         # Database name for tests
+          POSTGRES_USER: matt     # User for the test database
+          POSTGRES_PASSWORD: postgres # Password for the test user
+        # Map container port 5432 to host port 5432 (for the runner to connect)
+        ports:
+          - 5432:5432
+        # Health check to ensure PostgreSQL is ready before tests run
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # Steps to execute within the 'test' job
+    steps:
+      - name: Checkout code
+        # Action to check out your repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        # Action to set up a specific Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9' # Matches your Dockerfile's Python version
+
+      - name: Install dependencies
+        run: |
+          # Upgrade pip to the latest version
+          python -m pip install --upgrade pip
+          # Install all dependencies from requirements.txt
+          pip install -r requirements.txt
+          # Install alembic, as it might be needed for database migrations or schema management
+          pip install alembic
+
+      - name: Wait for PostgreSQL to be ready
+        # A short sleep to ensure the PostgreSQL service is fully initialized.
+        # The 'health-cmd' in the 'services' block helps, but a brief pause is a good safeguard.
+        run: |
+          echo "Waiting for PostgreSQL to be ready..."
+          sleep 5
+
+      - name: Run tests
+        # Set environment variables required by your application and tests
+        env:
+          # DATABASE_URL is used by your crm_database.py to connect to the database
+          # This points to the PostgreSQL service running within the GitHub Actions environment
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          # If your tests interact with external APIs (like OpenPhone or Google APIs)
+          # and require API keys, you should store them as GitHub Secrets.
+          # Example (uncomment and replace with your actual secret names if needed):
+          # OPENPHONE_API_KEY: ${{ secrets.OPENPHONE_API_KEY }}
+          # GOOGLE_CLIENT_SECRET_FILE: client_secret.json # If this file is committed and needed by tests
+        run: |
+          # Execute your pytest tests
+          # Pytest will return a non-zero exit code if tests fail, causing the job to fail
+          pytest
