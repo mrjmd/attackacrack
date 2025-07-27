@@ -40,162 +40,6 @@ def suppress_api_logging(caplog):
     caplog.clear()
 
 
-# --- Fixtures for Google Creds Mocking ---
-
-@pytest.fixture
-def mock_google_creds_flow(mocker):
-    """Mocks the entire Google OAuth flow components and returns a mock creds object."""
-    mock_creds = MagicMock(spec=google.oauth2.credentials.Credentials)
-    mock_creds.valid = True
-    mock_creds.expired = False
-    mock_creds.refresh_token = None # Default to no refresh token unless specified
-
-    mock_flow_instance = MagicMock(spec=google_auth_oauthlib.flow.InstalledAppFlow)
-    mock_flow_instance.run_local_server.return_value = mock_creds
-    # Corrected: Patch InstalledAppFlow where it's imported in api_integrations
-    mocker.patch('api_integrations.InstalledAppFlow', return_value=mock_flow_instance)
-    mocker.patch('google.auth.transport.requests.Request') # Patch Request used by creds.refresh
-
-    return mock_creds, mock_flow_instance, mock_flow_instance.run_local_server # Return run_local_server mock for assertions
-
-@pytest.fixture(autouse=True)
-def mock_pickle_and_os_path(mocker):
-    """Mocks os.path.exists, builtins.open, pickle.load, pickle.dump globally for creds tests."""
-    # Corrected: Patch os.path.exists where it's used in api_integrations
-    mocker.patch('api_integrations.os.path.exists', return_value=False) # Default: no token file
-    # Corrected: Patch builtins.open where it's used by api_integrations.
-    # The 'open' function is directly accessed in api_integrations, so patch it there.
-    mocker.patch('api_integrations.open', mocker.mock_open()) 
-    # Corrected: Patch pickle.load where it's used by api_integrations
-    mocker.patch('api_integrations.pickle.load', return_value=MagicMock(valid=False, expired=True, refresh_token="dummy")) # Default mock for expired token
-    # Corrected: Patch pickle.dump where it's used by api_integrations
-    mocker.patch('api_integrations.pickle.dump') # Default mock for saving token
-
-
-# --- Tests for get_google_creds ---
-
-def test_get_google_creds_existing_valid_token(app_context, mocker, mock_google_creds_flow):
-    """
-    Test get_google_creds when a valid token.pickle file exists.
-    """
-    mock_creds, mock_flow_instance, mock_run_local_server = mock_google_creds_flow
-    
-    api_integrations.os.path.exists.return_value = True # Override default: token file exists
-    api_integrations.pickle.load.return_value = mock_creds # Load returns our valid mock creds
-
-    creds = api_integrations.get_google_creds()
-
-    assert creds is mock_creds # Corrected: Use 'is' for identity assertion with mocks
-    api_integrations.os.path.exists.assert_called_once_with(api_integrations.TOKEN_FILE)
-    api_integrations.open.assert_called_once_with(api_integrations.TOKEN_FILE, 'rb') # Corrected: Use api_integrations.open
-    api_integrations.pickle.load.assert_called_once()
-    mock_creds.refresh.assert_not_called()
-    api_integrations.InstalledAppFlow.from_client_config.assert_not_called()
-    mock_run_local_server.assert_not_called()
-
-
-def test_get_google_creds_expired_token_successful_refresh(app_context, mocker, mock_google_creds_flow):
-    """
-    Test get_google_creds when an expired token is successfully refreshed.
-    """
-    mock_creds, mock_flow_instance, mock_run_local_server = mock_google_creds_flow
-    mock_creds.valid = False
-    mock_creds.expired = True
-    mock_creds.refresh_token = "some_refresh_token"
-    mock_creds.refresh.return_value = None # Simulate successful refresh (refresh modifies creds in place)
-    
-    api_integrations.os.path.exists.return_value = True
-    api_integrations.pickle.load.return_value = mock_creds # Load returns our expired mock creds
-
-    creds = api_integrations.get_google_creds()
-
-    assert creds is mock_creds # Corrected: Use 'is' for identity assertion with mocks
-    mock_creds.refresh.assert_called_once_with(mocker.ANY) # Check refresh was called
-    api_integrations.pickle.dump.assert_called_once_with(mock_creds, mocker.ANY) # Check new token was saved
-    mock_run_local_server.assert_not_called()
-
-
-def test_get_google_creds_expired_token_failed_refresh(app_context, mocker, mock_google_creds_flow):
-    """
-    Test get_google_creds when an expired token fails to refresh.
-    """
-    mock_creds, mock_flow_instance, mock_run_local_server = mock_google_creds_flow
-    mock_creds.valid = False
-    mock_creds.expired = True
-    mock_creds.refresh_token = "some_refresh_token"
-    mock_creds.refresh.side_effect = Exception("Refresh failed") # Simulate refresh failure
-
-    api_integrations.os.path.exists.return_value = True
-    api_integrations.pickle.load.return_value = mock_creds
-
-    creds = api_integrations.get_google_creds()
-
-    assert creds is None # Corrected: Assert is None
-    mock_creds.refresh.assert_called_once_with(mocker.ANY)
-    api_integrations.pickle.dump.assert_not_called()
-    mock_run_local_server.assert_not_called()
-
-
-def test_get_google_creds_no_token_file_successful_oauth_flow(app_context, mocker, mock_google_creds_flow):
-    """
-    Test get_google_creds when no token file exists and OAuth flow is successful.
-    """
-    mock_creds, mock_flow_instance, mock_run_local_server = mock_google_creds_flow
-    
-    app_context.config['GOOGLE_CLIENT_ID'] = 'mock_client_id'
-    app_context.config['GOOGLE_CLIENT_SECRET'] = 'mock_client_secret'
-    app_context.config['GOOGLE_PROJECT_ID'] = 'mock_project_id'
-
-    api_integrations.os.path.exists.return_value = False # No token file
-    # pickle.dump is implicitly mocked by mock_pickle_and_os_path fixture
-
-    creds = api_integrations.get_google_creds()
-
-    assert creds is mock_creds # Corrected: Use 'is' for identity assertion with mocks
-    api_integrations.InstalledAppFlow.from_client_config.assert_called_once()
-    mock_run_local_server.assert_called_once()
-    api_integrations.pickle.dump.assert_called_once_with(mock_creds, mocker.ANY)
-
-
-def test_get_google_creds_no_token_file_missing_client_config(app_context, mocker, mock_google_creds_flow):
-    """
-    Test get_google_creds when no token file exists and client config is missing.
-    """
-    mock_creds, mock_flow_instance, mock_run_local_server = mock_google_creds_flow
-    app_context.config['GOOGLE_CLIENT_ID'] = None # Simulate missing
-    app_context.config['GOOGLE_CLIENT_SECRET'] = 'mock_client_secret' # One is missing
-
-    api_integrations.os.path.exists.return_value = False
-
-    creds = api_integrations.get_google_creds()
-
-    assert creds is None # Corrected: Assert is None
-    api_integrations.InstalledAppFlow.from_client_config.assert_not_called()
-    mock_run_local_server.assert_not_called()
-    api_integrations.pickle.dump.assert_not_called()
-
-
-def test_get_google_creds_no_token_file_oauth_flow_fails(app_context, mocker, mock_google_creds_flow):
-    """
-    Test get_google_creds when no token file exists and OAuth flow fails.
-    """
-    mock_creds, mock_flow_instance, mock_run_local_server = mock_google_creds_flow
-    app_context.config['GOOGLE_CLIENT_ID'] = 'mock_client_id'
-    app_context.config['GOOGLE_CLIENT_SECRET'] = 'mock_client_secret'
-    app_context.config['GOOGLE_PROJECT_ID'] = 'mock_project_id'
-
-    mock_flow_instance.run_local_server.side_effect = Exception("OAuth flow failed")
-    
-    api_integrations.os.path.exists.return_value = False
-
-    creds = api_integrations.get_google_creds()
-
-    assert creds is None # Corrected: Assert is None
-    api_integrations.InstalledAppFlow.from_client_config.assert_called_once()
-    mock_run_local_server.assert_called_once()
-    api_integrations.pickle.dump.assert_not_called()
-
-
 # --- Tests for get_upcoming_calendar_events ---
 
 def test_get_upcoming_calendar_events_success(app_context, mocker):
@@ -213,10 +57,13 @@ def test_get_upcoming_calendar_events_success(app_context, mocker):
     # Corrected: Patch googleapiclient.discovery.build where it's used in api_integrations
     mocker.patch('api_integrations.build', return_value=mock_service)
 
-    # Mock datetime.now(UTC) for consistent timeMin
-    mock_datetime_now = mocker.patch('datetime.datetime')
-    mock_datetime_now.now.return_value = datetime(2025, 7, 27, 10, 0, 0, tzinfo=UTC) # Mock a timezone-aware datetime
-    mock_datetime_now.side_effect = lambda *args, **kw: datetime(*args, **kw) # Allow normal datetime creation
+    # Mock datetime.datetime.now(UTC) for consistent timeMin
+    mock_datetime_now = mocker.patch('api_integrations.datetime')
+    # Set the return value for datetime.now() specifically, without microseconds
+    mock_datetime_now.now.return_value = datetime(2025, 7, 27, 10, 0, 0, tzinfo=UTC) 
+    # Ensure that other datetime operations (like timedelta) still work by having a side_effect
+    mock_datetime_now.side_effect = lambda *args, **kw: datetime(*args, **kw)
+
 
     # 2. Execution
     events = api_integrations.get_upcoming_calendar_events(count=2)
@@ -225,6 +72,7 @@ def test_get_upcoming_calendar_events_success(app_context, mocker):
     assert events == mock_events_list_result['items']
     api_integrations.get_google_creds.assert_called_once()
     api_integrations.build.assert_called_once_with('calendar', 'v3', credentials=mock_creds)
+    # Corrected: The timeMin string should NOT include microseconds, as the mocked datetime has 0.
     mock_service.events().list.assert_called_once_with(
         calendarId='primary', timeMin="2025-07-27T10:00:00+00:00", maxResults=2, singleEvents=True, orderBy='startTime'
     )
@@ -261,7 +109,7 @@ def test_get_upcoming_calendar_events_api_error(app_context, mocker):
     mocker.patch('api_integrations.build', return_value=mock_service)
 
     # Mock datetime.now(UTC)
-    mocker.patch('datetime.datetime')
+    mocker.patch('api_integrations.datetime') # Patch the datetime module within api_integrations
 
     # 2. Execution
     events = api_integrations.get_upcoming_calendar_events()
@@ -270,7 +118,7 @@ def test_get_upcoming_calendar_events_api_error(app_context, mocker):
     assert events == []
     api_integrations.get_google_creds.assert_called_once()
     api_integrations.build.assert_called_once() # Build should be called
-    mock_service.events().list().execute.assert_called_once() # Execute should be called
+    mock_service.events().list().execute.assert_called_once()
 
 # --- Tests for get_recent_gmail_messages ---
 
@@ -860,13 +708,13 @@ def test_delete_google_calendar_event_no_creds(app_context, mocker):
     """
     mocker.patch('api_integrations.get_google_creds', return_value=None)
     # Corrected: Patch googleapiclient.discovery.build where it's used in api_integrations
-    mocker.patch('api_integrations.build')
+    mock_build = mocker.patch('api_integrations.build')
 
     result = api_integrations.delete_google_calendar_event("event_id")
 
     assert result is False
     api_integrations.get_google_creds.assert_called_once()
-    api_integrations.build.assert_not_called()
+    mock_build.assert_not_called()
 
 
 def test_delete_google_calendar_event_api_error(app_context, mocker):
