@@ -13,7 +13,7 @@
             </form>
         </div>
     </div>
-
+    
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left Column -->
         <div class="lg:col-span-2 space-y-6">
@@ -38,31 +38,19 @@
                 </ul>
             </div>
         </div>
-
+        
         <!-- Right Column (Communication History) -->
         <div class="space-y-6">
             <!-- Activity History Card -->
             <div class="bg-gray-900 rounded-lg shadow p-6">
                 <h3 class="text-xl font-bold mb-4 text-purple-400">Recent Activity</h3>
-                {% for activity in activities | sort(attribute='created_at', reverse=True) | limit(5) %}
-                    <div class="text-sm mb-3 border-b border-gray-800 pb-2">
-                        <p class="truncate text-gray-300">{{ activity.body }}</p>
-                        <p class="text-xs text-gray-500">{{ activity.created_at.strftime('%b %d, %I:%M %p') }} - {{ activity.direction }}</p>
+                {% for activity in activities | sort(attribute='created_at', reverse=True) %} {# REMOVED | limit(5) #}
+                    <div class="border-b border-gray-700 py-2">
+                        <p class="text-sm text-gray-400">{{ activity.created_at.strftime('%Y-%m-%d %H:%M') }} - {{ activity.type.capitalize() }} ({{ activity.direction.capitalize() }})</p>
+                        <p>{{ activity.body or activity.status or 'No content' }}</p>
                     </div>
                 {% else %}
-                    <p class="text-gray-400 text-sm">No activity found.</p>
-                {% endfor %}
-            </div>
-            <!-- Email History Card -->
-            <div class="bg-gray-900 rounded-lg shadow p-6">
-                <h3 class="text-xl font-bold mb-4 text-red-400">Recent Emails</h3>
-                {% for email in recent_emails %}
-                    <div class="text-sm mb-3 border-b border-gray-800 pb-2">
-                        <p class="truncate"><strong>From:</strong> {{ email.sender|replace('<', '&lt;')|replace('>', '&gt;') }}</p>
-                        <p class="truncate text-gray-300"><strong>Subj:</strong> {{ email.subject }}</p>
-                    </div>
-                {% else %}
-                    <p class="text-gray-400 text-sm">No email history found.</p>
+                    <p>No recent activity for this contact.</p>
                 {% endfor %}
             </div>
         </div>

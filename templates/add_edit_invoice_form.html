@@ -1,27 +1,43 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Invoice</title>
-</head>
-<body>
-    <h1>{% if invoice %}Edit{% else %}Add{% endif %} Invoice</h1>
-    <form method="POST">
-        <label for="amount">Amount:</label>
-        <input type="number" step="0.01" id="amount" name="amount" value="{{ invoice.amount if invoice else '' }}" required>
-        <br>
-        <label for="due_date">Due Date:</label>
-        <input type="date" id="due_date" name="due_date" value="{{ invoice.due_date if invoice else '' }}" required>
-        <br>
-        <label for="job_id">Job:</label>
-        <select id="job_id" name="job_id">
-            {% for job in jobs %}
-                <option value="{{ job.id }}" {% if invoice and invoice.job_id == job.id %}selected{% endif %}>{{ job.description }}</option>
-            {% endfor %}
-        </select>
-        <br>
-        <button type="submit">Save</button>
-    </form>
-    <a href="{{ url_for('invoice.invoices') }}">Cancel</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}{% if invoice %}Edit Invoice{% else %}Add New Invoice{% endif %}{% endblock %}
+
+{% block content %}
+    <div class="container mx-auto p-6 bg-gray-800 rounded-lg shadow-lg text-white">
+        <h1 class="text-3xl font-bold mb-6">{% if invoice %}Edit Invoice{% else %}Add New Invoice{% endif %}</h1>
+
+        <form method="POST" action="{% if invoice %}{{ url_for('invoice.edit_invoice', invoice_id=invoice.id) }}{% else %}{{ url_for('invoice.add_invoice') }}{% endif %}" class="space-y-4">
+            <div>
+                <label for="job_id" class="block text-sm font-medium text-gray-300">Job:</label>
+                <select id="job_id" name="job_id" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+                    <option value="">-- Select Job --</option>
+                    {% for job in jobs %}
+                        <option value="{{ job.id }}" {% if invoice and invoice.job_id == job.id %}selected{% endif %}>
+                            {{ job.id }} - {{ job.property.address if job.property else 'N/A' }} ({{ job.status }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-300">Status:</label>
+                <input type="text" id="status" name="status" value="{{ invoice.status if invoice else '' }}" required class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+            </div>
+            <div>
+                <label for="total_amount" class="block text-sm font-medium text-gray-300">Total Amount:</label>
+                <input type="number" step="0.01" id="total_amount" name="total_amount" value="{{ '%.2f'|format(invoice.total_amount) if invoice else '' }}" required class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+            </div>
+            <div>
+                <label for="issue_date" class="block text-sm font-medium text-gray-300">Issue Date:</label>
+                <input type="date" id="issue_date" name="issue_date" value="{{ invoice.issue_date.strftime('%Y-%m-%d') if invoice and invoice.issue_date else '' }}" required class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+            </div>
+            <div>
+                <label for="due_date" class="block text-sm font-medium text-gray-300">Due Date:</label>
+                <input type="date" id="due_date" name="due_date" value="{{ invoice.due_date.strftime('%Y-%m-%d') if invoice and invoice.due_date else '' }}" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+            </div>
+            <div class="flex space-x-4">
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-semibold">{% if invoice %}Update Invoice{% else %}Add Invoice{% endif %}</button>
+                <a href="{{ url_for('invoice.list_all') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-semibold">Cancel</a> {# CORRECTED ENDPOINT #}
+            </div>
+        </form>
+    </div>
+{% endblock %}
