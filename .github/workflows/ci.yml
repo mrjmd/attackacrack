@@ -22,9 +22,9 @@ jobs:
         image: postgres:13
         # Environment variables for the PostgreSQL container
         env:
-          POSTGRES_DB: attackacrack_dev         # Database name for tests
-          POSTGRES_USER: matt     # User for the test database
-          POSTGRES_PASSWORD: postgres # Password for the test user
+          POSTGRES_DB: test_db         # Database name for tests
+          POSTGRES_USER: test_user     # User for the test database
+          POSTGRES_PASSWORD: test_password # Password for the test user
         # Map container port 5432 to host port 5432 (for the runner to connect)
         ports:
           - 5432:5432
@@ -41,7 +41,7 @@ jobs:
         # Action to check out your repository code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11 # Changed from 3.10 to 3.11
+      - name: Set up Python 3.11
         # Action to set up a specific Python version
         uses: actions/setup-python@v5
         with:
@@ -69,7 +69,10 @@ jobs:
           # DATABASE_URL is used by your crm_database.py to connect to the database
           # This points to the PostgreSQL service running within the GitHub Actions environment
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
-          # If your tests interact with external APIs (like OpenPhone or Google APIs)
+          # Add your Gemini API Key as a GitHub Secret.
+          # This is crucial for the AI service to function in the CI environment.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # If your tests interact with other external APIs (like OpenPhone or Google APIs)
           # and require API keys, you should store them as GitHub Secrets.
           # Example (uncomment and replace with your actual secret names if needed):
           # OPENPHONE_API_KEY: ${{ secrets.OPENPHONE_API_KEY }}
