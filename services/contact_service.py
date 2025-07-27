@@ -1,5 +1,5 @@
 from crm_database import Contact, db
-from sqlalchemy.exc import IntegrityError # Added for handling potential IntegrityError
+from sqlalchemy.exc import IntegrityError
 
 class ContactService:
     def __init__(self):
