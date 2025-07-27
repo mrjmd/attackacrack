@@ -41,6 +41,8 @@ class Job(db.Model):
     property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=False)
     quotes = db.relationship('Quote', backref='job', lazy=True, cascade="all, delete-orphan")
     invoices = db.relationship('Invoice', backref='job', lazy=True, cascade="all, delete-orphan")
+    # Add relationship to Appointment if it's not already there implicitly
+    # appointments = db.relationship('Appointment', backref='job', lazy=True) # This would be on Job if Appointment had job_id
 
 class Appointment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -50,6 +52,10 @@ class Appointment(db.Model):
     time = db.Column(db.Time, nullable=False)
     contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
     google_calendar_event_id = db.Column(db.String(200), nullable=True)
+    
+    # ADDED THIS LINE: Foreign key to Job model
+    job_id = db.Column(db.Integer, db.ForeignKey('job.id'), nullable=True) # Made nullable as not all appts might have a job
+    job = db.relationship('Job', backref='appointments_rel') # Define relationship
 
 class ProductService(db.Model):
     id = db.Column(db.Integer, primary_key=True)

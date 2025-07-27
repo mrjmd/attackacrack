@@ -6,7 +6,7 @@ Fixtures defined here are automatically available to all tests.
 import pytest
 from app import create_app
 from extensions import db
-from crm_database import Contact, Property, Job, Quote, Invoice, Appointment
+from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Setting # Import Setting
 from datetime import date, time
 
 @pytest.fixture(scope='module')
@@ -22,7 +22,7 @@ def app():
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:', # Use an in-memory SQLite database for tests
         'SQLALCHEMY_TRACK_MODIFICATIONS': False,
         'WTF_CSRF_ENABLED': False, # Disable CSRF for easier form testing
-        'SERVER_NAME': 'localhost.localdomain' # ADDED THIS LINE: Required for url_for in tests
+        'SERVER_NAME': 'localhost.localdomain' # Required for url_for in tests
     })
 
     # The 'with app.app_context()' block makes the application context available,
@@ -40,8 +40,12 @@ def app():
         invoice = Invoice(id=1, amount=100.0, due_date=date(2025, 1, 1), job=job, status='Unpaid')
         appointment = Appointment(id=1, title="Test Appt", date=date(2025, 1, 1), time=time(12, 0), contact=contact)
         
+        # Seed common settings templates here
+        reminder_template = Setting(key='appointment_reminder_template', value='Hi {first_name}, reminder for {appointment_date} at {appointment_time}.')
+        review_template = Setting(key='review_request_template', value='Hi {first_name}, please leave a review!')
+        
         # Add all the created objects to the database session
-        db.session.add_all([contact, prop, job, quote, invoice, appointment])
+        db.session.add_all([contact, prop, job, quote, invoice, appointment, reminder_template, review_template])
         
         # Commit the changes to the database
         db.session.commit()
