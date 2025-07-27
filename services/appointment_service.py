@@ -51,6 +51,7 @@ class AppointmentService:
             # --- END SAVE ---
 
         except Exception as e:
+            # It's generally better to log the error than just print it in a production app
             print(f"Failed to create Google Calendar event after saving appointment: {e}")
 
         return new_appointment
@@ -59,9 +60,8 @@ class AppointmentService:
         return self.session.query(Appointment).all()
 
     def get_appointment_by_id(self, appointment_id):
-        # --- THIS IS THE FIX ---
+        # Refactored: Using Session.get() instead of Query.get()
         return self.session.get(Appointment, appointment_id)
-        # --- END FIX ---
 
     def delete_appointment(self, appointment):
         """
