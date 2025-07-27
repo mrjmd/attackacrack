@@ -120,15 +120,16 @@ def get_message_status(message_id):
 
 def run_scheduler():
     logging.info("Starting OpenPhone SMS Scheduler.")
+    df = None # Initialize df to None or an empty DataFrame
 
     try:
         # 1. Load contacts from CSV
         if not os.path.exists(CSV_FILE):
             logging.critical(f"CSV file not found at: {CSV_FILE}. Please create it with headers: name,phone_number,status,message_sent_at,openphone_message_id")
-            return
+            return # Exit early if file not found, df remains None
 
         # NEW: Explicitly read 'phone_number' as a string to prevent issues with leading '+'
-        df = pd.read_csv(CSV_FILE, dtype={'phone_number': str}) # THIS IS THE KEY CHANGE HERE
+        df = pd.read_csv(CSV_FILE, dtype={'phone_number': str})
         logging.info(f"Loaded {len(df)} contacts from {CSV_FILE}.")
 
         # Ensure required columns exist, add if missing with default values
@@ -148,7 +149,7 @@ def run_scheduler():
             logging.info(f"Checking status for {len(contacts_to_update_status)} previously sent messages...")
             for index, row in contacts_to_update_status.iterrows():
                 message_id = row['openphone_message_id']
-                if pd.notna(message_id) and str(message_id).strip() != "": # Added .strip() here too
+                if pd.notna(message_id) and str(message_id).strip() != "":
                     current_status = get_message_status(message_id)
                     if current_status and current_status != row['status']:
                         df.loc[index, 'status'] = current_status
@@ -175,23 +176,17 @@ def run_scheduler():
         sent_count = 0
         for index, row in contacts_to_message.iterrows():
             name = row['name']
-            phone_number = str(row['phone_number']).strip() # Ensure string and remove whitespace
+            phone_number = str(row['phone_number']).strip()
 
-            # Validation with the E.164 check:
-            # We are now *very* confident that phone_number is a string due to dtype={'phone_number': str}
-            # The check `not phone_number.startswith('+')` is the most important part now.
             if not phone_number.startswith('+') or len(phone_number) < 10:
                 logging.warning(f"Skipping invalid phone number for {name}: {phone_number}. Must be E.164 format (e.g., +12025550123).")
                 df.loc[index, 'status'] = 'error: invalid_phone_number'
                 continue
 
-            # Construct personalized message
             message_content = MESSAGE_TEMPLATE.format(name=name)
 
-            # Send message
             message_id, send_status = send_openphone_message(phone_number, message_content)
 
-            # Update DataFrame based on send result
             if message_id:
                 df.loc[index, 'status'] = send_status
                 df.loc[index, 'message_sent_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -201,7 +196,6 @@ def run_scheduler():
                 df.loc[index, 'status'] = send_status
                 df.loc[index, 'message_sent_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # Implement message throttling delay
             time.sleep(MESSAGE_THROTTLING_DELAY)
 
             if sent_count >= MAX_MESSAGES_PER_RUN:
@@ -216,15 +210,18 @@ def run_scheduler():
     except pd.errors.ParserError as pe:
         logging.critical(f"Error parsing CSV file '{CSV_FILE}': {pe}. Check CSV format.")
     except FileNotFoundError:
+        # This block might not be reached if os.path.exists is checked first
         logging.critical(f"The CSV file '{CSV_FILE}' was not found. Ensure it's in the same directory as the script.")
     except Exception as e:
         logging.critical(f"An unexpected error occurred during script execution: {e}", exc_info=True)
     finally:
-        try:
-            df.to_csv(CSV_FILE, index=False)
-            logging.info(f"Updated contact data saved to {CSV_FILE}.")
-        except Exception as e:
-            logging.critical(f"Failed to save updated CSV file: {e}", exc_info=True)
+        # Only attempt to save if df was successfully loaded
+        if df is not None:
+            try:
+                df.to_csv(CSV_FILE, index=False)
+                logging.info(f"Updated contact data saved to {CSV_FILE}.")
+            except Exception as e:
+                logging.critical(f"Failed to save updated CSV file: {e}", exc_info=True)
 
 # --- Main execution block ---
 if __name__ == "__main__":
