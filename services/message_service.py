@@ -1,11 +1,14 @@
 from extensions import db
-from crm_database import Activity, Contact, Property, Conversation # Updated imports
+from crm_database import Activity, Contact, Property, Conversation
 from services.contact_service import ContactService
 from services.property_service import PropertyService
 from services.openphone_service import OpenPhoneService
 from services.ai_service import AIService
 from datetime import datetime
 import re
+# --- THIS IS A FIX: Import SQLAlchemy's relationship loading tools ---
+from sqlalchemy.orm import subqueryload
+# --- END FIX ---
 
 class MessageService:
     def __init__(self):
@@ -16,7 +19,6 @@ class MessageService:
         self.ai_service = AIService()
 
     def get_or_create_conversation(self, contact_id, openphone_convo_id=None, participants=None):
-        """Finds an existing conversation or creates a new one."""
         if openphone_convo_id:
             conversation = self.session.query(Conversation).filter_by(openphone_id=openphone_convo_id).first()
             if conversation:
@@ -38,19 +40,28 @@ class MessageService:
         self.session.commit()
         return new_conversation
 
+
     def get_activities_for_contact(self, contact_id):
         """Gets all activities for a contact, sorted chronologically."""
         return self.session.query(Activity).join(Conversation).filter(Conversation.contact_id == contact_id).order_by(Activity.created_at.asc()).all()
 
+    # --- THIS IS THE REWRITTEN, EFFICIENT FUNCTION ---
     def get_latest_conversations_from_db(self, limit=10):
-        """Gets the most recent conversations from the local database."""
-        return self.session.query(Conversation).order_by(Conversation.last_activity_at.desc()).limit(limit).all()
+        """
+        Gets the most recent conversations from the local database, efficiently
+        pre-loading the related contact and all activities to prevent N+1 queries.
+        """
+        return self.session.query(Conversation)\
+            .options(
+                subqueryload(Conversation.contact), 
+                subqueryload(Conversation.activities)
+            )\
+            .order_by(Conversation.last_activity_at.desc())\
+            .limit(limit)\
+            .all()
+    # --- END REWRITTEN FUNCTION ---
 
     def process_incoming_webhook(self, webhook_data):
-        """
-        Processes incoming activities (messages, calls) from webhooks,
-        creating contacts and conversations as needed.
-        """
         activity_type = webhook_data.get('type')
         if not activity_type:
             return None
@@ -88,6 +99,5 @@ class MessageService:
                 self.session.add(new_activity)
                 conversation.last_activity_at = datetime.utcnow()
                 self.session.commit()
-                # AI enrichment logic would be called here in a future step
             return new_activity
         return None

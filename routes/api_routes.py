@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from services.contact_service import ContactService
 from services.message_service import MessageService
 from services.ai_service import AIService
+from crm_database import Activity # Import Activity
 
 api_bp = Blueprint('api', __name__)
 
@@ -15,8 +16,7 @@ def get_contacts():
 @api_bp.route('/messages/latest_conversations')
 def get_latest_conversations():
     message_service = MessageService()
-    # This endpoint is now database-driven
-    latest_conversations = message_service.get_latest_conversations_from_db(limit=5)
+    latest_conversations = message_service.get_latest_conversations_from_db(limit=10)
     conversations_json = []
     for conv in latest_conversations:
         last_activity = conv.activities[-1] if conv.activities else None
@@ -51,13 +51,9 @@ def get_contact_messages(contact_id):
 
 @api_bp.route('/appointments/generate_summary/<int:contact_id>')
 def generate_appointment_summary(contact_id):
-    """
-    Generates an AI summary of the conversation for a given contact.
-    """
     message_service = MessageService()
     ai_service = AIService()
     
-    # This should now get activities to be summarized
     activities = message_service.get_activities_for_contact(contact_id)
     summary = ai_service.summarize_conversation_for_appointment(activities)
     

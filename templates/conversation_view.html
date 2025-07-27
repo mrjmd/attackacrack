@@ -5,33 +5,74 @@
 {% block content %}
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h2 class="text-3xl font-bold">Conversation with {{ contact.first_name }} {{ contact.last_name }}</h2>
-            <a href="{{ url_for('contact.contact_detail', contact_id=contact.id) }}" class="text-sm text-gray-400 hover:text-white">Back to Contact Details</a>
+            <h1 class="text-3xl font-bold">Conversation with {{ contact.first_name }} {{ contact.last_name }}</h1>
+            <a href="{{ url_for('contact.contact_detail', contact_id=contact.id) }}" class="text-sm text-gray-400 hover:text-white">&larr; Back to Contact Details</a>
         </div>
-        <div class="flex items-center space-x-2">
-            <!-- --- THIS IS THE ONLY CHANGE IN THIS FILE --- -->
-            <!-- Corrected the url_for endpoint from 'quote.add_quote' to 'quote.add_edit' to match the function name in the route file -->
-            <a href="{{ url_for('quote.add_edit', contact_id=contact.id) }}" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-bold">Create Quote</a>
-            
-            <!-- NEW DROPDOWN BUTTON -->
-            <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-bold flex items-center">
-                    <span>Schedule Appointment</span>
-                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl z-10">
-                    <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id, type='Assessment') }}" class="block px-4 py-2 text-sm text-white hover:bg-gray-700">Assessment</a>
-                    <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id, type='Repair') }}" class="block px-4 py-2 text-sm text-white hover:bg-gray-700">Repair</a>
-                    <a href="{{ url_for('appointment.add_appointment', contact_id=contact.id, type='Callback') }}" class="block px-4 py-2 text-sm text-white hover:bg-gray-700">Callback</a>
-                </div>
-            </div>
-        </div>
+        <!-- Action buttons can be added here later -->
     </div>
 
     <div class="bg-gray-900 rounded-lg shadow">
-        <div id="message-container" class="p-6 h-96 overflow-y-auto flex flex-col space-y-4">
-            <!-- Messages will be dynamically inserted here -->
+        <!-- Timeline Container -->
+        <div id="timeline-container" class="p-6 h-[70vh] overflow-y-auto flex flex-col-reverse space-y-4 space-y-reverse">
+            
+            <!-- Loop through activities in reverse to show newest at the bottom -->
+            {% for activity in activities | reverse %}
+                
+                <!-- RENDER A MESSAGE -->
+                {% if activity.type == 'message' %}
+                    {% if activity.direction == 'outbound' %}
+                    <!-- Outgoing Message -->
+                    <div class="flex justify-end">
+                        <div class="bg-blue-600 text-white p-3 rounded-lg max-w-lg">
+                            <p class="whitespace-pre-wrap">{{ activity.body }}</p>
+                            <!-- Display Media Attachments -->
+                            {% for media in activity.media_attachments %}
+                                <img src="{{ media.source_url }}" alt="Attached media" class="mt-2 rounded-lg max-w-xs">
+                            {% endfor %}
+                            <p class="text-xs text-blue-200 text-right mt-1">{{ activity.created_at.strftime('%b %d, %I:%M %p') }}</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Incoming Message -->
+                    <div class="flex justify-start">
+                        <div class="bg-gray-700 text-white p-3 rounded-lg max-w-lg">
+                            <p class="whitespace-pre-wrap">{{ activity.body }}</p>
+                            <!-- Display Media Attachments -->
+                            {% for media in activity.media_attachments %}
+                                <img src="{{ media.source_url }}" alt="Attached media" class="mt-2 rounded-lg max-w-xs">
+                            {% endfor %}
+                            <p class="text-xs text-gray-400 text-right mt-1">{{ activity.created_at.strftime('%b %d, %I:%M %p') }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                <!-- RENDER A CALL -->
+                {% elif activity.type == 'call' %}
+                <div class="flex justify-center">
+                    <div class="text-center text-xs text-gray-400 bg-gray-800 rounded-full px-4 py-2">
+                        📞 {{ activity.direction | capitalize }} Call - {{ activity.status | replace('_', ' ') | title }}
+                        {% if activity.duration %}
+                            ({{ '%02d:%02d' % (activity.duration // 60, activity.duration % 60) }})
+                        {% endif %}
+                        - {{ activity.created_at.strftime('%b %d, %I:%M %p') }}
+                        {% if activity.recording_url %}
+                            <div class="mt-2">
+                                <audio controls class="w-full">
+                                    <source src="{{ activity.recording_url }}" type="audio/mpeg">
+                                    Your browser does not support the audio element.
+                                </audio>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+            {% else %}
+                <p class="text-gray-400 text-center">No activities found for this contact.</p>
+            {% endfor %}
         </div>
+
+        <!-- Message Composition Form -->
         <div class="p-4 border-t border-gray-700">
             <form method="POST">
                 <div class="flex items-center">
@@ -41,59 +82,4 @@
             </form>
         </div>
     </div>
-
-    <script>
-        const contactId = {{ contact.id }};
-        const messageContainer = document.getElementById('message-container');
-
-        function renderMessages(messages) {
-            messageContainer.innerHTML = ''; // Clear existing messages
-            if (messages.length === 0) {
-                messageContainer.innerHTML = '<p class="text-gray-400 text-center">No messages yet. Start the conversation!</p>';
-                return;
-            }
-
-            messages.forEach(message => {
-                const messageClass = message.direction === 'outgoing' 
-                    ? 'flex justify-end' 
-                    : 'flex justify-start';
-                
-                const bubbleClass = message.direction === 'outgoing'
-                    ? 'bg-blue-600'
-                    : 'bg-gray-700';
-
-                const timeClass = message.direction === 'outgoing'
-                    ? 'text-blue-200'
-                    : 'text-gray-400';
-
-                const messageHtml = `
-                    <div class="${messageClass}">
-                        <div class="${bubbleClass} text-white p-3 rounded-lg max-w-xs">
-                            <p>${message.body}</p>
-                            <p class="text-xs ${timeClass} text-right mt-1">${message.timestamp}</p>
-                        </div>
-                    </div>
-                `;
-                messageContainer.innerHTML += messageHtml;
-            });
-            messageContainer.scrollTop = messageContainer.scrollHeight;
-        }
-
-        function fetchAndRenderMessages() {
-            const apiUrl = "{{ url_for('api.get_contact_messages', contact_id=0) }}".replace('0', contactId);
-            fetch(apiUrl)
-                .then(response => response.json())
-                .then(data => {
-                    renderMessages(data);
-                })
-                .catch(error => console.error('Error fetching messages:', error));
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            fetchAndRenderMessages(); // Initial load
-            setInterval(fetchAndRenderMessages, 5000); // Poll every 5 seconds
-        });
-    </script>
-    <!-- We need to add Alpine.js for the dropdown to work -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 {% endblock %}

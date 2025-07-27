@@ -18,6 +18,7 @@ services:
       - ./token.pickle:/app/token.pickle
       - .:/app
     # --- END FIX ---
+    command: ["gunicorn", "--workers=4", "--bind=0.0.0.0:5000", "--timeout", "300", "app:create_app()"]
     depends_on:
       db:
         condition: service_healthy
