@@ -1,12 +1,11 @@
-# services/contact_service.py
-from crm_database import db, Contact
-from sqlalchemy.exc import IntegrityError
+from crm_database import Contact, db
+from sqlalchemy.exc import IntegrityError # Added for handling potential IntegrityError
 
 class ContactService:
     def __init__(self):
         self.session = db.session
 
-    def add_contact(self, first_name, last_name, email=None, phone=None):
+    def add_contact(self, first_name, last_name, email=None, phone=None): # Changed kwargs to explicit args
         try:
             new_contact = Contact(first_name=first_name, last_name=last_name, email=email, phone=phone)
             self.session.add(new_contact)
@@ -21,17 +20,18 @@ class ContactService:
         return self.session.query(Contact).all()
 
     def get_contact_by_id(self, contact_id):
-        # Using .get() for primary key lookup, which is efficient
-        return self.session.query(Contact).get(contact_id)
+        # Refactored: Using Session.get() instead of Query.get()
+        return self.session.get(Contact, contact_id)
 
     def get_contact_by_phone(self, phone_number):
-        """
-        Retrieves a contact by their phone number.
-        """
+        """Finds a contact by their phone number."""
+        if not phone_number:
+            return None
         return self.session.query(Contact).filter_by(phone=phone_number).first()
 
-    def update_contact(self, contact_id, **kwargs):
-        contact = self.get_contact_by_id(contact_id)
+    def update_contact(self, contact_id, **kwargs): # Changed contact to contact_id
+        # Refactored: Using Session.get() to retrieve the object
+        contact = self.session.get(Contact, contact_id)
         if not contact:
             return None # Contact not found
 
@@ -40,10 +40,11 @@ class ContactService:
         self.session.commit()
         return contact
 
-    def delete_contact(self, contact_id):
-        contact = self.get_contact_by_id(contact_id)
+    def delete_contact(self, contact_id): # Changed contact to contact_id
+        # Refactored: Using Session.get() to retrieve the object
+        contact = self.session.get(Contact, contact_id)
         if contact:
             self.session.delete(contact)
             self.session.commit()
-            return True
-        return False
+            return True # Indicate successful deletion
+        return False # Indicate contact not found
