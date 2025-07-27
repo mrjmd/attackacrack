@@ -20,7 +20,7 @@ google-auth==2.40.3
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.2
 google-generativeai==0.8.5
-googleapis-common-protos==1.70.0
+googleapis-common-protos==1.70.2
 greenlet==3.2.3
 grpcio==1.73.1
 grpcio-status==1.71.2
@@ -47,6 +47,7 @@ pydantic_core==2.33.2
 Pygments==2.19.2
 pyparsing==3.2.3
 pytest==8.4.1
+pytest-cov==5.0.0
 pytest-mock==3.14.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
@@ -58,7 +59,7 @@ six==1.17.0
 SQLAlchemy==2.0.41
 tqdm==4.67.1
 typing-inspection==0.4.1
-typing_extensions==4.14.1
+typing_extensions==4.14.2
 tzdata==2025.2
 tzlocal==5.3.1
 uritemplate==4.2.0

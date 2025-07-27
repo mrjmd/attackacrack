@@ -1,49 +1,34 @@
 import pytest
-from app import create_app
-from extensions import db
-from crm_database import Contact, Property, Job, Quote, Invoice, Appointment
-from datetime import date, time
 
-@pytest.fixture
-def client():
-    app = create_app(test_config={
-        'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
-        'WTF_CSRF_ENABLED': False
-    })
-
-    with app.test_client() as client:
-        with app.app_context():
-            db.create_all()
-            contact = Contact(id=1, first_name="Test", last_name="User", email="test@user.com", phone="123")
-            prop = Property(id=1, address="123 Test St", contact=contact)
-            job = Job(id=1, description="Test Job", property=prop)
-            quote = Quote(id=1, amount=100.0, job=job)
-            invoice = Invoice(id=1, amount=100.0, due_date=date(2025, 1, 1), job=job)
-            appointment = Appointment(id=1, title="Test Appt", date=date(2025, 1, 1), time=time(12, 0), contact=contact)
-            db.session.add_all([contact, prop, job, quote, invoice, appointment])
-            db.session.commit()
-        yield client
-
+# A list of all major endpoints that should load without errors.
+# This acts as a simple smoke test for all pages.
 endpoints = [
     '/',
     '/dashboard',
     '/contacts/',
     '/contacts/add',
-    '/contacts/1',
+    '/contacts/1', # Detail page for seeded contact
+    '/contacts/conversations',
+    '/contacts/1/conversation',
     '/properties/',
-    '/properties/1',
+    '/properties/add',
+    '/properties/1', # Detail page for seeded property
     '/appointments/',
-    '/appointments/1',
+    '/appointments/add',
+    '/appointments/1', # Detail page for seeded appointment
     '/jobs/',
-    '/jobs/job/1',
+    '/jobs/job/add',
+    '/jobs/job/1', # Detail page for seeded job
     '/quotes/',
-    '/quotes/quote/1',
+    '/quotes/quote/add',
+    '/quotes/quote/1', # Detail page for seeded quote
     '/invoices/',
-    # --- THIS IS THE FIX ---
-    '/invoices/1',
-    # --- END FIX ---
+    '/invoices/add',
+    '/invoices/1', # Detail page for seeded invoice
     '/settings',
+    '/settings/automation',
+    '/import_csv',
+    '/import_property_radar'
 ]
 
 @pytest.mark.parametrize("endpoint", endpoints)
@@ -52,7 +37,10 @@ def test_all_pages_load_ok(client, endpoint):
     GIVEN a test client with a fully seeded database
     WHEN a GET request is made to each main page and detail page
     THEN check that the response is successful (200 OK or 302 Redirect).
+    
+    This test uses the 'client' fixture from conftest.py.
     """
     response = client.get(endpoint)
     
+    # A 302 status code (redirect) is also considered a success for root URLs.
     assert response.status_code in [200, 302], f"Page {endpoint} failed to load with status {response.status_code}."

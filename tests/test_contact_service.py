@@ -1,112 +1,81 @@
 import pytest
-from app import create_app
-from extensions import db
 from services.contact_service import ContactService
 from crm_database import Contact
 
-@pytest.fixture
-def app():
-    """Create and configure a new app instance for each test."""
-    app = create_app(test_config={
-        'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
-        'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'WTF_CSRF_ENABLED': False
-    })
+# The 'app' and 'db_session' fixtures are now passed in from conftest.py
 
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-def test_add_contact(app):
+def test_add_contact(app, db_session):
     """Test adding a new contact to the database."""
-    with app.app_context():
-        contact_service = ContactService()
-        contact = contact_service.add_contact(
-            first_name='John',
-            last_name='Doe',
-            email='john.doe@example.com',
-            phone='1234567890'
-        )
-        assert contact.id is not None
-        assert contact.first_name == 'John'
+    contact_service = ContactService()
+    contact = contact_service.add_contact(
+        first_name='John',
+        last_name='Doe',
+        email='john.doe@example.com',
+        phone='1234567890'
+    )
+    assert contact.id is not None
+    assert contact.first_name == 'John'
 
-        # --- THIS IS A FIX ---
-        retrieved_contact = db.session.get(Contact, contact.id)
-        # --- END FIX ---
-        assert retrieved_contact is not None
-        assert retrieved_contact.email == 'john.doe@example.com'
+    retrieved_contact = db_session.get(Contact, contact.id)
+    assert retrieved_contact is not None
+    assert retrieved_contact.email == 'john.doe@example.com'
 
 def test_get_all_contacts(app):
     """Test retrieving all contacts from the database."""
-    with app.app_context():
-        contact_service = ContactService()
-        contact_service.add_contact(first_name='John', last_name='Doe', email='john@example.com', phone='111')
-        contact_service.add_contact(first_name='Jane', last_name='Smith', email='jane@example.com', phone='222')
+    contact_service = ContactService()
+    # Add a new contact to the existing seeded data
+    contact_service.add_contact(first_name='Jane', last_name='Smith', email='jane@example.com', phone='222')
 
-        all_contacts = contact_service.get_all_contacts()
-        assert len(all_contacts) == 2
-        assert all_contacts[0].first_name == 'John'
-        assert all_contacts[1].first_name == 'Jane'
+    all_contacts = contact_service.get_all_contacts()
+    # We expect the seeded contact + the new one
+    assert len(all_contacts) == 2
+    assert all_contacts[0].first_name == 'Test' # From conftest.py
+    assert all_contacts[1].first_name == 'Jane'
 
 def test_get_contact_by_id(app):
     """Test retrieving a single contact by their ID."""
-    with app.app_context():
-        contact_service = ContactService()
-        contact = contact_service.add_contact(first_name='Specific', last_name='User', email='specific@example.com', phone='333')
+    contact_service = ContactService()
+    # The contact with ID 1 is seeded in conftest.py
+    retrieved_contact = contact_service.get_contact_by_id(1)
+    assert retrieved_contact is not None
+    assert retrieved_contact.id == 1
+    assert retrieved_contact.first_name == 'Test'
 
-        retrieved_contact = contact_service.get_contact_by_id(contact.id)
-        assert retrieved_contact is not None
-        assert retrieved_contact.id == contact.id
-        assert retrieved_contact.first_name == 'Specific'
+    non_existent_contact = contact_service.get_contact_by_id(999)
+    assert non_existent_contact is None
 
-        non_existent_contact = contact_service.get_contact_by_id(999)
-        assert non_existent_contact is None
-
-def test_update_contact(app):
+def test_update_contact(app, db_session):
     """Test updating an existing contact's details."""
-    with app.app_context():
-        contact_service = ContactService()
-        contact = contact_service.add_contact(
-            first_name='Original',
-            last_name='Name',
-            email='original@example.com',
-            phone='1112223333'
-        )
+    contact_service = ContactService()
+    contact = db_session.get(Contact, 1) # Get the seeded contact
 
-        updated_contact = contact_service.update_contact(
-            contact,
-            first_name='Updated',
-            email='updated@example.com'
-        )
-        assert updated_contact.first_name == 'Updated'
-        assert updated_contact.last_name == 'Name'
-        assert updated_contact.email == 'updated@example.com'
+    updated_contact = contact_service.update_contact(
+        contact,
+        first_name='Updated',
+        email='updated@example.com'
+    )
+    assert updated_contact.first_name == 'Updated'
+    assert updated_contact.last_name == 'User' # Should remain the same
+    assert updated_contact.email == 'updated@example.com'
 
-        # --- THIS IS A FIX ---
-        retrieved_contact = db.session.get(Contact, contact.id)
-        # --- END FIX ---
-        assert retrieved_contact.first_name == 'Updated'
+    retrieved_contact = db_session.get(Contact, 1)
+    assert retrieved_contact.first_name == 'Updated'
 
-def test_delete_contact(app):
+def test_delete_contact(app, db_session):
     """Test deleting a contact from the database."""
-    with app.app_context():
-        contact_service = ContactService()
-        contact_to_delete = contact_service.add_contact(first_name='ToBe', last_name='Deleted', email='delete@me.com', phone='444')
-        contact_to_keep = contact_service.add_contact(first_name='To', last_name='Keep', email='keep@me.com', phone='555')
+    contact_service = ContactService()
+    # Add a temporary contact to be deleted
+    contact_to_delete = contact_service.add_contact(first_name='ToBe', last_name='Deleted', email='delete@me.com', phone='444')
+    
+    # Ensure we have 2 contacts before deletion (seeded + new)
+    assert len(contact_service.get_all_contacts()) == 2
 
-        contact_service.delete_contact(contact_to_delete)
+    contact_service.delete_contact(contact_to_delete)
 
-        # --- THIS IS A FIX ---
-        deleted_contact = db.session.get(Contact, contact_to_delete.id)
-        # --- END FIX ---
-        assert deleted_contact is None
-
-        # --- THIS IS A FIX ---
-        kept_contact = db.session.get(Contact, contact_to_keep.id)
-        # --- END FIX ---
-        assert kept_contact is not None
-        
-        all_contacts = contact_service.get_all_contacts()
-        assert len(all_contacts) == 1
+    deleted_contact = db_session.get(Contact, contact_to_delete.id)
+    assert deleted_contact is None
+    
+    # Ensure we are back to having only the 1 seeded contact
+    all_contacts = contact_service.get_all_contacts()
+    assert len(all_contacts) == 1
+    assert all_contacts[0].first_name == 'Test'

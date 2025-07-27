@@ -17,7 +17,7 @@ from services.contact_service import ContactService
 # --- CONFIGURATION ---
 MEDIA_UPLOAD_FOLDER = 'uploads/media'
 # Set to None for the full import.
-DRY_RUN_LIMIT = 10 
+DRY_RUN_LIMIT = None 
 
 def run_full_import():
     """
