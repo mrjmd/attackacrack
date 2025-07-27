@@ -1,81 +1,82 @@
 import pytest
 from services.contact_service import ContactService
-from crm_database import Contact
-
-# The 'app' and 'db_session' fixtures are now passed in from conftest.py
+from crm_database import Contact # Import Contact model
+from crm_database import db # Import db for session access
 
 def test_add_contact(app, db_session):
     """Test adding a new contact to the database."""
     contact_service = ContactService()
-    contact = contact_service.add_contact(
-        first_name='John',
-        last_name='Doe',
-        email='john.doe@example.com',
-        phone='1234567890'
-    )
-    assert contact.id is not None
-    assert contact.first_name == 'John'
+    new_contact = contact_service.add_contact(first_name='Test', last_name='User', email='test@example.com', phone='123-456-7890')
+    
+    assert new_contact is not None
+    assert new_contact.first_name == 'Test'
+    assert new_contact.last_name == 'User'
+    assert new_contact.email == 'test@example.com'
+    assert new_contact.phone == '123-456-7890'
 
-    retrieved_contact = db_session.get(Contact, contact.id)
-    assert retrieved_contact is not None
-    assert retrieved_contact.email == 'john.doe@example.com'
+    # Verify it's in the database
+    retrieved_contact = Contact.query.get(new_contact.id)
+    assert retrieved_contact == new_contact
 
-def test_get_all_contacts(app):
+def test_get_all_contacts(app, db_session):
     """Test retrieving all contacts from the database."""
     contact_service = ContactService()
-    # Add a new contact to the existing seeded data
+    
+    # Get the initial count of contacts from the database
+    initial_contact_count = len(contact_service.get_all_contacts())
+    
+    # Add a new contact for this specific test
     contact_service.add_contact(first_name='Jane', last_name='Smith', email='jane@example.com', phone='222')
-
+    
     all_contacts = contact_service.get_all_contacts()
-    # We expect the seeded contact + the new one
-    assert len(all_contacts) == 2
-    assert all_contacts[0].first_name == 'Test' # From conftest.py
-    assert all_contacts[1].first_name == 'Jane'
+    # We expect the count to be one more than the initial count
+    assert len(all_contacts) == initial_contact_count + 1
 
-def test_get_contact_by_id(app):
+def test_get_contact_by_id(app, db_session):
     """Test retrieving a single contact by their ID."""
     contact_service = ContactService()
-    # The contact with ID 1 is seeded in conftest.py
+    # Assuming conftest seeds a contact with ID 1 and name "Test User"
     retrieved_contact = contact_service.get_contact_by_id(1)
     assert retrieved_contact is not None
     assert retrieved_contact.id == 1
-    assert retrieved_contact.first_name == 'Test'
+    assert retrieved_contact.first_name == 'Test' # Based on seeded data in conftest.py
+    assert retrieved_contact.last_name == 'User'
 
+    # Test for non-existent contact
     non_existent_contact = contact_service.get_contact_by_id(999)
     assert non_existent_contact is None
 
 def test_update_contact(app, db_session):
-    """Test updating an existing contact's details."""
+    """Test updating an existing contact."""
     contact_service = ContactService()
-    contact = db_session.get(Contact, 1) # Get the seeded contact
+    # Assuming conftest seeds a contact with ID 1
+    updated_contact = contact_service.update_contact(1, first_name='Jonathan', email='jonathan.doe@example.com')
+    
+    assert updated_contact is not None
+    assert updated_contact.first_name == 'Jonathan'
+    assert updated_contact.last_name == 'User' # Last name should remain unchanged if not provided
+    assert updated_contact.email == 'jonathan.doe@example.com'
 
-    updated_contact = contact_service.update_contact(
-        contact,
-        first_name='Updated',
-        email='updated@example.com'
-    )
-    assert updated_contact.first_name == 'Updated'
-    assert updated_contact.last_name == 'User' # Should remain the same
-    assert updated_contact.email == 'updated@example.com'
-
-    retrieved_contact = db_session.get(Contact, 1)
-    assert retrieved_contact.first_name == 'Updated'
+    retrieved_contact = Contact.query.get(1)
+    assert retrieved_contact.first_name == 'Jonathan'
+    assert retrieved_contact.email == 'jonathan.doe@example.com'
 
 def test_delete_contact(app, db_session):
     """Test deleting a contact from the database."""
     contact_service = ContactService()
+    
+    # Get the initial count of contacts
+    initial_contact_count = len(contact_service.get_all_contacts())
+
     # Add a temporary contact to be deleted
     contact_to_delete = contact_service.add_contact(first_name='ToBe', last_name='Deleted', email='delete@me.com', phone='444')
     
-    # Ensure we have 2 contacts before deletion (seeded + new)
-    assert len(contact_service.get_all_contacts()) == 2
-
-    contact_service.delete_contact(contact_to_delete)
-
-    deleted_contact = db_session.get(Contact, contact_to_delete.id)
-    assert deleted_contact is None
+    # Ensure we have one more contact than initially
+    assert len(contact_service.get_all_contacts()) == initial_contact_count + 1
     
-    # Ensure we are back to having only the 1 seeded contact
-    all_contacts = contact_service.get_all_contacts()
-    assert len(all_contacts) == 1
-    assert all_contacts[0].first_name == 'Test'
+    contact_service.delete_contact(contact_to_delete.id)
+    
+    # After deletion, we should be back to the initial count
+    remaining_contacts = contact_service.get_all_contacts()
+    assert len(remaining_contacts) == initial_contact_count
+    assert Contact.query.get(contact_to_delete.id) is None

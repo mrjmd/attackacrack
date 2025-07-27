@@ -21,7 +21,8 @@ def app():
         'TESTING': True,
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:', # Use an in-memory SQLite database for tests
         'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'WTF_CSRF_ENABLED': False # Disable CSRF for easier form testing
+        'WTF_CSRF_ENABLED': False, # Disable CSRF for easier form testing
+        'SERVER_NAME': 'localhost.localdomain' # ADDED THIS LINE: Required for url_for in tests
     })
 
     # The 'with app.app_context()' block makes the application context available,
