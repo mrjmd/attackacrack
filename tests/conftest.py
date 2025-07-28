@@ -72,7 +72,7 @@ def client(app):
 def db_session(app):
     """
     A fixture that provides a clean database session for each test function.
-    This ensures that tests are isolated from each other.
+    This ensures that tests are isolated from each other by rolling back any changes.
     """
     with app.app_context():
         yield db.session

@@ -10,17 +10,14 @@ services:
       - "5000:5000"
     expose:
       - 5000
-    # --- THIS IS THE FIX ---
-    # We are now mounting two volumes:
-    # 1. The token file, as before.
-    # 2. A bind mount that syncs your entire project directory with the /app directory in the container.
     volumes:
-      # - ./token.pickle:/app/token.pickle
       - .:/app
-    # --- END FIX ---
-    command: ["gunicorn", "--workers=4", "--bind=0.0.0.0:5000", "--timeout", "300", "app:create_app()"]
+    # --- CHANGED: The command now explicitly calls the entrypoint script ---
+    command: ["/app/entrypoint.sh"]
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -54,5 +51,53 @@ services:
       retries: 5
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: crm_redis
+    volumes:
+      - redis_data:/data
+    expose:
+      - 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  celery:
+    build: .
+    container_name: crm_celery_worker
+    # --- This command will now be executed correctly ---
+    command: ["celery", "-A", "celery_worker.celery", "worker", "--loglevel=info"]
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  
+  celery-beat:
+    build: .
+    container_name: crm_celery_beat
+    # --- This command will now be executed correctly ---
+    command: ["celery", "-A", "celery_worker.celery", "beat", "--loglevel=info"]
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+
 volumes:
   postgres_data:
+  redis_data:

@@ -6,10 +6,7 @@ from config import Config
 from extensions import db
 from datetime import datetime
 import os
-from apscheduler.schedulers.background import BackgroundScheduler
-# --- THIS IS THE FIX ---
 from werkzeug.middleware.proxy_fix import ProxyFix
-# --- END FIX ---
 
 def create_app(config_class=Config, test_config=None):
     """Create and configure an instance of the Flask application."""
@@ -20,10 +17,7 @@ def create_app(config_class=Config, test_config=None):
     if test_config:
         app.config.update(test_config)
 
-    # --- THIS IS THE FIX ---
-    # Apply the proxy fix to make the app aware of the ngrok proxy.
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-    # --- END FIX ---
 
     db.init_app(app)
     migrate = Migrate(app, db)
@@ -65,21 +59,9 @@ def create_app(config_class=Config, test_config=None):
     app.register_blueprint(invoice_bp, url_prefix='/invoices')
     app.register_blueprint(api_bp, url_prefix='/api')
     
-    from services.scheduler_service import SchedulerService
+    # --- REMOVED APScheduler ---
+    # The background task scheduling is now handled by Celery Beat.
     
-    scheduler = BackgroundScheduler(daemon=True)
-    
-    def job_wrapper():
-        with app.app_context():
-            service = SchedulerService()
-            service.send_appointment_reminders()
-
-    scheduler.add_job(job_wrapper, 'cron', hour=8, minute=0)
-    
-    if os.environ.get('WERKZEUG_RUN_MAIN') or app.config.get('FLASK_ENV') == 'production':
-        scheduler.start()
-        print("--- Background scheduler started. ---")
-
     return app
 
 if __name__ == '__main__':

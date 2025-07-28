@@ -19,14 +19,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# --- THIS IS A FIX ---
-# Make the entrypoint script executable
 RUN chmod +x /app/entrypoint.sh
-# --- END FIX ---
 
 EXPOSE 5000
 
-# --- THIS IS A FIX ---
-# Set the entrypoint script as the command to run when the container starts.
-ENTRYPOINT ["/app/entrypoint.sh"]
-# --- END FIX ---
+# --- REMOVED: ENTRYPOINT instruction ---
+# The startup command will now be specified in docker-compose.yml for each service individually.

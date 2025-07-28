@@ -25,7 +25,6 @@ class Config:
     OPENPHONE_API_KEY = os.environ.get('OPENPHONE_API_KEY')
     OPENPHONE_PHONE_NUMBER = os.environ.get('OPENPHONE_PHONE_NUMBER')
     OPENPHONE_PHONE_NUMBER_ID = os.environ.get('OPENPHONE_PHONE_NUMBER_ID')
-    # [NEW] Secret key for verifying webhook authenticity
     OPENPHONE_WEBHOOK_SIGNING_KEY = os.environ.get('OPENPHONE_WEBHOOK_SIGNING_KEY')
 
     # Google OAuth
@@ -35,3 +34,9 @@ class Config:
 
     # Gemini API
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+    # --- FIXED: Celery Configuration (Using standard uppercase prefixes) ---
+    # Flask will load these, and Celery will automatically map them to its lowercase settings.
+    # We also use 'redis' as the hostname, which is the service name in docker-compose.
+    CELERY_BROKER_URL = os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
+    CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
