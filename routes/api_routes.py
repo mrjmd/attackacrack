@@ -1,10 +1,39 @@
-from flask import Blueprint, jsonify, request
+import hmac
+import hashlib
+from functools import wraps
+from flask import Blueprint, jsonify, request, current_app, abort
 from services.contact_service import ContactService
 from services.message_service import MessageService
 from services.ai_service import AIService
 from crm_database import Activity # Import Activity
 
 api_bp = Blueprint('api', __name__)
+
+def verify_openphone_signature(f):
+    """Decorator to verify webhook signature."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        signing_key = current_app.config.get('OPENPHONE_WEBHOOK_SIGNING_KEY')
+        if not signing_key:
+            current_app.logger.error("Webhook signing key is not configured.")
+            abort(500)
+
+        signature_header = request.headers.get('x-openphone-signature-v1')
+        if not signature_header:
+            abort(403)
+
+        payload = request.get_data()
+        expected_signature = hmac.new(
+            key=signing_key.encode('utf-8'),
+            msg=payload,
+            digestmod=hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected_signature, signature_header):
+            abort(403)
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 @api_bp.route('/contacts')
 def get_contacts():
@@ -60,14 +89,18 @@ def generate_appointment_summary(contact_id):
     return jsonify({'summary': summary})
 
 @api_bp.route('/webhooks/openphone', methods=['POST'])
+@verify_openphone_signature
 def openphone_webhook():
     message_service = MessageService()
     data = request.json
-    print(f"Received webhook: {data}")
+    current_app.logger.info(f"Received valid webhook: {data}")
     
     if data.get('type') == 'token.validated':
         return jsonify(success=True)
 
-    message_service.process_incoming_webhook(data)
-    
-    return jsonify(success=True)
+    try:
+        message_service.process_incoming_webhook(data)
+        return jsonify(success=True)
+    except Exception as e:
+        current_app.logger.error(f"Error processing webhook: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': 'Internal server error'}), 500

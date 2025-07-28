@@ -25,6 +25,8 @@ class Config:
     OPENPHONE_API_KEY = os.environ.get('OPENPHONE_API_KEY')
     OPENPHONE_PHONE_NUMBER = os.environ.get('OPENPHONE_PHONE_NUMBER')
     OPENPHONE_PHONE_NUMBER_ID = os.environ.get('OPENPHONE_PHONE_NUMBER_ID')
+    # [NEW] Secret key for verifying webhook authenticity
+    OPENPHONE_WEBHOOK_SIGNING_KEY = os.environ.get('OPENPHONE_WEBHOOK_SIGNING_KEY')
 
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
