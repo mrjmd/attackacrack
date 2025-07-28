@@ -15,7 +15,7 @@ services:
     # 1. The token file, as before.
     # 2. A bind mount that syncs your entire project directory with the /app directory in the container.
     volumes:
-      - ./token.pickle:/app/token.pickle
+      # - ./token.pickle:/app/token.pickle
       - .:/app
     # --- END FIX ---
     command: ["gunicorn", "--workers=4", "--bind=0.0.0.0:5000", "--timeout", "300", "app:create_app()"]

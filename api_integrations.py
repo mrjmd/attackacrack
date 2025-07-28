@@ -135,10 +135,8 @@ def get_recent_openphone_texts(contact_service: ContactService, count=5):
         if not api_key or not phone_number_id:
             return ([], "OpenPhone API Key or Phone Number ID is not configured.")
 
-        # --- THIS IS THE FIX ---
         # The header is now in the correct format, without "Bearer ".
         headers = {"Authorization": api_key}
-        # --- END FIX ---
         
         conversations_url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}&limit={count}"
         
