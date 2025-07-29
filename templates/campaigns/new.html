@@ -6,13 +6,41 @@
 <div class="max-w-4xl mx-auto space-y-6">
     <div class="bg-gray-700 rounded-lg p-6">
         <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-white">Create New Text Campaign</h1>
+            <div>
+                <h1 class="text-2xl font-bold text-white">Create New Campaign</h1>
+                <p class="text-gray-400 mt-1">Build your next marketing campaign</p>
+            </div>
             <a href="{{ url_for('campaigns.campaign_list') }}" class="text-gray-400 hover:text-white">
                 ← Back to Campaigns
             </a>
         </div>
 
         <form method="POST" action="{{ url_for('campaigns.create_campaign') }}" id="campaignForm" class="space-y-6">
+            <!-- Channel Selection -->
+            <div class="bg-blue-900 bg-opacity-30 border border-blue-700 rounded-lg p-4">
+                <label class="block text-sm font-medium text-blue-300 mb-3">
+                    Campaign Channel <span class="text-red-400">*</span>
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="relative">
+                        <input type="radio" name="channel" value="sms" checked class="sr-only">
+                        <div class="border-2 border-blue-500 bg-blue-600 bg-opacity-20 rounded-lg p-4 cursor-pointer text-center">
+                            <span class="text-2xl mb-2 block">📱</span>
+                            <h3 class="font-semibold text-white">Text Messages</h3>
+                            <p class="text-sm text-blue-300 mt-1">SMS campaigns via OpenPhone</p>
+                        </div>
+                    </label>
+                    <label class="relative opacity-50">
+                        <input type="radio" name="channel" value="email" disabled class="sr-only">
+                        <div class="border-2 border-gray-500 bg-gray-600 bg-opacity-20 rounded-lg p-4 cursor-not-allowed text-center">
+                            <span class="text-2xl mb-2 block">📧</span>
+                            <h3 class="font-semibold text-gray-300">Email Campaigns</h3>
+                            <p class="text-sm text-gray-400 mt-1">Coming soon with SmartLead integration</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             <!-- Campaign Basic Info -->
             <div>
                 <label for="name" class="block text-sm font-medium text-gray-300 mb-2">

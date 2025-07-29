@@ -5,10 +5,32 @@
 {% block content %}
 <div class="space-y-6">
     <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-white">Text Campaigns</h1>
-        <a href="{{ url_for('campaigns.new_campaign') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-            ➕ New Campaign
-        </a>
+        <div>
+            <h1 class="text-3xl font-bold text-white">Marketing Campaigns</h1>
+            <div class="flex gap-2 mt-2">
+                <a href="{{ url_for('campaigns.campaign_list') }}" 
+                   class="px-3 py-1 {% if not request.args.get('type') %}bg-blue-600 text-white{% else %}bg-gray-600 text-gray-300 hover:bg-gray-500{% endif %} rounded text-sm">
+                    All Campaigns
+                </a>
+                <a href="{{ url_for('campaigns.campaign_list') }}?type=sms" 
+                   class="px-3 py-1 {% if request.args.get('type') == 'sms' %}bg-blue-600 text-white{% else %}bg-gray-600 text-gray-300 hover:bg-gray-500{% endif %} rounded text-sm">
+                    📱 Text
+                </a>
+                <a href="{{ url_for('campaigns.campaign_list') }}?type=email" 
+                   class="px-3 py-1 {% if request.args.get('type') == 'email' %}bg-blue-600 text-white{% else %}bg-gray-600 text-gray-300 hover:bg-gray-500{% endif %} rounded text-sm">
+                    📧 Email
+                </a>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('campaigns.new_campaign') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                📱 New Text Campaign
+            </a>
+            <a href="{{ url_for('campaigns.new_campaign') }}?type=email" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg opacity-50 cursor-not-allowed" disabled>
+                📧 New Email Campaign
+                <span class="text-xs block">Coming Soon</span>
+            </a>
+        </div>
     </div>
 
     {% if campaigns %}

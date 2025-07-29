@@ -117,7 +117,7 @@ class Activity(db.Model):
     contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=True)
     
     # Activity details
-    activity_type = db.Column(db.String(20))  # 'call', 'message', 'voicemail'
+    activity_type = db.Column(db.String(20))  # 'call', 'message', 'voicemail', 'email'
     direction = db.Column(db.String(10))  # 'incoming', 'outgoing'
     status = db.Column(db.String(50))  # 'answered', 'missed', 'delivered', 'completed', etc.
     
@@ -130,6 +130,15 @@ class Activity(db.Model):
     # Message content
     body = db.Column(db.Text, nullable=True)
     media_urls = db.Column(db.JSON, nullable=True)  # Array of media attachment URLs
+    
+    # Email-specific fields
+    email_from = db.Column(db.String(120), nullable=True)
+    email_to = db.Column(db.JSON, nullable=True)  # Array for multiple recipients
+    email_cc = db.Column(db.JSON, nullable=True)
+    email_bcc = db.Column(db.JSON, nullable=True)
+    email_subject = db.Column(db.String(200), nullable=True)
+    email_thread_id = db.Column(db.String(100), nullable=True)
+    smartlead_id = db.Column(db.String(100), nullable=True)
     
     # Call-specific fields
     duration_seconds = db.Column(db.Integer, nullable=True)
@@ -197,6 +206,7 @@ class Campaign(db.Model):
     daily_limit = db.Column(db.Integer, default=125)
     business_hours_only = db.Column(db.Boolean, default=True)
     ab_config = db.Column(db.JSON, nullable=True)  # A/B test configuration
+    channel = db.Column(db.String(10), default='sms')  # 'sms', 'email'
     
     memberships = db.relationship('CampaignMembership', backref='campaign', lazy=True, cascade="all, delete-orphan")
 

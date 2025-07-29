@@ -29,7 +29,17 @@
                         <a href="{{ url_for('contact.conversation_list') }}" 
                            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'contact.conversation_list' %}bg-gray-700 text-blue-400{% endif %}">
                             <span class="mr-3 text-lg">💬</span>
-                            All Conversations
+                            All Messages
+                        </a>
+                        <a href="{{ url_for('contact.conversation_list') }}?filter=sms" 
+                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700">
+                            <span class="mr-3 text-lg">📱</span>
+                            Text Messages
+                        </a>
+                        <a href="{{ url_for('contact.conversation_list') }}?filter=email" 
+                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700">
+                            <span class="mr-3 text-lg">📧</span>
+                            Emails
                         </a>
                         <a href="{{ url_for('contact.conversation_list') }}?filter=missed" 
                            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700">
@@ -90,7 +100,17 @@
                         <a href="{{ url_for('campaigns.campaign_list') }}" 
                            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint.startswith('campaigns.') %}bg-gray-700 text-blue-400{% endif %}">
                             <span class="mr-3 text-lg">📢</span>
-                            Marketing
+                            Campaigns
+                        </a>
+                        <a href="{{ url_for('campaigns.campaign_list') }}?type=sms" 
+                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 ml-6">
+                            <span class="mr-3 text-lg">📱</span>
+                            Text Campaigns
+                        </a>
+                        <a href="{{ url_for('campaigns.campaign_list') }}?type=email" 
+                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 ml-6">
+                            <span class="mr-3 text-lg">📧</span>
+                            Email Campaigns
                         </a>
                         <a href="{{ url_for('growth.financials') }}" 
                            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'growth.financials' %}bg-gray-700 text-blue-400{% endif %}">

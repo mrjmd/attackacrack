@@ -31,11 +31,12 @@ class CampaignService:
                        name: str,
                        campaign_type: str = 'blast',
                        audience_type: str = 'mixed',
+                       channel: str = 'sms',
                        template_a: str = '',
                        template_b: str = None,
                        daily_limit: int = 125,
                        business_hours_only: bool = True) -> Campaign:
-        """Create a new text campaign"""
+        """Create a new marketing campaign"""
         
         # Validate campaign type
         if campaign_type not in ['blast', 'automated', 'ab_test']:
@@ -44,6 +45,14 @@ class CampaignService:
         # Validate audience type
         if audience_type not in ['cold', 'customer', 'mixed']:
             raise ValueError("Audience type must be 'cold', 'customer', or 'mixed'")
+        
+        # Validate channel
+        if channel not in ['sms', 'email']:
+            raise ValueError("Channel must be 'sms' or 'email'")
+        
+        # Email campaigns not yet supported
+        if channel == 'email':
+            raise ValueError("Email campaigns coming soon with SmartLead integration")
         
         # For A/B tests, require template_b
         if campaign_type == 'ab_test' and not template_b:
@@ -64,6 +73,7 @@ class CampaignService:
             name=name,
             campaign_type=campaign_type,
             audience_type=audience_type,
+            channel=channel,
             template_a=template_a,
             template_b=template_b,
             daily_limit=daily_limit,

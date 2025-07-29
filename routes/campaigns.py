@@ -71,6 +71,7 @@ def create_campaign():
             name=data['name'],
             campaign_type=data['campaign_type'],
             audience_type=data.get('audience_type', 'mixed'),
+            channel=data.get('channel', 'sms'),
             template_a=data['template_a'],
             template_b=data.get('template_b') if data['campaign_type'] == 'ab_test' else None,
             daily_limit=int(data.get('daily_limit', 125)),
