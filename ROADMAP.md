@@ -1,7 +1,7 @@
 # Attack-a-Crack CRM: Development Roadmap
 
-**Version:** 2.3  
-**Last Updated:** July 28, 2025
+**Version:** 2.4  
+**Last Updated:** July 29, 2025
 
 ## Executive Summary
 
@@ -15,9 +15,12 @@ The Attack-a-Crack CRM is a comprehensive platform designed to manage every aspe
 - **Secure Webhooks:** OpenPhone webhook endpoint with signature verification
 - **Real-time Updates:** Live polling for new text messages on dashboard
 - **Centralized Database:** SQLAlchemy models with comprehensive relationships
+- **Enhanced Database Models:** Added support for all OpenPhone data types (media, recordings, AI summaries)
+- **Large Scale Import:** Built robust import system handling 7000+ conversations with automatic resume
 
-### ⚠️ Critical Alert
-- **Empty Production Database:** Historical data import from OpenPhone must be rebuilt from scratch
+### 🚧 In Progress
+- **Historical Data Import:** Currently importing 7000+ conversations from OpenPhone (67% complete as of July 29)
+- **Contact Enrichment Data:** Prepared CSV consolidation of 6,110 unique contacts ready for import
 
 ## Development Philosophy: Stability First, Features Immediately After
 
@@ -247,6 +250,61 @@ def import_openphone_data():
 
 ---
 
+## Phase 1A: Contact Enrichment & Data Quality (NEW - IMMEDIATE PRIORITY)
+
+**Goal:** Enrich contact data from multiple sources to overcome OpenPhone API limitations and ensure high-quality contact information for campaigns.
+
+### Task 1A.1: Multi-Source Contact Enrichment
+
+**Priority:** CRITICAL  
+**Estimated Effort:** 3-4 days
+
+#### Problem Statement
+OpenPhone's API doesn't provide contact details (names, emails, etc.) for contacts created via web app. We have 6,110 unique contacts but 4,818 (79%) are missing critical information.
+
+#### Data Sources & Strategy
+
+**1. CSV Import & Merge**
+- Import consolidated CSV with 6,110 deduplicated contacts
+- Match by normalized phone number (+1 format)
+- Merge fields: first_name, last_name, email, company, address
+- Handle conflicts with source tracking
+
+**2. QuickBooks Customer Integration**
+- Connect to QuickBooks API
+- Match customers by phone number
+- Import: company name, billing address, payment history
+- Flag as "verified customer" for campaign rules
+
+**3. Gemini AI Conversation Analysis**
+- Process conversations for contacts missing data
+- Extract: names, addresses, emails, business context
+- Confidence scoring for extracted data
+- Human review queue for low-confidence extractions
+
+**4. Office Number Management**
+- Flag 23 identified office numbers
+- Prevent mass campaign sends to these numbers
+- Allow manual override with warning
+
+#### Implementation Plan
+```python
+class ContactEnrichmentService:
+    def enrich_from_csv(self, csv_path):
+        # Import and match contacts
+        
+    def enrich_from_quickbooks(self):
+        # API integration for customer data
+        
+    def enrich_from_conversations(self, contact_id):
+        # Gemini AI analysis of message history
+        
+    def flag_office_numbers(self, office_numbers):
+        # Mark contacts to prevent mass sends
+```
+
+---
+
 ## Phase 2: Core Workflow & Growth Engine (IMMEDIATE BUSINESS VALUE)
 
 **Goal:** Build primary features for daily operations and growth, leveraging the rich, reliable dataset.
@@ -270,25 +328,132 @@ def import_openphone_data():
 4. Add audio player for call recordings
 5. Integrate Gmail API for email display
 
-### Task 2.2: Marketing Campaign Engine (MVP)
+### Task 2.2: Text Campaign System (PRIORITY - Due by Friday)
+
+**Priority:** CRITICAL  
+**Estimated Effort:** 5 days (aggressive timeline)
+
+#### Campaign Types
+
+**1. Blast Campaigns** (Primary focus)
+- One-time sends to selected contacts
+- Cold outreach limited to 125/day per number
+- Customer announcements with no limits
+- Smart duplicate detection and script modification
+
+**2. Automated Campaigns** (Event-triggered)
+- Appointment reminders (T-1 day at 9am)
+- Post-appointment follow-ups (T+2 days)
+- QuickBooks event triggers (invoice paid, etc.)
+- Google Calendar integration
+
+**3. A/B Test Campaigns**
+- Automatic winner detection with statistical significance
+- Progressive traffic shifting to winning variant
+- Min sample size: 100 per variant
+- Auto-optimization after p<0.05
+
+#### Core Features
+
+**Smart Sending Logic:**
+- Pre-send validation (opt-outs, office numbers, recent contacts)
+- Business hours only: Weekdays 9am-6pm ET
+- Daily limit enforcement: 125 texts/day for cold outreach
+- Duplicate handling:
+  - <2 months: Modify script slightly
+  - Recent: Flag for manual review
+  - Office numbers: Auto-skip
+
+**Compliance & Safety:**
+- Universal opt-out database (SMS + Email)
+- STOP/UNSUBSCRIBE keyword detection
+- Permanent do-not-contact flagging
+- Reason tracking for all opt-outs
+
+**Campaign Analytics:**
+- Real-time response tracking
+- Response sentiment analysis (positive/negative/neutral)
+- A/B test performance metrics
+- Time-of-day response patterns
+- Conversion tracking
+
+#### Database Schema
+```python
+class Campaign(db.Model):
+    type = db.Column(db.String(20))  # 'blast', 'automated', 'ab_test'
+    audience_type = db.Column(db.String(20))  # 'cold', 'customer', 'mixed'
+    daily_limit = db.Column(db.Integer, default=125)
+    schedule_window = db.Column(db.JSON)  # {days: [1-5], hours: [9,18], tz: 'US/Eastern'}
+    ab_config = db.Column(db.JSON)  # {variants: [], threshold: 0.95, min_sample: 100}
+    
+class ContactFlag(db.Model):
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'))
+    flag_type = db.Column(db.String(50))  # 'opted_out', 'office_number', 'recently_texted'
+    flag_reason = db.Column(db.Text)
+    applies_to = db.Column(db.String(20))  # 'sms', 'email', 'both'
+    
+class CampaignRecipient(db.Model):
+    pre_send_flags = db.Column(db.JSON)  # ['already_texted', 'opted_out']
+    override_action = db.Column(db.String(20))  # 'skip', 'modify_script', 'flag_review'
+    response_sentiment = db.Column(db.String(20))  # 'positive', 'negative', 'neutral'
+```
+
+#### Personalization Variables
+- {first_name} - With intelligent fallbacks
+- {company} - For B2B outreach
+- {neighborhood} - Location-based targeting
+- {last_appointment} - For follow-ups
+- Future: {property_year_built}, etc.
+
+#### Implementation Timeline
+- **Day 1-2:** Core models, flagging system, daily limits
+- **Day 2-3:** Campaign builder UI, recipient validation
+- **Day 3-4:** A/B testing engine, sending queue
+- **Day 4-5:** Analytics dashboard, response tracking
+- **Day 5:** Testing, polish, documentation
+
+### Task 2.3: UI/UX Enhancements (Dashboard & Conversation Views)
 
 **Priority:** HIGH  
-**Estimated Effort:** 6-7 days
+**Estimated Effort:** 3-4 days
 
-#### Features
-- **Campaign Builder:** Create SMS campaigns with A/B testing
-- **Smart Scheduling:** Respect quiet hours and throttling limits
-- **Contact Rules:** Handle existing contacts per campaign settings
-- **Real-time Analytics:** Campaign performance dashboard
-- **Reply Classification:** AI-powered positive/negative reply detection
+#### Dashboard Redesign
+- **Metrics Cards:** Total contacts, active campaigns, response rates, revenue
+- **Activity Timeline:** Recent messages, calls, campaign events
+- **Quick Actions:** New campaign, send message, view reports
+- **Real-time Charts:** Message volume, response patterns, campaign performance
 
-#### Technical Implementation
-1. Create `marketing_routes.py` blueprint
-2. Build campaign management UI
-3. Implement `execute_sms_campaign` Celery task
-4. Create `send_throttled_sms` task with rate limiting
-5. Add webhook handler for reply classification
-6. Build analytics dashboard
+#### Conversations List Enhancement
+- **Advanced Search:** Filter by name, phone, tags, date range, campaign
+- **Bulk Operations:** Select multiple → tag, assign, export
+- **Visual Indicators:** 
+  - 🔵 Unread messages
+  - 📎 Has attachments
+  - 🤖 AI summary available
+  - 🏢 Office number warning
+- **Infinite Scroll:** Virtualized list for 7000+ conversations
+
+#### Enhanced Conversation Detail View
+- **Split Layout:** Contact sidebar + conversation timeline
+- **Rich Media Display:**
+  - Inline image viewer with lightbox
+  - Audio player for recordings/voicemails
+  - Document preview for PDFs
+- **AI Content Showcase:**
+  - Prominent call summaries
+  - Expandable transcripts
+  - Suggested next actions
+- **Quick Actions Bar:**
+  - Call contact
+  - Add to campaign
+  - Schedule appointment
+  - Add note/tag
+- **Activity Tabs:**
+  - Messages
+  - Calls
+  - Emails (future)
+  - Notes
+  - Campaign History
 
 ---
 
@@ -403,13 +568,16 @@ def import_openphone_data():
 
 ## Implementation Priority Matrix
 
-### Phase 1 (Immediate - Next 1-2 weeks)
-1. ✅ **Database Schema Enhancement** (Task 1.1)
-2. ✅ **Historical Data Import** (Task 1.2)
+### Phase 1 (Foundation - Completed/In Progress)
+1. ✅ **Database Schema Enhancement** (Task 1.1) - COMPLETE
+2. 🚧 **Historical Data Import** (Task 1.2) - 69% COMPLETE (4,857/7,000 conversations)
+3. 📋 **Contact Enrichment** (Task 1A.1) - DATA PREPARED
 
-### Phase 2 (High Priority - Next 2-3 weeks)
-3. **Unified Conversation View** (Task 2.1)
-4. **Marketing Campaign Engine MVP** (Task 2.2)
+### Phase 2 (Immediate Priorities - This Week)
+4. 🚨 **Text Campaign System** (Task 2.2) - DUE FRIDAY
+5. 📱 **Contact CSV Import** (Task 1A.1) - After import completes
+6. 🎨 **UI/UX Enhancements** (Task 2.3) - Dashboard & Conversations
+7. 👁️ **Unified Conversation View** (Task 2.1) - Enhanced display
 
 ### Phase 3 (Medium Priority - Next 4-6 weeks)
 5. **Enhanced Quote/Invoice Lifecycle** (Task 3.1)

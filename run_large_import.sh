@@ -30,8 +30,8 @@ echo "📋 Monitor progress: docker-compose logs -f web"
 echo "🛑 Stop gracefully: docker-compose exec web pkill -SIGINT python"
 echo ""
 
-# Run the import with timeout handling
-timeout 21600 docker-compose exec -T web python large_scale_import.py $RESUME_FLAG $RESET_FLAG
+# Run the import with timeout handling (macOS compatible)
+docker-compose exec -T web python large_scale_import.py $RESUME_FLAG $RESET_FLAG
 
 # Check the exit code
 EXIT_CODE=$?

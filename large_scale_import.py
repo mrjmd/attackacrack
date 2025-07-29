@@ -299,6 +299,16 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
             except Exception as e:
                 error_msg = f"Error processing conversation {convo_data.get('id', 'unknown')}: {e}"
                 
+                # Handle database transaction rollback issues
+                if "rolled back" in str(e).lower() or "uniqueviolation" in str(type(e).__name__):
+                    print(f"🔄 Database rollback detected, recovering...")
+                    try:
+                        db.session.rollback()  # Rollback the failed transaction
+                        print(f"⚠️  Skipping duplicate conversation: {convo_data.get('id', 'unknown')}")
+                        continue  # Skip this conversation and continue
+                    except Exception as rollback_error:
+                        print(f"❌ Could not recover from rollback: {rollback_error}")
+                
                 # Check if this is a critical error
                 if self._is_critical_error(e):
                     self.critical_errors.append(error_msg)
