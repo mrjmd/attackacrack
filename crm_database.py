@@ -1,18 +1,39 @@
 # crm_database.py
 
 from extensions import db
-from datetime import datetime
+from datetime import datetime, time
 
-# --- NEW: Conversation Model ---
-# This table holds the high-level information for each conversation thread.
+# --- NEW: User Model ---
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    openphone_user_id = db.Column(db.String(100), unique=True)
+    first_name = db.Column(db.String(50))
+    last_name = db.Column(db.String(50))
+    email = db.Column(db.String(120))
+
+# --- NEW: PhoneNumber Model ---
+class PhoneNumber(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    openphone_id = db.Column(db.String(100), unique=True)
+    phone_number = db.Column(db.String(20), unique=True)
+    name = db.Column(db.String(100), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+
+# --- ENHANCED: Conversation Model ---
 class Conversation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     openphone_id = db.Column(db.String(100), unique=True, nullable=True)
     contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
-    # Storing participants as a simple comma-separated string for now.
-    # For a more advanced system, this could be a separate related table.
-    participants = db.Column(db.String(500), nullable=True)
+    
+    # Conversation details
+    name = db.Column(db.String(200), nullable=True)  # Display name
+    participants = db.Column(db.String(500), nullable=True)  # Comma-separated phone numbers
+    phone_number_id = db.Column(db.String(100), nullable=True)  # Associated OpenPhone number
+    
+    # Activity tracking
     last_activity_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity_type = db.Column(db.String(20), nullable=True)  # 'message' or 'call'
+    last_activity_id = db.Column(db.String(100), nullable=True)  # OpenPhone activity ID
     
     activities = db.relationship('Activity', backref='conversation', lazy=True, cascade="all, delete-orphan")
 
@@ -86,22 +107,50 @@ class Invoice(db.Model):
     status = db.Column(db.String(20), default='Draft')
     job_id = db.Column(db.Integer, db.ForeignKey('job.id'), nullable=False)
 
-# --- RENAMED and ENHANCED: From Message to Activity ---
+# --- ENHANCED: Activity Model (Unified Communication Model) ---
 class Activity(db.Model):
+    # Core fields
     id = db.Column(db.Integer, primary_key=True)
-    conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id'), nullable=False)
-    openphone_id = db.Column(db.String(100), unique=True, nullable=False)
+    openphone_id = db.Column(db.String(100), unique=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id'))
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=True)
     
-    type = db.Column(db.String(20), nullable=False, default='message') # 'message', 'call', 'voicemail'
-    direction = db.Column(db.String(10), nullable=False)
-    status = db.Column(db.String(50), nullable=True) # e.g., 'answered', 'missed', 'delivered'
+    # Activity details
+    activity_type = db.Column(db.String(20))  # 'call', 'message', 'voicemail'
+    direction = db.Column(db.String(10))  # 'incoming', 'outgoing'
+    status = db.Column(db.String(50))  # 'answered', 'missed', 'delivered', 'completed', etc.
     
+    # Participants
+    from_number = db.Column(db.String(20), nullable=True)
+    to_numbers = db.Column(db.JSON, nullable=True)  # Array for multiple recipients
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    phone_number_id = db.Column(db.String(100), nullable=True)  # OpenPhone number used
+    
+    # Message content
     body = db.Column(db.Text, nullable=True)
-    duration = db.Column(db.Integer, nullable=True)
+    media_urls = db.Column(db.JSON, nullable=True)  # Array of media attachment URLs
+    
+    # Call-specific fields
+    duration_seconds = db.Column(db.Integer, nullable=True)
     recording_url = db.Column(db.String(500), nullable=True)
     voicemail_url = db.Column(db.String(500), nullable=True)
+    answered_at = db.Column(db.DateTime, nullable=True)
+    answered_by = db.Column(db.String(100), nullable=True)  # User ID
+    completed_at = db.Column(db.DateTime, nullable=True)
+    initiated_by = db.Column(db.String(100), nullable=True)  # User ID
+    forwarded_from = db.Column(db.String(100), nullable=True)
+    forwarded_to = db.Column(db.String(100), nullable=True)
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # AI-generated content (stored in same model for unified view)
+    ai_summary = db.Column(db.Text, nullable=True)  # Call summary
+    ai_next_steps = db.Column(db.Text, nullable=True)  # Recommended actions
+    ai_transcript = db.Column(db.JSON, nullable=True)  # Call transcript dialogue
+    ai_content_status = db.Column(db.String(50), nullable=True)  # 'pending', 'completed', 'failed'
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
     media_attachments = db.relationship('MediaAttachment', backref='activity', lazy=True, cascade="all, delete-orphan")
 
 class MediaAttachment(db.Model):
@@ -116,3 +165,37 @@ class Setting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(100), unique=True, nullable=False)
     value = db.Column(db.Text, nullable=False)
+
+# --- NEW: WebhookEvent Model (for reliability) ---
+class WebhookEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.String(100), unique=True)  # OpenPhone event ID
+    event_type = db.Column(db.String(50))  # 'message.new', 'call.completed', etc.
+    api_version = db.Column(db.String(10))  # 'v1', 'v2', 'v4'
+    payload = db.Column(db.JSON)  # Full webhook payload for reprocessing
+    processed = db.Column(db.Boolean, default=False)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# --- NEW: Campaign Model (Enhanced) ---
+class Campaign(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='draft')  # 'draft', 'running', 'paused', 'complete'
+    template_a = db.Column(db.Text)  # A/B test variant A
+    template_b = db.Column(db.Text, nullable=True)  # A/B test variant B
+    quiet_hours_start = db.Column(db.Time, default=time(20, 0))  # 8 PM
+    quiet_hours_end = db.Column(db.Time, default=time(9, 0))  # 9 AM
+    on_existing_contact = db.Column(db.String(50), default='ignore')  # 'ignore', 'flag_for_review', 'adapt_script'
+
+# --- NEW: CampaignMembership Model (Enhanced) ---
+class CampaignMembership(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'))
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'))
+    status = db.Column(db.String(50), default='pending')  # 'pending', 'sent', 'failed', 'replied_positive', 'replied_negative', 'suppressed'
+    variant_sent = db.Column(db.String(1), nullable=True)  # 'A' or 'B'
+    sent_at = db.Column(db.DateTime, nullable=True)
+    reply_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)
