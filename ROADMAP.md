@@ -34,6 +34,14 @@ This roadmap is organized into distinct phases where each phase is a prerequisit
 **Priority:** CRITICAL  
 **Estimated Effort:** 2-3 days
 
+#### Design Philosophy: Unified Activity Model
+
+The system uses a single `Activity` model to store all communication types (messages, calls, voicemails) along with their AI-generated enhancements (summaries, transcripts). This design enables:
+- Simplified queries for the unified conversation view
+- Consistent handling of all communication types
+- Easy addition of new activity types
+- Reduced database complexity
+
 #### New/Enhanced Models
 
 **User Model (New)**
@@ -46,28 +54,94 @@ class User(db.Model):
     email = db.Column(db.String(120))
 ```
 
+**PhoneNumber Model (New)**
+```python
+class PhoneNumber(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    openphone_id = db.Column(db.String(100), unique=True)
+    phone_number = db.Column(db.String(20), unique=True)
+    name = db.Column(db.String(100), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+```
+
 **Activity Model (Expanded)**
 ```python
 class Activity(db.Model):
-    # Existing fields
+    # Core fields
     id = db.Column(db.Integer, primary_key=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'))
-    conversation_id = db.Column(db.String(100))  # OpenPhone conversation ID
     openphone_id = db.Column(db.String(100), unique=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id'))
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=True)
     
-    # Enhanced fields
+    # Activity details
+    activity_type = db.Column(db.String(20))  # 'call', 'message', 'voicemail'
+    direction = db.Column(db.String(10))  # 'incoming', 'outgoing'
+    status = db.Column(db.String(50))  # 'answered', 'missed', 'delivered', 'completed', etc.
+    
+    # Participants
+    from_number = db.Column(db.String(20), nullable=True)
+    to_numbers = db.Column(db.JSON, nullable=True)  # Array for multiple recipients
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    activity_type = db.Column(db.String(20))  # 'call', 'message'
-    direction = db.Column(db.String(10))  # 'inbound', 'outbound'
-    status = db.Column(db.String(50))  # 'answered', 'missed', 'delivered', etc.
-    body = db.Column(db.Text)
+    phone_number_id = db.Column(db.String(100), nullable=True)  # OpenPhone number used
+    
+    # Message content
+    body = db.Column(db.Text, nullable=True)
+    media_urls = db.Column(db.JSON, nullable=True)  # Array of media attachment URLs
+    
+    # Call-specific fields
     duration_seconds = db.Column(db.Integer, nullable=True)
     recording_url = db.Column(db.String(500), nullable=True)
     voicemail_url = db.Column(db.String(500), nullable=True)
-    transcript = db.Column(db.Text, nullable=True)
-    media_urls = db.Column(db.JSON, nullable=True)  # List of MMS attachment URLs
+    answered_at = db.Column(db.DateTime, nullable=True)
+    answered_by = db.Column(db.String(100), nullable=True)  # User ID
+    completed_at = db.Column(db.DateTime, nullable=True)
+    initiated_by = db.Column(db.String(100), nullable=True)  # User ID
+    forwarded_from = db.Column(db.String(100), nullable=True)
+    forwarded_to = db.Column(db.String(100), nullable=True)
+    
+    # AI-generated content (stored in same model for unified view)
+    ai_summary = db.Column(db.Text, nullable=True)  # Call summary
+    ai_next_steps = db.Column(db.Text, nullable=True)  # Recommended actions
+    ai_transcript = db.Column(db.JSON, nullable=True)  # Call transcript dialogue
+    ai_content_status = db.Column(db.String(50), nullable=True)  # 'pending', 'completed', 'failed'
+    
+    # Timestamps
     created_at = db.Column(db.DateTime)
-    ai_summary = db.Column(db.Text, nullable=True)  # For future AI content
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+```
+
+**Conversation Model (Enhanced)**
+```python
+class Conversation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    openphone_id = db.Column(db.String(100), unique=True, nullable=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
+    
+    # Conversation details
+    name = db.Column(db.String(200), nullable=True)  # Display name
+    participants = db.Column(db.String(500), nullable=True)  # Comma-separated phone numbers
+    phone_number_id = db.Column(db.String(100), nullable=True)  # Associated OpenPhone number
+    
+    # Activity tracking
+    last_activity_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity_type = db.Column(db.String(20), nullable=True)  # 'message' or 'call'
+    last_activity_id = db.Column(db.String(100), nullable=True)  # OpenPhone activity ID
+    
+    activities = db.relationship('Activity', backref='conversation', lazy=True, cascade="all, delete-orphan")
+```
+
+**WebhookEvent Model (New - for reliability)**
+```python
+class WebhookEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.String(100), unique=True)  # OpenPhone event ID
+    event_type = db.Column(db.String(50))  # 'message.new', 'call.completed', etc.
+    api_version = db.Column(db.String(10))  # 'v1', 'v2', 'v4'
+    payload = db.Column(db.JSON)  # Full webhook payload for reprocessing
+    processed = db.Column(db.Boolean, default=False)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 ```
 
 **Campaign Model (Enhanced)**
@@ -101,11 +175,75 @@ class CampaignMembership(db.Model):
 **Priority:** CRITICAL  
 **Estimated Effort:** 3-4 days
 
-- Create comprehensive import script that populates all new models
-- Fetch and store User data from OpenPhone API
-- Import all historical conversations, messages, and calls
-- Handle media attachments and store URLs
-- Implement error handling and resume capability
+#### Implementation Details
+
+**Data Sources from OpenPhone API:**
+1. **Phone Numbers** (`/v1/phone-numbers`)
+   - Fetch all active phone numbers
+   - Store OpenPhone IDs for relationship mapping
+
+2. **Conversations** (`/v1/conversations`)
+   - Paginated fetch with `pageToken`
+   - Extract participants, last activity info
+   - Link to contacts by phone number matching
+
+3. **Messages** (`/v1/messages`)
+   - Fetch all historical messages
+   - Handle multiple recipients (group messages)
+   - Download and store media URLs
+   - Map to conversations and contacts
+
+4. **Calls** (`/v1/calls`)
+   - Import complete call history
+   - Capture all metadata (duration, participants, forwarding)
+   - Store recording URLs
+
+5. **Call Enhancements** (Business plan only)
+   - Call Summaries (`/v1/call-summaries/{callId}`)
+   - Call Transcripts (`/v1/call-transcripts/{callId}`)
+   - Store in Activity model's AI fields
+
+6. **Users** (from webhook events or API if available)
+   - Extract user IDs from call/message data
+   - Build user profiles from available data
+
+**Import Strategy:**
+```python
+# Pseudocode for import process
+def import_openphone_data():
+    # 1. Import phone numbers first (needed for relationships)
+    import_phone_numbers()
+    
+    # 2. Import conversations (creates conversation records)
+    import_conversations()
+    
+    # 3. Import messages and calls (creates activity records)
+    import_messages()  # Uses pagination
+    import_calls()     # Uses pagination
+    
+    # 4. Enhance calls with AI content (if available)
+    enhance_calls_with_ai()
+    
+    # 5. Link activities to contacts
+    match_activities_to_contacts()
+    
+    # 6. Update conversation last_activity fields
+    update_conversation_metadata()
+```
+
+**Error Handling & Resume Capability:**
+- Track import progress in database
+- Store last successful page token
+- Implement retry logic with exponential backoff
+- Log all API errors for review
+- Support resuming interrupted imports
+
+**Technical Considerations:**
+- **Authentication**: Use API key in `Authorization` header (not Bearer token)
+- **Rate Limiting**: Respect OpenPhone's rate limits with throttling
+- **Webhook Versions**: Handle different API versions (v1, v2, v4) in webhook events
+- **Data Integrity**: Store webhook event IDs to prevent duplicate processing
+- **Media Storage**: Decide whether to store media URLs only or download files locally
 
 ---
 
