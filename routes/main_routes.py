@@ -23,49 +23,163 @@ def index():
 
 @main_bp.route('/dashboard')
 def dashboard():
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+    from crm_database import Contact, Campaign, CampaignMembership, Activity, Conversation
+    from services.campaign_service import CampaignService
+    
     contact_service = ContactService()
-    property_service = PropertyService()
-    job_service = JobService()
-    quote_service = QuoteService()
     appointment_service = AppointmentService()
     message_service = MessageService()
+    campaign_service = CampaignService()
+    
+    # Enhanced Statistics for Dashboard Cards
+    total_contacts = Contact.query.count()
+    
+    # Contacts added this week (using Activity records as proxy since Contact doesn't have created_at)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    contacts_added_this_week = Activity.query.filter(
+        Activity.created_at >= week_ago,
+        Activity.contact_id.isnot(None)
+    ).distinct(Activity.contact_id).count()
+    
+    # Active campaigns
+    active_campaigns = Campaign.query.filter_by(status='running').count()
+    
+    # Campaign response rate (average across all campaigns)
+    all_campaigns = Campaign.query.all()
+    response_rates = []
+    try:
+        for campaign in all_campaigns:
+            analytics = campaign_service.get_campaign_analytics(campaign.id)
+            if analytics.get('sent_count', 0) > 0:
+                response_rates.append(analytics['response_rate'] * 100)
+    except Exception as e:
+        # Handle case where campaign service fails
+        pass
+    
+    avg_response_rate = round(sum(response_rates) / len(response_rates), 1) if response_rates else 0
+    
+    # Monthly revenue (placeholder - can be enhanced with actual revenue tracking)
+    monthly_revenue = 12500  # Placeholder
+    revenue_growth = 8.5  # Placeholder percentage
+    
+    # Messages sent today
+    today = datetime.utcnow().date()
+    messages_today = Activity.query.filter(
+        Activity.activity_type == 'message',
+        Activity.direction == 'outgoing',
+        func.date(Activity.created_at) == today
+    ).count()
+    
+    # Overall response rate (incoming messages vs outgoing)
+    total_outgoing = Activity.query.filter(
+        Activity.activity_type == 'message',
+        Activity.direction == 'outgoing'
+    ).count()
+    
+    total_incoming = Activity.query.filter(
+        Activity.activity_type == 'message',
+        Activity.direction == 'incoming'
+    ).count()
+    
+    overall_response_rate = round((total_incoming / total_outgoing * 100), 1) if total_outgoing > 0 else 0
     
     stats = {
-        'contact_count': len(contact_service.get_all_contacts()),
-        'property_count': len(property_service.get_all_properties()),
-        'active_jobs': len([j for j in job_service.get_all_jobs() if j.status == 'Active']),
-        'pending_quotes': len([q for q in quote_service.get_all_quotes() if q.status == 'Sent'])
+        'contact_count': total_contacts,
+        'contacts_added_this_week': contacts_added_this_week,
+        'active_campaigns': active_campaigns,
+        'campaign_response_rate': avg_response_rate,
+        'monthly_revenue': monthly_revenue,
+        'revenue_growth': revenue_growth,
+        'overall_response_rate': overall_response_rate,
+        'messages_today': messages_today
     }
     
-    internal_appointments = appointment_service.get_all_appointments()
-    google_events = get_upcoming_calendar_events()
-    gmail_messages = get_recent_gmail_messages()
-    
-    # --- THIS IS THE FIX ---
-    # This one call now gets all the data we need, efficiently.
+    # Activity Timeline Data
     latest_conversations = message_service.get_latest_conversations_from_db()
     
     openphone_texts = []
     for conv in latest_conversations:
-        # We no longer need a new query here. The activities are already loaded.
         last_activity = max(conv.activities, key=lambda act: act.created_at) if conv.activities else None
-        openphone_texts.append({
-            'contact_id': conv.contact.id,
-            'contact_name': conv.contact.first_name,
-            'contact_number': conv.contact.phone,
-            'latest_message_body': last_activity.body if last_activity else "No activities yet"
-        })
-    openphone_error = None
-    # --- END FIX ---
-
+        if last_activity:
+            openphone_texts.append({
+                'contact_id': conv.contact.id,
+                'contact_name': conv.contact.first_name or conv.contact.phone,
+                'contact_number': conv.contact.phone,
+                'latest_message_body': last_activity.body or "No message content",
+                'timestamp': last_activity.created_at.strftime('%H:%M') if last_activity.created_at else 'Just now'
+            })
+    
+    # Campaign Events for Timeline
+    recent_campaigns = Campaign.query.order_by(Campaign.created_at.desc()).limit(3).all()
+    campaign_events = []
+    try:
+        for campaign in recent_campaigns:
+            analytics = campaign_service.get_campaign_analytics(campaign.id)
+            campaign_events.append({
+                'title': f'Campaign: {campaign.name}',
+                'description': f'{analytics.get("sent_count", 0)} messages sent, {analytics.get("response_count", 0)} responses',
+                'time': campaign.created_at.strftime('%H:%M') if campaign.created_at else 'Recently'
+            })
+    except Exception as e:
+        # If campaign analytics fail, show basic info
+        for campaign in recent_campaigns:
+            campaign_events.append({
+                'title': f'Campaign: {campaign.name}',
+                'description': f'Status: {campaign.status}',
+                'time': campaign.created_at.strftime('%H:%M') if campaign.created_at else 'Recently'
+            })
+    
+    # Message Volume Data (Last 7 Days)
+    message_volume_data = []
+    for i in range(7):
+        day = datetime.utcnow().date() - timedelta(days=6-i)
+        count = Activity.query.filter(
+            Activity.activity_type == 'message',
+            func.date(Activity.created_at) == day
+        ).count()
+        message_volume_data.append({'date': day, 'count': count})
+    
+    # Recent Campaigns with Performance
+    recent_campaigns_with_perf = []
+    try:
+        for campaign in recent_campaigns:
+            analytics = campaign_service.get_campaign_analytics(campaign.id)
+            recent_campaigns_with_perf.append({
+                'name': campaign.name,
+                'response_rate': round(analytics.get('response_rate', 0) * 100, 1)
+            })
+    except Exception as e:
+        # If analytics fail, show campaigns without rates
+        for campaign in recent_campaigns:
+            recent_campaigns_with_perf.append({
+                'name': campaign.name,
+                'response_rate': 0
+            })
+    
+    # Today's Appointments
+    appointments = appointment_service.get_all_appointments()[:4]  # Limit to 4
+    
+    # System Health Data
+    campaign_queue_size = CampaignMembership.query.filter_by(status='pending').count()
+    
+    # Data quality score (percentage of contacts with complete info)
+    contacts_with_names = Contact.query.filter(~Contact.first_name.like('%+1%')).count()
+    contacts_with_emails = Contact.query.filter(Contact.email.isnot(None), Contact.email != '').count()
+    data_quality_score = round(((contacts_with_names + contacts_with_emails) / (total_contacts * 2)) * 100) if total_contacts > 0 else 0
+    
     return render_template(
         'dashboard.html', 
         stats=stats, 
-        appointments=internal_appointments,
-        google_events=google_events,
-        gmail_messages=gmail_messages,
+        appointments=appointments,
         openphone_texts=openphone_texts,
-        openphone_error=openphone_error
+        campaign_events=campaign_events,
+        message_volume_data=message_volume_data,
+        recent_campaigns=recent_campaigns_with_perf,
+        campaign_queue_size=campaign_queue_size,
+        data_quality_score=data_quality_score,
+        pending_tasks=3  # Placeholder
     )
 
 # ... (rest of file is unchanged) ...
