@@ -1,25 +1,315 @@
 {% extends "base.html" %}
 
-{% block title %}Recent Conversations{% endblock %}
+{% block title %}Conversations{% endblock %}
 
 {% block content %}
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold">Recent Conversations</h1>
+<div class="space-y-6">
+    <!-- Header with Search and Actions -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Conversations</h1>
+            <p class="text-gray-400 mt-1">{{ total_conversations }} total conversations</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('campaigns.new_campaign') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                <span>📢</span> New Campaign
+            </a>
+            <button id="bulk-actions-btn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg disabled:opacity-50" disabled>
+                Bulk Actions
+            </button>
+        </div>
     </div>
-    <div class="bg-gray-900 rounded-lg shadow p-6">
-        <ul>
-            {% for convo in conversations %}
-                {% set last_activity = convo.activities | sort(attribute='created_at', reverse=True) | first %}
-                <li class="border-b border-gray-700 py-3">
-                    <a href="{{ url_for('contact.conversation', contact_id=convo.contact.id) }}" class="block hover:bg-gray-800 p-2 rounded-lg">
-                        <p class="font-semibold text-white">{{ convo.contact.first_name }} {{ convo.contact.last_name }}</p>
-                        <p class="text-sm text-gray-400 truncate">{{ last_activity.body if last_activity else 'No activities yet' }}</p>
-                        <p class="text-xs text-gray-500 text-right mt-1">{{ convo.last_activity_at.strftime('%b %d, %I:%M %p') }}</p>
-                    </a>
-                </li>
-            {% else %}
-                 <li>No conversations found.</li>
-            {% endfor %}
-        </ul>
+
+    <!-- Search and Filters -->
+    <div class="bg-gray-700 rounded-lg p-4">
+        <form method="GET" class="flex flex-wrap gap-4 items-end">
+            <!-- Search Box -->
+            <div class="flex-1 min-w-64">
+                <label class="block text-sm font-medium text-gray-300 mb-1">Search</label>
+                <input type="text" name="search" value="{{ search_query }}" 
+                       placeholder="Search by name, phone, email, or message content..."
+                       class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            <!-- Filter Type -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Filter</label>
+                <select name="filter" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500">
+                    <option value="all" {{ 'selected' if filter_type == 'all' }}>All Conversations</option>
+                    <option value="unread" {{ 'selected' if filter_type == 'unread' }}>Unread</option>
+                    <option value="has_attachments" {{ 'selected' if filter_type == 'has_attachments' }}>Has Attachments</option>
+                    <option value="office_numbers" {{ 'selected' if filter_type == 'office_numbers' }}>Office Numbers</option>
+                </select>
+            </div>
+            
+            <!-- Date Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Date</label>
+                <select name="date" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500">
+                    <option value="all" {{ 'selected' if date_filter == 'all' }}>All Time</option>
+                    <option value="today" {{ 'selected' if date_filter == 'today' }}>Today</option>
+                    <option value="week" {{ 'selected' if date_filter == 'week' }}>This Week</option>
+                    <option value="month" {{ 'selected' if date_filter == 'month' }}>This Month</option>
+                </select>
+            </div>
+            
+            <!-- Submit Button -->
+            <div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                    Filter
+                </button>
+            </div>
+            
+            <!-- Clear Filters -->
+            {% if search_query or filter_type != 'all' or date_filter != 'all' %}
+            <div>
+                <a href="{{ url_for('contact.conversation_list') }}" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">
+                    Clear
+                </a>
+            </div>
+            {% endif %}
+        </form>
     </div>
+
+    <!-- Bulk Actions Form -->
+    <form id="bulk-actions-form" method="POST" action="{{ url_for('contact.bulk_conversation_action') }}" style="display: none;">
+        <div class="bg-gray-700 rounded-lg p-4 border-2 border-purple-500">
+            <div class="flex items-center gap-4">
+                <select name="action" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white">
+                    <option value="">Select Action...</option>
+                    <option value="mark_read">Mark as Read</option>
+                    <option value="add_to_campaign">Add to Campaign</option>
+                    <option value="flag_office">Flag as Office Numbers</option>
+                    <option value="export">Export to CSV</option>
+                </select>
+                
+                <div id="campaign-select" style="display: none;">
+                    <select name="campaign_id" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white">
+                        <option value="">Select Campaign...</option>
+                        {% for campaign in available_campaigns %}
+                        <option value="{{ campaign.id }}">{{ campaign.name }} ({{ campaign.status }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">
+                    Execute
+                </button>
+                
+                <button type="button" id="cancel-bulk" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">
+                    Cancel
+                </button>
+                
+                <span id="selected-count" class="text-gray-300">0 selected</span>
+            </div>
+        </div>
+    </form>
+
+    <!-- Conversations List -->
+    <div class="bg-gray-700 rounded-lg">
+        {% if conversations %}
+            <!-- Select All Header -->
+            <div class="px-4 py-3 border-b border-gray-600 flex items-center gap-3">
+                <input type="checkbox" id="select-all" class="rounded border-gray-500">
+                <label for="select-all" class="text-gray-300 text-sm">Select All</label>
+                <span class="text-gray-400 text-sm">{{ conversations|length }} conversations shown</span>
+            </div>
+            
+            <!-- Conversation Items -->
+            <div class="divide-y divide-gray-600">
+                {% for item in conversations %}
+                {% set conv = item.conversation %}
+                {% set activity = item.latest_activity %}
+                <div class="p-4 hover:bg-gray-600 transition-colors conversation-item">
+                    <div class="flex items-start gap-3">
+                        <!-- Checkbox -->
+                        <input type="checkbox" name="conversation_ids" value="{{ conv.id }}" 
+                               class="mt-2 rounded border-gray-500 conversation-checkbox">
+                        
+                        <!-- Visual Indicators -->
+                        <div class="flex flex-col gap-1 mt-1">
+                            {% if item.is_unread %}
+                            <div class="w-2 h-2 bg-blue-500 rounded-full" title="Unread messages"></div>
+                            {% endif %}
+                            {% if item.has_attachments %}
+                            <div class="text-gray-400 text-xs" title="Has attachments">📎</div>
+                            {% endif %}
+                            {% if item.has_ai_summary %}
+                            <div class="text-purple-400 text-xs" title="AI summary available">🤖</div>
+                            {% endif %}
+                            {% if item.is_office_number %}
+                            <div class="text-yellow-400 text-xs" title="Office number">🏢</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Main Content -->
+                        <div class="flex-1 min-w-0">
+                            <a href="{{ url_for('contact.conversation', contact_id=conv.contact.id) }}" 
+                               class="block hover:text-blue-400 transition-colors">
+                                
+                                <!-- Contact Info -->
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="font-semibold text-white {{ 'font-bold' if item.is_unread }}">
+                                            {{ conv.contact.first_name }} {{ conv.contact.last_name }}
+                                        </h3>
+                                        <span class="text-gray-400 text-sm">{{ conv.contact.phone }}</span>
+                                        {% if conv.contact.email %}
+                                        <span class="text-gray-500 text-xs">{{ conv.contact.email }}</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="text-right">
+                                        <div class="text-xs text-gray-400">
+                                            {{ conv.last_activity_at.strftime('%b %d, %I:%M %p') if conv.last_activity_at else 'No activity' }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            {{ item.message_count }} messages
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Latest Activity Preview -->
+                                {% if activity %}
+                                <div class="flex items-start gap-2">
+                                    <span class="text-xs {{ 'text-green-400' if activity.direction == 'outgoing' else 'text-blue-400' }}">
+                                        {% if activity.activity_type == 'call' %}
+                                            📞
+                                        {% elif activity.activity_type == 'voicemail' %}
+                                            🎤
+                                        {% else %}
+                                            {{ '→' if activity.direction == 'outgoing' else '←' }}
+                                        {% endif %}
+                                    </span>
+                                    <p class="text-gray-300 text-sm truncate flex-1 {{ 'font-medium' if item.is_unread }}">
+                                        {% if activity.activity_type == 'call' %}
+                                            {{ 'Outgoing call' if activity.direction == 'outgoing' else 'Incoming call' }}
+                                            {% if activity.duration_seconds %}
+                                                ({{ (activity.duration_seconds // 60) }}m)
+                                            {% endif %}
+                                        {% elif activity.activity_type == 'voicemail' %}
+                                            Voicemail received
+                                        {% else %}
+                                            {{ activity.body if activity.body else 'Message (no content)' }}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                {% endif %}
+                            </a>
+                        </div>
+                        
+                        <!-- Quick Actions -->
+                        <div class="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button class="text-gray-400 hover:text-white text-xs p-1 rounded" 
+                                    title="Quick reply">💬</button>
+                            <button class="text-gray-400 hover:text-white text-xs p-1 rounded" 
+                                    title="Add to campaign">📢</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="p-8 text-center">
+                <div class="text-gray-400 text-lg mb-2">No conversations found</div>
+                <p class="text-gray-500">Try adjusting your search or filter criteria</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="flex justify-center items-center gap-2">
+        {% if has_prev %}
+        <a href="{{ url_for('contact.conversation_list', page=page-1, search=search_query, filter=filter_type, date=date_filter) }}" 
+           class="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Previous</a>
+        {% endif %}
+        
+        <span class="px-3 py-2 text-gray-300">
+            Page {{ page }} of {{ total_pages }}
+        </span>
+        
+        {% if has_next %}
+        <a href="{{ url_for('contact.conversation_list', page=page+1, search=search_query, filter=filter_type, date=date_filter) }}" 
+           class="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Bulk selection functionality
+const selectAllCheckbox = document.getElementById('select-all');
+const conversationCheckboxes = document.querySelectorAll('.conversation-checkbox');
+const bulkActionsBtn = document.getElementById('bulk-actions-btn');
+const bulkActionsForm = document.getElementById('bulk-actions-form');
+const selectedCountSpan = document.getElementById('selected-count');
+const cancelBulkBtn = document.getElementById('cancel-bulk');
+
+function updateBulkActions() {
+    const checkedBoxes = document.querySelectorAll('.conversation-checkbox:checked');
+    const count = checkedBoxes.length;
+    
+    bulkActionsBtn.disabled = count === 0;
+    selectedCountSpan.textContent = `${count} selected`;
+    
+    if (count > 0 && bulkActionsForm.style.display === 'none') {
+        bulkActionsBtn.textContent = `Actions (${count})`;
+    } else {
+        bulkActionsBtn.textContent = 'Bulk Actions';
+    }
+}
+
+// Select all functionality
+selectAllCheckbox.addEventListener('change', function() {
+    conversationCheckboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+    });
+    updateBulkActions();
+});
+
+// Individual checkbox changes
+conversationCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', updateBulkActions);
+});
+
+// Show bulk actions form
+bulkActionsBtn.addEventListener('click', function() {
+    if (!this.disabled) {
+        bulkActionsForm.style.display = 'block';
+        this.style.display = 'none';
+    }
+});
+
+// Cancel bulk actions
+cancelBulkBtn.addEventListener('click', function() {
+    bulkActionsForm.style.display = 'none';
+    bulkActionsBtn.style.display = 'inline-block';
+    
+    // Uncheck all
+    conversationCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    selectAllCheckbox.checked = false;
+    updateBulkActions();
+});
+
+// Show campaign select when "add to campaign" is selected
+document.querySelector('select[name="action"]').addEventListener('change', function() {
+    const campaignSelect = document.getElementById('campaign-select');
+    if (this.value === 'add_to_campaign') {
+        campaignSelect.style.display = 'block';
+    } else {
+        campaignSelect.style.display = 'none';
+    }
+});
+
+// Add hover effect to conversation items
+document.querySelectorAll('.conversation-item').forEach(item => {
+    item.classList.add('group');
+});
+
+// Initialize
+updateBulkActions();
+</script>
 {% endblock %}

@@ -96,20 +96,44 @@ def dashboard():
         'messages_today': messages_today
     }
     
-    # Activity Timeline Data
-    latest_conversations = message_service.get_latest_conversations_from_db()
+    # Activity Timeline Data (get more conversations and sort by most recent activity)
+    latest_conversations = message_service.get_latest_conversations_from_db(limit=20)
     
     openphone_texts = []
     for conv in latest_conversations:
+        # Get the most recent activity for this conversation
         last_activity = max(conv.activities, key=lambda act: act.created_at) if conv.activities else None
         if last_activity:
+            # Determine content based on activity type
+            if last_activity.activity_type == 'call':
+                if last_activity.direction == 'incoming':
+                    content = "📞 Incoming call"
+                else:
+                    content = "📞 Outgoing call"
+                if last_activity.duration_seconds:
+                    duration_min = last_activity.duration_seconds // 60
+                    content += f" ({duration_min}m)"
+            elif last_activity.activity_type == 'voicemail':
+                content = "🎤 Voicemail received"
+            else:
+                # Message type
+                content = last_activity.body or "📱 Message (no content)"
+            
             openphone_texts.append({
                 'contact_id': conv.contact.id,
                 'contact_name': conv.contact.first_name or conv.contact.phone,
                 'contact_number': conv.contact.phone,
-                'latest_message_body': last_activity.body or "No message content",
-                'timestamp': last_activity.created_at.strftime('%H:%M') if last_activity.created_at else 'Just now'
+                'latest_message_body': content,
+                'timestamp': last_activity.created_at.strftime('%H:%M') if last_activity.created_at else 'Just now',
+                'activity_timestamp': last_activity.created_at,  # For sorting
+                'activity_type': last_activity.activity_type
             })
+    
+    # Sort by most recent activity timestamp descending
+    openphone_texts.sort(key=lambda x: x['activity_timestamp'], reverse=True)
+    
+    # Take only the top 5 for dashboard display
+    openphone_texts = openphone_texts[:5]
     
     # Campaign Events for Timeline
     recent_campaigns = Campaign.query.order_by(Campaign.created_at.desc()).limit(3).all()
