@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Automation - Settings{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-white">Automation Configuration</h1>
+        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            ➕ Create Rule
+        </button>
+    </div>
+
+    <!-- Automation Categories -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Message Automation -->
+        <div class="bg-gray-700 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                <span class="mr-2">💬</span>
+                Message Automation
+            </h3>
+            <div class="space-y-4">
+                <div class="bg-gray-600 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Appointment Reminders</h4>
+                            <p class="text-sm text-gray-400">Send reminders 24h before appointments</p>
+                        </div>
+                        <div class="bg-green-600 text-white px-2 py-1 rounded text-xs">Active</div>
+                    </div>
+                    <div class="text-sm text-gray-300 mt-2">
+                        "Hi {first_name}, this is a reminder about your appointment tomorrow at {time}..."
+                    </div>
+                </div>
+                
+                <div class="bg-gray-600 rounded-lg p-4 opacity-75">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Follow-up Sequences</h4>
+                            <p class="text-sm text-gray-400">Auto-follow up after estimates</p>
+                        </div>
+                        <div class="bg-yellow-600 text-white px-2 py-1 rounded text-xs">Coming Soon</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-600 rounded-lg p-4 opacity-75">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Missed Call Responses</h4>
+                            <p class="text-sm text-gray-400">Auto-reply to missed calls</p>
+                        </div>
+                        <div class="bg-yellow-600 text-white px-2 py-1 rounded text-xs">Coming Soon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scheduling Automation -->
+        <div class="bg-gray-700 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                <span class="mr-2">📅</span>
+                Scheduling Rules
+            </h3>
+            <div class="space-y-4">
+                <div class="bg-gray-600 rounded-lg p-4 opacity-75">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Auto-Scheduling</h4>
+                            <p class="text-sm text-gray-400">Smart appointment booking</p>
+                        </div>
+                        <div class="bg-yellow-600 text-white px-2 py-1 rounded text-xs">Coming Soon</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-600 rounded-lg p-4 opacity-75">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Time Blocking</h4>
+                            <p class="text-sm text-gray-400">Prevent double-booking</p>
+                        </div>
+                        <div class="bg-yellow-600 text-white px-2 py-1 rounded text-xs">Coming Soon</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-600 rounded-lg p-4 opacity-75">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Business Hours</h4>
+                            <p class="text-sm text-gray-400">Define availability windows</p>
+                        </div>
+                        <div class="bg-yellow-600 text-white px-2 py-1 rounded text-xs">Coming Soon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Automation -->
+        <div class="bg-gray-700 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                <span class="mr-2">✅</span>
+                Task Automation
+            </h3>
+            <div class="space-y-4">
+                <div class="bg-gray-600 rounded-lg p-4 opacity-75">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Lead Assignment</h4>
+                            <p class="text-sm text-gray-400">Auto-assign new leads to team</p>
+                        </div>
+                        <div class="bg-yellow-600 text-white px-2 py-1 rounded text-xs">Coming Soon</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-600 rounded-lg p-4 opacity-75">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Quote Generation</h4>
+                            <p class="text-sm text-gray-400">Auto-create quotes from job details</p>
+                        </div>
+                        <div class="bg-yellow-600 text-white px-2 py-1 rounded text-xs">Coming Soon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaign Automation -->
+        <div class="bg-gray-700 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                <span class="mr-2">📢</span>
+                Campaign Automation
+            </h3>
+            <div class="space-y-4">
+                <div class="bg-gray-600 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Business Hours Enforcement</h4>
+                            <p class="text-sm text-gray-400">Only send messages 9AM-6PM ET</p>
+                        </div>
+                        <div class="bg-green-600 text-white px-2 py-1 rounded text-xs">Active</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-600 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Daily Send Limits</h4>
+                            <p class="text-sm text-gray-400">Limit cold outreach to 125/day</p>
+                        </div>
+                        <div class="bg-green-600 text-white px-2 py-1 rounded text-xs">Active</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-600 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-medium text-white">Opt-out Detection</h4>
+                            <p class="text-sm text-gray-400">Auto-detect and process STOP requests</p>
+                        </div>
+                        <div class="bg-green-600 text-white px-2 py-1 rounded text-xs">Active</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Settings -->
+    <div class="bg-gray-700 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Global Automation Settings</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Business Hours</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <select class="bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                        <option>9:00 AM</option>
+                        <option>8:00 AM</option>
+                        <option>10:00 AM</option>
+                    </select>
+                    <select class="bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                        <option>6:00 PM</option>
+                        <option>5:00 PM</option>
+                        <option>7:00 PM</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Time Zone</label>
+                <select class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                    <option>Eastern Time (ET)</option>
+                    <option>Central Time (CT)</option>
+                    <option>Mountain Time (MT)</option>
+                    <option>Pacific Time (PT)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

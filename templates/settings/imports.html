@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Data Imports - Settings{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-white">Data Imports</h1>
+        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            ➕ Add New Import
+        </button>
+    </div>
+
+    <!-- Import Sources Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <!-- OpenPhone Import -->
+        <div class="bg-gray-700 rounded-lg p-6">
+            <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">📞</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">OpenPhone</h3>
+                    <p class="text-sm text-gray-400">Conversations & Contacts</p>
+                </div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Last Import:</span>
+                    <span class="text-green-400">Active</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Records:</span>
+                    <span class="text-white">7,060 contacts</span>
+                </div>
+            </div>
+            <button class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded">
+                ✅ Connected
+            </button>
+        </div>
+
+        <!-- QuickBooks Import -->
+        <div class="bg-gray-700 rounded-lg p-6 opacity-75">
+            <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">💼</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">QuickBooks</h3>
+                    <p class="text-sm text-gray-400">Financial Data</p>
+                </div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Status:</span>
+                    <span class="text-yellow-400">Coming Soon</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Import:</span>
+                    <span class="text-gray-400">Invoices, Expenses</span>
+                </div>
+            </div>
+            <button class="w-full bg-gray-600 text-gray-400 py-2 rounded cursor-not-allowed" disabled>
+                🔗 Connect
+            </button>
+        </div>
+
+        <!-- PropertyRadar Import -->
+        <div class="bg-gray-700 rounded-lg p-6 opacity-75">
+            <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">🏠</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">PropertyRadar</h3>
+                    <p class="text-sm text-gray-400">Property Data</p>
+                </div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Status:</span>
+                    <span class="text-yellow-400">Coming Soon</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Import:</span>
+                    <span class="text-gray-400">Leads, Properties</span>
+                </div>
+            </div>
+            <button class="w-full bg-gray-600 text-gray-400 py-2 rounded cursor-not-allowed" disabled>
+                🔗 Connect
+            </button>
+        </div>
+
+        <!-- CSV Import -->
+        <div class="bg-gray-700 rounded-lg p-6">
+            <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">📄</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">CSV Files</h3>
+                    <p class="text-sm text-gray-400">Manual Uploads</p>
+                </div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Last Upload:</span>
+                    <span class="text-green-400">Recent</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Format:</span>
+                    <span class="text-white">Contacts, Properties</span>
+                </div>
+            </div>
+            <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">
+                📤 Upload CSV
+            </button>
+        </div>
+
+        <!-- Google Calendar -->
+        <div class="bg-gray-700 rounded-lg p-6 opacity-75">
+            <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">📅</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Google Calendar</h3>
+                    <p class="text-sm text-gray-400">Appointments Sync</p>
+                </div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Status:</span>
+                    <span class="text-yellow-400">Coming Soon</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Sync:</span>
+                    <span class="text-gray-400">Two-way</span>
+                </div>
+            </div>
+            <button class="w-full bg-gray-600 text-gray-400 py-2 rounded cursor-not-allowed" disabled>
+                🔗 Connect
+            </button>
+        </div>
+
+        <!-- Email Integration -->
+        <div class="bg-gray-700 rounded-lg p-6 opacity-75">
+            <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">📧</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Email Provider</h3>
+                    <p class="text-sm text-gray-400">Gmail, Outlook</p>
+                </div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Status:</span>
+                    <span class="text-yellow-400">Coming Soon</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Import:</span>
+                    <span class="text-gray-400">Email History</span>
+                </div>
+            </div>
+            <button class="w-full bg-gray-600 text-gray-400 py-2 rounded cursor-not-allowed" disabled>
+                🔗 Connect
+            </button>
+        </div>
+    </div>
+
+    <!-- Import History -->
+    <div class="bg-gray-700 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Recent Import Activity</h3>
+        <div class="space-y-3">
+            <div class="flex justify-between items-center py-2 border-b border-gray-600">
+                <div class="flex items-center">
+                    <span class="text-lg mr-3">📞</span>
+                    <div>
+                        <div class="text-white font-medium">OpenPhone Full Import</div>
+                        <div class="text-sm text-gray-400">7,060 contacts, 2,900+ conversations</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-green-400 font-medium">✅ Success</div>
+                    <div class="text-sm text-gray-400">2 hours ago</div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-600">
+                <div class="flex items-center">
+                    <span class="text-lg mr-3">📄</span>
+                    <div>
+                        <div class="text-white font-medium">CSV Contact Enrichment</div>
+                        <div class="text-sm text-gray-400">3,299 contacts updated</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-green-400 font-medium">✅ Success</div>
+                    <div class="text-sm text-gray-400">Yesterday</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
