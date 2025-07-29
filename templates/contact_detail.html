@@ -46,7 +46,7 @@
                 <h3 class="text-xl font-bold mb-4 text-purple-400">Recent Activity</h3>
                 {% for activity in activities | sort(attribute='created_at', reverse=True) %} {# REMOVED | limit(5) #}
                     <div class="border-b border-gray-700 py-2">
-                        <p class="text-sm text-gray-400">{{ activity.created_at.strftime('%Y-%m-%d %H:%M') }} - {{ activity.type.capitalize() }} ({{ activity.direction.capitalize() }})</p>
+                        <p class="text-sm text-gray-400">{{ activity.created_at.strftime('%Y-%m-%d %H:%M') }} - {{ activity.activity_type.capitalize() }} ({{ activity.direction.capitalize() }})</p>
                         <p>{{ activity.body or activity.status or 'No content' }}</p>
                     </div>
                 {% else %}

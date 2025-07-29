@@ -43,7 +43,7 @@ def conversation(contact_id):
     contact = contact_service.get_contact_by_id(contact_id)
     activities = message_service.get_activities_for_contact(contact_id)
     
-    return render_template('conversation_view.html', contact=contact, activities=activities)
+    return render_template('conversation_view_enhanced.html', contact=contact, activities=activities)
 
 @contact_bp.route('/add', methods=['GET', 'POST'])
 def add_contact():

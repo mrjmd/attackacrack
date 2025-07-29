@@ -1,0 +1,18 @@
+{
+  "conversations_processed": 17,
+  "last_conversation_id": null,
+  "started_at": "2025-07-29T15:46:46.050581",
+  "checkpoints": [],
+  "updated_at": "2025-07-29T15:48:45.924099",
+  "stats": {
+    "conversations_processed": 17,
+    "messages_imported": 16,
+    "calls_imported": 1,
+    "media_downloaded": 0,
+    "recordings_downloaded": 0,
+    "voicemails_downloaded": 0,
+    "ai_summaries_generated": 0,
+    "validation_issues": [],
+    "errors": []
+  }
+}

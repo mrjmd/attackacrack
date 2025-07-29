@@ -19,7 +19,7 @@
             {% for activity in activities | reverse %}
                 
                 <!-- RENDER A MESSAGE -->
-                {% if activity.type == 'message' %}
+                {% if activity.activity_type == 'message' %}
                     {% if activity.direction == 'outbound' %}
                     <!-- Outgoing Message -->
                     <div class="flex justify-end">
@@ -47,12 +47,12 @@
                     {% endif %}
 
                 <!-- RENDER A CALL -->
-                {% elif activity.type == 'call' %}
+                {% elif activity.activity_type == 'call' %}
                 <div class="flex justify-center">
                     <div class="text-center text-xs text-gray-400 bg-gray-800 rounded-full px-4 py-2">
                         📞 {{ activity.direction | capitalize }} Call - {{ activity.status | replace('_', ' ') | title }}
-                        {% if activity.duration %}
-                            ({{ '%02d:%02d' % (activity.duration // 60, activity.duration % 60) }})
+                        {% if activity.duration_seconds %}
+                            ({{ '%02d:%02d' % (activity.duration_seconds // 60, activity.duration_seconds % 60) }})
                         {% endif %}
                         - {{ activity.created_at.strftime('%b %d, %I:%M %p') }}
                         {% if activity.recording_url %}
