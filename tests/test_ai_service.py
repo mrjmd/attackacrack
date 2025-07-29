@@ -39,8 +39,8 @@ def test_summarize_conversation_for_appointment(mocker, app):
                 conversation_id=conversation.id, # This will be None until conversation is committed and has an ID
                 openphone_id="msg1",
                 created_at=datetime.now(),
-                direction="in",
-                type="message",
+                direction="incoming",
+                activity_type="message",
                 body="Hello, I have a crack in my foundation.",
                 # Removed 'media_url' as it's not a direct column on Activity
             ),
@@ -48,8 +48,8 @@ def test_summarize_conversation_for_appointment(mocker, app):
                 conversation_id=conversation.id, # This will be None until conversation is committed and has an ID
                 openphone_id="msg2",
                 created_at=datetime.now(),
-                direction="out",
-                type="message",
+                direction="outgoing",
+                activity_type="message",
                 body="Can you send a picture?",
                 # Removed 'media_url' as it's not a direct column on Activity
             )

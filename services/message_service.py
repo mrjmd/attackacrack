@@ -90,7 +90,7 @@ class MessageService:
                 new_activity = Activity(
                     conversation_id=conversation.id,
                     openphone_id=openphone_id,
-                    type='message',
+                    activity_type='message',
                     body=message_payload.get('body'),
                     direction='inbound',
                     status='delivered',
