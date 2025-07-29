@@ -140,7 +140,7 @@ def get_recent_openphone_texts(contact_service: ContactService, count=5):
         
         conversations_url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}&limit={count}"
         
-        conversation_response = requests.get(conversations_url, headers=headers, verify=False)
+        conversation_response = requests.get(conversations_url, headers=headers, verify=True, timeout=(5, 30))
         conversation_response.raise_for_status()
         conversations = conversation_response.json().get('data', [])
 
@@ -152,7 +152,7 @@ def get_recent_openphone_texts(contact_service: ContactService, count=5):
             if last_activity_type == 'message':
                 last_activity_id = convo.get('lastActivityId')
                 message_url = f"https://api.openphone.com/v1/messages/{last_activity_id}"
-                message_response = requests.get(message_url, headers=headers, verify=False)
+                message_response = requests.get(message_url, headers=headers, verify=True, timeout=(5, 30))
                 if message_response.status_code == 200:
                     message_data = message_response.json()
                     latest_message_body = message_data.get('data', {}).get('text', "[Message with no body]")

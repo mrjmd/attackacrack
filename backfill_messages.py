@@ -36,7 +36,7 @@ def run_backfill():
         print("Fetching recent conversations from OpenPhone...")
         conversations_url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}&limit=50"
         try:
-            convo_response = requests.get(conversations_url, headers=headers, verify=False)
+            convo_response = requests.get(conversations_url, headers=headers, verify=True)
             convo_response.raise_for_status()
             conversations = convo_response.json().get('data', [])
             print(f"Found {len(conversations)} conversations to check.")
@@ -74,7 +74,7 @@ def run_backfill():
             # Fetch the single last message using the endpoint we know works
             message_url = f"https://api.openphone.com/v1/messages/{last_activity_id}"
             try:
-                message_response = requests.get(message_url, headers=headers, verify=False)
+                message_response = requests.get(message_url, headers=headers, verify=True)
                 if message_response.status_code == 404:
                     print("  -> Last activity was not a message (e.g., a call). Skipping.")
                     continue

@@ -1,5 +1,7 @@
 import os
+import secrets
 from dotenv import load_dotenv
+from typing import Optional
 
 # Find the absolute path of the root directory
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -7,14 +9,46 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # Load the .env file from the root directory
 load_dotenv(os.path.join(basedir, '.env'))
 
+class ConfigurationError(Exception):
+    """Raised when required configuration is missing or invalid"""
+    pass
+
 class Config:
     """
     Base configuration class. Contains default configuration settings
     and settings applicable to all environments.
     """
-    # Flask settings
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
+    # Flask settings - SECURITY FIX: Generate secure random key if not provided
+    SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     FLASK_ENV = os.environ.get('FLASK_ENV')
+    
+    @classmethod
+    def validate_required_config(cls) -> None:
+        """Validate that all required configuration is present"""
+        required_vars = [
+            'OPENPHONE_API_KEY',
+            'DB_USER', 
+            'DB_PASSWORD',
+            'DB_NAME'
+        ]
+        
+        missing_vars = []
+        for var in required_vars:
+            if not os.environ.get(var):
+                missing_vars.append(var)
+        
+        if missing_vars:
+            raise ConfigurationError(
+                f"Missing required environment variables: {', '.join(missing_vars)}"
+            )
+    
+    @staticmethod
+    def get_required_env(key: str) -> str:
+        """Get required environment variable or raise error"""
+        value = os.environ.get(key)
+        if not value:
+            raise ConfigurationError(f"Required environment variable {key} is not set")
+        return value
 
     # Database settings
     SQLALCHEMY_DATABASE_URI = os.environ.get('POSTGRES_URI') or \

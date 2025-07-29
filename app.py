@@ -1,12 +1,18 @@
 # app.py
 
-from flask import Flask
+from flask import Flask, g, request
 from flask_migrate import Migrate
 from config import Config
 from extensions import db
 from datetime import datetime
 import os
+import uuid
 from werkzeug.middleware.proxy_fix import ProxyFix
+from logging_config import setup_logging, get_logger
+
+# Configure logging as early as possible
+setup_logging(app_name="attackacrack-crm", log_level="INFO")
+logger = get_logger(__name__)
 
 def create_app(config_class=Config, test_config=None):
     """Create and configure an instance of the Flask application."""
@@ -21,6 +27,37 @@ def create_app(config_class=Config, test_config=None):
 
     db.init_app(app)
     migrate = Migrate(app, db)
+    
+    # Add request tracking middleware
+    @app.before_request
+    def before_request():
+        g.request_id = str(uuid.uuid4())
+        logger.info("Request started", 
+                   request_id=g.request_id,
+                   method=request.method if hasattr(request, 'method') else None,
+                   path=request.path if hasattr(request, 'path') else None)
+    
+    @app.after_request
+    def after_request(response):
+        logger.info("Request completed",
+                   request_id=getattr(g, 'request_id', None),
+                   status_code=response.status_code)
+        return response
+    
+    # Global error handlers
+    @app.errorhandler(500)
+    def internal_error(error):
+        logger.error("Internal server error",
+                    request_id=getattr(g, 'request_id', None),
+                    error=str(error))
+        return "Internal server error", 500
+    
+    @app.errorhandler(404)
+    def not_found_error(error):
+        logger.warning("Page not found",
+                      request_id=getattr(g, 'request_id', None),
+                      path=request.path if hasattr(request, 'path') else None)
+        return "Page not found", 404
 
     @app.template_filter('format_google_date')
     def format_google_date(date_string):

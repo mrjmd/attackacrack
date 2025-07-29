@@ -46,7 +46,7 @@ def test_send_sms_success(app, mocker):
         expected_url,
         headers=expected_headers,
         json=expected_payload,
-        verify=False # As per your existing code
+        verify=True, timeout=(5, 30) # Security fix: Always verify SSL
     )
 
 def test_send_sms_no_api_key(app):
@@ -72,7 +72,7 @@ def test_send_sms_no_api_key(app):
 
     # 3. Assertions
     assert response_data is None
-    assert "API Key not configured." in error
+    assert "API Key not configured" in error
     # Verify that requests.post was NOT called
     # We can't directly assert on requests.post not being called without mocking it,
     # but the logic ensures it won't be called if api_key is None.

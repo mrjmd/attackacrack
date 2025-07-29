@@ -389,8 +389,8 @@ def test_get_recent_openphone_texts_success_messages(app_context, mocker):
     
     # Verify requests.get calls
     requests.get.assert_has_calls([
-        call(f"https://api.openphone.com/v1/conversations?phoneNumberId=op_phone_id&limit=1", headers={"Authorization": "op_api_key"}, verify=False),
-        call(f"https://api.openphone.com/v1/messages/msg_1", headers={"Authorization": "op_api_key"}, verify=False)
+        call(f"https://api.openphone.com/v1/conversations?phoneNumberId=op_phone_id&limit=1", headers={"Authorization": "op_api_key"}, verify=True, timeout=(5, 30)),
+        call(f"https://api.openphone.com/v1/messages/msg_1", headers={"Authorization": "op_api_key"}, verify=True, timeout=(5, 30))
     ])
     mock_contact_service_instance.get_contact_by_phone.assert_called_once_with('+1234567890')
 
@@ -436,7 +436,7 @@ def test_get_recent_openphone_texts_success_calls(app_context, mocker):
     assert texts[0]['contact_number'] == '+19876543210'
     assert texts[0]['latest_message_body'] == '[Last activity was a phone call]'
     
-    requests.get.assert_called_once_with(f"https://api.openphone.com/v1/conversations?phoneNumberId=op_phone_id&limit=1", headers={"Authorization": "op_api_key"}, verify=False)
+    requests.get.assert_called_once_with(f"https://api.openphone.com/v1/conversations?phoneNumberId=op_phone_id&limit=1", headers={"Authorization": "op_api_key"}, verify=True, timeout=(5, 30))
     mock_contact_service_instance.get_contact_by_phone.assert_called_once_with('+19876543210')
 
 

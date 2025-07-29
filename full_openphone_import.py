@@ -53,7 +53,7 @@ def run_full_import():
             url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}"
             params = {'maxResults': DRY_RUN_LIMIT}
             try:
-                response = requests.get(url, headers=headers, params=params, verify=False)
+                response = requests.get(url, headers=headers, params=params, verify=True)
                 response.raise_for_status()
                 all_conversations = response.json().get('data', [])
                 print(f"Fetched {len(all_conversations)} conversations for dry run.")
@@ -68,7 +68,7 @@ def run_full_import():
                 if page_token:
                     params['pageToken'] = page_token
                 try:
-                    response = requests.get(url, headers=headers, params=params, verify=False)
+                    response = requests.get(url, headers=headers, params=params, verify=True)
                     response.raise_for_status()
                     data = response.json()
                     all_conversations.extend(data.get('data', []))
@@ -121,7 +121,7 @@ def run_full_import():
                 }
                 if page_token: params['pageToken'] = page_token
                 try:
-                    res = requests.get(url, headers=headers, params=params, verify=False)
+                    res = requests.get(url, headers=headers, params=params, verify=True)
                     res.raise_for_status()
                     data = res.json()
                     all_activities.extend(data.get('data', []))
@@ -141,7 +141,7 @@ def run_full_import():
                 }
                 if page_token: params['pageToken'] = page_token
                 try:
-                    res = requests.get(url, headers=headers, params=params, verify=False)
+                    res = requests.get(url, headers=headers, params=params, verify=True)
                     res.raise_for_status()
                     data = res.json()
                     all_activities.extend(data.get('data', []))
@@ -177,7 +177,7 @@ def run_full_import():
 
                     for media_url in activity_data.get('media', []):
                         try:
-                            media_res = requests.get(media_url, verify=False)
+                            media_res = requests.get(media_url, verify=True)
                             if media_res.status_code == 200:
                                 filename = media_url.split('/')[-1].split('?')[0]
                                 local_path = os.path.join(MEDIA_UPLOAD_FOLDER, filename)
