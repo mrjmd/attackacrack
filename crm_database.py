@@ -43,6 +43,7 @@ class Contact(db.Model):
     last_name = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)
     phone = db.Column(db.String(20), nullable=True, unique=True)
+    contact_metadata = db.Column(db.JSON, nullable=True)  # For flexible data storage
     properties = db.relationship('Property', backref='contact', lazy=True, cascade="all, delete-orphan")
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
     # A contact can now have multiple conversations
@@ -189,6 +190,15 @@ class Campaign(db.Model):
     quiet_hours_start = db.Column(db.Time, default=time(20, 0))  # 8 PM
     quiet_hours_end = db.Column(db.Time, default=time(9, 0))  # 9 AM
     on_existing_contact = db.Column(db.String(50), default='ignore')  # 'ignore', 'flag_for_review', 'adapt_script'
+    
+    # NEW: Enhanced campaign features
+    campaign_type = db.Column(db.String(20), default='blast')  # 'blast', 'automated', 'ab_test'
+    audience_type = db.Column(db.String(20), default='mixed')  # 'cold', 'customer', 'mixed'  
+    daily_limit = db.Column(db.Integer, default=125)
+    business_hours_only = db.Column(db.Boolean, default=True)
+    ab_config = db.Column(db.JSON, nullable=True)  # A/B test configuration
+    
+    memberships = db.relationship('CampaignMembership', backref='campaign', lazy=True, cascade="all, delete-orphan")
 
 # --- NEW: CampaignMembership Model (Enhanced) ---
 class CampaignMembership(db.Model):
@@ -199,3 +209,25 @@ class CampaignMembership(db.Model):
     variant_sent = db.Column(db.String(1), nullable=True)  # 'A' or 'B'
     sent_at = db.Column(db.DateTime, nullable=True)
     reply_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)
+    
+    # NEW: Enhanced tracking fields
+    pre_send_flags = db.Column(db.JSON, nullable=True)  # Flags detected before sending
+    override_action = db.Column(db.String(20), nullable=True)  # 'skip', 'modify_script', 'flag_review'
+    response_sentiment = db.Column(db.String(20), nullable=True)  # 'positive', 'negative', 'neutral'
+    message_sent = db.Column(db.Text, nullable=True)  # Actual message sent (for A/B tracking)
+    
+    contact = db.relationship('Contact', backref='campaign_memberships')
+    reply_activity = db.relationship('Activity', backref='campaign_reply')
+
+# --- NEW: ContactFlag Model (for opt-outs and compliance) ---
+class ContactFlag(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
+    flag_type = db.Column(db.String(50), nullable=False)  # 'opted_out', 'office_number', 'recently_texted', 'do_not_contact'
+    flag_reason = db.Column(db.Text, nullable=True)  # Human readable reason
+    applies_to = db.Column(db.String(20), default='sms')  # 'sms', 'email', 'both'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)  # For temporary flags like 'recently_texted'
+    created_by = db.Column(db.String(100), nullable=True)  # Who/what created this flag
+    
+    contact = db.relationship('Contact', backref='flags')
