@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Text Campaigns{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-white">Text Campaigns</h1>
+        <a href="{{ url_for('campaigns.new_campaign') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            ➕ New Campaign
+        </a>
+    </div>
+
+    {% if campaigns %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for item in campaigns %}
+        {% set campaign = item.campaign %}
+        {% set analytics = item.analytics %}
+        <div class="bg-gray-700 rounded-lg p-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-white">{{ campaign.name }}</h3>
+                <span class="px-3 py-1 rounded-full text-sm {% if campaign.status == 'running' %}bg-green-600 text-white{% elif campaign.status == 'paused' %}bg-yellow-600 text-white{% elif campaign.status == 'complete' %}bg-blue-600 text-white{% else %}bg-gray-600 text-white{% endif %}">
+                    {{ campaign.status.title() }}
+                </span>
+            </div>
+            <!-- Campaign Type -->
+            <div class="flex gap-2">
+                <span class="px-2 py-1 bg-blue-600 text-white text-xs rounded">{{ campaign.campaign_type.title() }}</span>
+                {% if campaign.audience_type %}
+                <span class="px-2 py-1 bg-gray-600 text-white text-xs rounded">{{ campaign.audience_type.title() }}</span>
+                {% endif %}
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <div class="text-2xl font-bold text-blue-400">{{ analytics.sent_count }}</div>
+                    <div class="text-sm text-gray-400">Sent</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-green-400">{{ analytics.response_count }}</div>
+                    <div class="text-sm text-gray-400">Responses</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-cyan-400">
+                        {{ (analytics.response_rate * 100)|round(1) }}%
+                    </div>
+                    <div class="text-sm text-gray-400">Rate</div>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            {% set progress_pct = (analytics.sent_count / analytics.total_recipients * 100) if analytics.total_recipients > 0 else 0 %}
+            <div>
+                <div class="flex justify-between text-sm text-gray-400 mb-1">
+                    <span>Progress</span>
+                    <span>{{ analytics.sent_count }}/{{ analytics.total_recipients }}</span>
+                </div>
+                <div class="w-full bg-gray-600 rounded-full h-2">
+                    <div class="bg-blue-500 h-2 rounded-full" style="width: {{ progress_pct }}%"></div>
+                </div>
+            </div>
+
+            <!-- A/B Test Indicator -->
+            {% if campaign.campaign_type == 'ab_test' and analytics.ab_test %}
+            <div class="border-t border-gray-600 pt-3">
+                <div class="text-sm text-gray-400 mb-2">A/B Test:</div>
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                        <div class="font-bold text-blue-400">A: {{ (analytics.ab_test.variant_a.rate * 100)|round(1) }}%</div>
+                        <div class="text-xs text-gray-400">{{ analytics.ab_test.variant_a.sent }} sent</div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-green-400">B: {{ (analytics.ab_test.variant_b.rate * 100)|round(1) }}%</div>
+                        <div class="text-xs text-gray-400">{{ analytics.ab_test.variant_b.sent }} sent</div>
+                    </div>
+                </div>
+                {% if analytics.ab_test.config.winner_declared %}
+                <div class="text-center mt-2">
+                    <span class="px-2 py-1 bg-green-600 text-white text-xs rounded">Winner: {{ analytics.ab_test.config.winner_variant }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Daily Limit -->
+            <div class="text-sm">
+                <span class="text-gray-400">Today:</span>
+                <span class="text-white">{{ analytics.sends_today }}/{{ analytics.daily_limit }}</span>
+                {% if analytics.sends_today >= analytics.daily_limit %}
+                <span class="text-yellow-400 ml-1" title="Daily limit reached">⚠️</span>
+                {% endif %}
+            </div>
+
+            <!-- Created Date -->
+            <div class="text-sm text-gray-400">
+                Created {{ analytics.created_at.strftime('%m/%d/%y') }}
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex justify-between items-center pt-3 border-t border-gray-600">
+                <a href="{{ url_for('campaigns.campaign_detail', campaign_id=campaign.id) }}" 
+                   class="text-blue-400 hover:text-blue-300 text-sm">
+                    View Details →
+                </a>
+                {% if campaign.status == 'draft' %}
+                <form method="POST" action="{{ url_for('campaigns.start_campaign', campaign_id=campaign.id) }}" class="inline">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm" 
+                            onclick="return confirm('Start this campaign?')">
+                        ▶️ Start
+                    </button>
+                </form>
+                {% elif campaign.status == 'running' %}
+                <form method="POST" action="{{ url_for('campaigns.pause_campaign', campaign_id=campaign.id) }}" class="inline">
+                    <button type="submit" class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm" 
+                            onclick="return confirm('Pause this campaign?')">
+                        ⏸️ Pause
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+        <div class="text-6xl mb-4">📢</div>
+        <h2 class="text-xl font-semibold text-white mb-2">No campaigns yet</h2>
+        <p class="text-gray-400 mb-6">Create your first text campaign to start reaching your contacts.</p>
+        <a href="{{ url_for('campaigns.new_campaign') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+            ➕ Create Campaign
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

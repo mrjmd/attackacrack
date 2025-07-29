@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}{{ campaign.name }} - Campaign Details{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-start">
+        <div>
+            <h1 class="text-3xl font-bold text-white">{{ campaign.name }}</h1>
+            <div class="flex gap-2 mt-2">
+                <span class="px-3 py-1 rounded-full text-sm {% if campaign.status == 'running' %}bg-green-600 text-white{% elif campaign.status == 'paused' %}bg-yellow-600 text-white{% elif campaign.status == 'complete' %}bg-blue-600 text-white{% else %}bg-gray-600 text-white{% endif %}">
+                    {{ campaign.status.title() }}
+                </span>
+                <span class="px-3 py-1 bg-blue-600 text-white text-sm rounded">{{ campaign.campaign_type.title() }}</span>
+                {% if campaign.audience_type %}
+                <span class="px-3 py-1 bg-gray-600 text-white text-sm rounded">{{ campaign.audience_type.title() }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('campaigns.campaign_list') }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg">
+                ← Back to Campaigns
+            </a>
+            {% if campaign.status == 'draft' %}
+            <form method="POST" action="{{ url_for('campaigns.start_campaign', campaign_id=campaign.id) }}">
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg" 
+                        onclick="return confirm('Start this campaign?')">
+                    ▶️ Start Campaign
+                </button>
+            </form>
+            {% elif campaign.status == 'running' %}
+            <form method="POST" action="{{ url_for('campaigns.pause_campaign', campaign_id=campaign.id) }}">
+                <button type="submit" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg" 
+                        onclick="return confirm('Pause this campaign?')">
+                    ⏸️ Pause Campaign
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-gray-700 rounded-lg p-6 text-center">
+            <div class="text-3xl font-bold text-blue-400 mb-1">{{ analytics.sent_count }}</div>
+            <div class="text-gray-300 mb-1">Messages Sent</div>
+            <div class="text-sm text-gray-400">{{ analytics.sends_today }} sent today</div>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-6 text-center">
+            <div class="text-3xl font-bold text-green-400 mb-1">{{ analytics.response_count }}</div>
+            <div class="text-gray-300 mb-1">Responses</div>
+            <div class="text-sm text-gray-400">{{ (analytics.response_rate * 100)|round(1) }}% response rate</div>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-6 text-center">
+            <div class="text-3xl font-bold text-cyan-400 mb-1">{{ analytics.pending_count }}</div>
+            <div class="text-gray-300 mb-1">Pending</div>
+            <div class="text-sm text-gray-400">{{ analytics.failed_count }} failed</div>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-6 text-center">
+            <div class="text-3xl font-bold text-white mb-1">{{ analytics.total_recipients }}</div>
+            <div class="text-gray-300 mb-1">Total Recipients</div>
+            <div class="text-sm text-gray-400">Daily limit: {{ analytics.daily_limit }}</div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    {% set progress_pct = (analytics.sent_count / analytics.total_recipients * 100) if analytics.total_recipients > 0 else 0 %}
+    <div class="bg-gray-700 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-2">
+            <h2 class="text-lg font-semibold text-white">Campaign Progress</h2>
+            <span class="text-gray-400">{{ (progress_pct)|round(1) }}% Complete</span>
+        </div>
+        <div class="w-full bg-gray-600 rounded-full h-3">
+            <div class="bg-blue-500 h-3 rounded-full" style="width: {{ progress_pct }}%"></div>
+        </div>
+    </div>
+
+    <!-- A/B Test Results (if applicable) -->
+    {% if campaign.campaign_type == 'ab_test' and analytics.ab_test %}
+    <div class="bg-gray-700 rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">A/B Test Results</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+            <div class="text-center p-4 border border-gray-600 rounded-lg">
+                <h3 class="text-blue-400 font-semibold mb-2">Variant A</h3>
+                <div class="text-2xl font-bold text-white">{{ (analytics.ab_test.variant_a.rate * 100)|round(1) }}%</div>
+                <div class="text-sm text-gray-400">{{ analytics.ab_test.variant_a.responses }} responses from {{ analytics.ab_test.variant_a.sent }} sent</div>
+            </div>
+            <div class="text-center text-xl font-bold text-white">VS</div>
+            <div class="text-center p-4 border border-gray-600 rounded-lg">
+                <h3 class="text-green-400 font-semibold mb-2">Variant B</h3>
+                <div class="text-2xl font-bold text-white">{{ (analytics.ab_test.variant_b.rate * 100)|round(1) }}%</div>
+                <div class="text-sm text-gray-400">{{ analytics.ab_test.variant_b.responses }} responses from {{ analytics.ab_test.variant_b.sent }} sent</div>
+            </div>
+        </div>
+        
+        {% if analytics.ab_test.config.winner_declared %}
+        <div class="text-center mt-6">
+            <div class="bg-green-900 border border-green-700 rounded-lg p-4">
+                <h3 class="text-green-300 font-semibold mb-1">
+                    🏆 Winner Declared: Variant {{ analytics.ab_test.config.winner_variant }}
+                </h3>
+                <div class="text-sm text-gray-400">Statistical significance achieved on {{ analytics.ab_test.config.winner_declared_at[:10] }}</div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center mt-6">
+            <div class="bg-blue-900 border border-blue-700 rounded-lg p-4">
+                <div class="text-blue-300 text-sm">
+                    📊 Test is running. Need minimum {{ analytics.ab_test.config.min_sample_size }} sends per variant for statistical significance.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Message Templates -->
+    <div class="grid grid-cols-1 {% if campaign.template_b %}md:grid-cols-2{% endif %} gap-4">
+        <div class="bg-gray-700 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-white mb-3">Message Template{% if campaign.template_b %} A{% endif %}</h3>
+            <div class="bg-gray-600 p-4 rounded-lg text-gray-200">
+                {{ campaign.template_a|replace('\n', '<br>')|safe }}
+            </div>
+        </div>
+        {% if campaign.template_b %}
+        <div class="bg-gray-700 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-white mb-3">Message Template B</h3>
+            <div class="bg-gray-600 p-4 rounded-lg text-gray-200">
+                {{ campaign.template_b|replace('\n', '<br>')|safe }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Activity & Settings -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-gray-700 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-white">Recent Sends</h3>
+                <a href="{{ url_for('campaigns.campaign_recipients', campaign_id=campaign.id) }}" 
+                   class="text-blue-400 hover:text-blue-300 text-sm">
+                    View All Recipients →
+                </a>
+            </div>
+            {% if recent_sends %}
+            <div class="space-y-3">
+                {% for send in recent_sends %}
+                <div class="flex justify-between items-center pb-3 border-b border-gray-600 last:border-b-0">
+                    <div>
+                        <div class="font-semibold text-white">{{ send.contact.first_name }} {{ send.contact.last_name }}</div>
+                        <div class="text-sm text-gray-400">{{ send.contact.phone }}</div>
+                        {% if send.variant_sent %}
+                        <span class="px-2 py-1 bg-gray-600 text-white text-xs rounded">{{ send.variant_sent }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-right text-sm text-gray-400">
+                        {{ send.sent_at.strftime('%m/%d %I:%M %p') }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center text-gray-400 py-6">
+                No messages sent yet
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="bg-gray-700 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-white mb-4">Campaign Settings</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-300">Daily Limit:</span>
+                    <span class="text-white">{{ analytics.daily_limit }} messages</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-300">Business Hours:</span>
+                    <span class="text-white">
+                        {% if campaign.business_hours_only %}
+                        ✅ Yes
+                        {% else %}
+                        ❌ No
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-300">Created:</span>
+                    <span class="text-white">{{ analytics.created_at.strftime('%m/%d/%Y') }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-300">Type:</span>
+                    <span class="text-white">{{ campaign.campaign_type.title() }}</span>
+                </div>
+                {% if campaign.audience_type %}
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-300">Audience:</span>
+                    <span class="text-white">{{ campaign.audience_type.title() }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Auto-refresh for running campaigns -->
+{% if campaign.status == 'running' %}
+<script>
+// Auto-refresh analytics every 30 seconds for running campaigns
+setInterval(function() {
+    fetch('{{ url_for("campaigns.api_campaign_analytics", campaign_id=campaign.id) }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update key metrics without full page reload
+                location.reload(); // Simple approach - could be optimized to update specific elements
+            }
+        })
+        .catch(error => console.log('Analytics refresh failed:', error));
+}, 30000);
+</script>
+{% endif %}
+{% endblock %}

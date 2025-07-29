@@ -86,6 +86,7 @@ def create_app(config_class=Config, test_config=None):
     from routes.quote_routes import quote_bp
     from routes.invoice_routes import invoice_bp
     from routes.api_routes import api_bp
+    from routes.campaigns import campaigns_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(contact_bp, url_prefix='/contacts')
@@ -95,6 +96,7 @@ def create_app(config_class=Config, test_config=None):
     app.register_blueprint(quote_bp, url_prefix='/quotes')
     app.register_blueprint(invoice_bp, url_prefix='/invoices')
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(campaigns_bp)
     
     # --- REMOVED APScheduler ---
     # The background task scheduling is now handled by Celery Beat.

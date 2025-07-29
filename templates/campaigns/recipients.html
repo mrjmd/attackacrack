@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}{{ campaign.name }} - Recipients{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1>{{ campaign.name }} - Recipients</h1>
+                    <p class="text-muted mb-0">{{ recipients|length }} recipients shown</p>
+                </div>
+                <a href="{{ url_for('campaigns.campaign_detail', campaign_id=campaign.id) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Campaign
+                </a>
+            </div>
+
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="GET" class="row align-items-end">
+                        <div class="col-md-3">
+                            <label for="status">Status Filter</label>
+                            <select name="status" id="status" class="form-control" onchange="this.form.submit()">
+                                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Sent</option>
+                                <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+                                <option value="skipped" {% if status_filter == 'skipped' %}selected{% endif %}>Skipped</option>
+                            </select>
+                        </div>
+                        {% if campaign.campaign_type == 'ab_test' %}
+                        <div class="col-md-3">
+                            <label for="variant">Variant Filter</label>
+                            <select name="variant" id="variant" class="form-control" onchange="this.form.submit()">
+                                <option value="all" {% if variant_filter == 'all' %}selected{% endif %}>All Variants</option>
+                                <option value="A" {% if variant_filter == 'A' %}selected{% endif %}>Variant A</option>
+                                <option value="B" {% if variant_filter == 'B' %}selected{% endif %}>Variant B</option>
+                            </select>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                            <a href="{{ url_for('campaigns.campaign_recipients', campaign_id=campaign.id) }}" class="btn btn-outline-secondary">Clear</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Recipients Table -->
+            <div class="card">
+                <div class="card-body">
+                    {% if recipients %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Contact</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    {% if campaign.campaign_type == 'ab_test' %}
+                                    <th>Variant</th>
+                                    {% endif %}
+                                    <th>Sent At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for recipient in recipients %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong>{{ recipient.contact.first_name }} {{ recipient.contact.last_name }}</strong>
+                                        </div>
+                                        {% if recipient.contact.email %}
+                                        <small class="text-muted">{{ recipient.contact.email }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <code>{{ recipient.contact.phone }}</code>
+                                    </td>
+                                    <td>
+                                        {% if recipient.status == 'sent' %}
+                                        <span class="badge badge-success">Sent</span>
+                                        {% elif recipient.status == 'pending' %}
+                                        <span class="badge badge-warning">Pending</span>
+                                        {% elif recipient.status == 'failed' %}
+                                        <span class="badge badge-danger">Failed</span>
+                                        {% elif recipient.status == 'skipped' %}
+                                        <span class="badge badge-secondary">Skipped</span>
+                                        {% else %}
+                                        <span class="badge badge-light">{{ recipient.status.title() }}</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if campaign.campaign_type == 'ab_test' %}
+                                    <td>
+                                        {% if recipient.variant_sent %}
+                                        <span class="badge badge-{% if recipient.variant_sent == 'A' %}primary{% else %}info{% endif %}">
+                                            {{ recipient.variant_sent }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        {% if recipient.sent_at %}
+                                        <div>{{ recipient.sent_at.strftime('%m/%d/%Y') }}</div>
+                                        <small class="text-muted">{{ recipient.sent_at.strftime('%I:%M %p') }}</small>
+                                        {% else %}
+                                        <span class="text-muted">Not sent</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <!-- View message if sent -->
+                                        {% if recipient.message_sent %}
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                data-toggle="modal" 
+                                                data-target="#messageModal"
+                                                data-contact="{{ recipient.contact.first_name }} {{ recipient.contact.last_name }}"
+                                                data-message="{{ recipient.message_sent }}"
+                                                data-variant="{{ recipient.variant_sent or '' }}">
+                                            <i class="fas fa-eye"></i> View Message
+                                        </button>
+                                        {% endif %}
+                                        
+                                        <!-- View contact conversations -->
+                                        {% if recipient.contact.conversations %}
+                                        <a href="/conversations/{{ recipient.contact.conversations[0].id }}" 
+                                           class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-comments"></i> Conversations
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No recipients found</h5>
+                        <p class="text-muted">Try adjusting your filters or check if the campaign has recipients.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Message Modal -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Message Sent</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>To:</strong> <span id="modal-contact"></span>
+                    <span id="modal-variant" class="badge badge-primary ml-2" style="display: none;"></span>
+                </div>
+                <div class="alert alert-light">
+                    <div id="modal-message"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle message modal
+$('#messageModal').on('show.bs.modal', function (event) {
+    var button = $(event.relatedTarget);
+    var contact = button.data('contact');
+    var message = button.data('message');
+    var variant = button.data('variant');
+    
+    $('#modal-contact').text(contact);
+    $('#modal-message').text(message);
+    
+    if (variant) {
+        $('#modal-variant').text('Variant ' + variant).show();
+    } else {
+        $('#modal-variant').hide();
+    }
+});
+</script>
+{% endblock %}

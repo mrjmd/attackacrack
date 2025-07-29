@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}New Campaign{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="bg-gray-700 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-white">Create New Text Campaign</h1>
+            <a href="{{ url_for('campaigns.campaign_list') }}" class="text-gray-400 hover:text-white">
+                ← Back to Campaigns
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('campaigns.create_campaign') }}" id="campaignForm" class="space-y-6">
+            <!-- Campaign Basic Info -->
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-300 mb-2">
+                    Campaign Name <span class="text-red-400">*</span>
+                </label>
+                <input type="text" name="name" id="name" required 
+                       class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                       placeholder="e.g., Spring Cleaning Outreach">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="campaign_type" class="block text-sm font-medium text-gray-300 mb-2">
+                        Campaign Type <span class="text-red-400">*</span>
+                    </label>
+                    <select name="campaign_type" id="campaign_type" required 
+                            class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                        <option value="blast">Blast Campaign (Single message)</option>
+                        <option value="ab_test">A/B Test Campaign</option>
+                        <option value="automated">Automated Campaign</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="audience_type" class="block text-sm font-medium text-gray-300 mb-2">
+                        Audience Type
+                    </label>
+                    <select name="audience_type" id="audience_type" 
+                            class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                        <option value="mixed">Mixed (Cold + Customers)</option>
+                        <option value="cold">Cold Prospects Only</option>
+                        <option value="customer">Existing Customers Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Message Templates -->
+            <div>
+                <label for="template_a" class="block text-sm font-medium text-gray-300 mb-2">
+                    Message Template <span class="text-red-400">*</span>
+                </label>
+                <textarea name="template_a" id="template_a" rows="4" required
+                          class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                          placeholder="Hi {first_name}, we're offering professional services in {neighborhood}. Would you like a free estimate? Reply STOP to opt out."></textarea>
+                <p class="text-sm text-gray-400 mt-1">
+                    Available variables: {first_name}, {last_name}, {email}, {company}, {neighborhood}
+                </p>
+            </div>
+
+            <!-- A/B Test Template B (Hidden by default) -->
+            <div id="template_b_group" class="hidden">
+                <label for="template_b" class="block text-sm font-medium text-gray-300 mb-2">
+                    Alternative Message (Variant B)
+                </label>
+                <textarea name="template_b" id="template_b" rows="4"
+                          class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                          placeholder="Hello {first_name}! Looking for quality services in {neighborhood}? Get your free quote today! Text STOP to unsubscribe."></textarea>
+            </div>
+
+            <!-- Campaign Settings -->
+            <div class="border-t border-gray-600 pt-6">
+                <h2 class="text-lg font-semibold text-white mb-4">Campaign Settings</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="daily_limit" class="block text-sm font-medium text-gray-300 mb-2">
+                            Daily Send Limit
+                        </label>
+                        <input type="number" name="daily_limit" id="daily_limit" 
+                               value="125" min="1" max="500"
+                               class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                        <p class="text-sm text-gray-400 mt-1">Maximum messages per day (125 recommended for cold outreach)</p>
+                    </div>
+                    <div>
+                        <label for="min_days_since_contact" class="block text-sm font-medium text-gray-300 mb-2">
+                            Days Since Last Contact
+                        </label>
+                        <input type="number" name="min_days_since_contact" id="min_days_since_contact" 
+                               value="30" min="1"
+                               class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                        <p class="text-sm text-gray-400 mt-1">Only contact people not texted in X days</p>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="business_hours_only" id="business_hours_only" checked
+                               class="mr-3 rounded bg-gray-600 border-gray-500">
+                        <span class="text-gray-300">Send only during business hours (9 AM - 6 PM ET, weekdays)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Audience Filters -->
+            <div class="border-t border-gray-600 pt-6">
+                <h2 class="text-lg font-semibold text-white mb-4">Audience Filters</h2>
+                
+                <div class="space-y-3">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="has_name_only" id="has_name_only" checked
+                               class="mr-3 rounded bg-gray-600 border-gray-500">
+                        <span class="text-gray-300">Only contacts with real names (exclude phone numbers as names)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="checkbox" name="has_email" id="has_email"
+                               class="mr-3 rounded bg-gray-600 border-gray-500">
+                        <span class="text-gray-300">Only contacts with email addresses</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="checkbox" name="exclude_office_numbers" id="exclude_office_numbers" checked
+                               class="mr-3 rounded bg-gray-600 border-gray-500">
+                        <span class="text-gray-300">Exclude office/business numbers</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Audience Preview -->
+            <div class="bg-blue-900 bg-opacity-50 border border-blue-700 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-blue-300 mb-3">Audience Size Preview</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-4">
+                    <div>
+                        <div class="text-2xl font-bold text-blue-400">{{ audience_stats.total_contacts }}</div>
+                        <div class="text-sm text-gray-400">Total Contacts</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-green-400">{{ audience_stats.named_contacts }}</div>
+                        <div class="text-sm text-gray-400">With Names</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-cyan-400">{{ audience_stats.email_contacts }}</div>
+                        <div class="text-sm text-gray-400">With Emails</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-yellow-400">{{ audience_stats.opted_out_count }}</div>
+                        <div class="text-sm text-gray-400">Opted Out</div>
+                    </div>
+                </div>
+                <div class="text-center border-t border-blue-700 pt-3">
+                    <span class="text-blue-300">Estimated Recipients: </span>
+                    <span id="filtered_count" class="text-2xl font-bold text-blue-400">Calculating...</span>
+                </div>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div class="flex justify-between pt-6">
+                <a href="{{ url_for('campaigns.campaign_list') }}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg">
+                    ← Back to Campaigns
+                </a>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
+                    💾 Create Campaign
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const campaignTypeSelect = document.getElementById('campaign_type');
+    const templateBGroup = document.getElementById('template_b_group');
+    const templateB = document.getElementById('template_b');
+    
+    // Show/hide Template B based on campaign type
+    campaignTypeSelect.addEventListener('change', function() {
+        if (this.value === 'ab_test') {
+            templateBGroup.classList.remove('hidden');
+            templateB.required = true;
+        } else {
+            templateBGroup.classList.add('hidden');
+            templateB.required = false;
+        }
+    });
+    
+    // Update audience preview when filters change
+    const filterInputs = document.querySelectorAll('#has_name_only, #has_email, #exclude_office_numbers, #min_days_since_contact');
+    
+    function updateAudiencePreview() {
+        const filters = {
+            has_name_only: document.getElementById('has_name_only').checked,
+            has_email: document.getElementById('has_email').checked,
+            exclude_office_numbers: document.getElementById('exclude_office_numbers').checked,
+            min_days_since_contact: parseInt(document.getElementById('min_days_since_contact').value) || 30
+        };
+        
+        fetch('{{ url_for("campaigns.api_preview_audience") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(filters)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('filtered_count').textContent = data.audience_size.toLocaleString();
+            } else {
+                document.getElementById('filtered_count').textContent = 'Error calculating';
+            }
+        })
+        .catch(error => {
+            document.getElementById('filtered_count').textContent = 'Error calculating';
+        });
+    }
+    
+    // Initial audience preview
+    updateAudiencePreview();
+    
+    // Update on filter changes
+    filterInputs.forEach(input => {
+        input.addEventListener('change', updateAudiencePreview);
+    });
+});
+</script>
+{% endblock %}

@@ -20,6 +20,7 @@
                     <a href="{{ url_for('job.list_all') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg hover:bg-gray-700 {% if request.endpoint.startswith('job.') %}bg-gray-700{% endif %}">Jobs</a>
                     <a href="{{ url_for('quote.list_all') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg hover:bg-gray-700 {% if request.endpoint.startswith('quote.') %}bg-gray-700{% endif %}">Quotes</a>
                     <a href="{{ url_for('invoice.list_all') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg hover:bg-gray-700 {% if request.endpoint.startswith('invoice.') %}bg-gray-700{% endif %}">Invoices</a>
+                    <a href="{{ url_for('campaigns.campaign_list') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg hover:bg-gray-700 {% if request.endpoint.startswith('campaigns.') %}bg-gray-700{% endif %}">Campaigns</a>
                     <a href="{{ url_for('main.marketing') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg hover:bg-gray-700 {% if request.endpoint == 'main.marketing' %}bg-gray-700{% endif %}">Marketing</a>
                     <a href="{{ url_for('main.settings') }}" class="flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg hover:bg-gray-700 {% if request.endpoint == 'main.settings' %}bg-gray-700{% endif %}">Settings</a>
                 </nav>
