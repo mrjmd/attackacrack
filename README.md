@@ -218,6 +218,46 @@ with app.app_context():
 "
 ```
 
+### QuickBooks Integration
+```bash
+# Test QuickBooks connection
+docker-compose exec web python -c "
+from services.quickbooks_service import QuickBooksService
+qb = QuickBooksService()
+print('QB Connection Status:', qb.test_connection())
+"
+
+# Sync customers from QuickBooks
+docker-compose exec web python -c "
+from services.quickbooks_sync_service import QuickBooksSyncService
+sync = QuickBooksSyncService()
+result = sync.sync_customers()
+print(f'Synced {result[\"synced_count\"]} customers')
+"
+
+# Import products/services from QuickBooks
+docker-compose exec web python -c "
+from services.quickbooks_sync_service import QuickBooksSyncService
+sync = QuickBooksSyncService()
+result = sync.sync_products()
+print(f'Imported {result[\"imported_count\"]} products/services')
+"
+
+# Check QuickBooks sync status
+docker-compose exec web python -c "
+from app import create_app
+from crm_database import Contact, Product, QuickBooksSync
+app = create_app()
+with app.app_context():
+    qb_customers = Contact.query.filter(Contact.quickbooks_customer_id.isnot(None)).count()
+    qb_products = Product.query.filter(Product.quickbooks_item_id.isnot(None)).count()
+    sync_errors = QuickBooksSync.query.filter_by(sync_status='error').count()
+    print(f'QB Customers: {qb_customers}')
+    print(f'QB Products: {qb_products}')
+    print(f'Sync Errors: {sync_errors}')
+"
+```
+
 ## Architecture Overview
 
 ### Core Components
@@ -261,6 +301,7 @@ with app.app_context():
 
 - **OpenPhone API**: SMS/call management (requires API key and webhook configuration)
 - **Google APIs**: Calendar integration and Gemini AI (requires OAuth setup)
+- **QuickBooks Online API**: Financial data, customers, products/services (requires OAuth 2.0 app)
 - **PostgreSQL**: Primary data storage
 - **Redis**: Message queue and caching
 - **Ngrok**: Local webhook testing in development
@@ -284,10 +325,15 @@ Tests are located in `tests/` directory with pytest configuration in `pytest.ini
 - Contact data enrichment from CSV sources
 
 ### 📋 Upcoming Priorities
-- Text campaign system with A/B testing
-- Enhanced UI/UX for dashboard and conversations
-- QuickBooks integration for customer enrichment
-- AI-powered conversation analysis
+- **QuickBooks Integration** (In Progress) - See [QUICKBOOKS_INTEGRATION_PLAN.md](QUICKBOOKS_INTEGRATION_PLAN.md)
+  - OAuth 2.0 authentication with QuickBooks Online
+  - Customer data sync and contact enrichment  
+  - Real products/services import from QB items
+  - Bidirectional quote/invoice workflows
+  - Financial analytics and customer segmentation
+- Enhanced conversation detail view with AI showcase
+- Real-time performance charts and analytics
+- Advanced campaign features with multi-channel support
 
 ## Environment Variables
 
@@ -311,6 +357,12 @@ REDIS_URL=redis://redis:6379/0
 # Google APIs
 GOOGLE_CALENDAR_CREDENTIALS_FILE=path/to/credentials.json
 GOOGLE_AI_API_KEY=your_gemini_api_key
+
+# QuickBooks Online
+QUICKBOOKS_CLIENT_ID=your_qb_app_client_id
+QUICKBOOKS_CLIENT_SECRET=your_qb_app_client_secret
+QUICKBOOKS_REDIRECT_URI=http://localhost:5000/auth/quickbooks/callback
+QUICKBOOKS_SANDBOX=True
 
 # Ngrok (for development)
 NGROK_AUTHTOKEN=your_ngrok_token
