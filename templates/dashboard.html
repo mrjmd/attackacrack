@@ -155,7 +155,7 @@
                         <h3 class="text-sm font-medium text-gray-300 mb-3">Message Volume (7 days)</h3>
                         <div class="h-32 flex items-end justify-between gap-1">
                             {% for day in message_volume_data %}
-                            <div class="flex-1 bg-blue-500 rounded-t" style="height: {{ (day.count / message_volume_data|map(attribute='count')|max * 100)|default(0) }}%"></div>
+                            <div class="flex-1 bg-blue-500 rounded-t" style="height: {{ (day.count / ((message_volume_data|map(attribute='count')|max) or 1) * 100)|default(0) }}%"></div>
                             {% endfor %}
                         </div>
                         <div class="flex justify-between text-xs text-gray-400 mt-2">

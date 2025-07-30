@@ -51,7 +51,7 @@ def test_openphone_webhook_validation(client, app):
     
     assert response.status_code == 200
     data = json.loads(response.data)
-    assert data['success'] is True
+    assert data['status'] == 'success'
 
 # TODO: Add test for incoming message webhook ('message.new')
 # TODO: Add test for generate_appointment_summary API endpoint

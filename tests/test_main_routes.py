@@ -25,9 +25,9 @@ def test_dashboard_route_with_mocking(client, mocker, app):
         response = client.get(url_for('main.dashboard'))
     
     assert response.status_code == 200
-    assert b'<h2 class="text-3xl font-bold mb-6">Dashboard</h2>' in response.data
+    assert b'<h1 class="text-3xl font-bold text-white">Dashboard</h1>' in response.data
     
     # Check for the expected "no data" message for appointments.
     # With both internal appointments and Google events mocked to be empty,
     # this text should now correctly appear.
-    assert b"No upcoming appointments or events." in response.data
+    assert b"No appointments scheduled for today." in response.data

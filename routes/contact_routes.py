@@ -311,7 +311,77 @@ def conversation(contact_id):
     contact = contact_service.get_contact_by_id(contact_id)
     activities = message_service.get_activities_for_contact(contact_id)
     
-    return render_template('conversation_view_enhanced.html', contact=contact, activities=activities)
+    # Additional data for enhanced view
+    from crm_database import Job, ContactFlag, CampaignMembership, Campaign
+    
+    # Get recent jobs
+    recent_jobs = []
+    if contact.properties:
+        for prop in contact.properties:
+            recent_jobs.extend(prop.jobs)
+    recent_jobs = sorted(recent_jobs, key=lambda x: x.completed_at if x.completed_at else datetime.min, reverse=True)[:3]
+    
+    # Check for flags
+    has_office_flag = ContactFlag.query.filter_by(
+        contact_id=contact_id,
+        flag_type='office_number'
+    ).first() is not None
+    
+    has_opted_out = ContactFlag.query.filter_by(
+        contact_id=contact_id,
+        flag_type='opted_out'
+    ).first() is not None
+    
+    # Get campaign memberships
+    campaign_memberships = CampaignMembership.query.filter_by(
+        contact_id=contact_id
+    ).join(Campaign).order_by(CampaignMembership.sent_at.desc()).limit(3).all()
+    
+    # Calculate statistics
+    call_count = sum(1 for a in activities if a.activity_type == 'call')
+    last_activity = max(activities, key=lambda a: a.created_at) if activities else None
+    last_activity_date = last_activity.created_at.strftime('%b %d, %Y') if last_activity else None
+    
+    # Use the new enhanced template
+    return render_template('conversation_detail_enhanced.html', 
+                         contact=contact, 
+                         activities=activities,
+                         recent_jobs=recent_jobs,
+                         has_office_flag=has_office_flag,
+                         has_opted_out=has_opted_out,
+                         campaign_memberships=campaign_memberships,
+                         call_count=call_count,
+                         last_activity_date=last_activity_date)
+
+@contact_bp.route('/<int:contact_id>/send-message', methods=['POST'])
+def send_message(contact_id):
+    """Send a message to a contact via OpenPhone"""
+    from services.openphone_service import OpenPhoneService
+    
+    contact_service = ContactService()
+    contact = contact_service.get_contact_by_id(contact_id)
+    
+    if not contact:
+        flash('Contact not found', 'error')
+        return redirect(url_for('contact.conversation_list'))
+    
+    message_body = request.form.get('body', '').strip()
+    if not message_body:
+        flash('Message cannot be empty', 'error')
+        return redirect(url_for('contact.conversation', contact_id=contact_id))
+    
+    try:
+        openphone_service = OpenPhoneService()
+        result = openphone_service.send_message(contact.phone, message_body)
+        
+        if result.get('success'):
+            flash('Message sent successfully!', 'success')
+        else:
+            flash('Failed to send message', 'error')
+    except Exception as e:
+        flash(f'Error sending message: {str(e)}', 'error')
+    
+    return redirect(url_for('contact.conversation', contact_id=contact_id))
 
 @contact_bp.route('/add', methods=['GET', 'POST'])
 def add_contact():

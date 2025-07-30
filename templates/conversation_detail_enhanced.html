@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+
+{% block title %}Conversation - {{ contact.first_name }} {{ contact.last_name }}{% endblock %}
+
+{% block content %}
+<div class="flex h-screen">
+    <!-- Left Sidebar: Contact Information -->
+    <div class="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <!-- Contact Header -->
+        <div class="p-6 border-b border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-white">Contact Info</h2>
+                <a href="{{ url_for('contact.contact_detail', contact_id=contact.id) }}" 
+                   class="text-sm text-blue-400 hover:text-blue-300">
+                    View Full Profile →
+                </a>
+            </div>
+            
+            <!-- Contact Basic Info -->
+            <div class="space-y-3">
+                <div>
+                    <h3 class="text-2xl font-semibold text-white">
+                        {{ contact.first_name }} {{ contact.last_name }}
+                    </h3>
+                    {% if contact.email %}
+                    <p class="text-gray-400 text-sm">{{ contact.email }}</p>
+                    {% endif %}
+                </div>
+                
+                <div class="flex items-center gap-2 text-gray-300">
+                    <span>📱</span>
+                    <span>{{ contact.phone }}</span>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="flex gap-2 pt-3">
+                    <button class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm">
+                        📞 Call
+                    </button>
+                    <button class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded text-sm">
+                        📧 Email
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contact Details -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+            <!-- Customer Status -->
+            {% if contact.quickbooks_customer_id %}
+            <div class="bg-green-900 bg-opacity-30 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-green-400 mb-2">✓ QuickBooks Customer</h4>
+                <div class="text-sm text-gray-300 space-y-1">
+                    <p>Total Sales: ${{ contact.total_sales|default(0)|int }}</p>
+                    <p>Outstanding: ${{ contact.outstanding_balance|default(0)|int }}</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Properties -->
+            {% if contact.properties %}
+            <div>
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Properties</h4>
+                <div class="space-y-2">
+                    {% for property in contact.properties[:3] %}
+                    <div class="bg-gray-700 rounded p-3">
+                        <p class="text-sm text-white">{{ property.address }}</p>
+                        <p class="text-xs text-gray-400">{{ property.jobs|length }} jobs</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Recent Jobs -->
+            {% if recent_jobs %}
+            <div>
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Recent Jobs</h4>
+                <div class="space-y-2">
+                    {% for job in recent_jobs[:3] %}
+                    <div class="bg-gray-700 rounded p-3">
+                        <p class="text-sm text-white">{{ job.description }}</p>
+                        <p class="text-xs text-gray-400">
+                            {% if job.completed_at %}{{ job.completed_at.strftime('%b %d, %Y') }}{% else %}In Progress{% endif %} - {{ job.status }}
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Tags & Flags -->
+            <div>
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Tags & Status</h4>
+                <div class="flex flex-wrap gap-2">
+                    {% if contact.contact_metadata and contact.contact_metadata.get('tags') %}
+                        {% for tag in contact.contact_metadata.get('tags', []) %}
+                        <span class="px-2 py-1 bg-gray-700 text-gray-300 rounded text-xs">{{ tag }}</span>
+                        {% endfor %}
+                    {% endif %}
+                    {% if has_office_flag %}
+                    <span class="px-2 py-1 bg-yellow-900 text-yellow-300 rounded text-xs">🏢 Office</span>
+                    {% endif %}
+                    {% if has_opted_out %}
+                    <span class="px-2 py-1 bg-red-900 text-red-300 rounded text-xs">🚫 Opted Out</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Campaign History -->
+            {% if campaign_memberships %}
+            <div>
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Campaign History</h4>
+                <div class="space-y-2">
+                    {% for membership in campaign_memberships[:3] %}
+                    <div class="bg-gray-700 rounded p-3">
+                        <p class="text-sm text-white">{{ membership.campaign.name }}</p>
+                        <p class="text-xs text-gray-400">
+                            {{ membership.status }} - {{ membership.sent_at.strftime('%b %d') if membership.sent_at else 'Pending' }}
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Notes Section -->
+            <div>
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Notes</h4>
+                <textarea class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white placeholder-gray-400 h-24"
+                          placeholder="Add notes about this contact..."></textarea>
+                <button class="mt-2 bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm">
+                    Save Note
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content: Conversation -->
+    <div class="flex-1 flex flex-col bg-gray-900">
+        <!-- Conversation Header -->
+        <div class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <a href="{{ url_for('contact.conversation_list') }}" 
+                       class="text-gray-400 hover:text-white">
+                        ← Back
+                    </a>
+                    <div>
+                        <h1 class="text-xl font-semibold text-white">
+                            {{ contact.first_name }} {{ contact.last_name }}
+                        </h1>
+                        <div class="flex items-center gap-4 text-sm text-gray-400">
+                            <span>{{ activities|length }} messages</span>
+                            <span>{{ call_count }} calls</span>
+                            {% if last_activity_date %}
+                            <span>Last activity: {{ last_activity_date }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Conversation Actions -->
+                <div class="flex items-center gap-2">
+                    <button class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Search">
+                        🔍
+                    </button>
+                    <button class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Add to Campaign">
+                        📢
+                    </button>
+                    <button class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Schedule">
+                        📅
+                    </button>
+                    <button class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="More">
+                        ⋮
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Messages Container -->
+        <div id="messages-container" class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            <!-- Date Separators and Messages -->
+            {% set current_date = None %}
+            {% for activity in activities %}
+                {% set activity_date = activity.created_at.date() %}
+                
+                <!-- Date Separator -->
+                {% if activity_date != current_date %}
+                    {% set current_date = activity_date %}
+                    <div class="flex items-center justify-center my-6">
+                        <div class="bg-gray-800 rounded-full px-4 py-1 text-sm text-gray-400">
+                            {{ activity.created_at.strftime('%B %d, %Y') }}
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- Message/Activity Display -->
+                {% if activity.activity_type == 'message' %}
+                    <div class="flex {% if activity.direction == 'outgoing' %}justify-end{% else %}justify-start{% endif %}">
+                        <div class="max-w-2xl">
+                            <div class="{% if activity.direction == 'outgoing' %}bg-blue-600 text-white{% else %}bg-gray-700 text-white{% endif %} rounded-lg px-4 py-3 shadow-lg">
+                                <!-- Message Content -->
+                                {% if activity.body %}
+                                    <p class="whitespace-pre-wrap">{{ activity.body }}</p>
+                                {% endif %}
+                                
+                                <!-- Media Attachments -->
+                                {% if activity.media_urls %}
+                                    <div class="mt-3 grid grid-cols-2 gap-2">
+                                        {% for media_url in activity.media_urls %}
+                                            {% if media_url.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
+                                                <img src="{{ media_url }}" 
+                                                     alt="Attached image" 
+                                                     class="rounded cursor-pointer hover:opacity-90 max-h-48 object-cover"
+                                                     onclick="openMediaModal('{{ media_url }}')">
+                                            {% else %}
+                                                <a href="{{ media_url }}" target="_blank" 
+                                                   class="block bg-black bg-opacity-20 rounded p-3 hover:bg-opacity-30">
+                                                    <span class="text-sm">📎 Attachment</span>
+                                                </a>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Message Metadata -->
+                            <div class="flex items-center gap-2 mt-1 px-1 text-xs text-gray-500">
+                                <span>{{ activity.created_at.strftime('%I:%M %p') }}</span>
+                                {% if activity.direction == 'outgoing' %}
+                                    <span>•</span>
+                                    <span>{{ activity.status|default('sent')|title }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                {% elif activity.activity_type == 'call' %}
+                    <!-- Enhanced Call Display -->
+                    <div class="flex justify-center my-6">
+                        <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full border border-gray-700">
+                            <div class="flex items-start gap-4">
+                                <div class="text-3xl">
+                                    {% if activity.direction == 'incoming' %}
+                                        <span class="text-green-400">📞</span>
+                                    {% else %}
+                                        <span class="text-blue-400">📞</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold text-white mb-2">
+                                        {{ 'Incoming' if activity.direction == 'incoming' else 'Outgoing' }} Call
+                                    </h3>
+                                    
+                                    <div class="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span class="text-gray-400">Status:</span>
+                                            <span class="text-white ml-2">{{ activity.status|default('completed')|title }}</span>
+                                        </div>
+                                        {% if activity.duration_seconds %}
+                                        <div>
+                                            <span class="text-gray-400">Duration:</span>
+                                            <span class="text-white ml-2">{{ (activity.duration_seconds // 60) }}m {{ (activity.duration_seconds % 60) }}s</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Recording Player -->
+                                    {% if activity.recording_url %}
+                                    <div class="mt-4 bg-gray-900 rounded-lg p-4">
+                                        <p class="text-sm text-gray-400 mb-2">📼 Call Recording</p>
+                                        <audio controls class="w-full">
+                                            <source src="{{ activity.recording_url }}" type="audio/mpeg">
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- AI Summary -->
+                                    {% if activity.ai_summary %}
+                                    <div class="mt-4 bg-purple-900 bg-opacity-20 rounded-lg p-4 border border-purple-800">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="text-purple-400">🤖</span>
+                                            <h4 class="text-sm font-semibold text-purple-300">AI Summary</h4>
+                                        </div>
+                                        <p class="text-sm text-gray-200 whitespace-pre-wrap">{{ activity.ai_summary }}</p>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- Next Steps -->
+                                    {% if activity.ai_next_steps %}
+                                    <div class="mt-3 bg-blue-900 bg-opacity-20 rounded-lg p-4 border border-blue-800">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="text-blue-400">📋</span>
+                                            <h4 class="text-sm font-semibold text-blue-300">Recommended Actions</h4>
+                                        </div>
+                                        <p class="text-sm text-gray-200 whitespace-pre-wrap">{{ activity.ai_next_steps }}</p>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- Expandable Transcript -->
+                                    {% if activity.ai_transcript and activity.ai_transcript.dialogue %}
+                                    <details class="mt-4">
+                                        <summary class="cursor-pointer text-sm text-gray-400 hover:text-white">
+                                            📝 View Full Transcript ({{ activity.ai_transcript.dialogue|length }} lines)
+                                        </summary>
+                                        <div class="mt-3 bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                                            <div class="space-y-2 text-sm">
+                                                {% for segment in activity.ai_transcript.dialogue %}
+                                                <div class="flex gap-3">
+                                                    <span class="font-semibold text-gray-400 w-20 flex-shrink-0">
+                                                        {{ segment.speaker|default('Unknown') }}:
+                                                    </span>
+                                                    <span class="text-gray-200">{{ segment.text|default(segment.content) }}</span>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </details>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                {% elif activity.activity_type == 'voicemail' %}
+                    <!-- Voicemail Display -->
+                    <div class="flex justify-center my-6">
+                        <div class="bg-gray-800 rounded-lg p-4 max-w-md w-full border border-gray-700">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="text-2xl text-orange-400">🎤</span>
+                                <h3 class="text-lg font-semibold text-white">Voicemail</h3>
+                            </div>
+                            {% if activity.voicemail_url %}
+                            <audio controls class="w-full">
+                                <source src="{{ activity.voicemail_url }}" type="audio/mpeg">
+                                Your browser does not support the audio element.
+                            </audio>
+                            {% endif %}
+                            <p class="text-xs text-gray-500 mt-2">{{ activity.created_at.strftime('%I:%M %p') }}</p>
+                        </div>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="flex items-center justify-center h-full">
+                    <div class="text-center text-gray-500">
+                        <p class="text-lg mb-2">No conversation history</p>
+                        <p class="text-sm">Send a message to start the conversation</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Message Composer -->
+        <div class="bg-gray-800 border-t border-gray-700 p-4">
+            <form method="POST" action="{{ url_for('contact.send_message', contact_id=contact.id) }}" class="flex items-end gap-3">
+                <div class="flex-1">
+                    <textarea name="body" 
+                              rows="1"
+                              placeholder="Type a message..."
+                              class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              onkeydown="handleKeyPress(event)"
+                              oninput="autoResize(this)"></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" 
+                            class="p-3 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg"
+                            title="Attach file">
+                        📎
+                    </button>
+                    <button type="submit" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg flex items-center gap-2">
+                        <span>Send</span>
+                        <span>➤</span>
+                    </button>
+                </div>
+            </form>
+            <p class="text-xs text-gray-500 mt-2 text-center">
+                Press Enter to send, Shift+Enter for new line
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Media Modal -->
+<div id="mediaModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4" onclick="closeMediaModal()">
+    <div class="relative max-w-7xl max-h-full">
+        <img id="modalImage" src="" alt="Full size image" class="max-w-full max-h-full">
+        <button onclick="closeMediaModal()" class="absolute top-4 right-4 text-white text-3xl hover:text-gray-300">×</button>
+    </div>
+</div>
+
+<script>
+// Auto-scroll to bottom on load
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('messages-container');
+    container.scrollTop = container.scrollHeight;
+});
+
+// Auto-resize textarea
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+}
+
+// Handle Enter key for sending
+function handleKeyPress(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        event.target.form.submit();
+    }
+}
+
+// Media modal functions
+function openMediaModal(src) {
+    document.getElementById('modalImage').src = src;
+    document.getElementById('mediaModal').classList.remove('hidden');
+}
+
+function closeMediaModal() {
+    document.getElementById('mediaModal').classList.add('hidden');
+}
+
+// Keyboard shortcut for closing modal
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeMediaModal();
+    }
+});
+</script>
+{% endblock %}
