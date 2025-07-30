@@ -87,6 +87,38 @@ class CampaignService:
         
         return campaign
     
+    def add_recipients_from_list(self, campaign_id: int, list_id: int) -> int:
+        """Add recipients from a campaign list"""
+        from services.campaign_list_service import CampaignListService
+        list_service = CampaignListService()
+        
+        # Get all active contacts from the list
+        contacts = list_service.get_list_contacts(list_id)
+        
+        added = 0
+        for contact in contacts:
+            # Skip if already in campaign
+            existing = CampaignMembership.query.filter_by(
+                campaign_id=campaign_id,
+                contact_id=contact.id
+            ).first()
+            
+            if not existing:
+                membership = CampaignMembership(
+                    campaign_id=campaign_id,
+                    contact_id=contact.id,
+                    status='pending'
+                )
+                db.session.add(membership)
+                added += 1
+        
+        # Update campaign list reference
+        campaign = Campaign.query.get(campaign_id)
+        campaign.list_id = list_id
+        
+        db.session.commit()
+        return added
+    
     def add_recipients(self, campaign_id: int, contact_filters: Dict) -> int:
         """Add recipients to campaign based on filters"""
         campaign = Campaign.query.get_or_404(campaign_id)
@@ -227,6 +259,37 @@ class CampaignService:
         
         for membership in pending:
             try:
+                # Check contact history
+                history = self._check_contact_history(membership.contact, campaign)
+                
+                # Store history info in membership
+                if history['has_history']:
+                    membership.previous_contact_date = history['last_contact_date']
+                    membership.previous_contact_type = history['last_contact_type'] 
+                    membership.previous_response = history['previous_response']
+                
+                # Handle based on campaign settings
+                if history['has_history'] and campaign.on_existing_contact != 'ignore':
+                    # Check minimum days between contacts
+                    if history['days_since'] < campaign.days_between_contacts:
+                        membership.status = 'suppressed'
+                        membership.pre_send_flags = {'reason': 'too_recent', 'days_since': history['days_since']}
+                        stats['skipped'] += 1
+                        continue
+                    
+                    # Handle negative responses
+                    if history['previous_response'] == 'negative':
+                        if campaign.on_existing_contact == 'flag_for_review':
+                            membership.status = 'flagged'
+                            membership.pre_send_flags = {'reason': 'negative_response'}
+                            stats['skipped'] += 1
+                            continue
+                        elif campaign.on_existing_contact == 'skip':
+                            membership.status = 'suppressed'
+                            membership.pre_send_flags = {'reason': 'negative_response'}
+                            stats['skipped'] += 1
+                            continue
+                
                 # Final pre-send validation
                 if self._should_skip_send(membership):
                     membership.status = 'skipped'
@@ -236,10 +299,22 @@ class CampaignService:
                 
                 # Determine which variant to send (for A/B tests)
                 variant = self._determine_variant(campaign)
-                template = campaign.template_a if variant == 'A' else campaign.template_b
                 
-                # Personalize message
-                personalized_message = self._personalize_message(template, membership.contact)
+                # Choose template based on contact history
+                if (history['has_history'] and 
+                    campaign.on_existing_contact == 'adapt_script' and 
+                    campaign.adapt_script_template):
+                    template = campaign.adapt_script_template
+                    membership.script_adapted = True
+                else:
+                    template = campaign.template_a if variant == 'A' else campaign.template_b
+                
+                # Personalize message with history context
+                personalized_message = self._personalize_message(
+                    template, 
+                    membership.contact,
+                    context={'previous_contact': history} if history['has_history'] else None
+                )
                 
                 # Send message
                 success = self._send_message(membership.contact.phone, personalized_message)
@@ -365,8 +440,8 @@ class CampaignService:
             'responses': response_count
         }
     
-    def _personalize_message(self, template: str, contact: Contact) -> str:
-        """Personalize message template with contact data"""
+    def _personalize_message(self, template: str, contact: Contact, context: Dict = None) -> str:
+        """Personalize message template with contact data and context"""
         if not template:
             return ""
         
@@ -376,6 +451,22 @@ class CampaignService:
         # Basic personalization
         first_name = contact.first_name if contact.first_name and not contact.first_name.startswith('+') else ''
         message = message.replace('{first_name}', first_name)
+        
+        # Context-based personalization
+        if context and context.get('previous_contact'):
+            history = context['previous_contact']
+            if history['has_history']:
+                # Add context placeholders
+                message = message.replace('{days_since_contact}', str(history['days_since']))
+                message = message.replace('{last_contact_type}', history['last_contact_type'])
+                
+                # Time-based greetings
+                if history['days_since'] < 7:
+                    message = message.replace('{time_greeting}', 'Following up from last week')
+                elif history['days_since'] < 30:
+                    message = message.replace('{time_greeting}', 'Following up from a few weeks ago')
+                else:
+                    message = message.replace('{time_greeting}', "It's been a while")
         message = message.replace('{last_name}', contact.last_name or '')
         message = message.replace('{email}', contact.email or '')
         
@@ -395,6 +486,49 @@ class CampaignService:
             return result.get('success', False)
         except Exception as e:
             return False
+    
+    def _check_contact_history(self, contact: Contact, campaign: Campaign) -> Dict:
+        """Check contact's previous interactions"""
+        # Find most recent outgoing activity
+        last_activity = Activity.query.filter(
+            Activity.contact_id == contact.id,
+            Activity.direction == 'outgoing',
+            Activity.activity_type.in_(['message', 'email', 'call'])
+        ).order_by(Activity.created_at.desc()).first()
+        
+        if not last_activity:
+            return {'has_history': False}
+        
+        days_since = (datetime.utcnow() - last_activity.created_at).days
+        
+        # Check for response to last activity
+        response = None
+        if last_activity.activity_type == 'message':
+            # Look for incoming message after our last outgoing
+            response_activity = Activity.query.filter(
+                Activity.contact_id == contact.id,
+                Activity.direction == 'incoming',
+                Activity.created_at > last_activity.created_at,
+                Activity.activity_type == 'message'
+            ).first()
+            
+            if response_activity:
+                # Simple sentiment analysis
+                response_text = response_activity.body.lower() if response_activity.body else ''
+                if any(word in response_text for word in ['stop', 'unsubscribe', 'remove', 'no']):
+                    response = 'negative'
+                elif any(word in response_text for word in ['yes', 'interested', 'sure', 'ok']):
+                    response = 'positive'
+                else:
+                    response = 'neutral'
+        
+        return {
+            'has_history': True,
+            'last_contact_date': last_activity.created_at,
+            'last_contact_type': last_activity.activity_type,
+            'days_since': days_since,
+            'previous_response': response
+        }
     
     def _should_skip_send(self, membership: CampaignMembership) -> bool:
         """Check if we should skip sending to this contact"""

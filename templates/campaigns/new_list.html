@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Create Campaign List{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="bg-gray-700 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-white">Create Campaign List</h1>
+            <a href="{{ url_for('campaigns.campaign_lists') }}" class="text-gray-400 hover:text-white">
+                ← Back to Lists
+            </a>
+        </div>
+        <form method="POST" action="{{ url_for('campaigns.new_campaign_list') }}">
+            <!-- Basic Info -->
+            <div class="space-y-4">
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-300 mb-1">List Name</label>
+                    <input type="text" class="w-full bg-gray-600 text-white px-3 py-2 rounded-lg border border-gray-500 focus:border-blue-400 focus:outline-none" 
+                           id="name" name="name" required placeholder="e.g., Q1 2025 Prospects">
+                </div>
+                
+                <div>
+                    <label for="description" class="block text-sm font-medium text-gray-300 mb-1">Description</label>
+                    <textarea class="w-full bg-gray-600 text-white px-3 py-2 rounded-lg border border-gray-500 focus:border-blue-400 focus:outline-none" 
+                              id="description" name="description" rows="2" 
+                              placeholder="Optional description of this list"></textarea>
+                </div>
+                
+                <div>
+                    <label class="flex items-start">
+                        <input type="checkbox" id="is_dynamic" name="is_dynamic"
+                               class="mt-1 w-4 h-4 text-blue-600 bg-gray-700 border-gray-500 rounded focus:ring-blue-400">
+                        <span class="ml-2">
+                            <span class="block font-medium text-white">Dynamic List</span>
+                            <span class="block text-sm text-gray-400">Automatically updates based on filter criteria</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Creation Method -->
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-300 mb-2">How to Build This List</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="flex items-center bg-gray-600 rounded-lg p-3 cursor-pointer hover:bg-gray-500">
+                        <input type="radio" name="creation_method" 
+                               id="method_csv" value="csv_import" checked
+                               class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-500">
+                        <span class="ml-2 text-white">From CSV Import</span>
+                    </label>
+                    <label class="flex items-center bg-gray-600 rounded-lg p-3 cursor-pointer hover:bg-gray-500">
+                        <input type="radio" name="creation_method" 
+                               id="method_filter" value="filter"
+                               class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-500">
+                        <span class="ml-2 text-white">Using Filters</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- CSV Import Options -->
+            <div id="csv_options" class="mt-6 bg-gray-600 rounded-lg p-4">
+                <h5 class="text-white font-medium mb-3">Select CSV Import</h5>
+                {% if csv_imports %}
+                    <select class="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-500 focus:border-blue-400 focus:outline-none" 
+                            name="csv_import_id" id="csv_import_id">
+                        <option value="">Choose an import...</option>
+                        {% for import in csv_imports %}
+                            <option value="{{ import.id }}" 
+                                    {% if request.args.get('import_id') == import.id|string %}selected{% endif %}>
+                                {{ import.filename }} - {{ import.imported_at.strftime('%Y-%m-%d') }} 
+                                ({{ import.successful_imports }} contacts)
+                            </option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <p class="text-gray-400">No CSV imports found. 
+                       <a href="{{ url_for('campaigns.import_campaign_csv') }}" class="text-blue-400 hover:text-blue-300">Import CSV first</a>
+                    </p>
+                {% endif %}
+            </div>
+            
+            <!-- Filter Options -->
+            <div id="filter_options" class="mt-6 bg-gray-600 rounded-lg p-4" style="display: none;">
+                <h5 class="text-white font-medium mb-3">Filter Criteria</h5>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Import Source</label>
+                        <input type="text" class="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-500 focus:border-blue-400 focus:outline-none" 
+                               name="import_source" placeholder="e.g., propertyradar_2025.csv">
+                    </div>
+                    
+                    <div>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="no_recent_contact" name="no_recent_contact"
+                                   class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-500 rounded focus:ring-blue-400">
+                            <span class="ml-2 text-white">No recent contact in the last</span>
+                            <input type="number" name="days_since_contact" value="30" 
+                                   class="ml-2 w-20 bg-gray-700 text-white px-2 py-1 rounded border border-gray-500 focus:border-blue-400 focus:outline-none">
+                            <span class="ml-2 text-white">days</span>
+                        </label>
+                    </div>
+                    
+                    <div>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="exclude_opted_out" name="exclude_opted_out" checked
+                                   class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-500 rounded focus:ring-blue-400">
+                            <span class="ml-2 text-white">Exclude opted-out contacts</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-between mt-8">
+                <a href="{{ url_for('campaigns.campaign_lists') }}" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">Cancel</a>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Create List</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Toggle between CSV and filter options
+document.querySelectorAll('input[name="creation_method"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        if (this.value === 'csv_import') {
+            document.getElementById('csv_options').style.display = 'block';
+            document.getElementById('filter_options').style.display = 'none';
+        } else {
+            document.getElementById('csv_options').style.display = 'none';
+            document.getElementById('filter_options').style.display = 'block';
+        }
+    });
+});
+
+// Pre-select import if coming from imports page
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('import_id')) {
+    document.getElementById('method_csv').checked = true;
+}
+</script>
+{% endblock %}

@@ -5,11 +5,16 @@ Campaign routes for creating and managing text campaigns
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash
 from datetime import datetime
 from extensions import db
-from crm_database import Campaign, Contact, ContactFlag, CampaignMembership
+from crm_database import Campaign, Contact, ContactFlag, CampaignMembership, CampaignList, CSVImport
 from services.campaign_service import CampaignService
+from services.campaign_list_service import CampaignListService
+from services.csv_import_service import CSVImportService
+from services.contact_service import ContactService
 
 campaigns_bp = Blueprint('campaigns', __name__)
 campaign_service = CampaignService()
+list_service = CampaignListService()
+csv_service = CSVImportService(ContactService())
 
 
 @campaigns_bp.route('/campaigns')
@@ -57,7 +62,17 @@ def new_campaign():
         'available_contacts': total_contacts - opted_out_count
     }
     
-    return render_template('campaigns/new.html', audience_stats=audience_stats)
+    # Get available campaign lists with stats
+    campaign_lists = []
+    for lst in list_service.get_all_lists():
+        stats = list_service.get_list_stats(lst.id)
+        # Add active members count as a property for the template
+        lst.active_members_count = stats['active_members']
+        campaign_lists.append(lst)
+    
+    return render_template('campaigns/new.html', 
+                         audience_stats=audience_stats,
+                         campaign_lists=campaign_lists)
 
 
 @campaigns_bp.route('/campaigns', methods=['POST'])
@@ -78,16 +93,24 @@ def create_campaign():
             business_hours_only=data.get('business_hours_only') == 'on'
         )
         
-        # Add recipients based on filters
-        contact_filters = {
-            'has_name_only': data.get('has_name_only') == 'on',
-            'has_email': data.get('has_email') == 'on',
-            'exclude_office_numbers': data.get('exclude_office_numbers') == 'on',
-            'exclude_opted_out': True,  # Always exclude opted out
-            'min_days_since_contact': int(data.get('min_days_since_contact', 30))
-        }
-        
-        recipients_added = campaign_service.add_recipients(campaign.id, contact_filters)
+        # Add recipients based on list or filters
+        if data.get('use_list') == 'on' and data.get('list_id'):
+            # Use existing campaign list
+            recipients_added = campaign_service.add_recipients_from_list(
+                campaign.id, 
+                int(data['list_id'])
+            )
+        else:
+            # Use filters
+            contact_filters = {
+                'has_name_only': data.get('has_name_only') == 'on',
+                'has_email': data.get('has_email') == 'on',
+                'exclude_office_numbers': data.get('exclude_office_numbers') == 'on',
+                'exclude_opted_out': True,  # Always exclude opted out
+                'min_days_since_contact': int(data.get('min_days_since_contact', 30))
+            }
+            
+            recipients_added = campaign_service.add_recipients(campaign.id, contact_filters)
         
         flash(f'Campaign "{campaign.name}" created with {recipients_added} recipients!', 'success')
         return redirect(url_for('campaigns.campaign_detail', campaign_id=campaign.id))
@@ -238,3 +261,161 @@ def api_preview_audience():
             'success': False,
             'error': str(e)
         }), 500
+
+# Campaign List Management Routes
+@campaigns_bp.route("/campaigns/lists")
+def campaign_lists():
+    """Show all campaign lists"""
+    lists = list_service.get_all_lists()
+    
+    # Get stats for each list
+    list_data = []
+    for lst in lists:
+        stats = list_service.get_list_stats(lst.id)
+        list_data.append({
+            "list": lst,
+            "stats": stats
+        })
+    
+    # Get recent imports
+    recent_imports = csv_service.get_import_history(limit=5)
+    
+    return render_template("campaigns/lists.html", 
+                         lists=list_data,
+                         recent_imports=recent_imports)
+
+
+@campaigns_bp.route("/campaigns/lists/new", methods=["GET", "POST"])
+def new_campaign_list():
+    """Create a new campaign list"""
+    if request.method == "POST":
+        data = request.form
+        
+        # Create list
+        campaign_list = list_service.create_list(
+            name=data["name"],
+            description=data.get("description"),
+            is_dynamic=data.get("is_dynamic") == "on",
+            created_by="system"  # TODO: Get from session
+        )
+        
+        # Handle different list creation methods
+        if data.get("creation_method") == "csv_import":
+            # Add contacts from specific CSV import
+            import_id = data.get("csv_import_id")
+            if import_id:
+                contacts = csv_service.get_contacts_by_import(int(import_id))
+                contact_ids = [c.id for c in contacts]
+                list_service.add_contacts_to_list(campaign_list.id, contact_ids)
+        
+        elif data.get("creation_method") == "filter":
+            # Build filter criteria
+            criteria = {}
+            
+            if data.get("import_source"):
+                criteria["import_source"] = data["import_source"]
+            
+            if data.get("no_recent_contact"):
+                criteria["no_recent_contact"] = True
+                criteria["days_since_contact"] = int(data.get("days_since_contact", 30))
+            
+            if data.get("exclude_opted_out"):
+                criteria["exclude_opted_out"] = True
+            
+            # Save criteria and find matching contacts
+            campaign_list.filter_criteria = criteria
+            db.session.commit()
+            
+            if campaign_list.is_dynamic:
+                list_service.refresh_dynamic_list(campaign_list.id)
+            else:
+                # Static list - add contacts now
+                contacts = list_service.find_contacts_by_criteria(criteria)
+                contact_ids = [c.id for c in contacts]
+                list_service.add_contacts_to_list(campaign_list.id, contact_ids)
+        
+        flash(f"Campaign list {campaign_list.name} created successfully!", "success")
+        return redirect(url_for("campaigns.campaign_lists"))
+    
+    # GET - show form
+    csv_imports = CSVImport.query.order_by(CSVImport.imported_at.desc()).all()
+    return render_template("campaigns/new_list.html", csv_imports=csv_imports)
+
+
+@campaigns_bp.route("/campaigns/lists/<int:list_id>")
+def view_campaign_list(list_id):
+    """View details of a campaign list"""
+    campaign_list = CampaignList.query.get_or_404(list_id)
+    stats = list_service.get_list_stats(list_id)
+    contacts = list_service.get_list_contacts(list_id)
+    
+    # Get campaigns using this list
+    campaigns = Campaign.query.filter_by(list_id=list_id).all()
+    
+    return render_template("campaigns/list_detail.html",
+                         list=campaign_list,
+                         stats=stats,
+                         contacts=contacts[:100],  # Limit display
+                         campaigns=campaigns)
+
+
+@campaigns_bp.route("/campaigns/lists/<int:list_id>/refresh", methods=["POST"])
+def refresh_campaign_list(list_id):
+    """Refresh a dynamic list"""
+    campaign_list = CampaignList.query.get_or_404(list_id)
+    
+    if not campaign_list.is_dynamic:
+        flash("Only dynamic lists can be refreshed", "error")
+    else:
+        results = list_service.refresh_dynamic_list(list_id)
+        added = results["added"]
+        removed = results["removed"]
+        flash(f"List refreshed: {added} added, {removed} removed", "success")
+    
+    return redirect(url_for("campaigns.view_campaign_list", list_id=list_id))
+
+
+@campaigns_bp.route("/campaigns/import-csv", methods=["GET", "POST"])
+def import_campaign_csv():
+    """Import contacts from CSV and optionally create a campaign list"""
+    if request.method == "POST":
+        file = request.files.get("csv_file")
+        if not file or not file.filename.endswith(".csv"):
+            flash("Please upload a valid CSV file", "error")
+            return redirect(request.url)
+        
+        # Import the CSV
+        create_list = request.form.get("create_list") == "on"
+        list_name = request.form.get("list_name")
+        
+        results = csv_service.import_contacts(
+            file=file,
+            list_name=list_name,
+            create_list=create_list,
+            imported_by="system"  # TODO: Get from session
+        )
+        
+        # Show results
+        if results["successful"] > 0:
+            successful = results["successful"]
+            message = f"Successfully imported {successful} contacts"
+            if results["duplicates"] > 0:
+                duplicates = results["duplicates"]
+                message += f" ({duplicates} duplicates skipped)"
+            if results["list_id"]:
+                message += f" and created campaign list"
+            flash(message, "success")
+        
+        if results["failed"] > 0:
+            failed = results["failed"]
+            flash(f"{failed} contacts failed to import", "warning")
+            if results["errors"]:
+                for error in results["errors"][:3]:  # Show first 3 errors
+                    flash(f"Error: {error}", "error")
+        
+        if results["list_id"]:
+            return redirect(url_for("campaigns.view_campaign_list", list_id=results["list_id"]))
+        else:
+            return redirect(url_for("campaigns.campaign_lists"))
+    
+    return render_template("campaigns/import_csv.html")

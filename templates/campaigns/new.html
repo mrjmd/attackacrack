@@ -133,11 +133,51 @@
                 </div>
             </div>
 
-            <!-- Audience Filters -->
+            <!-- Audience Selection -->
             <div class="border-t border-gray-600 pt-6">
-                <h2 class="text-lg font-semibold text-white mb-4">Audience Filters</h2>
+                <h2 class="text-lg font-semibold text-white mb-4">Audience Selection</h2>
                 
-                <div class="space-y-3">
+                <!-- List or Filter Selection -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">How to Select Recipients</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="flex items-center bg-gray-600 rounded-lg p-3 cursor-pointer hover:bg-gray-500">
+                            <input type="radio" name="audience_method" value="list" id="use_list_radio"
+                                   class="mr-3 rounded bg-gray-700 border-gray-500">
+                            <span class="text-white">Use Campaign List</span>
+                        </label>
+                        <label class="flex items-center bg-gray-600 rounded-lg p-3 cursor-pointer hover:bg-gray-500">
+                            <input type="radio" name="audience_method" value="filters" id="use_filters_radio" checked
+                                   class="mr-3 rounded bg-gray-700 border-gray-500">
+                            <span class="text-white">Use Filters</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Campaign List Selection (hidden by default) -->
+                <div id="list_selection" class="hidden mb-4">
+                    <label for="list_id" class="block text-sm font-medium text-gray-300 mb-2">
+                        Select Campaign List
+                    </label>
+                    <select name="list_id" id="list_id" 
+                            class="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white">
+                        <option value="">Choose a list...</option>
+                        {% for list in campaign_lists %}
+                            <option value="{{ list.id }}" data-count="{{ list.active_members_count }}">
+                                {{ list.name }} ({{ list.active_members_count }} contacts)
+                                {% if list.is_dynamic %}[Dynamic]{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-sm text-gray-400 mt-1">
+                        <a href="{{ url_for('campaigns.campaign_lists') }}" class="text-blue-400 hover:text-blue-300">Manage Lists</a> |
+                        <a href="{{ url_for('campaigns.new_campaign_list') }}" class="text-blue-400 hover:text-blue-300">Create New List</a>
+                    </p>
+                    <input type="hidden" name="use_list" id="use_list" value="off">
+                </div>
+                
+                <!-- Filter Options (shown by default) -->
+                <div id="filter_options" class="space-y-3">
                     <label class="flex items-center">
                         <input type="checkbox" name="has_name_only" id="has_name_only" checked
                                class="mr-3 rounded bg-gray-600 border-gray-500">
@@ -215,10 +255,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Handle audience method selection
+    const useListRadio = document.getElementById('use_list_radio');
+    const useFiltersRadio = document.getElementById('use_filters_radio');
+    const listSelection = document.getElementById('list_selection');
+    const filterOptions = document.getElementById('filter_options');
+    const useListInput = document.getElementById('use_list');
+    const listIdSelect = document.getElementById('list_id');
+    
+    useListRadio.addEventListener('change', function() {
+        if (this.checked) {
+            listSelection.classList.remove('hidden');
+            filterOptions.classList.add('hidden');
+            useListInput.value = 'on';
+            updateListPreview();
+        }
+    });
+    
+    useFiltersRadio.addEventListener('change', function() {
+        if (this.checked) {
+            listSelection.classList.add('hidden');
+            filterOptions.classList.remove('hidden');
+            useListInput.value = 'off';
+            updateAudiencePreview();
+        }
+    });
+    
+    // Update preview when list is selected
+    listIdSelect.addEventListener('change', updateListPreview);
+    
+    function updateListPreview() {
+        const selectedOption = listIdSelect.options[listIdSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const count = selectedOption.getAttribute('data-count') || '0';
+            document.getElementById('filtered_count').textContent = parseInt(count).toLocaleString();
+        } else {
+            document.getElementById('filtered_count').textContent = '0';
+        }
+    }
+    
     // Update audience preview when filters change
     const filterInputs = document.querySelectorAll('#has_name_only, #has_email, #exclude_office_numbers, #min_days_since_contact');
     
     function updateAudiencePreview() {
+        // Only update if using filters
+        if (!useFiltersRadio.checked) return;
+        
         const filters = {
             has_name_only: document.getElementById('has_name_only').checked,
             has_email: document.getElementById('has_email').checked,

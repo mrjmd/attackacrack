@@ -44,6 +44,12 @@ class Contact(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=True)
     phone = db.Column(db.String(20), nullable=True, unique=True)
     contact_metadata = db.Column(db.JSON, nullable=True)  # For flexible data storage
+    
+    # CSV Import tracking
+    csv_import_id = db.Column(db.Integer, db.ForeignKey('csv_import.id'), nullable=True)
+    import_source = db.Column(db.String(100), nullable=True)
+    imported_at = db.Column(db.DateTime, nullable=True)
+    
     properties = db.relationship('Property', backref='contact', lazy=True, cascade="all, delete-orphan")
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
     # A contact can now have multiple conversations
@@ -208,6 +214,13 @@ class Campaign(db.Model):
     ab_config = db.Column(db.JSON, nullable=True)  # A/B test configuration
     channel = db.Column(db.String(10), default='sms')  # 'sms', 'email'
     
+    # List management
+    list_id = db.Column(db.Integer, db.ForeignKey('campaign_list.id'), nullable=True)
+    
+    # Contact history handling
+    adapt_script_template = db.Column(db.Text, nullable=True)  # Template for previously contacted
+    days_between_contacts = db.Column(db.Integer, default=30)  # Minimum days before recontacting
+    
     memberships = db.relationship('CampaignMembership', backref='campaign', lazy=True, cascade="all, delete-orphan")
 
 # --- NEW: CampaignMembership Model (Enhanced) ---
@@ -226,6 +239,12 @@ class CampaignMembership(db.Model):
     response_sentiment = db.Column(db.String(20), nullable=True)  # 'positive', 'negative', 'neutral'
     message_sent = db.Column(db.Text, nullable=True)  # Actual message sent (for A/B tracking)
     
+    # Contact history tracking
+    previous_contact_date = db.Column(db.DateTime, nullable=True)
+    previous_contact_type = db.Column(db.String(50), nullable=True)  # 'sms', 'email', 'call'
+    previous_response = db.Column(db.String(50), nullable=True)  # 'positive', 'negative', 'no_response'
+    script_adapted = db.Column(db.Boolean, default=False)
+    
     contact = db.relationship('Contact', backref='campaign_memberships')
     reply_activity = db.relationship('Activity', backref='campaign_reply')
 
@@ -241,3 +260,49 @@ class ContactFlag(db.Model):
     created_by = db.Column(db.String(100), nullable=True)  # Who/what created this flag
     
     contact = db.relationship('Contact', backref='flags')
+
+# --- CSV Import Tracking ---
+class CSVImport(db.Model):
+    __tablename__ = 'csv_import'
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    imported_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    imported_by = db.Column(db.String(100), nullable=True)
+    total_rows = db.Column(db.Integer, nullable=True)
+    successful_imports = db.Column(db.Integer, nullable=True)
+    failed_imports = db.Column(db.Integer, nullable=True)
+    import_type = db.Column(db.String(50), nullable=True)  # 'contacts', 'properties', etc.
+    import_metadata = db.Column(db.JSON, nullable=True)
+    
+    contacts = db.relationship('Contact', backref='csv_import', lazy=True)
+
+# --- Campaign List Management ---
+class CampaignList(db.Model):
+    __tablename__ = 'campaign_list'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_by = db.Column(db.String(100), nullable=True)
+    filter_criteria = db.Column(db.JSON, nullable=True)  # Store dynamic filter rules
+    is_dynamic = db.Column(db.Boolean, default=False)  # Dynamic lists update automatically
+    
+    members = db.relationship('CampaignListMember', backref='list', lazy=True, cascade="all, delete-orphan")
+    campaigns = db.relationship('Campaign', backref='list', lazy=True)
+
+class CampaignListMember(db.Model):
+    __tablename__ = 'campaign_list_member'
+    id = db.Column(db.Integer, primary_key=True)
+    list_id = db.Column(db.Integer, db.ForeignKey('campaign_list.id', ondelete='CASCADE'), nullable=False)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id', ondelete='CASCADE'), nullable=False)
+    added_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    added_by = db.Column(db.String(100), nullable=True)
+    status = db.Column(db.String(50), default='active')  # 'active', 'removed', 'suppressed'
+    import_metadata = db.Column(db.JSON, nullable=True)
+    
+    contact = db.relationship('Contact', backref='list_memberships')
+    
+    __table_args__ = (
+        db.UniqueConstraint('list_id', 'contact_id', name='unique_list_member'),
+    )

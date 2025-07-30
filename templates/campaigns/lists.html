@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Campaign Lists{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header Section -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Campaign Lists</h1>
+            <p class="text-gray-400 mt-1">Manage your contact lists for targeted campaigns</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('campaigns.new_campaign_list') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-lg">
+                <span>➕</span> Create New List
+            </a>
+            <a href="{{ url_for('campaigns.import_campaign_csv') }}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-lg">
+                <span>📤</span> Import CSV
+            </a>
+        </div>
+    </div>
+    
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg p-6 text-white shadow-lg">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-blue-100 text-sm font-medium">Total Lists</p>
+                    <p class="text-3xl font-bold mt-1">{{ lists|length }}</p>
+                </div>
+                <div class="text-3xl opacity-50">📋</div>
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-green-600 to-green-700 rounded-lg p-6 text-white shadow-lg">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-green-100 text-sm font-medium">Total Contacts</p>
+                    <p class="text-3xl font-bold mt-1">
+                        {% set total_contacts = lists|sum(attribute='stats.active_members', start=0) %}
+                        {{ total_contacts }}
+                    </p>
+                </div>
+                <div class="text-3xl opacity-50">👥</div>
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg p-6 text-white shadow-lg">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-purple-100 text-sm font-medium">Dynamic Lists</p>
+                    <p class="text-3xl font-bold mt-1">
+                        {{ lists|selectattr('list.is_dynamic')|list|length }}
+                    </p>
+                </div>
+                <div class="text-3xl opacity-50">🔄</div>
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-lg p-6 text-white shadow-lg">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-yellow-100 text-sm font-medium">Recent Imports</p>
+                    <p class="text-3xl font-bold mt-1">{{ recent_imports|length }}</p>
+                </div>
+                <div class="text-3xl opacity-50">📤</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Imports -->
+    {% if recent_imports %}
+    <div class="bg-gray-700 rounded-lg shadow-lg overflow-hidden">
+        <div class="px-6 py-4 bg-gray-800 border-b border-gray-600">
+            <h2 class="text-xl font-semibold text-white">Recent CSV Imports</h2>
+        </div>
+        <div class="p-6">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-gray-400 text-sm uppercase tracking-wider border-b border-gray-600">
+                            <th class="py-3 px-2 font-medium">File</th>
+                            <th class="py-3 px-2 font-medium">Imported</th>
+                            <th class="py-3 px-2 font-medium">Contacts</th>
+                            <th class="py-3 px-2 font-medium">Status</th>
+                            <th class="py-3 px-2 font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-600">
+                        {% for import in recent_imports %}
+                        <tr class="hover:bg-gray-600 transition-colors">
+                            <td class="py-3 px-2">
+                                <span class="text-white font-medium">{{ import.filename }}</span>
+                            </td>
+                            <td class="py-3 px-2 text-gray-300">{{ import.imported_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="py-3 px-2">
+                                <span class="text-white">{{ import.successful_imports }}</span>
+                                <span class="text-gray-400">/ {{ import.total_rows }}</span>
+                            </td>
+                            <td class="py-3 px-2">
+                                {% if import.failed_imports > 0 %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-900 text-yellow-200">
+                                        {{ import.failed_imports }} failed
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900 text-green-200">
+                                        Complete
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-2">
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors" 
+                                        onclick="createListFromImport({{ import.id }})">
+                                    Create List
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Campaign Lists -->
+    <div class="bg-gray-700 rounded-lg shadow-lg overflow-hidden">
+        <div class="px-6 py-4 bg-gray-800 border-b border-gray-600">
+            <h2 class="text-xl font-semibold text-white">All Lists</h2>
+        </div>
+        <div class="p-6">
+            {% if lists %}
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-gray-400 text-sm uppercase tracking-wider border-b border-gray-600">
+                                <th class="py-3 px-2 font-medium">Name</th>
+                                <th class="py-3 px-2 font-medium">Type</th>
+                                <th class="py-3 px-2 font-medium text-center">Active Contacts</th>
+                                <th class="py-3 px-2 font-medium">Created</th>
+                                <th class="py-3 px-2 font-medium">Last Updated</th>
+                                <th class="py-3 px-2 font-medium text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-600">
+                            {% for item in lists %}
+                            <tr class="hover:bg-gray-600 transition-colors">
+                                <td class="py-3 px-2">
+                                    <a href="{{ url_for('campaigns.view_campaign_list', list_id=item.list.id) }}" class="text-blue-400 hover:text-blue-300 font-medium">
+                                        {{ item.list.name }}
+                                    </a>
+                                    {% if item.list.description %}
+                                        <span class="block text-xs text-gray-400 mt-1">{{ item.list.description }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-2">
+                                    {% if item.list.is_dynamic %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-900 text-blue-200">
+                                            Dynamic
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-600 text-gray-200">
+                                            Static
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-2 text-center">
+                                    <span class="text-white font-medium">{{ item.stats.active_members }}</span>
+                                    {% if item.stats.removed_members > 0 %}
+                                        <span class="text-gray-400 text-sm ml-1">({{ item.stats.removed_members }} removed)</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-2 text-gray-300">{{ item.list.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td class="py-3 px-2 text-gray-300">
+                                    {% if item.list.updated_at %}
+                                        {{ item.list.updated_at.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        <span class="text-gray-500">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-2 text-right">
+                                    <div class="flex gap-2 justify-end">
+                                        <a href="{{ url_for('campaigns.view_campaign_list', list_id=item.list.id) }}" 
+                                           class="text-blue-400 hover:text-blue-300 text-sm font-medium">View</a>
+                                        {% if item.list.is_dynamic %}
+                                            <form method="POST" action="{{ url_for('campaigns.refresh_campaign_list', list_id=item.list.id) }}" 
+                                                  class="inline">
+                                                <button type="submit" class="text-yellow-400 hover:text-yellow-300 text-sm font-medium">Refresh</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📋</div>
+                    <h3 class="text-xl font-semibold text-white mb-2">No campaign lists yet</h3>
+                    <p class="text-gray-400 mb-6">Create your first list to start organizing your contacts.</p>
+                    <a href="{{ url_for('campaigns.new_campaign_list') }}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors">
+                        <span>➕</span> Create Your First List
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function createListFromImport(importId) {
+    // Redirect to new list page with import ID pre-selected
+    window.location.href = `{{ url_for('campaigns.new_campaign_list') }}?import_id=${importId}`;
+}
+</script>
+{% endblock %}

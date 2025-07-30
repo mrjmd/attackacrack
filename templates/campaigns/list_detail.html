@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}{{ list.name }} - Campaign List{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-gray-700 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-white">{{ list.name }}</h1>
+                {% if list.description %}
+                    <p class="text-gray-400 mt-1">{{ list.description }}</p>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('campaigns.campaign_lists') }}" class="text-gray-400 hover:text-white">
+                ← Back to Lists
+            </a>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-600 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-green-400">{{ stats.active_members }}</div>
+                <div class="text-sm text-gray-400">Active Contacts</div>
+            </div>
+            <div class="bg-gray-600 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-red-400">{{ stats.removed_members }}</div>
+                <div class="text-sm text-gray-400">Removed</div>
+            </div>
+            <div class="bg-gray-600 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-blue-400">{{ campaigns|length }}</div>
+                <div class="text-sm text-gray-400">Campaigns Using</div>
+            </div>
+            <div class="bg-gray-600 rounded-lg p-4 text-center">
+                <div class="text-sm font-bold">
+                    {% if list.is_dynamic %}
+                        <span class="px-3 py-1 bg-blue-600 text-white rounded">Dynamic</span>
+                    {% else %}
+                        <span class="px-3 py-1 bg-gray-500 text-white rounded">Static</span>
+                    {% endif %}
+                </div>
+                <div class="text-sm text-gray-400 mt-2">List Type</div>
+            </div>
+        </div>
+        
+        <div class="flex gap-2 mb-6">
+            {% if list.is_dynamic %}
+                <form method="POST" action="{{ url_for('campaigns.refresh_campaign_list', list_id=list.id) }}" class="inline">
+                    <button type="submit" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg">
+                        🔄 Refresh List
+                    </button>
+                </form>
+            {% endif %}
+            <a href="{{ url_for('campaigns.new_campaign') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                📱 Create Campaign with This List
+            </a>
+        </div>
+        
+        {% if list.filter_criteria %}
+        <div class="bg-gray-600 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-white mb-2">Filter Criteria</h3>
+            <div class="text-sm text-gray-300">
+                {% if list.filter_criteria.import_source %}
+                    <p>Import Source: {{ list.filter_criteria.import_source }}</p>
+                {% endif %}
+                {% if list.filter_criteria.no_recent_contact %}
+                    <p>No contact in last {{ list.filter_criteria.days_since_contact }} days</p>
+                {% endif %}
+                {% if list.filter_criteria.exclude_opted_out %}
+                    <p>Excluding opted-out contacts</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if campaigns %}
+    <div class="bg-gray-700 rounded-lg p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">Campaigns Using This List</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-600">
+                        <th class="text-left py-2">Campaign Name</th>
+                        <th class="text-left py-2">Status</th>
+                        <th class="text-left py-2">Created</th>
+                        <th class="text-left py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-300">
+                    {% for campaign in campaigns %}
+                    <tr class="border-b border-gray-600">
+                        <td class="py-2">{{ campaign.name }}</td>
+                        <td class="py-2">
+                            <span class="px-2 py-1 rounded text-xs 
+                                {% if campaign.status == 'running' %}bg-green-600 text-white
+                                {% elif campaign.status == 'paused' %}bg-yellow-600 text-white
+                                {% elif campaign.status == 'complete' %}bg-blue-600 text-white
+                                {% else %}bg-gray-600 text-white{% endif %}">
+                                {{ campaign.status.title() }}
+                            </span>
+                        </td>
+                        <td class="py-2">{{ campaign.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td class="py-2">
+                            <a href="{{ url_for('campaigns.campaign_detail', campaign_id=campaign.id) }}" 
+                               class="text-blue-400 hover:text-blue-300">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="bg-gray-700 rounded-lg p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">Contacts ({{ contacts|length }} shown)</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-600">
+                        <th class="text-left py-2">Name</th>
+                        <th class="text-left py-2">Phone</th>
+                        <th class="text-left py-2">Email</th>
+                        <th class="text-left py-2">Status</th>
+                        <th class="text-left py-2">Added</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-300">
+                    {% for contact in contacts %}
+                    <tr class="border-b border-gray-600">
+                        <td class="py-2">
+                            <a href="{{ url_for('contact.detail', contact_id=contact.id) }}" 
+                               class="text-blue-400 hover:text-blue-300">
+                                {{ contact.first_name }} {{ contact.last_name }}
+                            </a>
+                        </td>
+                        <td class="py-2">{{ contact.phone }}</td>
+                        <td class="py-2">{{ contact.email or '-' }}</td>
+                        <td class="py-2">
+                            {% if contact.contact_flags %}
+                                {% for flag in contact.contact_flags %}
+                                    {% if flag.flag_type == 'opted_out' %}
+                                        <span class="px-2 py-1 bg-red-600 text-white text-xs rounded">Opted Out</span>
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span class="px-2 py-1 bg-green-600 text-white text-xs rounded">Active</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2">{{ contact.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if contacts|length >= 100 %}
+            <p class="text-sm text-gray-400 mt-4 text-center">Showing first 100 contacts only</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
