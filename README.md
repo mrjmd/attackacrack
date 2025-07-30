@@ -2,6 +2,26 @@
 
 A comprehensive Flask-based CRM system integrated with OpenPhone for SMS/communication management, featuring automated workflows, AI-powered insights, and multi-source contact enrichment.
 
+## Project Structure
+
+```
+├── app.py              # Flask application entry point
+├── config.py           # Application configuration
+├── crm_database.py     # Database models
+├── routes/             # Flask route handlers
+├── services/           # Business logic and service layer
+├── templates/          # Jinja2 HTML templates
+├── tests/              # Test suite
+├── tasks/              # Celery background tasks
+├── migrations/         # Alembic database migrations
+├── docs/               # Project documentation
+├── utils/              # Utility scripts and tools
+│   ├── imports/        # Data import utilities
+│   ├── webhooks/       # Webhook testing tools
+│   └── media/          # Media handling utilities
+└── uploads/            # File upload directory
+```
+
 ## Quick Start
 
 ### Prerequisites
