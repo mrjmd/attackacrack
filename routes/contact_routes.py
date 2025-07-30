@@ -16,6 +16,9 @@ def list_all():
 
 @contact_bp.route('/conversations')
 def conversation_list():
+    # Refresh session to get latest data from webhooks
+    db.session.expire_all()
+    
     # Get search and filter parameters
     search_query = request.args.get('search', '').strip()
     filter_type = request.args.get('filter', 'all')  # all, unread, has_attachments, office_numbers

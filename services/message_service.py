@@ -60,44 +60,4 @@ class MessageService:
             .limit(limit)\
             .all()
     # --- END REWRITTEN FUNCTION ---
-
-    def process_incoming_webhook(self, webhook_data):
-        activity_type = webhook_data.get('type')
-        if not activity_type:
-            return None
-
-        if activity_type in ['message.new', 'message.received']:
-            message_payload = webhook_data.get('data', {}).get('object', {})
-            if not message_payload or message_payload.get('direction') != 'incoming':
-                return None
-
-            from_number = message_payload.get('from')
-            openphone_id = message_payload.get('id')
-            conversation_id_op = message_payload.get('conversationId')
-            
-            contact = self.contact_service.get_contact_by_phone(from_number)
-            if not contact:
-                contact = self.contact_service.add_contact(
-                    first_name=from_number,
-                    last_name="(New SMS Contact)",
-                    phone=from_number
-                )
-            
-            conversation = self.get_or_create_conversation(contact.id, conversation_id_op)
-            
-            existing_activity = self.session.query(Activity).filter_by(openphone_id=openphone_id).first()
-            if not existing_activity:
-                new_activity = Activity(
-                    conversation_id=conversation.id,
-                    openphone_id=openphone_id,
-                    activity_type='message',
-                    body=message_payload.get('body'),
-                    direction='inbound',
-                    status='delivered',
-                    created_at=datetime.utcnow()
-                )
-                self.session.add(new_activity)
-                conversation.last_activity_at = datetime.utcnow()
-                self.session.commit()
-            return new_activity
-        return None
+    # Note: Webhook processing is now handled by services/openphone_webhook_service.py

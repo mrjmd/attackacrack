@@ -1,5 +1,6 @@
 import hmac
 import hashlib
+import base64
 from functools import wraps
 from flask import Blueprint, jsonify, request, current_app, abort
 from services.contact_service import ContactService
@@ -18,19 +19,52 @@ def verify_openphone_signature(f):
             current_app.logger.error("Webhook signing key is not configured.")
             abort(500)
 
-        signature_header = request.headers.get('x-openphone-signature-v1')
+        # OpenPhone uses 'openphone-signature' header with format: hmac;version;timestamp;signature
+        signature_header = request.headers.get('openphone-signature')
         if not signature_header:
+            current_app.logger.error("No openphone-signature header found")
             abort(403)
 
-        payload = request.get_data()
-        expected_signature = hmac.new(
-            key=signing_key.encode('utf-8'),
-            msg=payload,
-            digestmod=hashlib.sha256
-        ).hexdigest()
-
-        if not hmac.compare_digest(expected_signature, signature_header):
+        # Parse OpenPhone signature format: hmac;version;timestamp;signature
+        try:
+            parts = signature_header.split(';')
+            if len(parts) != 4 or parts[0] != 'hmac':
+                current_app.logger.error(f"Invalid signature format: {signature_header}")
+                abort(403)
+            
+            version, timestamp, received_signature = parts[1], parts[2], parts[3]
+            current_app.logger.info(f"OpenPhone signature - Version: {version}, Timestamp: {timestamp}")
+        except Exception as e:
+            current_app.logger.error(f"Error parsing signature: {e}")
             abort(403)
+
+        # Implement OpenPhone signature verification per their documentation:
+        # Compute the data covered by the signature as bytes: timestamp.raw_payload
+        signed_data_bytes = b''.join([timestamp.encode(), b'.', request.data])
+        
+        # Convert the base64-encoded signing key to bytes
+        try:
+            signing_key_bytes = base64.b64decode(signing_key)
+        except Exception as e:
+            current_app.logger.error(f"Failed to decode signing key: {e}")
+            abort(500)
+        
+        # Compute the SHA256 HMAC digest
+        hmac_object = hmac.new(signing_key_bytes, signed_data_bytes, 'sha256')
+        expected_signature_b64 = base64.b64encode(hmac_object.digest()).decode()
+        
+        current_app.logger.info(f"OpenPhone signature verification:")
+        current_app.logger.info(f"  Timestamp: {timestamp}")
+        current_app.logger.info(f"  Raw payload length: {len(request.data)} bytes")
+        current_app.logger.info(f"  Signed data: {signed_data_bytes[:100]}...")
+        current_app.logger.info(f"  Expected: {expected_signature_b64}")
+        current_app.logger.info(f"  Received: {received_signature}")
+        
+        if not hmac.compare_digest(expected_signature_b64, received_signature):
+            current_app.logger.error("OpenPhone signature verification failed")
+            abort(403)
+        else:
+            current_app.logger.info("✅ OpenPhone signature verified successfully!")
         
         return f(*args, **kwargs)
     return decorated_function
@@ -45,6 +79,8 @@ def get_contacts():
 @api_bp.route('/messages/latest_conversations')
 def get_latest_conversations():
     message_service = MessageService()
+    # Refresh session to get latest data from webhooks
+    message_service.session.expire_all()
     latest_conversations = message_service.get_latest_conversations_from_db(limit=10)
     conversations_json = []
     for conv in latest_conversations:
@@ -91,16 +127,15 @@ def generate_appointment_summary(contact_id):
 @api_bp.route('/webhooks/openphone', methods=['POST'])
 @verify_openphone_signature
 def openphone_webhook():
-    message_service = MessageService()
+    from services.openphone_webhook_service import OpenPhoneWebhookService
+    
+    webhook_service = OpenPhoneWebhookService()
     data = request.json
     current_app.logger.info(f"Received valid webhook: {data}")
     
-    if data.get('type') == 'token.validated':
-        return jsonify(success=True)
-
     try:
-        message_service.process_incoming_webhook(data)
-        return jsonify(success=True)
+        result = webhook_service.process_webhook(data)
+        return jsonify(result)
     except Exception as e:
         current_app.logger.error(f"Error processing webhook: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': 'Internal server error'}), 500

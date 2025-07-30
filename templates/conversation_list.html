@@ -311,5 +311,55 @@ document.querySelectorAll('.conversation-item').forEach(item => {
 
 // Initialize
 updateBulkActions();
+
+// Real-time conversation updates
+function refreshConversations() {
+    // Only refresh if no search/filter is active (to avoid disrupting user interaction)
+    const searchQuery = '{{ search_query }}';
+    const filterType = '{{ filter_type }}';
+    const dateFilter = '{{ date_filter }}';
+    
+    if (searchQuery || filterType !== 'all' || dateFilter !== 'all') {
+        return; // Don't auto-refresh when user has filters active
+    }
+    
+    // Fetch updated conversation data
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('ajax', '1'); // Add ajax parameter
+    
+    fetch(currentUrl.toString())
+        .then(response => response.text())
+        .then(html => {
+            // Extract just the conversation items from the response
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newConversations = doc.querySelector('.space-y-2');
+            const currentConversations = document.querySelector('.space-y-2');
+            
+            if (newConversations && currentConversations) {
+                // Update conversation list while preserving selected checkboxes
+                const selectedIds = Array.from(document.querySelectorAll('input[name="conversation_ids"]:checked'))
+                    .map(cb => cb.value);
+                
+                currentConversations.innerHTML = newConversations.innerHTML;
+                
+                // Restore selected checkboxes
+                selectedIds.forEach(id => {
+                    const checkbox = document.querySelector(`input[name="conversation_ids"][value="${id}"]`);
+                    if (checkbox) checkbox.checked = true;
+                });
+                
+                // Reinitialize event handlers
+                updateBulkActions();
+                document.querySelectorAll('.conversation-item').forEach(item => {
+                    item.classList.add('group');
+                });
+            }
+        })
+        .catch(error => console.error('Error refreshing conversations:', error));
+}
+
+// Refresh every 20 seconds (less frequent than dashboard to avoid disrupting user workflow)
+setInterval(refreshConversations, 20000);
 </script>
 {% endblock %}

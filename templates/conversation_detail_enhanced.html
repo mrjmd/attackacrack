@@ -207,18 +207,71 @@
                                 
                                 <!-- Media Attachments -->
                                 {% if activity.media_urls %}
-                                    <div class="mt-3 grid grid-cols-2 gap-2">
-                                        {% for media_url in activity.media_urls %}
+                                    {# Collect all image URLs for this message #}
+                                    {% set image_urls = [] %}
+                                    {% for media_item in activity.media_urls %}
+                                        {% set is_image = false %}
+                                        {% set media_url = None %}
+                                        
+                                        {% if media_item is string %}
+                                            {% set media_url = media_item %}
+                                            {# Check by file extension for legacy data #}
                                             {% if media_url.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
-                                                <img src="{{ media_url }}" 
-                                                     alt="Attached image" 
-                                                     class="rounded cursor-pointer hover:opacity-90 max-h-48 object-cover"
-                                                     onclick="openMediaModal('{{ media_url }}')">
-                                            {% else %}
-                                                <a href="{{ media_url }}" target="_blank" 
-                                                   class="block bg-black bg-opacity-20 rounded p-3 hover:bg-opacity-30">
-                                                    <span class="text-sm">📎 Attachment</span>
-                                                </a>
+                                                {% set is_image = true %}
+                                            {% endif %}
+                                        {% elif media_item is mapping and 'url' in media_item %}
+                                            {% set media_url = media_item.url %}
+                                            {# Check by MIME type for new data #}
+                                            {% if media_item.type and media_item.type.startswith('image/') %}
+                                                {% set is_image = true %}
+                                            {% endif %}
+                                        {% endif %}
+                                        
+                                        {% if media_url and is_image %}
+                                            {% set _ = image_urls.append(media_url) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <div class="mt-3 {% if image_urls|length > 1 %}grid grid-cols-2 gap-2{% endif %}">
+                                        {% for media_item in activity.media_urls %}
+                                            {% set is_image = false %}
+                                            {% set media_url = None %}
+                                            {% set media_type = None %}
+                                            
+                                            {% if media_item is string %}
+                                                {% set media_url = media_item %}
+                                                {# Check by file extension for legacy data #}
+                                                {% if media_url.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
+                                                    {% set is_image = true %}
+                                                {% endif %}
+                                            {% elif media_item is mapping and 'url' in media_item %}
+                                                {% set media_url = media_item.url %}
+                                                {% set media_type = media_item.type %}
+                                                {# Check by MIME type for new data #}
+                                                {% if media_type and media_type.startswith('image/') %}
+                                                    {% set is_image = true %}
+                                                {% endif %}
+                                            {% endif %}
+                                            
+                                            {% if media_url %}
+                                                {% if is_image %}
+                                                    <div class="relative group">
+                                                        <img src="{{ media_url }}" 
+                                                             alt="Attached image" 
+                                                             class="w-full h-48 object-cover rounded cursor-pointer transition-opacity group-hover:opacity-90"
+                                                             onclick="openMediaModal('{{ media_url }}', {{ image_urls|tojson }})">
+                                                        {% if image_urls|length > 1 %}
+                                                            <div class="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                                                                {{ loop.index }} / {{ image_urls|length }}
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                {% else %}
+                                                    <a href="{{ media_url }}" target="_blank" 
+                                                       class="block bg-black bg-opacity-20 rounded p-3 hover:bg-opacity-30 transition-colors">
+                                                        <span class="text-sm">📎 Attachment</span>
+                                                    </a>
+                                                {% endif %}
                                             {% endif %}
                                         {% endfor %}
                                     </div>
@@ -384,11 +437,29 @@
     </div>
 </div>
 
-<!-- Media Modal -->
+<!-- Enhanced Media Modal with Slideshow -->
 <div id="mediaModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4" onclick="closeMediaModal()">
-    <div class="relative max-w-7xl max-h-full">
+    <div class="relative max-w-7xl max-h-full" onclick="event.stopPropagation()">
+        <!-- Close button -->
+        <button onclick="closeMediaModal()" class="absolute top-4 right-4 text-white text-4xl hover:text-gray-300 z-10">×</button>
+        
+        <!-- Previous button -->
+        <button id="prevButton" onclick="changeSlide(-1)" class="absolute left-4 top-1/2 transform -translate-y-1/2 text-white text-5xl hover:text-gray-300 z-10 hidden">
+            ‹
+        </button>
+        
+        <!-- Next button -->
+        <button id="nextButton" onclick="changeSlide(1)" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-white text-5xl hover:text-gray-300 z-10 hidden">
+            ›
+        </button>
+        
+        <!-- Image container -->
         <img id="modalImage" src="" alt="Full size image" class="max-w-full max-h-full">
-        <button onclick="closeMediaModal()" class="absolute top-4 right-4 text-white text-3xl hover:text-gray-300">×</button>
+        
+        <!-- Image counter -->
+        <div id="imageCounter" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm bg-black bg-opacity-50 px-3 py-1 rounded hidden">
+            <span id="currentImageNum">1</span> / <span id="totalImageNum">1</span>
+        </div>
     </div>
 </div>
 
@@ -413,20 +484,114 @@ function handleKeyPress(event) {
     }
 }
 
-// Media modal functions
-function openMediaModal(src) {
+// Media modal and slideshow functions
+let currentImages = [];
+let currentImageIndex = 0;
+
+function openMediaModal(src, allImages) {
+    // If allImages is provided, set up slideshow
+    if (allImages && allImages.length > 0) {
+        currentImages = allImages;
+        currentImageIndex = allImages.indexOf(src);
+        if (currentImageIndex === -1) currentImageIndex = 0;
+        
+        // Show/hide slideshow controls
+        if (allImages.length > 1) {
+            document.getElementById('prevButton').classList.remove('hidden');
+            document.getElementById('nextButton').classList.remove('hidden');
+            document.getElementById('imageCounter').classList.remove('hidden');
+            updateImageCounter();
+        } else {
+            document.getElementById('prevButton').classList.add('hidden');
+            document.getElementById('nextButton').classList.add('hidden');
+            document.getElementById('imageCounter').classList.add('hidden');
+        }
+    } else {
+        // Single image
+        currentImages = [src];
+        currentImageIndex = 0;
+        document.getElementById('prevButton').classList.add('hidden');
+        document.getElementById('nextButton').classList.add('hidden');
+        document.getElementById('imageCounter').classList.add('hidden');
+    }
+    
     document.getElementById('modalImage').src = src;
     document.getElementById('mediaModal').classList.remove('hidden');
 }
 
 function closeMediaModal() {
     document.getElementById('mediaModal').classList.add('hidden');
+    currentImages = [];
+    currentImageIndex = 0;
 }
 
-// Keyboard shortcut for closing modal
+function changeSlide(direction) {
+    currentImageIndex += direction;
+    
+    // Wrap around
+    if (currentImageIndex >= currentImages.length) {
+        currentImageIndex = 0;
+    } else if (currentImageIndex < 0) {
+        currentImageIndex = currentImages.length - 1;
+    }
+    
+    document.getElementById('modalImage').src = currentImages[currentImageIndex];
+    updateImageCounter();
+}
+
+function updateImageCounter() {
+    document.getElementById('currentImageNum').textContent = currentImageIndex + 1;
+    document.getElementById('totalImageNum').textContent = currentImages.length;
+}
+
+// Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closeMediaModal();
+    if (document.getElementById('mediaModal').classList.contains('hidden')) return;
+    
+    switch(e.key) {
+        case 'Escape':
+            closeMediaModal();
+            break;
+        case 'ArrowLeft':
+            if (currentImages.length > 1) changeSlide(-1);
+            break;
+        case 'ArrowRight':
+            if (currentImages.length > 1) changeSlide(1);
+            break;
+    }
+});
+
+// Real-time message updates
+let lastActivityCount = {{ activities|length }};
+
+function refreshMessages() {
+    const contactId = {{ contact.id }};
+    
+    fetch(`/api/contacts/${contactId}/messages`)
+        .then(response => response.json())
+        .then(messages => {
+            if (messages.length > lastActivityCount) {
+                // New messages arrived, refresh the page to show them
+                // In the future, we could append just the new messages
+                window.location.reload();
+            }
+            lastActivityCount = messages.length;
+        })
+        .catch(error => console.error('Error checking for new messages:', error));
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('messages-container');
+    container.scrollTop = container.scrollHeight;
+}
+
+// Check for new messages every 10 seconds
+setInterval(refreshMessages, 10000);
+
+// Also check when the page becomes visible again (user switches back to tab)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        refreshMessages();
     }
 });
 </script>

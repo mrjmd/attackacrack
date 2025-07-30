@@ -486,12 +486,40 @@ class EnhancedOpenPhoneImporter:
                 logger.error(f"Error downloading media {media_url}: {e}")
                 self.stats['errors'].append(f"Media download {media_url}: {str(e)}")
 
+    def _fetch_call_recording_url(self, call_id: str) -> Optional[str]:
+        """Fetch recording URL for a call using correct OpenPhone API endpoint"""
+        try:
+            url = f"https://api.openphone.com/v1/call-recordings/{call_id}"
+            response = requests.get(url, headers=self.headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                recordings = data.get('data', [])
+                if recordings:
+                    recording = recordings[0]  # Usually just one recording per call
+                    recording_url = recording.get('url')
+                    logger.info(f"Found recording for call {call_id}: {recording.get('id')}")
+                    return recording_url
+            elif response.status_code == 404:
+                # No recording available - normal case
+                logger.debug(f"No recording available for call {call_id}")
+                return None
+            else:
+                logger.warning(f"API error fetching recording for {call_id}: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error fetching recording for call {call_id}: {e}")
+            return None
+
     def _download_call_recordings(self, activity: Activity, call_data: Dict):
         """Download call recordings and voicemails"""
-        # Download recording
-        recording_url = call_data.get('recordingUrl')
-        if recording_url:
-            try:
+        # Fetch recording using correct OpenPhone API endpoint
+        call_id = call_data.get('id')
+        if call_id:
+            recording_url = self._fetch_call_recording_url(call_id)
+            if recording_url:
+                try:
                 response = requests.get(recording_url, verify=True, timeout=(5, 30))
                 if response.status_code == 200:
                     filename = f"recording_{activity.id}_{call_data.get('id', 'unknown')}.mp3"
