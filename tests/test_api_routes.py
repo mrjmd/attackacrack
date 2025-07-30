@@ -27,23 +27,37 @@ def test_openphone_webhook_validation(client, app):
     WHEN a 'token.validated' event is POSTed to the OpenPhone webhook
     THEN the response should be a 200 OK.
     """
-    # --- FIXED: This test now simulates a valid signed request ---
-    # Set a dummy signing key in the app's test config
-    signing_key = "test_signing_key"
+    import base64
+    import time
+    
+    # Set a dummy signing key in the app's test config (base64 encoded)
+    signing_key = base64.b64encode(b"test_signing_key").decode('utf-8')
     app.config['OPENPHONE_WEBHOOK_SIGNING_KEY'] = signing_key
 
     webhook_data = {'type': 'token.validated'}
     payload = json.dumps(webhook_data).encode('utf-8')
-
+    
+    # Generate timestamp
+    timestamp = str(int(time.time() * 1000))  # milliseconds
+    
+    # Create signed data: timestamp.payload
+    signed_data = timestamp.encode() + b'.' + payload
+    
     # Calculate the expected signature
-    expected_signature = hmac.new(
-        key=signing_key.encode('utf-8'),
-        msg=payload,
-        digestmod=hashlib.sha256
-    ).hexdigest()
+    signing_key_bytes = base64.b64decode(signing_key)
+    expected_signature = base64.b64encode(
+        hmac.new(
+            key=signing_key_bytes,
+            msg=signed_data,
+            digestmod=hashlib.sha256
+        ).digest()
+    ).decode('utf-8')
+    
+    # Create OpenPhone signature header format: hmac;version;timestamp;signature
+    signature_header = f"hmac;1;{timestamp};{expected_signature}"
 
     headers = {
-        'x-openphone-signature-v1': expected_signature,
+        'openphone-signature': signature_header,
         'Content-Type': 'application/json'
     }
 
