@@ -112,9 +112,13 @@ class CampaignListService:
         """Find contacts based on filter criteria"""
         query = Contact.query
         
-        # CSV Import filter
+        # CSV Import filter - now supports many-to-many relationship
         if 'csv_import_id' in criteria:
-            query = query.filter_by(csv_import_id=criteria['csv_import_id'])
+            # Try new many-to-many relationship first
+            from crm_database import ContactCSVImport
+            query = query.join(ContactCSVImport).filter(
+                ContactCSVImport.csv_import_id == criteria['csv_import_id']
+            )
         
         if 'import_source' in criteria:
             query = query.filter_by(import_source=criteria['import_source'])

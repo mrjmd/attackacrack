@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from werkzeug.datastructures import FileStorage
-from crm_database import db, Contact, CSVImport, CampaignList, CampaignListMember
+from crm_database import db, Contact, CSVImport, CampaignList, CampaignListMember, ContactCSVImport
 from services.contact_service import ContactService
 
 
@@ -86,9 +86,35 @@ class CSVImportService:
                         
                         # Check if contact already exists
                         existing = Contact.query.filter_by(phone=row['phone']).first()
+                        data_updated = {}
+                        
                         if existing:
                             results['duplicates'] += 1
                             contact = existing
+                            
+                            # Enrich existing contact data
+                            if row.get('first_name') and not existing.first_name:
+                                existing.first_name = row['first_name']
+                                data_updated['first_name'] = row['first_name']
+                            
+                            if row.get('last_name') and not existing.last_name:
+                                existing.last_name = row['last_name']
+                                data_updated['last_name'] = row['last_name']
+                            
+                            if row.get('email') and not existing.email:
+                                existing.email = row['email']
+                                data_updated['email'] = row['email']
+                            
+                            # Merge metadata
+                            new_metadata = self._extract_metadata(row)
+                            if new_metadata:
+                                if existing.contact_metadata:
+                                    existing.contact_metadata.update(new_metadata)
+                                else:
+                                    existing.contact_metadata = new_metadata
+                                data_updated['metadata'] = new_metadata
+                            
+                            is_new = False
                         else:
                             # Create new contact
                             contact = Contact(
@@ -104,15 +130,36 @@ class CSVImportService:
                             db.session.add(contact)
                             db.session.flush()
                             results['contacts_created'].append(contact.id)
+                            is_new = True
                         
-                        # Add to campaign list if created
-                        if campaign_list and not existing:
-                            list_member = CampaignListMember(
+                        # Create association between contact and CSV import
+                        contact_csv_import = ContactCSVImport(
+                            contact_id=contact.id,
+                            csv_import_id=csv_import.id,
+                            is_new=is_new,
+                            data_updated=data_updated if data_updated else None
+                        )
+                        db.session.add(contact_csv_import)
+                        
+                        # Add to campaign list (for both new and existing contacts)
+                        if campaign_list:
+                            # Check if already in list
+                            existing_member = CampaignListMember.query.filter_by(
                                 list_id=campaign_list.id,
-                                contact_id=contact.id,
-                                added_by=imported_by
-                            )
-                            db.session.add(list_member)
+                                contact_id=contact.id
+                            ).first()
+                            
+                            if not existing_member:
+                                list_member = CampaignListMember(
+                                    list_id=campaign_list.id,
+                                    contact_id=contact.id,
+                                    added_by=imported_by
+                                )
+                                db.session.add(list_member)
+                            elif existing_member.status == 'removed':
+                                # Reactivate if previously removed
+                                existing_member.status = 'active'
+                                existing_member.added_at = datetime.utcnow()
                         
                         results['successful'] += 1
                         
@@ -134,7 +181,9 @@ class CSVImportService:
         csv_import.failed_imports = results['failed']
         csv_import.import_metadata = {
             'errors': results['errors'][:10],  # Store first 10 errors
-            'duplicates': results['duplicates']
+            'duplicates': results['duplicates'],
+            'new_contacts': len(results['contacts_created']),
+            'enriched_contacts': results['duplicates']  # All duplicates were enriched
         }
         
         db.session.commit()
@@ -157,4 +206,7 @@ class CSVImportService:
     
     def get_contacts_by_import(self, import_id: int) -> List[Contact]:
         """Get all contacts from a specific import"""
-        return Contact.query.filter_by(csv_import_id=import_id).all()
+        csv_import = CSVImport.query.get(import_id)
+        if csv_import:
+            return csv_import.contacts
+        return []

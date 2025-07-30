@@ -45,10 +45,13 @@ class Contact(db.Model):
     phone = db.Column(db.String(20), nullable=True, unique=True)
     contact_metadata = db.Column(db.JSON, nullable=True)  # For flexible data storage
     
-    # CSV Import tracking
+    # CSV Import tracking (keeping legacy field for backward compatibility)
     csv_import_id = db.Column(db.Integer, db.ForeignKey('csv_import.id'), nullable=True)
     import_source = db.Column(db.String(100), nullable=True)
     imported_at = db.Column(db.DateTime, nullable=True)
+    
+    # NEW: Many-to-many relationship with CSV imports
+    csv_imports = db.relationship('CSVImport', secondary='contact_csv_import', back_populates='contacts', lazy=True)
     
     properties = db.relationship('Property', backref='contact', lazy=True, cascade="all, delete-orphan")
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
@@ -274,7 +277,22 @@ class CSVImport(db.Model):
     import_type = db.Column(db.String(50), nullable=True)  # 'contacts', 'properties', etc.
     import_metadata = db.Column(db.JSON, nullable=True)
     
-    contacts = db.relationship('Contact', backref='csv_import', lazy=True)
+    # Update relationship to use association table
+    contacts = db.relationship('Contact', secondary='contact_csv_import', back_populates='csv_imports', lazy=True)
+
+# --- NEW: Association table for many-to-many relationship between contacts and CSV imports ---
+class ContactCSVImport(db.Model):
+    __tablename__ = 'contact_csv_import'
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id', ondelete='CASCADE'), nullable=False)
+    csv_import_id = db.Column(db.Integer, db.ForeignKey('csv_import.id', ondelete='CASCADE'), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_new = db.Column(db.Boolean, default=True)  # Was this a new contact or existing?
+    data_updated = db.Column(db.JSON, nullable=True)  # Track what fields were updated
+    
+    __table_args__ = (
+        db.UniqueConstraint('contact_id', 'csv_import_id', name='unique_contact_csv_import'),
+    )
 
 # --- Campaign List Management ---
 class CampaignList(db.Model):

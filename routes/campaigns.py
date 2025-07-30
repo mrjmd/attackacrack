@@ -398,12 +398,21 @@ def import_campaign_csv():
         # Show results
         if results["successful"] > 0:
             successful = results["successful"]
-            message = f"Successfully imported {successful} contacts"
-            if results["duplicates"] > 0:
-                duplicates = results["duplicates"]
-                message += f" ({duplicates} duplicates skipped)"
+            new_contacts = len(results.get("contacts_created", []))
+            enriched = results["duplicates"]
+            
+            message_parts = []
+            if new_contacts > 0:
+                message_parts.append(f"{new_contacts} new contacts created")
+            if enriched > 0:
+                message_parts.append(f"{enriched} existing contacts enriched")
+            
+            message = f"Successfully processed {successful} contacts"
+            if message_parts:
+                message += f" ({', '.join(message_parts)})"
+            
             if results["list_id"]:
-                message += f" and created campaign list"
+                message += " and added to campaign list"
             flash(message, "success")
         
         if results["failed"] > 0:
