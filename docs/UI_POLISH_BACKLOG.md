@@ -104,63 +104,128 @@ This document tracks identified areas for user interface and user experience ref
    - Status: Inconsistent across app
    - Description: Standardize loading indicators for all async operations
 
-7. **Empty States** 🟡
+17. **Empty States** 🟡
    - Status: Some lists show raw "No items" text
    - Description: Design friendly empty states with helpful actions
 
-8. **Form Validation** 🟡
+18. **Form Validation** 🟡
    - Status: Basic HTML5 validation only
    - Description: Add real-time validation with helpful error messages
 
-9. **Mobile Responsiveness** 🔴
+19. **Mobile Responsiveness** 🔴
    - Status: Not fully tested
    - Description: Ensure all views work well on mobile devices
 
+### Conversation List Improvements
+
+20. **Bulk Actions UX** 🟡
+   - Status: Button disappears when clicked
+   - Description: Keep button visible but disabled, show form below for better context
+
+21. **Hover Actions Size** 🟢
+   - Status: Icons too small
+   - Description: Increase clickable target area for quick reply and add to campaign icons
+
+22. **Pagination Display** 🟢
+   - Status: Only Previous/Next
+   - Description: Show page numbers (e.g., << 1 2 **3** 4 5 >>) for better navigation
+
+### Conversation Detail View
+
+23. **Message Send Feedback** 🟡
+   - Status: No loading indicator
+   - Description: Add subtle loading indicator after clicking Send
+
+24. **Media Download Button** 🟢
+   - Status: Missing in modal
+   - Description: Add download button within media viewer modal
+
+25. **Notes Save Feedback** 🟡
+   - Status: No save confirmation
+   - Description: Add Save button with success indicator for Notes section
+
 ### User Feedback
 
-10. **Success Messages** 🟡
+26. **Success Messages** 🟡
     - Status: Inconsistent
     - Description: Standardize success notifications after user actions
 
-11. **Error Handling** 🔴
+27. **Error Handling** 🔴
     - Status: Some errors show raw messages
     - Description: User-friendly error messages with recovery actions
 
-12. **Confirmation Dialogs** 🟡
+28. **Confirmation Dialogs** 🟡
     - Status: Missing for destructive actions
     - Description: Add confirmations for delete/archive operations
 
+### Settings & User Management
+
+29. **Settings Navigation** 🟡
+    - Status: Separate pages
+    - Description: Convert to tabbed interface within single /settings route
+
+30. **User Management Functions** 🟡
+    - Status: Limited functionality
+    - Description: Add ability to edit user roles and resend invitations
+
+31. **Action Feedback** 🟡
+    - Status: No progress indicators
+    - Description: Add loading spinners and clear success/failure messages for admin actions
+
 ### Performance
 
-13. **Search Functionality** 🟡
+32. **Search Functionality** 🟡
     - Status: Basic text search only
     - Description: Add filters, sorting, and advanced search options
 
-14. **Bulk Operations** 🟢
+33. **Bulk Operations** 🟢
     - Status: Limited to conversations
     - Description: Extend bulk actions to other entities (contacts, properties)
 
-15. **Keyboard Shortcuts** 🟢
+34. **Keyboard Shortcuts** 🟢
     - Status: Not implemented
     - Description: Add power-user keyboard shortcuts
 
 ## Implementation Priority
 
 ### Phase 1 (Critical)
-- Mobile responsiveness testing and fixes
-- Consistent error handling
+- Mobile responsiveness testing and fixes (#19)
+- Consistent error handling (#27)
 
-### Phase 2 (Important)
-- Financial dashboard implementation
-- Core automation features
-- Loading and empty states
-- Form validation improvements
+### Phase 2 (Important) 
+- Consistent header component (#3)
+- Flash message styling (#4)
+- Dashboard empty states (#7)
+- Form focus states (#13)
+- Button consistency (#14)
+- Loading states standardization (#16)
+- Empty states design (#17)
+- Form validation improvements (#18)
+- Bulk actions UX (#20)
+- Message send feedback (#23)
+- Notes save feedback (#25)
+- Success message standardization (#26)
+- Confirmation dialogs (#28)
+- Settings navigation (#29)
+- User management functions (#30)
+- Action feedback (#31)
+- Search functionality enhancements (#32)
 
 ### Phase 3 (Nice-to-have)
-- Email integration
-- Advanced calendar features
-- Keyboard shortcuts
-- Extended bulk operations
+- Favicon (#1)
+- Active nav state enhancement (#2)
+- Live indicator functionality (#6)
+- Chart tooltips (#8)
+- Financial dashboard (#9)
+- Core automation features (#10)
+- Email integration (#11)
+- Advanced calendar features (#12)
+- Disabled button states (#15)
+- Hover actions size (#21)
+- Pagination display (#22)
+- Media download button (#24)
+- Bulk operations extension (#33)
+- Keyboard shortcuts (#34)
 
 ## Notes
 
