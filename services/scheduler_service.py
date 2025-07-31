@@ -3,11 +3,12 @@
 from extensions import db
 from crm_database import Appointment, Job, Quote, Setting, Property, Contact
 from services.invoice_service import InvoiceService
-from sms_sender import send_sms
+from services.openphone_service import OpenPhoneService
 from datetime import date, timedelta, datetime
 import logging
 from celery_worker import celery
 from sqlalchemy.orm import joinedload
+from flask import current_app
 
 @celery.task
 def send_appointment_reminders():
@@ -37,8 +38,12 @@ def send_appointment_reminders():
                 appointment_time=appt.time.strftime('%I:%M %P')
             )
             try:
-                send_sms(contact.phone, message)
-                logging.info(f"Sent appointment reminder to {contact.first_name} for appointment {appt.id}")
+                openphone_service = OpenPhoneService()
+                result = openphone_service.send_message(contact.phone, message)
+                if result.get('success'):
+                    logging.info(f"Sent appointment reminder to {contact.first_name} for appointment {appt.id}")
+                else:
+                    logging.error(f"Failed to send SMS reminder for appointment {appt.id}. Error: {result.get('error')}")
             except Exception as e:
                 logging.error(f"Failed to send SMS reminder for appointment {appt.id}. Error: {e}")
         else:
@@ -72,8 +77,12 @@ def send_review_requests():
             contact = job.property.contact
             message = template.format(first_name=contact.first_name)
             try:
-                send_sms(contact.phone, message)
-                logging.info(f"Sent review request to {contact.first_name} for job {job.id}")
+                openphone_service = OpenPhoneService()
+                result = openphone_service.send_message(contact.phone, message)
+                if result.get('success'):
+                    logging.info(f"Sent review request to {contact.first_name} for job {job.id}")
+                else:
+                    logging.error(f"Failed to send review request for job {job.id}. Error: {result.get('error')}")
             except Exception as e:
                 logging.error(f"Failed to send review request for job {job.id}. Error: {e}")
         else:

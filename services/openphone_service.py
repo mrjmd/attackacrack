@@ -96,3 +96,28 @@ class OpenPhoneService:
             })
             
             return None, f"OpenPhone API request failed: {str(e)}"
+    
+    def send_message(self, to_number: str, body: str) -> Dict[str, Any]:
+        """
+        Convenience method to send an SMS using the default phone number ID from config.
+        This matches the interface expected by campaign_service and contact_routes.
+        
+        Args:
+            to_number: Recipient phone number
+            body: Message content
+            
+        Returns:
+            Dict with 'success' key and optional 'error' or 'data' keys
+        """
+        from_number_id = current_app.config.get('OPENPHONE_PHONE_NUMBER_ID')
+        
+        if not from_number_id:
+            logger.error("OPENPHONE_PHONE_NUMBER_ID not configured")
+            return {'success': False, 'error': 'Phone number ID not configured'}
+        
+        response_data, error = self.send_sms(to_number, from_number_id, body)
+        
+        if error:
+            return {'success': False, 'error': error}
+        else:
+            return {'success': True, 'data': response_data}
