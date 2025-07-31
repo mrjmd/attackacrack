@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import csv
 from services.contact_service import ContactService
 
@@ -24,8 +32,8 @@ class CsvImporter:
                         email=row.get('email'),
                         phone=row.get('phone')
                     )
-            print(f"Successfully imported contacts from {filepath}")
+            logger.info(f"Successfully imported contacts from {filepath}")
         except FileNotFoundError:
-            print(f"Error: The file {filepath} was not found.")
+            logger.info(f"Error: The file {filepath} was not found.")
         except Exception as e:
-            print(f"An error occurred during CSV import: {e}")
+            logger.info(f"An error occurred during CSV import: {e}")

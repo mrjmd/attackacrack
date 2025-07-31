@@ -4,6 +4,14 @@ Large Scale OpenPhone Import - Optimized for 7000+ conversations
 Handles timeouts, progress tracking, and reliable execution for big imports
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import os
 import signal
 import sys
@@ -36,22 +44,22 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
         # Reset progress if requested
         if reset and os.path.exists(self.progress_file):
             os.remove(self.progress_file)
-            print("🗑️  Reset: Cleared previous progress")
+            logger.info("🗑️  Reset: Cleared previous progress")
         
         # Load previous progress if exists
         self.progress = self._load_progress()
         
-        print("🚀 Large Scale Import Initialized")
-        print(f"📊 Batch Size: {batch_size} conversations")
-        print(f"💾 Checkpoint Every: {checkpoint_interval} conversations")
-        print(f"⏱️  API Timeout: {self.timeout[0]}s connect, {self.timeout[1]}s read")
-        print(f"🔄 Max Retries: {self.max_retries}")
-        print(f"❌ Max Critical Errors: {self.max_critical_errors} (then abort)")
+        logger.info("🚀 Large Scale Import Initialized")
+        logger.info(f"📊 Batch Size: {batch_size} conversations")
+        logger.info(f"💾 Checkpoint Every: {checkpoint_interval} conversations")
+        logger.info(f"⏱️  API Timeout: {self.timeout[0]}s connect, {self.timeout[1]}s read")
+        logger.info(f"🔄 Max Retries: {self.max_retries}")
+        logger.info(f"❌ Max Critical Errors: {self.max_critical_errors} (then abort)")
     
     def _signal_handler(self, signum, frame):
         """Handle interruption signals gracefully"""
-        print(f"\n⚠️  Received signal {signum}. Gracefully shutting down...")
-        print("💾 Saving progress before exit...")
+        logger.info(f"\n⚠️  Received signal {signum}. Gracefully shutting down...")
+        logger.info("💾 Saving progress before exit...")
         self.interrupted = True
     
     def _load_progress(self) -> dict:
@@ -60,10 +68,10 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
             try:
                 with open(self.progress_file, 'r') as f:
                     progress = json.load(f)
-                    print(f"📂 Loaded previous progress: {progress.get('conversations_processed', 0)} conversations completed")
+                    logger.info(f"📂 Loaded previous progress: {progress.get('conversations_processed', 0)} conversations completed")
                     return progress
             except Exception as e:
-                print(f"⚠️  Could not load progress file: {e}")
+                logger.info(f"⚠️  Could not load progress file: {e}")
         
         return {
             'conversations_processed': 0,
@@ -85,7 +93,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                 json.dump(self.progress, f, indent=2)
                 
         except Exception as e:
-            print(f"⚠️  Could not save progress: {e}")
+            logger.info(f"⚠️  Could not save progress: {e}")
     
     def _make_api_request(self, url: str, params: dict = None, retry_count: int = 0):
         """Make API request with enhanced timeout and retry logic"""
@@ -103,7 +111,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             if retry_count < self.max_retries:
                 wait_time = (2 ** retry_count)  # Exponential backoff
-                print(f"⏳ API timeout/connection error. Retrying in {wait_time}s... ({retry_count + 1}/{self.max_retries})")
+                logger.info(f"⏳ API timeout/connection error. Retrying in {wait_time}s... ({retry_count + 1}/{self.max_retries})")
                 time.sleep(wait_time)
                 return self._make_api_request(url, params, retry_count + 1)
             else:
@@ -112,7 +120,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:  # Rate limit
                 wait_time = int(e.response.headers.get('Retry-After', 60))
-                print(f"🚦 Rate limited. Waiting {wait_time}s...")
+                logger.info(f"🚦 Rate limited. Waiting {wait_time}s...")
                 time.sleep(wait_time)
                 return self._make_api_request(url, params, retry_count)
             else:
@@ -120,9 +128,9 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
     
     def run_large_scale_import(self):
         """Main large scale import with checkpoint and resume capabilities"""
-        print("="*80)
-        print("🚀 STARTING LARGE SCALE OPENPHONE IMPORT")
-        print("="*80)
+        logger.info("="*80)
+        logger.info("🚀 STARTING LARGE SCALE OPENPHONE IMPORT")
+        logger.info("="*80)
         
         from app import create_app
         from services.contact_service import ContactService
@@ -137,7 +145,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
             phone_number_id = app.config.get('OPENPHONE_PHONE_NUMBER_ID')
 
             if not all([api_key, user_phone_number, phone_number_id]):
-                print("❌ ERROR: Missing OpenPhone configuration")
+                logger.info("❌ ERROR: Missing OpenPhone configuration")
                 return False
 
             # Initialize parent class attributes
@@ -157,34 +165,34 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                 # Clean up progress file on successful completion
                 if os.path.exists(self.progress_file):
                     os.remove(self.progress_file)
-                    print("🗑️  Cleaned up progress file")
+                    logger.info("🗑️  Cleaned up progress file")
                 
                 return True
                 
             except KeyboardInterrupt:
-                print("\n⚠️  Import interrupted by user")
+                logger.info("\n⚠️  Import interrupted by user")
                 self._save_progress()
-                print("💾 Progress saved. Resume with: python large_scale_import.py --resume")
+                logger.info("💾 Progress saved. Resume with: python large_scale_import.py --resume")
                 return False
                 
             except Exception as e:
-                print(f"❌ Import failed: {e}")
+                logger.info(f"❌ Import failed: {e}")
                 self._save_progress()
                 return False
     
     def _import_in_batches(self):
         """Import conversations in manageable batches"""
-        print("📦 Starting batch import process...")
+        logger.info("📦 Starting batch import process...")
         
         # Get total conversation count first
         total_conversations = self._get_total_conversation_count()
-        print(f"📊 Total conversations to import: {total_conversations}")
+        logger.info(f"📊 Total conversations to import: {total_conversations}")
         
         batch_number = 1
         conversations_imported = self.progress['conversations_processed']
         
         while conversations_imported < total_conversations and not self.interrupted:
-            print(f"\n📦 Processing Batch {batch_number} (Conversations {conversations_imported + 1}-{min(conversations_imported + self.batch_size, total_conversations)})")
+            logger.info(f"\n📦 Processing Batch {batch_number} (Conversations {conversations_imported + 1}-{min(conversations_imported + self.batch_size, total_conversations)})")
             
             # Fetch batch of conversations
             batch_conversations = self._fetch_conversation_batch(
@@ -193,7 +201,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
             )
             
             if not batch_conversations:
-                print("✅ No more conversations to import")
+                logger.info("✅ No more conversations to import")
                 break
             
             # Process this batch
@@ -206,11 +214,11 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
             # Save checkpoint
             if batch_number % (self.checkpoint_interval // self.batch_size or 1) == 0:
                 self._save_progress()
-                print(f"💾 Checkpoint saved: {conversations_imported} conversations completed")
+                logger.info(f"💾 Checkpoint saved: {conversations_imported} conversations completed")
             
             # Progress update
             progress_percent = (conversations_imported / total_conversations) * 100
-            print(f"📈 Progress: {conversations_imported}/{total_conversations} ({progress_percent:.1f}%)")
+            logger.info(f"📈 Progress: {conversations_imported}/{total_conversations} ({progress_percent:.1f}%)")
             
             batch_number += 1
             
@@ -232,7 +240,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                 return len(data.get('data', []))
                 
         except Exception as e:
-            print(f"⚠️  Could not get conversation count: {e}")
+            logger.info(f"⚠️  Could not get conversation count: {e}")
             return 7000  # Fallback to user's estimate
     
     def _fetch_conversation_batch(self, offset: int, limit: int) -> list:
@@ -277,7 +285,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
             return conversations
             
         except Exception as e:
-            print(f"❌ Error fetching conversation batch: {e}")
+            logger.info(f"❌ Error fetching conversation batch: {e}")
             return []
     
     def _process_conversation_batch(self, conversations: list):
@@ -301,26 +309,26 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                 
                 # Handle database transaction rollback issues
                 if "rolled back" in str(e).lower() or "uniqueviolation" in str(type(e).__name__):
-                    print(f"🔄 Database rollback detected, recovering...")
+                    logger.info(f"🔄 Database rollback detected, recovering...")
                     try:
                         db.session.rollback()  # Rollback the failed transaction
-                        print(f"⚠️  Skipping duplicate conversation: {convo_data.get('id', 'unknown')}")
+                        logger.info(f"⚠️  Skipping duplicate conversation: {convo_data.get('id', 'unknown')}")
                         continue  # Skip this conversation and continue
                     except Exception as rollback_error:
-                        print(f"❌ Could not recover from rollback: {rollback_error}")
+                        logger.info(f"❌ Could not recover from rollback: {rollback_error}")
                 
                 # Check if this is a critical error
                 if self._is_critical_error(e):
                     self.critical_errors.append(error_msg)
-                    print(f"❌ CRITICAL ERROR: {error_msg}")
+                    logger.info(f"❌ CRITICAL ERROR: {error_msg}")
                     
                     if len(self.critical_errors) >= self.max_critical_errors:
-                        print(f"\n🚨 TOO MANY CRITICAL ERRORS ({len(self.critical_errors)})!")
-                        print("🛑 ABORTING IMPORT TO PREVENT DATA CORRUPTION")
-                        print("💡 Fix the errors, reset, and restart from scratch")
+                        logger.info(f"\n🚨 TOO MANY CRITICAL ERRORS ({len(self.critical_errors)})!")
+                        logger.info("🛑 ABORTING IMPORT TO PREVENT DATA CORRUPTION")
+                        logger.info("💡 Fix the errors, reset, and restart from scratch")
                         raise Exception(f"Critical error limit exceeded: {len(self.critical_errors)} errors")
                 else:
-                    print(f"⚠️  Non-critical error: {error_msg}")
+                    logger.info(f"⚠️  Non-critical error: {error_msg}")
                     # Continue with next conversation for non-critical errors
                     continue
         
@@ -375,7 +383,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                 self._process_activity(conversation, activity_data)
                 
         except Exception as e:
-            print(f"⚠️  Error importing activities for conversation {conversation.id}: {e}")
+            logger.info(f"⚠️  Error importing activities for conversation {conversation.id}: {e}")
     
     def _fetch_messages_with_timeout(self, participants: list) -> list:
         """Fetch messages with enhanced timeout handling"""
@@ -403,7 +411,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                     break
                     
             except Exception as e:
-                print(f"⚠️  Error fetching messages: {e}")
+                logger.info(f"⚠️  Error fetching messages: {e}")
                 break
         
         return messages
@@ -434,7 +442,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                     break
                     
             except Exception as e:
-                print(f"⚠️  Error fetching calls: {e}")
+                logger.info(f"⚠️  Error fetching calls: {e}")
                 break
         
         return calls
@@ -461,30 +469,30 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
     
     def _print_final_summary(self):
         """Print comprehensive final summary"""
-        print("\n" + "="*80)
-        print("🎉 LARGE SCALE IMPORT COMPLETED SUCCESSFULLY")
-        print("="*80)
+        logger.info("\n" + "="*80)
+        logger.info("🎉 LARGE SCALE IMPORT COMPLETED SUCCESSFULLY")
+        logger.info("="*80)
         
         duration = datetime.utcnow() - datetime.fromisoformat(self.progress['started_at'])
         
-        print(f"⏱️  Total Duration: {duration}")
-        print(f"📊 Conversations Processed: {self.stats['conversations_processed']}")
-        print(f"📱 Messages Imported: {self.stats['messages_imported']}")
-        print(f"📞 Calls Imported: {self.stats['calls_imported']}")
-        print(f"📎 Media Downloaded: {self.stats['media_downloaded']}")
-        print(f"🎵 Recordings Downloaded: {self.stats['recordings_downloaded']}")
-        print(f"📧 Voicemails Downloaded: {self.stats['voicemails_downloaded']}")
-        print(f"🤖 AI Summaries Generated: {self.stats['ai_summaries_generated']}")
+        logger.info(f"⏱️  Total Duration: {duration}")
+        logger.info(f"📊 Conversations Processed: {self.stats['conversations_processed']}")
+        logger.info(f"📱 Messages Imported: {self.stats['messages_imported']}")
+        logger.info(f"📞 Calls Imported: {self.stats['calls_imported']}")
+        logger.info(f"📎 Media Downloaded: {self.stats['media_downloaded']}")
+        logger.info(f"🎵 Recordings Downloaded: {self.stats['recordings_downloaded']}")
+        logger.info(f"📧 Voicemails Downloaded: {self.stats['voicemails_downloaded']}")
+        logger.info(f"🤖 AI Summaries Generated: {self.stats['ai_summaries_generated']}")
         
         if self.stats.get('validation_issues'):
-            print(f"⚠️  Validation Issues: {len(self.stats['validation_issues'])}")
+            logger.info(f"⚠️  Validation Issues: {len(self.stats['validation_issues'])}")
         
         if self.stats['errors']:
-            print(f"❌ Errors Encountered: {len(self.stats['errors'])}")
+            logger.info(f"❌ Errors Encountered: {len(self.stats['errors'])}")
         
-        print("\n✅ All OpenPhone data successfully imported!")
-        print("🎯 Ready for production use with full conversation history")
-        print("="*80)
+        logger.info("\n✅ All OpenPhone data successfully imported!")
+        logger.info("🎯 Ready for production use with full conversation history")
+        logger.info("="*80)
 
 
 def main():
@@ -500,23 +508,23 @@ def main():
     
     args = parser.parse_args()
     
-    print("🚀 Large Scale OpenPhone Import")
-    print("="*80)
+    logger.info("🚀 Large Scale OpenPhone Import")
+    logger.info("="*80)
     
     # Check for existing progress
     progress_file = 'import_progress.json'
     has_progress = os.path.exists(progress_file)
     
     if args.reset:
-        print("🗑️  RESET MODE: Starting fresh import")
+        logger.info("🗑️  RESET MODE: Starting fresh import")
     elif args.resume or (args.auto_resume and has_progress):
         if has_progress:
-            print("🔄 RESUME MODE: Continuing from previous progress")
+            logger.info("🔄 RESUME MODE: Continuing from previous progress")
         else:
-            print("⚠️  No previous progress found, starting fresh import")
+            logger.info("⚠️  No previous progress found, starting fresh import")
     elif has_progress:
-        print("📁 Found previous progress file")
-        print("💡 Use --resume to continue, --reset to start fresh, or --auto-resume for automatic handling")
+        logger.info("📁 Found previous progress file")
+        logger.info("💡 Use --resume to continue, --reset to start fresh, or --auto-resume for automatic handling")
         
         # Auto-decide based on progress age
         try:
@@ -526,13 +534,13 @@ def main():
                 age_hours = (datetime.utcnow() - last_update).total_seconds() / 3600
                 
                 if age_hours < 24:  # Less than 24 hours old
-                    print(f"🔄 Progress is recent ({age_hours:.1f}h old), auto-resuming...")
+                    logger.info(f"🔄 Progress is recent ({age_hours:.1f}h old), auto-resuming...")
                     args.resume = True
                 else:
-                    print(f"⚠️  Progress is old ({age_hours:.1f}h), starting fresh...")
+                    logger.info(f"⚠️  Progress is old ({age_hours:.1f}h), starting fresh...")
                     args.reset = True
         except:
-            print("⚠️  Could not read progress, starting fresh...")
+            logger.info("⚠️  Could not read progress, starting fresh...")
             args.reset = True
     
     try:
@@ -545,26 +553,26 @@ def main():
         success = importer.run_large_scale_import()
         
         if success:
-            print("\n✅ IMPORT COMPLETED SUCCESSFULLY!")
-            print("🎯 All OpenPhone conversations have been imported")
-            print("🌐 Check your app at http://localhost:5000/contacts/conversations")
+            logger.info("\n✅ IMPORT COMPLETED SUCCESSFULLY!")
+            logger.info("🎯 All OpenPhone conversations have been imported")
+            logger.info("🌐 Check your app at http://localhost:5000/contacts/conversations")
             sys.exit(0)
         else:
-            print("\n⚠️  IMPORT WAS INTERRUPTED")
-            print("💾 Progress has been saved automatically")
-            print("🔄 Resume with: python large_scale_import.py --resume")
+            logger.info("\n⚠️  IMPORT WAS INTERRUPTED")
+            logger.info("💾 Progress has been saved automatically")
+            logger.info("🔄 Resume with: python large_scale_import.py --resume")
             sys.exit(1)
             
     except Exception as e:
         if "critical error limit exceeded" in str(e).lower():
-            print(f"\n🚨 CRITICAL ERRORS DETECTED - IMPORT ABORTED")
-            print("🛠️  Fix the code issues and run with --reset to start fresh")
-            print("📋 Critical errors encountered:")
+            logger.info(f"\n🚨 CRITICAL ERRORS DETECTED - IMPORT ABORTED")
+            logger.info("🛠️  Fix the code issues and run with --reset to start fresh")
+            logger.info("📋 Critical errors encountered:")
             for error in importer.critical_errors:
-                print(f"   - {error}")
+                logger.info(f"   - {error}")
             sys.exit(2)
         else:
-            print(f"\n❌ UNEXPECTED ERROR: {e}")
+            logger.info(f"\n❌ UNEXPECTED ERROR: {e}")
             sys.exit(1)
 
 

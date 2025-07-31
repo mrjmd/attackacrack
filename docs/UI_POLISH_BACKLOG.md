@@ -1,23 +1,55 @@
 # UI Polish Backlog
 
-This document tracks identified UI/UX improvements and gaps for future development sprints.
+**Version 1.1 | Last Updated: July 31, 2025**
+
+This document tracks identified areas for user interface and user experience refinement. These items are generally non-critical but are essential for improving usability, consistency, and the overall professional feel of the application.
 
 ## Status Legend
 - 🔴 **Critical**: Affects core functionality
-- 🟡 **Important**: Degrades user experience
+- 🟡 **Important**: Degrades user experience  
 - 🟢 **Nice-to-have**: Polish and refinement
 
 ## Backlog Items
 
-### Navigation & Structure
+### Global & Navigation
 
-1. **Unified Settings Experience** 🟢
+1. **Favicon** 🟢
+   - Status: Missing
+   - Description: Add favicon for brand identity in browser tabs
+   
+2. **Active Nav State Enhancement** 🟢
+   - Status: Needs improvement
+   - Description: Make active page indicator more visually distinct (brighter color or solid vertical bar)
+   
+3. **Consistent Header Component** 🟡
+   - Status: Inconsistent implementation
+   - Description: Main content area should have consistent header displaying page title and primary actions
+   
+4. **Flash Message Styling** 🟡
+   - Status: Needs standardization
+   - Description: Style flash messages prominently with consistent positioning and clear color coding (green/yellow/red)
+
+5. **Unified Settings Experience** 🟢
    - Status: ✅ Completed
    - Description: Consolidated Data Imports and System Settings into single Settings area with tab navigation
 
+### Dashboard Improvements
+
+6. **Live Indicator Functionality** 🟢
+   - Status: Visual only
+   - Description: Make the "Live" indicator functional by flashing when new data loads via auto-refresh
+
+7. **Dashboard Empty States** 🟡
+   - Status: No empty state design
+   - Description: Design friendly empty state views for new users when no data exists
+
+8. **Chart Tooltips** 🟢
+   - Status: Basic charts only
+   - Description: Add hover tooltips showing exact numbers on performance charts
+
 ### Non-Functional Features
 
-2. **Financial Dashboard** 🟡
+9. **Financial Dashboard** 🟡
    - Status: Hidden from navigation
    - Description: Complete implementation of financial metrics, reports, and export functionality
    - Components:
@@ -26,7 +58,7 @@ This document tracks identified UI/UX improvements and gaps for future developme
      - Quote conversion rates
      - Export functionality
 
-3. **Automation Features** 🟡
+10. **Automation Features** 🟡
    - Status: Marked as "Coming Soon"
    - Description: Implement pending automation features
    - Components:
@@ -36,7 +68,7 @@ This document tracks identified UI/UX improvements and gaps for future developme
      - Time blocking
      - Business hours configuration
 
-4. **Email Integration (SmartLead)** 🟢
+11. **Email Integration (SmartLead)** 🟢
    - Status: Marked as "Coming Soon"
    - Description: Full email campaign integration
    - Components:
@@ -44,7 +76,7 @@ This document tracks identified UI/UX improvements and gaps for future developme
      - Inbox integration
      - Analytics dashboard
 
-5. **Advanced Calendar Features** 🟢
+12. **Advanced Calendar Features** 🟢
    - Status: Basic integration exists
    - Description: Enhanced Google Calendar functionality
    - Components:
@@ -52,9 +84,23 @@ This document tracks identified UI/UX improvements and gaps for future developme
      - Availability checking
      - Group scheduling
 
+### Forms (Global)
+
+13. **Input Focus State** 🟡
+   - Status: Basic focus only
+   - Description: Add prominent focus ring (blue glow) to improve accessibility and usability
+
+14. **Button Consistency** 🟡
+   - Status: Inconsistent placement
+   - Description: Primary action buttons should always be bottom right, cancel links consistently styled
+
+15. **Disabled Button States** 🟢
+   - Status: Not visually distinct
+   - Description: Add lower opacity and cursor-not-allowed for disabled buttons
+
 ### UI Consistency
 
-6. **Loading States** 🟡
+16. **Loading States** 🟡
    - Status: Inconsistent across app
    - Description: Standardize loading indicators for all async operations
 

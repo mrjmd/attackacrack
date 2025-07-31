@@ -12,6 +12,14 @@ This file contains example payloads for all webhook event types to help with:
 """
 
 # Message Events
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 MESSAGE_RECEIVED_PAYLOAD = {
     "apiVersion": "v1",
     "createdAt": "2025-07-30T10:00:00.000Z",
@@ -334,20 +342,20 @@ def test_all_payloads():
         'call.transcript.completed': CALL_TRANSCRIPT_CREATED_PAYLOAD
     }
     
-    print("Testing all webhook payload examples...")
+    logger.info("Testing all webhook payload examples...")
     for event_type, payload in payloads.items():
         valid, message = validate_webhook_payload(payload)
         if valid:
-            print(f"✅ {event_type}: Valid")
+            logger.info(f"✅ {event_type}: Valid")
             # Check for media in message events
             if event_type.startswith('message.'):
                 media = get_media_from_message(payload)
                 if media:
-                    print(f"   📎 Contains {len(media)} media attachments")
+                    logger.info(f"   📎 Contains {len(media)} media attachments")
         else:
-            print(f"❌ {event_type}: {message}")
+            logger.info(f"❌ {event_type}: {message}")
     
-    print("\nAll payloads tested!")
+    logger.info("\nAll payloads tested!")
 
 if __name__ == "__main__":
     test_all_payloads()

@@ -4,6 +4,14 @@ Targeted CSV Contact Enrichment
 Only updates contacts that have phone numbers as names (from OpenPhone import)
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import json
 import re
 from datetime import datetime
@@ -18,33 +26,33 @@ def targeted_enrichment():
     app = create_app()
     
     with app.app_context():
-        print("🎯 Targeted CSV Contact Enrichment")
-        print("="*50)
+        logger.info("🎯 Targeted CSV Contact Enrichment")
+        logger.info("="*50)
         
         # Find the most recent enrichment file
         enrichment_dir = Path('./enrichment_data')
         json_files = list(enrichment_dir.glob('merged_contacts_*.json'))
         
         if not json_files:
-            print("❌ No enrichment data files found!")
+            logger.info("❌ No enrichment data files found!")
             return False
         
         # Get the most recent file
         latest_file = max(json_files, key=lambda f: f.stat().st_mtime)
-        print(f"📂 Using: {latest_file.name}")
+        logger.info(f"📂 Using: {latest_file.name}")
         
         # Load enrichment data
         with open(latest_file, 'r') as f:
             enrichment_data = json.load(f)
         
-        print(f"📊 Loaded {len(enrichment_data):,} enriched contacts")
+        logger.info(f"📊 Loaded {len(enrichment_data):,} enriched contacts")
         
         # Find contacts that need enrichment (have phone numbers as names)
         contacts_needing_enrichment = Contact.query.filter(
             Contact.first_name.like('%+1%')
         ).all()
         
-        print(f"🔍 Found {len(contacts_needing_enrichment):,} contacts needing enrichment")
+        logger.info(f"🔍 Found {len(contacts_needing_enrichment):,} contacts needing enrichment")
         
         # Track statistics
         stats = {
@@ -95,50 +103,50 @@ def targeted_enrichment():
                 if stats['contacts_processed'] % 50 == 0:
                     try:
                         db.session.commit()
-                        print(f"   📦 Processed {stats['contacts_processed']:,} contacts...")
+                        logger.info(f"   📦 Processed {stats['contacts_processed']:,} contacts...")
                     except Exception as e:
-                        print(f"   ⚠️  Error committing batch: {e}")
+                        logger.info(f"   ⚠️  Error committing batch: {e}")
                         db.session.rollback()
         
         # Final commit
         try:
             db.session.commit()
         except Exception as e:
-            print(f"⚠️  Final commit error: {e}")
+            logger.info(f"⚠️  Final commit error: {e}")
             db.session.rollback()
         
         # Print results
-        print("\n" + "="*50)
-        print("✅ TARGETED ENRICHMENT COMPLETE")
-        print("="*50)
+        logger.info("\n" + "="*50)
+        logger.info("✅ TARGETED ENRICHMENT COMPLETE")
+        logger.info("="*50)
         
-        print(f"\n📊 Results:")
-        print(f"   Contacts processed: {stats['contacts_processed']:,}")
-        print(f"   Contacts updated: {stats['contacts_updated']:,}")
-        print(f"   First names updated: {stats['first_name_updated']:,}")
-        print(f"   Last names updated: {stats['last_name_updated']:,}")
-        print(f"   Emails added: {stats['email_updated']:,}")
+        logger.info(f"\n📊 Results:")
+        logger.info(f"   Contacts processed: {stats['contacts_processed']:,}")
+        logger.info(f"   Contacts updated: {stats['contacts_updated']:,}")
+        logger.info(f"   First names updated: {stats['first_name_updated']:,}")
+        logger.info(f"   Last names updated: {stats['last_name_updated']:,}")
+        logger.info(f"   Emails added: {stats['email_updated']:,}")
         
         # Show sample of updated contacts
-        print(f"\n📋 Sample updated contacts:")
+        logger.info(f"\n📋 Sample updated contacts:")
         updated_contacts = Contact.query.filter(
             ~Contact.first_name.like('%+1%')
         ).limit(5).all()
         
         for contact in updated_contacts:
-            print(f"   {contact.first_name} {contact.last_name} - {contact.phone}")
+            logger.info(f"   {contact.first_name} {contact.last_name} - {contact.phone}")
         
         total_contacts = Contact.query.count()
         enriched_count = Contact.query.filter(
             ~Contact.first_name.like('%+1%')
         ).count()
         
-        print(f"\n📊 Final Database State:")
-        print(f"   Total contacts: {total_contacts:,}")
-        print(f"   Contacts with real names: {enriched_count:,}")
+        logger.info(f"\n📊 Final Database State:")
+        logger.info(f"   Total contacts: {total_contacts:,}")
+        logger.info(f"   Contacts with real names: {enriched_count:,}")
         
-        print(f"\n🎯 Enrichment complete! Ready for text campaigns.")
-        print("="*50)
+        logger.info(f"\n🎯 Enrichment complete! Ready for text campaigns.")
+        logger.info("="*50)
         
         return True
 

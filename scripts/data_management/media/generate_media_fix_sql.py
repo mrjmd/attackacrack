@@ -5,7 +5,15 @@ Since we can't determine the actual media type from URLs alone,
 we'll assume Google Storage URLs are images (which they typically are from OpenPhone).
 """
 
-print("""
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
+logger.info("""
 -- SQL to fix existing media URLs in the database
 -- This assumes URLs from storage.googleapis.com are images
 

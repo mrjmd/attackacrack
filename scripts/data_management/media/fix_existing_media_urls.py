@@ -5,6 +5,14 @@ Since we can't determine the media type from the URL alone,
 we'll need to make HEAD requests to check the Content-Type.
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import os
 import sys
 import requests
@@ -24,7 +32,7 @@ def get_media_type(url):
         content_type = response.headers.get('Content-Type', '')
         return content_type
     except Exception as e:
-        print(f"Error checking {url}: {e}")
+        logger.info(f"Error checking {url}: {e}")
         # Fallback: assume it's an image if it's from Google Storage
         if 'storage.googleapis.com' in url:
             return 'image/jpeg'
@@ -38,7 +46,7 @@ def fix_media_urls():
     # Get database URL from config
     database_url = Config.SQLALCHEMY_DATABASE_URI
     if not database_url:
-        print("No database URL configured")
+        logger.info("No database URL configured")
         return
     
     # Create engine and session
@@ -53,7 +61,7 @@ def fix_media_urls():
             Activity.media_urls != '[]'
         ).all()
         
-        print(f"Found {len(activities)} activities with media attachments")
+        logger.info(f"Found {len(activities)} activities with media attachments")
         
         fixed_count = 0
         for activity in activities:
@@ -70,7 +78,7 @@ def fix_media_urls():
                             'url': item,
                             'type': media_type
                         })
-                        print(f"  - {item} -> {media_type}")
+                        logger.info(f"  - {item} -> {media_type}")
                     elif isinstance(item, dict):
                         # Already in new format
                         fixed_urls.append(item)
@@ -78,16 +86,16 @@ def fix_media_urls():
                 if needs_fix:
                     activity.media_urls = fixed_urls
                     fixed_count += 1
-                    print(f"Fixed activity {activity.id}: {len(fixed_urls)} media items")
+                    logger.info(f"Fixed activity {activity.id}: {len(fixed_urls)} media items")
         
         if fixed_count > 0:
             session.commit()
-            print(f"\nSuccessfully fixed {fixed_count} activities")
+            logger.info(f"\nSuccessfully fixed {fixed_count} activities")
         else:
-            print("No activities needed fixing")
+            logger.info("No activities needed fixing")
             
     except Exception as e:
-        print(f"Error: {e}")
+        logger.info(f"Error: {e}")
         session.rollback()
     finally:
         session.close()

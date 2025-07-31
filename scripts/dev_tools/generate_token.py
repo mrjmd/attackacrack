@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import os
 import pickle
 from google.auth.transport.requests import Request
@@ -16,8 +24,8 @@ def main():
     creds = None
     
     if not os.path.exists(CLIENT_SECRET_FILE):
-        print(f"Error: '{CLIENT_SECRET_FILE}' not found in the current directory.")
-        print("Please ensure your Google Cloud project's client_secret.json is in the same directory as this script.")
+        logger.info(f"Error: '{CLIENT_SECRET_FILE}' not found in the current directory.")
+        logger.info("Please ensure your Google Cloud project's client_secret.json is in the same directory as this script.")
         return
 
     with open(CLIENT_SECRET_FILE, 'r') as f:
@@ -30,12 +38,12 @@ def main():
         
         with open(TOKEN_FILE, 'wb') as token:
             pickle.dump(creds, token)
-        print(f"\nSuccessfully generated and saved credentials to '{TOKEN_FILE}'.")
-        print("You can now remove this 'generate_token.py' script.")
+        logger.info(f"\nSuccessfully generated and saved credentials to '{TOKEN_FILE}'.")
+        logger.info("You can now remove this 'generate_token.py' script.")
         
     except Exception as e:
-        print(f"An error occurred during the OAuth flow: {e}")
-        print("Please ensure your client_secret.json is correct and you have internet access.")
+        logger.info(f"An error occurred during the OAuth flow: {e}")
+        logger.info("Please ensure your client_secret.json is correct and you have internet access.")
 
 if __name__ == '__main__':
     main()

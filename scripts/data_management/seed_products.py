@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import csv
 from app import create_app
 from extensions import db
@@ -8,7 +16,7 @@ def run_seed():
     Reads the QuickBooks products and services CSV and populates the
     product_service table in the database.
     """
-    print("--- Starting Product & Service Seeding ---")
+    logger.info("--- Starting Product & Service Seeding ---")
     
     app = create_app()
     
@@ -32,7 +40,7 @@ def run_seed():
                     try:
                         price = float(price_str)
                     except (ValueError, TypeError):
-                        print(f"Skipping '{name}' due to invalid price: '{price_str}'")
+                        logger.info(f"Skipping '{name}' due to invalid price: '{price_str}'")
                         continue
 
                     # Check if this product already exists
@@ -47,13 +55,13 @@ def run_seed():
                         products_added += 1
                 
                 db.session.commit()
-                print(f"--- Seeding Complete ---")
-                print(f"Added {products_added} new products/services to the database.")
+                logger.info(f"--- Seeding Complete ---")
+                logger.info(f"Added {products_added} new products/services to the database.")
 
         except FileNotFoundError:
-            print(f"ERROR: The file '{csv_filename}' was not found. Please make sure it's in the root directory.")
+            logger.info(f"ERROR: The file '{csv_filename}' was not found. Please make sure it's in the root directory.")
         except Exception as e:
-            print(f"An error occurred during seeding: {e}")
+            logger.info(f"An error occurred during seeding: {e}")
             db.session.rollback()
 
 if __name__ == '__main__':

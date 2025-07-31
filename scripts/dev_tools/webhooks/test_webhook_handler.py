@@ -9,6 +9,14 @@ This script tests our webhook handler with all event types to ensure:
 4. Database operations work as expected
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import requests
 import hmac
 import hashlib
@@ -36,7 +44,7 @@ class WebhookTester:
     
     def send_webhook(self, payload, event_name):
         """Send a test webhook to our handler"""
-        print(f"\n📤 Testing {event_name}...")
+        logger.info(f"\n📤 Testing {event_name}...")
         
         headers = {
             'Content-Type': 'application/json',
@@ -53,25 +61,25 @@ class WebhookTester:
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ Success: {result}")
+                logger.info(f"✅ Success: {result}")
                 
                 # Check for specific features
                 if event_name == "message.received":
                     media = get_media_from_message(payload)
                     if media:
-                        print(f"   📎 Processed {len(media)} media attachments")
+                        logger.info(f"   📎 Processed {len(media)} media attachments")
                 
                 return True
             else:
-                print(f"❌ Failed: {response.status_code}")
-                print(f"   Response: {response.text}")
+                logger.info(f"❌ Failed: {response.status_code}")
+                logger.info(f"   Response: {response.text}")
                 return False
                 
         except requests.exceptions.ConnectionError:
-            print(f"❌ Connection failed - is the server running?")
+            logger.info(f"❌ Connection failed - is the server running?")
             return False
         except Exception as e:
-            print(f"❌ Error: {e}")
+            logger.info(f"❌ Error: {e}")
             return False
     
     def test_all_webhooks(self):
@@ -86,8 +94,8 @@ class WebhookTester:
             ("Call Transcript Completed", CALL_TRANSCRIPT_CREATED_PAYLOAD)
         ]
         
-        print("🧪 OpenPhone Webhook Handler Test Suite")
-        print("=" * 50)
+        logger.info("🧪 OpenPhone Webhook Handler Test Suite")
+        logger.info("=" * 50)
         
         passed = 0
         failed = 0
@@ -98,18 +106,18 @@ class WebhookTester:
             else:
                 failed += 1
         
-        print("\n" + "=" * 50)
-        print(f"📊 Results: {passed} passed, {failed} failed")
+        logger.info("\n" + "=" * 50)
+        logger.info(f"📊 Results: {passed} passed, {failed} failed")
         
         if failed == 0:
-            print("🎉 All webhooks handled successfully!")
+            logger.info("🎉 All webhooks handled successfully!")
         else:
-            print("⚠️  Some webhooks failed - check the implementation")
+            logger.info("⚠️  Some webhooks failed - check the implementation")
     
     def test_media_handling(self):
         """Specifically test media attachment handling"""
-        print("\n🖼️  Testing Media Attachment Handling")
-        print("=" * 50)
+        logger.info("\n🖼️  Testing Media Attachment Handling")
+        logger.info("=" * 50)
         
         # Create a message with multiple media types
         media_payload = MESSAGE_RECEIVED_PAYLOAD.copy()
@@ -123,7 +131,7 @@ class WebhookTester:
         media_payload['id'] = "WEBHOOK_MEDIA_TEST"
         
         if self.send_webhook(media_payload, "Message with Multiple Media"):
-            print("✅ Media handling test passed!")
+            logger.info("✅ Media handling test passed!")
             
             # Check database to verify media was stored
             with self.app.app_context():
@@ -133,27 +141,27 @@ class WebhookTester:
                 ).first()
                 
                 if activity and activity.media_urls:
-                    print(f"   📎 Verified {len(activity.media_urls)} media URLs in database")
+                    logger.info(f"   📎 Verified {len(activity.media_urls)} media URLs in database")
                     for url in activity.media_urls:
-                        print(f"      - {url}")
+                        logger.info(f"      - {url}")
         else:
-            print("❌ Media handling test failed")
+            logger.info("❌ Media handling test failed")
     
     def test_ai_content_handling(self):
         """Test AI summary and transcript handling"""
-        print("\n🤖 Testing AI Content Handling")
-        print("=" * 50)
+        logger.info("\n🤖 Testing AI Content Handling")
+        logger.info("=" * 50)
         
         # First create a call
         self.send_webhook(CALL_COMPLETED_PAYLOAD, "Call Completed")
         
         # Then add AI summary
         if self.send_webhook(CALL_SUMMARY_CREATED_PAYLOAD, "Call Summary"):
-            print("✅ AI Summary handled correctly")
+            logger.info("✅ AI Summary handled correctly")
         
         # Then add transcript
         if self.send_webhook(CALL_TRANSCRIPT_CREATED_PAYLOAD, "Call Transcript"):
-            print("✅ AI Transcript handled correctly")
+            logger.info("✅ AI Transcript handled correctly")
             
             # Verify AI content in database
             with self.app.app_context():
@@ -164,10 +172,10 @@ class WebhookTester:
                 
                 if activity:
                     if activity.ai_summary:
-                        print("   ✅ AI Summary stored in database")
+                        logger.info("   ✅ AI Summary stored in database")
                     if activity.ai_transcript:
-                        print("   ✅ AI Transcript stored in database")
-                        print(f"      - {len(activity.ai_transcript.get('dialogue', []))} dialogue segments")
+                        logger.info("   ✅ AI Transcript stored in database")
+                        logger.info(f"      - {len(activity.ai_transcript.get('dialogue', []))} dialogue segments")
 
 def main():
     if len(sys.argv) > 1:
@@ -188,7 +196,7 @@ def main():
         tester.test_media_handling()
         tester.test_ai_content_handling()
     else:
-        print("Usage: python test_webhook_handler.py [all|media|ai|full]")
+        logger.info("Usage: python test_webhook_handler.py [all|media|ai|full]")
         sys.exit(1)
 
 if __name__ == "__main__":

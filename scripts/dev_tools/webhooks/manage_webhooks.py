@@ -15,6 +15,14 @@ Usage:
   python manage_webhooks.py delete
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import requests
 import json
 import sys
@@ -38,28 +46,28 @@ class WebhookManager:
     
     def list_webhooks(self):
         """List all current webhooks"""
-        print("🔍 Listing current OpenPhone webhooks...")
+        logger.info("🔍 Listing current OpenPhone webhooks...")
         
         url = "https://api.openphone.com/v1/webhooks"
         response = requests.get(url, headers=self.headers)
         
         if response.status_code == 200:
             webhooks = response.json().get('data', [])
-            print(f"Found {len(webhooks)} webhooks:")
+            logger.info(f"Found {len(webhooks)} webhooks:")
             
             for webhook in webhooks:
-                print(f"  📡 {webhook.get('id')}")
-                print(f"     URL: {webhook.get('url')}")
-                print(f"     Events: {webhook.get('events', [])}")
-                print(f"     Phone Number ID: {webhook.get('phoneNumberId')}")
-                print(f"     Created: {webhook.get('createdAt')}")
+                logger.info(f"  📡 {webhook.get('id')}")
+                logger.info(f"     URL: {webhook.get('url')}")
+                logger.info(f"     Events: {webhook.get('events', [])}")
+                logger.info(f"     Phone Number ID: {webhook.get('phoneNumberId')}")
+                logger.info(f"     Created: {webhook.get('createdAt')}")
                 print()
         else:
-            print(f"❌ Error listing webhooks: {response.status_code} - {response.text}")
+            logger.info(f"❌ Error listing webhooks: {response.status_code} - {response.text}")
     
     def create_webhooks(self):
         """Create webhooks for all event types"""
-        print("🚀 Creating OpenPhone webhooks for all event types...")
+        logger.info("🚀 Creating OpenPhone webhooks for all event types...")
         
         # Webhook events available in OpenPhone API (as of documentation)
         webhook_configs = [
@@ -79,7 +87,7 @@ class WebhookManager:
         created_count = 0
         
         for config in webhook_configs:
-            print(f"Creating {config['name']}...")
+            logger.info(f"Creating {config['name']}...")
             
             webhook_data = {
                 'url': self.webhook_url,
@@ -92,18 +100,18 @@ class WebhookManager:
             
             if response.status_code == 201:
                 webhook = response.json()
-                print(f"  ✅ Created webhook: {webhook.get('id')}")
-                print(f"     Events: {', '.join(config['events'])}")
+                logger.info(f"  ✅ Created webhook: {webhook.get('id')}")
+                logger.info(f"     Events: {', '.join(config['events'])}")
                 created_count += 1
             else:
-                print(f"  ❌ Failed to create {config['name']}: {response.status_code}")
-                print(f"     Error: {response.text}")
+                logger.info(f"  ❌ Failed to create {config['name']}: {response.status_code}")
+                logger.info(f"     Error: {response.text}")
         
-        print(f"\\n🎉 Created {created_count}/{len(webhook_configs)} webhooks")
+        logger.info(f"\\n🎉 Created {created_count}/{len(webhook_configs)} webhooks")
     
     def test_webhook_connectivity(self):
         """Test if our webhook endpoint is accessible"""
-        print("🧪 Testing webhook endpoint connectivity...")
+        logger.info("🧪 Testing webhook endpoint connectivity...")
         
         # Test basic connectivity (should get 403 due to missing signature)
         test_payload = {'type': 'test', 'data': {}}
@@ -116,33 +124,33 @@ class WebhookManager:
             )
             
             if response.status_code == 403:
-                print("✅ Webhook endpoint is accessible (403 expected - missing signature)")
-                print(f"   URL: {self.webhook_url}")
+                logger.info("✅ Webhook endpoint is accessible (403 expected - missing signature)")
+                logger.info(f"   URL: {self.webhook_url}")
             else:
-                print(f"⚠️  Unexpected response: {response.status_code}")
-                print(f"   Response: {response.text}")
+                logger.info(f"⚠️  Unexpected response: {response.status_code}")
+                logger.info(f"   Response: {response.text}")
                 
         except requests.RequestException as e:
-            print(f"❌ Cannot reach webhook endpoint: {e}")
-            print(f"   URL: {self.webhook_url}")
-            print("   Make sure your application is running and accessible")
+            logger.info(f"❌ Cannot reach webhook endpoint: {e}")
+            logger.info(f"   URL: {self.webhook_url}")
+            logger.info("   Make sure your application is running and accessible")
     
     def delete_all_webhooks(self):
         """Delete all webhooks (use with caution!)"""
-        print("🗑️  Deleting all OpenPhone webhooks...")
+        logger.info("🗑️  Deleting all OpenPhone webhooks...")
         
         # First list webhooks
         url = "https://api.openphone.com/v1/webhooks"
         response = requests.get(url, headers=self.headers)
         
         if response.status_code != 200:
-            print(f"❌ Error listing webhooks: {response.status_code}")
+            logger.info(f"❌ Error listing webhooks: {response.status_code}")
             return
         
         webhooks = response.json().get('data', [])
         
         if not webhooks:
-            print("No webhooks to delete")
+            logger.info("No webhooks to delete")
             return
         
         deleted_count = 0
@@ -154,16 +162,16 @@ class WebhookManager:
             delete_response = requests.delete(delete_url, headers=self.headers)
             
             if delete_response.status_code == 204:
-                print(f"  ✅ Deleted webhook: {webhook_id}")
+                logger.info(f"  ✅ Deleted webhook: {webhook_id}")
                 deleted_count += 1
             else:
-                print(f"  ❌ Failed to delete {webhook_id}: {delete_response.status_code}")
+                logger.info(f"  ❌ Failed to delete {webhook_id}: {delete_response.status_code}")
         
-        print(f"\\n🗑️  Deleted {deleted_count}/{len(webhooks)} webhooks")
+        logger.info(f"\\n🗑️  Deleted {deleted_count}/{len(webhooks)} webhooks")
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python manage_webhooks.py [list|create|test|delete]")
+        logger.info("Usage: python manage_webhooks.py [list|create|test|delete]")
         sys.exit(1)
     
     command = sys.argv[1].lower()
@@ -182,14 +190,14 @@ def main():
             if confirm.lower() == 'yes':
                 manager.delete_all_webhooks()
             else:
-                print("Cancelled")
+                logger.info("Cancelled")
         else:
-            print(f"Unknown command: {command}")
-            print("Available commands: list, create, test, delete")
+            logger.info(f"Unknown command: {command}")
+            logger.info("Available commands: list, create, test, delete")
             sys.exit(1)
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.info(f"❌ Error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

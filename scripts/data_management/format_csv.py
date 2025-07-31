@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import csv
 import argparse
 import os
@@ -75,15 +83,15 @@ def reformat_contacts_for_openphone(input_file_path, output_file_path):
                     })
 
     except FileNotFoundError:
-        print(f"Error: The file '{input_file_path}' was not found.")
+        logger.info(f"Error: The file '{input_file_path}' was not found.")
         return
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logger.info(f"An unexpected error occurred: {e}")
         return
 
     # --- 6. Write Output File ---
     if not processed_contacts:
-        print("No contacts with phone numbers found to write.")
+        logger.info("No contacts with phone numbers found to write.")
         return
         
     try:
@@ -91,9 +99,9 @@ def reformat_contacts_for_openphone(input_file_path, output_file_path):
             writer = csv.DictWriter(outfile, fieldnames=output_headers)
             writer.writeheader()
             writer.writerows(processed_contacts)
-        print(f"Successfully created '{output_file_path}' with {len(processed_contacts)} contacts.")
+        logger.info(f"Successfully created '{output_file_path}' with {len(processed_contacts)} contacts.")
     except Exception as e:
-        print(f"An error occurred while writing the file: {e}")
+        logger.info(f"An error occurred while writing the file: {e}")
 
 
 # --- How to use the script ---

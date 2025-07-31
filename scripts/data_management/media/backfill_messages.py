@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
+
 import os
 from datetime import datetime
 import requests
@@ -17,7 +25,7 @@ def run_backfill():
     Connects to the OpenPhone API, fetches the last message from recent conversations,
     and saves any missing messages to the local database.
     """
-    print("--- Starting OpenPhone Message Backfill ---")
+    logger.info("--- Starting OpenPhone Message Backfill ---")
     
     app = create_app()
     
@@ -26,22 +34,22 @@ def run_backfill():
         phone_number_id = app.config.get('OPENPHONE_PHONE_NUMBER_ID')
 
         if not all([api_key, phone_number_id]):
-            print("ERROR: Missing OpenPhone configuration in .env file. Aborting.")
+            logger.info("ERROR: Missing OpenPhone configuration in .env file. Aborting.")
             return
 
         headers = {"Authorization": api_key}
         contact_service = ContactService()
 
         # 1. Get recent conversations
-        print("Fetching recent conversations from OpenPhone...")
+        logger.info("Fetching recent conversations from OpenPhone...")
         conversations_url = f"https://api.openphone.com/v1/conversations?phoneNumberId={phone_number_id}&limit=50"
         try:
             convo_response = requests.get(conversations_url, headers=headers, verify=True)
             convo_response.raise_for_status()
             conversations = convo_response.json().get('data', [])
-            print(f"Found {len(conversations)} conversations to check.")
+            logger.info(f"Found {len(conversations)} conversations to check.")
         except Exception as e:
-            print(f"ERROR: Could not fetch conversations: {e}")
+            logger.info(f"ERROR: Could not fetch conversations: {e}")
             return
 
         # 2. For each conversation, get the LAST message and save it
@@ -53,12 +61,12 @@ def run_backfill():
             if not last_activity_id or not other_participant_number:
                 continue
 
-            print(f"\nProcessing conversation with {other_participant_number}...")
+            logger.info(f"\nProcessing conversation with {other_participant_number}...")
             
             # Find or create the contact
             contact = db.session.query(Contact).filter_by(phone=other_participant_number).first()
             if not contact:
-                print(f"  -> New contact found. Creating entry for {other_participant_number}.")
+                logger.info(f"  -> New contact found. Creating entry for {other_participant_number}.")
                 contact = contact_service.add_contact(
                     first_name=other_participant_number,
                     last_name="(from backfill)",
@@ -68,7 +76,7 @@ def run_backfill():
             # Check if we already have this specific message
             exists = db.session.query(Message).filter_by(openphone_id=last_activity_id).first()
             if exists:
-                print("  -> Latest message already exists in DB. Skipping.")
+                logger.info("  -> Latest message already exists in DB. Skipping.")
                 continue
 
             # Fetch the single last message using the endpoint we know works
@@ -76,7 +84,7 @@ def run_backfill():
             try:
                 message_response = requests.get(message_url, headers=headers, verify=True)
                 if message_response.status_code == 404:
-                    print("  -> Last activity was not a message (e.g., a call). Skipping.")
+                    logger.info("  -> Last activity was not a message (e.g., a call). Skipping.")
                     continue
                 message_response.raise_for_status()
                 msg_data = message_response.json().get('data', {})
@@ -91,16 +99,16 @@ def run_backfill():
                 )
                 db.session.add(new_message)
                 total_messages_added += 1
-                print(f"  -> Added latest message to the database.")
+                logger.info(f"  -> Added latest message to the database.")
 
             except Exception as e:
-                print(f"  -> ERROR: Could not fetch message {last_activity_id}: {e}")
+                logger.info(f"  -> ERROR: Could not fetch message {last_activity_id}: {e}")
                 continue
 
         # Commit all the new messages at the end
         db.session.commit()
-        print("\n--- Backfill Complete ---")
-        print(f"Total new messages added: {total_messages_added}")
+        logger.info("\n--- Backfill Complete ---")
+        logger.info(f"Total new messages added: {total_messages_added}")
 
 if __name__ == '__main__':
     run_backfill()

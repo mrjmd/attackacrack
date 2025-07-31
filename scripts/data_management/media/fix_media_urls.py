@@ -4,9 +4,16 @@ Fix media_urls format in existing activities.
 Converts from [{'url': '...', 'type': '...'}] to ['...']
 """
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+
 from crm_database import db, Activity
 from app import create_app
 import json
+from scripts.script_logger import get_logger
+
+logger = get_logger(__name__)
 
 def fix_media_urls():
     """Convert media_urls from dict format to string array format"""
@@ -33,13 +40,13 @@ def fix_media_urls():
                     
                     activity.media_urls = fixed_urls
                     fixed_count += 1
-                    print(f"Fixed activity {activity.id}: {len(fixed_urls)} media URLs")
+                    logger.info(f"Fixed activity {activity.id}: {len(fixed_urls)} media URLs")
         
         if fixed_count > 0:
             db.session.commit()
-            print(f"\nFixed {fixed_count} activities with media attachments")
+            logger.info(f"Fixed {fixed_count} activities with media attachments")
         else:
-            print("No activities needed fixing")
+            logger.info("No activities needed fixing")
 
 if __name__ == "__main__":
     fix_media_urls()
