@@ -6,10 +6,45 @@ from datetime import datetime, time, date
 # --- NEW: User Model ---
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    openphone_user_id = db.Column(db.String(100), unique=True)
-    first_name = db.Column(db.String(50))
-    last_name = db.Column(db.String(50))
-    email = db.Column(db.String(120))
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='marketer')  # 'admin' or 'marketer'
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+    
+    # Legacy OpenPhone field - keeping for backward compatibility
+    openphone_user_id = db.Column(db.String(100), unique=True, nullable=True)
+    
+    # Flask-Login required properties
+    def is_authenticated(self):
+        return True
+    
+    def is_anonymous(self):
+        return False
+    
+    def get_id(self):
+        return str(self.id)
+    
+    @property
+    def is_admin(self):
+        return self.role == 'admin'
+
+# --- NEW: InviteToken Model ---
+class InviteToken(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='marketer')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    used_at = db.Column(db.DateTime)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    created_by = db.relationship('User', backref='sent_invites')
 
 # --- NEW: PhoneNumber Model ---
 class PhoneNumber(db.Model):

@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, jsonify, flash
+from flask_login import login_required
 from datetime import datetime, timedelta
 from sqlalchemy import or_, and_, func
 from services.contact_service import ContactService
@@ -9,12 +10,14 @@ from crm_database import Activity, Conversation, Contact, ContactFlag
 contact_bp = Blueprint('contact', __name__)
 
 @contact_bp.route('/')
+@login_required
 def list_all():
     contact_service = ContactService()
     all_contacts = contact_service.get_all_contacts()
     return render_template('contact_list.html', contacts=all_contacts)
 
 @contact_bp.route('/conversations')
+@login_required
 def conversation_list():
     # Refresh session to get latest data from webhooks
     db.session.expire_all()

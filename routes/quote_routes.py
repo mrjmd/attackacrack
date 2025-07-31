@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required
 from services.quote_service import QuoteService
 from services.job_service import JobService
 from services.invoice_service import InvoiceService
@@ -10,17 +11,20 @@ quote_service = QuoteService()
 job_service = JobService()
 
 @quote_bp.route('/')
+@login_required
 def list_all():
     quotes = quote_service.get_all_quotes()
     return render_template('quote_list.html', quotes=quotes)
 
 @quote_bp.route('/quote/<int:quote_id>')
+@login_required
 def view(quote_id):
     quote = quote_service.get_quote_by_id(quote_id)
     return render_template('quote_detail.html', quote=quote)
 
 @quote_bp.route('/quote/add', methods=['GET', 'POST'])
 @quote_bp.route('/quote/<int:quote_id>/edit', methods=['GET', 'POST'])
+@login_required
 def add_edit(quote_id=None):
     quote = None
     if quote_id:
@@ -46,12 +50,14 @@ def add_edit(quote_id=None):
     return render_template('add_edit_quote_form.html', quote=quote, jobs=jobs, product_services=product_services)
 
 @quote_bp.route('/quote/<int:quote_id>/delete', methods=['POST'])
+@login_required
 def delete(quote_id):
     quote_service.delete_quote(quote_id)
     flash('Quote deleted successfully!', 'success')
     return redirect(url_for('quote.list_all'))
 
 @quote_bp.route('/quote/<int:quote_id>/convert', methods=['POST'])
+@login_required
 def convert_quote_to_invoice(quote_id):
     """
     Handles the POST request to convert a quote into an invoice.

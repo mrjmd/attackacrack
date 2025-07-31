@@ -3,6 +3,7 @@ import hashlib
 import base64
 from functools import wraps
 from flask import Blueprint, jsonify, request, current_app, abort
+from flask_login import login_required
 from services.contact_service import ContactService
 from services.message_service import MessageService
 from services.ai_service import AIService
@@ -70,6 +71,7 @@ def verify_openphone_signature(f):
     return decorated_function
 
 @api_bp.route('/contacts')
+@login_required
 def get_contacts():
     contact_service = ContactService()
     contacts = contact_service.get_all_contacts()
@@ -77,6 +79,7 @@ def get_contacts():
     return jsonify(contact_list)
 
 @api_bp.route('/messages/latest_conversations')
+@login_required
 def get_latest_conversations():
     message_service = MessageService()
     # Refresh session to get latest data from webhooks
@@ -95,6 +98,7 @@ def get_latest_conversations():
 
 # --- THIS IS THE FIX ---
 @api_bp.route('/contacts/<int:contact_id>/messages')
+@login_required
 def get_contact_messages(contact_id):
     """
     Provides a JSON list of all activities for a specific contact.
@@ -115,6 +119,7 @@ def get_contact_messages(contact_id):
 # --- END FIX ---
 
 @api_bp.route('/appointments/generate_summary/<int:contact_id>')
+@login_required
 def generate_appointment_summary(contact_id):
     message_service = MessageService()
     ai_service = AIService()

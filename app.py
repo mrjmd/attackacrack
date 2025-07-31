@@ -3,7 +3,7 @@
 from flask import Flask, g, request
 from flask_migrate import Migrate
 from config import Config
-from extensions import db
+from extensions import db, login_manager, bcrypt
 from datetime import datetime
 import os
 import uuid
@@ -27,6 +27,18 @@ def create_app(config_class=Config, test_config=None):
 
     db.init_app(app)
     migrate = Migrate(app, db)
+    
+    # Initialize authentication
+    bcrypt.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Please log in to access this page.'
+    
+    # User loader for Flask-Login
+    from crm_database import User
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
     
     # Add request tracking middleware
     @app.before_request
@@ -89,7 +101,7 @@ def create_app(config_class=Config, test_config=None):
     from routes.campaigns import campaigns_bp
     from routes.growth_routes import growth_bp
     from routes.settings_routes import settings_bp
-    from routes.auth_routes import auth_bp
+    from routes.auth import auth_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(contact_bp, url_prefix='/contacts')
@@ -106,6 +118,10 @@ def create_app(config_class=Config, test_config=None):
     
     # --- REMOVED APScheduler ---
     # The background task scheduling is now handled by Celery Beat.
+    
+    # Register CLI commands
+    from utils import commands
+    commands.init_app(app)
     
     return app
 

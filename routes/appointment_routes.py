@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for
+from flask_login import login_required
 from services.appointment_service import AppointmentService
 from services.contact_service import ContactService
 from services.message_service import MessageService
@@ -8,18 +9,21 @@ from datetime import datetime
 appointment_bp = Blueprint('appointment', __name__)
 
 @appointment_bp.route('/')
+@login_required
 def list_all():
     appointment_service = AppointmentService()
     all_appointments = appointment_service.get_all_appointments()
     return render_template('appointment_list.html', appointments=all_appointments)
 
 @appointment_bp.route('/<int:appointment_id>')
+@login_required
 def appointment_detail(appointment_id):
     appointment_service = AppointmentService()
     appointment = appointment_service.get_appointment_by_id(appointment_id)
     return render_template('appointment_detail.html', appointment=appointment)
 
 @appointment_bp.route('/add', methods=['GET', 'POST'])
+@login_required
 def add_appointment():
     appointment_service = AppointmentService()
     contact_service = ContactService()
@@ -52,6 +56,7 @@ def add_appointment():
     return render_template('add_edit_appointment_form.html', contacts=contacts, prefilled=prefilled_data)
 
 @appointment_bp.route('/<int:appointment_id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_appointment(appointment_id):
     # This function will need a similar update if you enable the edit button
     appointment_service = AppointmentService()
@@ -63,6 +68,7 @@ def edit_appointment(appointment_id):
 
 
 @appointment_bp.route('/<int:appointment_id>/delete', methods=['POST'])
+@login_required
 def delete_appointment(appointment_id):
     # --- FIX FOR NameError ---
     # Instantiate the service inside the function

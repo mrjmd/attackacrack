@@ -3,6 +3,7 @@ Campaign routes for creating and managing text campaigns
 """
 
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash
+from flask_login import login_required
 from datetime import datetime
 from extensions import db
 from crm_database import Campaign, Contact, ContactFlag, CampaignMembership, CampaignList, CSVImport
@@ -18,6 +19,7 @@ csv_service = CSVImportService(ContactService())
 
 
 @campaigns_bp.route('/campaigns')
+@login_required
 def campaign_list():
     """List all campaigns with basic stats"""
     campaigns = Campaign.query.order_by(Campaign.created_at.desc()).all()
@@ -34,6 +36,7 @@ def campaign_list():
 
 
 @campaigns_bp.route('/campaigns/new')
+@login_required
 def new_campaign():
     """Show campaign creation form"""
     # Get contact counts for audience sizing
@@ -76,6 +79,7 @@ def new_campaign():
 
 
 @campaigns_bp.route('/campaigns', methods=['POST'])
+@login_required
 def create_campaign():
     """Create a new campaign"""
     try:
@@ -121,6 +125,7 @@ def create_campaign():
 
 
 @campaigns_bp.route('/campaigns/<int:campaign_id>')
+@login_required
 def campaign_detail(campaign_id):
     """Show campaign details and analytics"""
     campaign = Campaign.query.get_or_404(campaign_id)
@@ -139,6 +144,7 @@ def campaign_detail(campaign_id):
 
 
 @campaigns_bp.route('/campaigns/<int:campaign_id>/start', methods=['POST'])
+@login_required
 def start_campaign(campaign_id):
     """Start a campaign"""
     try:
@@ -154,6 +160,7 @@ def start_campaign(campaign_id):
 
 
 @campaigns_bp.route('/campaigns/<int:campaign_id>/pause', methods=['POST'])
+@login_required
 def pause_campaign(campaign_id):
     """Pause a running campaign"""
     campaign = Campaign.query.get_or_404(campaign_id)
@@ -169,6 +176,7 @@ def pause_campaign(campaign_id):
 
 
 @campaigns_bp.route('/campaigns/<int:campaign_id>/recipients')
+@login_required
 def campaign_recipients(campaign_id):
     """Show campaign recipients with filtering"""
     campaign = Campaign.query.get_or_404(campaign_id)
@@ -196,6 +204,7 @@ def campaign_recipients(campaign_id):
 
 
 @campaigns_bp.route('/api/campaigns/<int:campaign_id>/analytics')
+@login_required
 def api_campaign_analytics(campaign_id):
     """API endpoint for real-time campaign analytics"""
     try:
@@ -212,6 +221,7 @@ def api_campaign_analytics(campaign_id):
 
 
 @campaigns_bp.route('/api/campaigns/preview-audience', methods=['POST'])
+@login_required
 def api_preview_audience():
     """Preview campaign audience size based on filters"""
     try:
@@ -264,6 +274,7 @@ def api_preview_audience():
 
 # Campaign List Management Routes
 @campaigns_bp.route("/campaigns/lists")
+@login_required
 def campaign_lists():
     """Show all campaign lists"""
     lists = list_service.get_all_lists()
@@ -286,6 +297,7 @@ def campaign_lists():
 
 
 @campaigns_bp.route("/campaigns/lists/new", methods=["GET", "POST"])
+@login_required
 def new_campaign_list():
     """Create a new campaign list"""
     if request.method == "POST":
@@ -343,6 +355,7 @@ def new_campaign_list():
 
 
 @campaigns_bp.route("/campaigns/lists/<int:list_id>")
+@login_required
 def view_campaign_list(list_id):
     """View details of a campaign list"""
     campaign_list = CampaignList.query.get_or_404(list_id)
@@ -360,6 +373,7 @@ def view_campaign_list(list_id):
 
 
 @campaigns_bp.route("/campaigns/lists/<int:list_id>/refresh", methods=["POST"])
+@login_required
 def refresh_campaign_list(list_id):
     """Refresh a dynamic list"""
     campaign_list = CampaignList.query.get_or_404(list_id)
@@ -376,6 +390,7 @@ def refresh_campaign_list(list_id):
 
 
 @campaigns_bp.route("/campaigns/import-csv", methods=["GET", "POST"])
+@login_required
 def import_campaign_csv():
     """Import contacts from CSV and optionally create a campaign list"""
     if request.method == "POST":

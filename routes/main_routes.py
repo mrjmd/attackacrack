@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask_login import login_required
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
@@ -9,8 +10,8 @@ from services.job_service import JobService
 from services.quote_service import QuoteService
 from services.appointment_service import AppointmentService
 from services.message_service import MessageService
-from csv_importer import CsvImporter
-from property_radar_importer import PropertyRadarImporter
+from utils.csv_importer import CsvImporter
+from utils.property_radar_importer import PropertyRadarImporter
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 from extensions import db
 from crm_database import Setting, Activity, Conversation
@@ -19,9 +20,15 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
-    return redirect(url_for('main.dashboard'))
+    """Root route - redirect to dashboard if logged in, else to login"""
+    from flask_login import current_user
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    else:
+        return redirect(url_for('auth.login'))
 
 @main_bp.route('/dashboard')
+@login_required
 def dashboard():
     from datetime import datetime, timedelta
     from sqlalchemy import func
@@ -208,10 +215,12 @@ def dashboard():
 
 # ... (rest of file is unchanged) ...
 @main_bp.route('/settings')
+@login_required
 def settings():
     return render_template('settings.html')
 
 @main_bp.route('/settings/automation', methods=['GET', 'POST'])
+@login_required
 def automation_settings():
     if request.method == 'POST':
         form_type = request.form.get('form_type')
@@ -249,6 +258,7 @@ def automation_settings():
     return render_template('automation_settings.html', reminder_template_text=reminder_text, review_template_text=review_text)
 
 @main_bp.route('/import_csv', methods=['GET', 'POST'])
+@login_required
 def import_csv():
     contact_service = ContactService()
     if request.method == 'POST':
@@ -273,6 +283,7 @@ def import_csv():
     return render_template('import_csv.html')
 
 @main_bp.route('/import_property_radar', methods=['GET', 'POST'])
+@login_required
 def import_property_radar():
     contact_service = ContactService()
     property_service = PropertyService()
@@ -300,13 +311,16 @@ def import_property_radar():
 
 # --- Placeholder routes from original file ---
 @main_bp.route('/customers')
+@login_required
 def customers():
     return render_template('customers.html')
 
 @main_bp.route('/finances')
+@login_required
 def finances():
     return render_template('finances.html')
 
 @main_bp.route('/marketing')
+@login_required
 def marketing():
     return render_template('marketing.html')

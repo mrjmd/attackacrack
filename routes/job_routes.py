@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required
 from services.job_service import JobService
 from services.property_service import PropertyService
 
@@ -7,17 +8,20 @@ job_service = JobService()
 property_service = PropertyService()
 
 @job_bp.route('/')
+@login_required
 def list_all():
     jobs = job_service.get_all_jobs()
     return render_template('job_list.html', jobs=jobs)
 
 @job_bp.route('/job/<int:job_id>')
+@login_required
 def view(job_id):
     job = job_service.get_job_by_id(job_id)
     return render_template('job_detail.html', job=job)
 
 @job_bp.route('/job/add', methods=['GET', 'POST'])
 @job_bp.route('/job/<int:job_id>/edit', methods=['GET', 'POST'])
+@login_required
 def add_edit(job_id=None):
     job = None
     if job_id:
@@ -40,6 +44,7 @@ def add_edit(job_id=None):
     return render_template('add_edit_job_form.html', job=job, properties=properties)
 
 @job_bp.route('/job/<int:job_id>/delete', methods=['POST'])
+@login_required
 def delete(job_id):
     job_service.delete_job(job_id)
     flash('Job deleted successfully!', 'success')
