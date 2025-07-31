@@ -1,7 +1,7 @@
 # crm_database.py
 
 from extensions import db
-from datetime import datetime, time
+from datetime import datetime, time, date
 
 # --- NEW: User Model ---
 class User(db.Model):
@@ -53,6 +53,20 @@ class Contact(db.Model):
     # NEW: Many-to-many relationship with CSV imports
     csv_imports = db.relationship('CSVImport', secondary='contact_csv_import', back_populates='contacts', lazy=True)
     
+    # QuickBooks integration fields
+    quickbooks_customer_id = db.Column(db.String(50), nullable=True, unique=True)
+    quickbooks_sync_token = db.Column(db.String(50), nullable=True)  # For updates
+    customer_type = db.Column(db.String(20), nullable=True, default='prospect')  # 'prospect', 'customer'
+    payment_terms = db.Column(db.String(50), nullable=True)  # Net 30, etc.
+    credit_limit = db.Column(db.Numeric(10, 2), nullable=True)
+    tax_exempt = db.Column(db.Boolean, default=False)
+    
+    # Financial summary (calculated from QB)
+    total_sales = db.Column(db.Numeric(10, 2), default=0)
+    outstanding_balance = db.Column(db.Numeric(10, 2), default=0)
+    last_payment_date = db.Column(db.DateTime, nullable=True)
+    average_days_to_pay = db.Column(db.Integer, nullable=True)
+    
     properties = db.relationship('Property', backref='contact', lazy=True, cascade="all, delete-orphan")
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
     # A contact can now have multiple conversations
@@ -88,34 +102,132 @@ class Appointment(db.Model):
     job_id = db.Column(db.Integer, db.ForeignKey('job.id'), nullable=True) # Made nullable as not all appts might have a job
     job = db.relationship('Job', backref='appointments_rel') # Define relationship
 
-class ProductService(db.Model):
+class Product(db.Model):
+    __tablename__ = 'product'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False, unique=True)
+    name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    price = db.Column(db.Float, nullable=False)
+    
+    # QuickBooks fields
+    quickbooks_item_id = db.Column(db.String(50), unique=True, nullable=True)
+    quickbooks_sync_token = db.Column(db.String(50), nullable=True)
+    item_type = db.Column(db.String(20), nullable=False, default='service')  # 'service', 'inventory', 'non_inventory'
+    
+    # Pricing
+    unit_price = db.Column(db.Numeric(10, 2), nullable=True)
+    cost = db.Column(db.Numeric(10, 2), nullable=True)
+    
+    # Inventory tracking
+    quantity_on_hand = db.Column(db.Integer, nullable=True)
+    reorder_point = db.Column(db.Integer, nullable=True)
+    
+    # Tax and accounting
+    taxable = db.Column(db.Boolean, default=True)
+    income_account = db.Column(db.String(100), nullable=True)
+    expense_account = db.Column(db.String(100), nullable=True)
+    
+    # Status
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Keep alias for backward compatibility
+ProductService = Product
 
 class QuoteLineItem(db.Model):
+    __tablename__ = 'quote_line_item'
     id = db.Column(db.Integer, primary_key=True)
     quote_id = db.Column(db.Integer, db.ForeignKey('quote.id'), nullable=False)
-    product_service_id = db.Column(db.Integer, db.ForeignKey('product_service.id'), nullable=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+    
+    # Item details
     description = db.Column(db.Text, nullable=False)
-    quantity = db.Column(db.Integer, nullable=False, default=1)
-    price = db.Column(db.Float, nullable=False)
-    product_service = db.relationship('ProductService')
+    quantity = db.Column(db.Numeric(10, 2), default=1)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    line_total = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    # QB fields
+    quickbooks_line_id = db.Column(db.String(50), nullable=True)
+    
+    product = db.relationship('Product', backref='quote_items')
 
 class Quote(db.Model):
+    __tablename__ = 'quote'
     id = db.Column(db.Integer, primary_key=True)
-    amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Draft')
     job_id = db.Column(db.Integer, db.ForeignKey('job.id'), nullable=False)
+    
+    # QuickBooks integration
+    quickbooks_estimate_id = db.Column(db.String(50), nullable=True, unique=True)
+    quickbooks_sync_token = db.Column(db.String(50), nullable=True)
+    
+    # Enhanced financial fields
+    subtotal = db.Column(db.Numeric(10, 2), default=0)
+    tax_amount = db.Column(db.Numeric(10, 2), default=0)
+    total_amount = db.Column(db.Numeric(10, 2), default=0)
+    
+    # Terms and conditions
+    payment_terms = db.Column(db.String(50), nullable=True)
+    due_date = db.Column(db.Date, nullable=True)
+    expiration_date = db.Column(db.Date, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
     line_items = db.relationship('QuoteLineItem', backref='quote', lazy=True, cascade="all, delete-orphan")
 
 class Invoice(db.Model):
+    __tablename__ = 'invoice'
     id = db.Column(db.Integer, primary_key=True)
-    amount = db.Column(db.Float, nullable=False)
-    due_date = db.Column(db.Date, nullable=False)
     status = db.Column(db.String(20), default='Draft')
     job_id = db.Column(db.Integer, db.ForeignKey('job.id'), nullable=False)
+    
+    # QuickBooks integration
+    quickbooks_invoice_id = db.Column(db.String(50), nullable=True, unique=True)
+    quickbooks_sync_token = db.Column(db.String(50), nullable=True)
+    
+    # Link to quote
+    quote_id = db.Column(db.Integer, db.ForeignKey('quote.id'), nullable=True)
+    
+    # Enhanced financial fields
+    subtotal = db.Column(db.Numeric(10, 2), default=0)
+    tax_amount = db.Column(db.Numeric(10, 2), default=0)
+    total_amount = db.Column(db.Numeric(10, 2), default=0)
+    amount_paid = db.Column(db.Numeric(10, 2), default=0)
+    balance_due = db.Column(db.Numeric(10, 2), default=0)
+    
+    # Dates
+    invoice_date = db.Column(db.Date, nullable=False, default=date.today)
+    due_date = db.Column(db.Date, nullable=False)
+    
+    # Payment tracking
+    payment_status = db.Column(db.String(20), default='unpaid')  # 'unpaid', 'partial', 'paid', 'overdue'
+    paid_date = db.Column(db.DateTime, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    quote = db.relationship('Quote', backref='invoices')
+    invoice_items = db.relationship('InvoiceLineItem', backref='invoice', lazy=True, cascade="all, delete-orphan")
+
+class InvoiceLineItem(db.Model):
+    __tablename__ = 'invoice_line_item'
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoice.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+    
+    # Item details
+    description = db.Column(db.Text, nullable=False)
+    quantity = db.Column(db.Numeric(10, 2), default=1)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    line_total = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    # QB fields
+    quickbooks_line_id = db.Column(db.String(50), nullable=True)
+    
+    product = db.relationship('Product', backref='invoice_items')
 
 # --- ENHANCED: Activity Model (Unified Communication Model) ---
 class Activity(db.Model):
@@ -323,4 +435,31 @@ class CampaignListMember(db.Model):
     
     __table_args__ = (
         db.UniqueConstraint('list_id', 'contact_id', name='unique_list_member'),
+    )
+
+# --- QuickBooks Integration Models ---
+class QuickBooksAuth(db.Model):
+    __tablename__ = 'quickbooks_auth'
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(50), unique=True, nullable=False)  # QB Company ID
+    access_token = db.Column(db.Text, nullable=False)  # Encrypted
+    refresh_token = db.Column(db.Text, nullable=False)  # Encrypted
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class QuickBooksSync(db.Model):
+    __tablename__ = 'quickbooks_sync'
+    id = db.Column(db.Integer, primary_key=True)
+    entity_type = db.Column(db.String(50), nullable=False)  # 'customer', 'item', 'invoice', 'estimate'
+    entity_id = db.Column(db.String(50), nullable=False)  # QB entity ID
+    local_id = db.Column(db.Integer, nullable=True)  # Local CRM entity ID
+    local_table = db.Column(db.String(50), nullable=True)  # Which local table (contact, product, invoice, quote)
+    sync_version = db.Column(db.String(50), nullable=True)  # QB SyncToken
+    last_synced = db.Column(db.DateTime, default=datetime.utcnow)
+    sync_status = db.Column(db.String(20), default='pending')  # 'pending', 'synced', 'error'
+    error_message = db.Column(db.Text, nullable=True)
+    
+    __table_args__ = (
+        db.UniqueConstraint('entity_type', 'entity_id', name='unique_qb_entity'),
     )

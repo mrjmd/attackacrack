@@ -42,7 +42,7 @@ def test_create_quote_with_line_items(app, db_session):
     assert new_quote.line_items[0].description == "Crack Repair"
     
     # Check that the total amount was calculated correctly
-    assert new_quote.amount == 1700.50
+    assert new_quote.total_amount == 1700.50
 
 def test_create_quote_error_handling(app, db_session):
     """
@@ -78,7 +78,7 @@ def test_create_quote_with_zero_line_items(app, db_session):
     
     new_quote = quote_service.create_quote(quote_data)
     assert new_quote is not None
-    assert new_quote.amount == 0
+    assert new_quote.total_amount == 0
     assert len(new_quote.line_items) == 0
 
 def test_update_quote_success(app, db_session):
@@ -110,7 +110,7 @@ def test_update_quote_success(app, db_session):
     updated_quote = quote_service.update_quote(quote.id, update_data)
     assert updated_quote is not None
     assert updated_quote.status == "Sent"
-    assert updated_quote.amount == 500.0  # (2 * 150) + (1 * 200)
+    assert updated_quote.total_amount == 500.0  # (2 * 150) + (1 * 200)
     assert len(updated_quote.line_items) == 2
 
 def test_update_quote_not_found(app, db_session):
@@ -206,4 +206,4 @@ def test_calculate_line_item_totals(app, db_session):
     
     quote = quote_service.create_quote(quote_data)
     expected_total = (2.5 * 100.25) + (0 * 500) + (10 * 0) + (1 * 199.99)
-    assert abs(quote.amount - expected_total) < 0.01  # Handle floating point precision
+    assert abs(float(quote.total_amount) - expected_total) < 0.01  # Handle floating point precision

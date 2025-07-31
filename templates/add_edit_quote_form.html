@@ -62,8 +62,8 @@
         
         <!-- Total Amount -->
         <div class="mt-6 text-right">
-            <h3 class="text-2xl font-bold">Total: $<span id="total-amount">{{ "%.2f".format(quote.amount) if quote else "0.00" }}</span></h3>
-            <input type="hidden" name="amount" id="amount-input" value="{{ quote.amount if quote else 0 }}">
+            <h3 class="text-2xl font-bold">Total: $<span id="total-amount">{{ "%.2f".format(quote.total_amount) if quote else "0.00" }}</span></h3>
+            <input type="hidden" name="amount" id="amount-input" value="{{ quote.total_amount if quote else 0 }}">
         </div>
 
         <div class="flex items-center justify-end mt-6">

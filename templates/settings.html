@@ -4,18 +4,26 @@
 
 {% block content %}
     <h2 class="text-3xl font-bold mb-6">Settings</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-gray-900 rounded-lg shadow p-6">
-            <h3 class="text-xl font-bold mb-4">Data Management</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="bg-gray-700 rounded-lg shadow p-6">
+            <h3 class="text-xl font-bold mb-4 text-white">Data Management</h3>
             <div class="space-y-2">
-                <p><a href="{{ url_for('main.import_csv') }}" class="text-blue-400 hover:underline">Import Contacts from CSV</a></p>
-                <p><a href="{{ url_for('main.import_property_radar') }}" class="text-blue-400 hover:underline">Import from Property Radar CSV</a></p>
+                <p><a href="{{ url_for('main.import_csv') }}" class="text-blue-400 hover:text-blue-300">Import Contacts from CSV</a></p>
+                <p><a href="{{ url_for('main.import_property_radar') }}" class="text-blue-400 hover:text-blue-300">Import from Property Radar CSV</a></p>
             </div>
         </div>
-        <div class="bg-gray-900 rounded-lg shadow p-6">
-            <h3 class="text-xl font-bold mb-4">Automation</h3>
+        <div class="bg-gray-700 rounded-lg shadow p-6">
+            <h3 class="text-xl font-bold mb-4 text-white">Automation</h3>
             <div class="space-y-2">
-                <p><a href="{{ url_for('main.automation_settings') }}" class="text-blue-400 hover:underline">Configure Automated Messages</a></p>
+                <p><a href="{{ url_for('main.automation_settings') }}" class="text-blue-400 hover:text-blue-300">Configure Automated Messages</a></p>
+            </div>
+        </div>
+        <div class="bg-gray-700 rounded-lg shadow p-6">
+            <h3 class="text-xl font-bold mb-4 text-white">Integrations</h3>
+            <div class="space-y-2">
+                <p><a href="{{ url_for('settings.quickbooks') }}" class="text-blue-400 hover:text-blue-300">QuickBooks Integration</a></p>
+                <p class="text-gray-500">Smartlead (Coming Soon)</p>
+                <p class="text-gray-500">Google Calendar (Coming Soon)</p>
             </div>
         </div>
     </div>

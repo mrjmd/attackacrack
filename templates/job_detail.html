@@ -26,7 +26,7 @@
                 </div>
             <ul>
                 {% for quote in job.quotes %}
-                    <li class="border-b border-gray-700 py-2"><a href="{{ url_for('quote.view', quote_id=quote.id) }}" class="hover:text-blue-400">Quote for ${{ "%.2f"|format(quote.amount) }} - Status: {{ quote.status }}</a></li>
+                    <li class="border-b border-gray-700 py-2"><a href="{{ url_for('quote.view', quote_id=quote.id) }}" class="hover:text-blue-400">Quote for ${{ "%.2f"|format(quote.total_amount) }} - Status: {{ quote.status }}</a></li>
                 {% else %}
                     <li>No quotes found for this job.</li>
                 {% endfor %}
@@ -40,7 +40,7 @@
                 </div>
             <ul>
                 {% for invoice in job.invoices %}
-                     <li class="border-b border-gray-700 py-2"><a href="{{ url_for('invoice.invoice_detail', invoice_id=invoice.id) }}" class="hover:text-blue-400">Invoice for ${{ "%.2f"|format(invoice.amount) }} - Status: {{ invoice.status }}</a></li>
+                     <li class="border-b border-gray-700 py-2"><a href="{{ url_for('invoice.invoice_detail', invoice_id=invoice.id) }}" class="hover:text-blue-400">Invoice for ${{ "%.2f"|format(invoice.total_amount) }} - Status: {{ invoice.status }}</a></li>
                 {% else %}
                     <li>No invoices found for this job.</li>
                 {% endfor %}

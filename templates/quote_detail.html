@@ -9,7 +9,7 @@
         <div class="card-body">
             <h5 class="card-title">Quote for Job #{{ quote.job_id }}</h5>
             <p><strong>Status:</strong> <span class="badge bg-primary">{{ quote.status }}</span></p>
-            <p><strong>Amount:</strong> ${{ "%.2f"|format(quote.amount) }}</p>
+            <p><strong>Amount:</strong> ${{ "%.2f"|format(quote.total_amount) }}</p>
             <p><strong>Job Description:</strong> {{ quote.job.description }}</p>
             <p><strong>Customer:</strong> {{ quote.job.property.contact.first_name }} {{ quote.job.property.contact.last_name }}</p>
             <p><strong>Property Address:</strong> {{ quote.job.property.address }}</p>

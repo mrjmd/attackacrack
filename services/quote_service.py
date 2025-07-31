@@ -21,7 +21,9 @@ class QuoteService:
             new_quote = Quote(
                 job_id=data['job_id'],
                 status=data.get('status', 'Draft'),
-                amount=0  # Start with 0, will calculate from line items
+                subtotal=0,  # Start with 0, will calculate from line items
+                tax_amount=0,
+                total_amount=0
             )
             db.session.add(new_quote)
             
@@ -34,14 +36,16 @@ class QuoteService:
                     
                     line_item = QuoteLineItem(
                         quote=new_quote,
-                        product_service_id=item_data.get('product_service_id') or None,
+                        product_id=item_data.get('product_id') or None,
                         description=item_data['description'],
                         quantity=quantity,
-                        price=price
+                        unit_price=price,
+                        line_total=quantity * price
                     )
                     db.session.add(line_item)
             
-            new_quote.amount = total_amount
+            new_quote.subtotal = total_amount
+            new_quote.total_amount = total_amount  # No tax calculation for now
             db.session.commit()
             return new_quote
         except Exception as e:
@@ -77,21 +81,24 @@ class QuoteService:
                     if item_id: # Existing item
                         line_item = QuoteLineItem.query.get(item_id)
                         if line_item:
-                            line_item.product_service_id = item_data.get('product_service_id') or None
+                            line_item.product_id = item_data.get('product_id') or None
                             line_item.description = item_data['description']
                             line_item.quantity = quantity
-                            line_item.price = price
+                            line_item.unit_price = price
+                            line_item.line_total = quantity * price
                     else: # New item
                         new_line_item = QuoteLineItem(
                             quote_id=quote.id,
-                            product_service_id=item_data.get('product_service_id') or None,
+                            product_id=item_data.get('product_id') or None,
                             description=item_data['description'],
                             quantity=quantity,
-                            price=price
+                            unit_price=price,
+                            line_total=quantity * price
                         )
                         db.session.add(new_line_item)
             
-            quote.amount = total_amount
+            quote.subtotal = total_amount
+            quote.total_amount = total_amount  # No tax calculation for now
             db.session.commit()
             return quote
         except Exception as e:

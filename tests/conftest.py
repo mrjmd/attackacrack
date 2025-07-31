@@ -37,8 +37,8 @@ def app():
         contact = Contact(id=1, first_name="Test", last_name="User", email="test@user.com", phone="+15551234567")
         prop = Property(id=1, address="123 Test St", contact=contact)
         job = Job(id=1, description="Test Job", property=prop, status='Active')
-        quote = Quote(id=1, amount=100.0, job=job, status='Sent')
-        invoice = Invoice(id=1, amount=100.0, due_date=date(2025, 1, 1), job=job, status='Unpaid')
+        quote = Quote(id=1, subtotal=100.0, tax_amount=0.0, total_amount=100.0, job=job, status='Sent')
+        invoice = Invoice(id=1, subtotal=100.0, tax_amount=0.0, total_amount=100.0, due_date=date(2025, 1, 1), job=job, status='Unpaid')
         appointment = Appointment(id=1, title="Test Appt", date=date(2025, 1, 1), time=time(12, 0), contact=contact, job_id=job.id) # Use job_id
         
         # Seed common settings templates here

@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}QuickBooks Integration{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">QuickBooks Integration</h1>
+            <p class="text-gray-400 mt-1">Connect your QuickBooks Online account to sync financial data</p>
+        </div>
+        <a href="{{ url_for('main.settings') }}" class="text-gray-400 hover:text-white">
+            ← Back to Settings
+        </a>
+    </div>
+    
+    <!-- Connection Status -->
+    <div class="bg-gray-700 rounded-lg shadow-lg overflow-hidden">
+        <div class="px-6 py-4 bg-gray-800 border-b border-gray-600">
+            <h2 class="text-xl font-semibold text-white">Connection Status</h2>
+        </div>
+        <div class="p-6">
+            {% if is_authenticated %}
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+                            <span class="text-2xl">✓</span>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-medium text-white">Connected to QuickBooks</h3>
+                        {% if company_info %}
+                            <p class="text-gray-300 mt-1">
+                                Company: <span class="font-medium">{{ company_info.get('CompanyInfo', {}).get('CompanyName', 'Unknown') }}</span>
+                            </p>
+                            <p class="text-gray-400 text-sm mt-1">
+                                Country: {{ company_info.get('CompanyInfo', {}).get('Country', 'Unknown') }}
+                            </p>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('auth.quickbooks_disconnect') }}" class="mt-4">
+                            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                                    onclick="return confirm('Are you sure you want to disconnect from QuickBooks?')">
+                                Disconnect
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
+                            <span class="text-2xl">○</span>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-medium text-white">Not Connected</h3>
+                        <p class="text-gray-400 mt-1">Connect to QuickBooks to sync your financial data</p>
+                        <a href="{{ url_for('auth.quickbooks_auth') }}" 
+                           class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
+                            Connect to QuickBooks
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% if is_authenticated %}
+    <!-- Sync Actions -->
+    <div class="bg-gray-700 rounded-lg shadow-lg overflow-hidden">
+        <div class="px-6 py-4 bg-gray-800 border-b border-gray-600">
+            <h2 class="text-xl font-semibold text-white">Data Sync</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-300 mb-4">
+                Manually sync data from QuickBooks. This will import customers, products/services, estimates, and invoices.
+            </p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Sync All -->
+                <form method="POST" action="{{ url_for('settings.quickbooks_sync') }}" class="flex">
+                    <input type="hidden" name="sync_type" value="all">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors">
+                        <span class="text-xl mb-1 block">🔄</span>
+                        <span class="font-medium">Sync All Data</span>
+                        <span class="text-sm block mt-1 opacity-75">Complete sync of all entities</span>
+                    </button>
+                </form>
+                
+                <!-- Sync Customers -->
+                <form method="POST" action="{{ url_for('settings.quickbooks_sync') }}" class="flex">
+                    <input type="hidden" name="sync_type" value="customers">
+                    <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg transition-colors">
+                        <span class="text-xl mb-1 block">👥</span>
+                        <span class="font-medium">Sync Customers</span>
+                        <span class="text-sm block mt-1 opacity-75">Import & enrich contacts</span>
+                    </button>
+                </form>
+                
+                <!-- Sync Items -->
+                <form method="POST" action="{{ url_for('settings.quickbooks_sync') }}" class="flex">
+                    <input type="hidden" name="sync_type" value="items">
+                    <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors">
+                        <span class="text-xl mb-1 block">📦</span>
+                        <span class="font-medium">Sync Products</span>
+                        <span class="text-sm block mt-1 opacity-75">Import products & services</span>
+                    </button>
+                </form>
+                
+                <!-- Sync Estimates -->
+                <form method="POST" action="{{ url_for('settings.quickbooks_sync') }}" class="flex">
+                    <input type="hidden" name="sync_type" value="estimates">
+                    <button type="submit" class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-3 rounded-lg transition-colors">
+                        <span class="text-xl mb-1 block">📋</span>
+                        <span class="font-medium">Sync Estimates</span>
+                        <span class="text-sm block mt-1 opacity-75">Import as quotes</span>
+                    </button>
+                </form>
+                
+                <!-- Sync Invoices -->
+                <form method="POST" action="{{ url_for('settings.quickbooks_sync') }}" class="flex">
+                    <input type="hidden" name="sync_type" value="invoices">
+                    <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-lg transition-colors">
+                        <span class="text-xl mb-1 block">🧾</span>
+                        <span class="font-medium">Sync Invoices</span>
+                        <span class="text-sm block mt-1 opacity-75">Import invoice data</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sync Settings -->
+    <div class="bg-gray-700 rounded-lg shadow-lg overflow-hidden">
+        <div class="px-6 py-4 bg-gray-800 border-b border-gray-600">
+            <h2 class="text-xl font-semibold text-white">Sync Settings</h2>
+        </div>
+        <div class="p-6">
+            <div class="space-y-4">
+                <label class="flex items-center">
+                    <input type="checkbox" class="mr-3 rounded bg-gray-600 border-gray-500" checked disabled>
+                    <span class="text-gray-300">Automatically sync on schedule (Coming soon)</span>
+                </label>
+                
+                <label class="flex items-center">
+                    <input type="checkbox" class="mr-3 rounded bg-gray-600 border-gray-500" checked disabled>
+                    <span class="text-gray-300">Enable webhook notifications (Coming soon)</span>
+                </label>
+                
+                <label class="flex items-center">
+                    <input type="checkbox" class="mr-3 rounded bg-gray-600 border-gray-500" checked disabled>
+                    <span class="text-gray-300">Create CRM records for new QuickBooks entities (Coming soon)</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="bg-{% if category == 'error' %}red{% elif category == 'success' %}green{% else %}blue{% endif %}-900 bg-opacity-50 border border-{% if category == 'error' %}red{% elif category == 'success' %}green{% else %}blue{% endif %}-700 rounded-lg p-4">
+                    <p class="text-{% if category == 'error' %}red{% elif category == 'success' %}green{% else %}blue{% endif %}-300">
+                        {{ message }}
+                    </p>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+{% endblock %}

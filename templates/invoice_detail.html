@@ -14,7 +14,7 @@
     </div>
 
     <div class="bg-gray-900 rounded-lg shadow p-6">
-        <p><strong>Amount:</strong> ${{ "%.2f"|format(invoice.amount) }}</p>
+        <p><strong>Amount:</strong> ${{ "%.2f"|format(invoice.total_amount) }}</p>
         <p><strong>Due Date:</strong> {{ invoice.due_date }}</p>
         <p><strong>Status:</strong> {{ invoice.status }}</p>
         <p><strong>Job:</strong> <a href="{{ url_for('job.view', job_id=invoice.job.id) }}" class="text-blue-400 hover:underline">{{ invoice.job.description }}</a></p>

@@ -29,7 +29,7 @@
                                 Job #{{ quote.job.id }} - {{ quote.job.property.address }}
                             </a>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">${{ "%.2f".format(quote.amount) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${{ "%.2f".format(quote.total_amount) }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                 {% if quote.status == 'Draft' %} bg-yellow-500 text-yellow-900

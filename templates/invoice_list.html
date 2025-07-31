@@ -10,7 +10,7 @@
     <div class="bg-gray-900 rounded-lg shadow p-6">
         <ul>
             {% for invoice in invoices %}
-                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('invoice.invoice_detail', invoice_id=invoice.id) }}" class="hover:text-blue-400">Invoice #{{ invoice.id }}</a> - ${{ "%.2f"|format(invoice.amount) }} ({{ invoice.status }})</li>
+                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('invoice.invoice_detail', invoice_id=invoice.id) }}" class="hover:text-blue-400">Invoice #{{ invoice.id }}</a> - ${{ "%.2f"|format(invoice.total_amount) }} ({{ invoice.status }})</li>
             {% else %}
                 <li>No invoices found.</li>
             {% endfor %}
