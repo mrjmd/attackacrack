@@ -54,7 +54,6 @@ class TestWebhookIntegrity:
     def sample_contact(self):
         """Create a sample contact for testing."""
         contact = Contact(
-            openphone_contact_id="CN123456",
             first_name="Test",
             last_name="User",
             phone="+12345678900",
@@ -86,7 +85,7 @@ class TestWebhookIntegrity:
         
         # Verify activity created
         activity = Activity.query.filter_by(
-            openphone_activity_id="MSG123"
+            openphone_id="MSG123"
         ).first()
         assert activity is not None
         assert activity.type == 'sms'
@@ -96,7 +95,7 @@ class TestWebhookIntegrity:
         
         # Verify conversation
         conversation = Conversation.query.filter_by(
-            openphone_conversation_id="CONV123"
+            openphone_id="CONV123"
         ).first()
         assert conversation is not None
         assert conversation.contact_id == sample_contact.id
@@ -136,7 +135,7 @@ class TestWebhookIntegrity:
         
         # Verify media URLs stored
         activity = Activity.query.filter_by(
-            openphone_activity_id="MSG_MEDIA_123"
+            openphone_id="MSG_MEDIA_123"
         ).first()
         assert activity.media_urls is not None
         assert len(activity.media_urls) == 2
@@ -177,7 +176,7 @@ class TestWebhookIntegrity:
         
         # Verify update
         activity = Activity.query.filter_by(
-            openphone_activity_id="MSG_UPDATE_123"
+            openphone_id="MSG_UPDATE_123"
         ).first()
         assert activity.body == "Updated message content"
     
@@ -225,7 +224,7 @@ class TestWebhookIntegrity:
         
         # Verify call activity created
         activity = Activity.query.filter_by(
-            openphone_activity_id="CALL123"
+            openphone_id="CALL123"
         ).first()
         assert activity is not None
         assert activity.type == 'call'
@@ -246,7 +245,7 @@ class TestWebhookIntegrity:
         """Test call.recording.completed webhook handling."""
         # First create a call activity
         call_activity = Activity(
-            openphone_activity_id="CALL_REC_123",
+            openphone_id="CALL_REC_123",
             type="call",
             direction="outgoing",
             from_number="+19876543210",
@@ -271,7 +270,7 @@ class TestWebhookIntegrity:
         
         # Verify recording URL updated
         activity = Activity.query.filter_by(
-            openphone_activity_id="CALL_REC_123"
+            openphone_id="CALL_REC_123"
         ).first()
         assert activity.recording_url == "https://recordings.openphone.com/call123.mp3"
         assert activity.recording_duration_ms == 240000
@@ -309,7 +308,7 @@ class TestWebhookIntegrity:
         
         # Verify contact created
         contact = Contact.query.filter_by(
-            openphone_contact_id="CN_NEW_123"
+            openphone_id="CN_NEW_123"
         ).first()
         assert contact is not None
         assert contact.first_name == "John"
@@ -321,7 +320,7 @@ class TestWebhookIntegrity:
         """Test contact.updated webhook handling."""
         payload = self.create_webhook_payload("contact.updated", {
             "object": "contact",
-            "id": sample_contact.openphone_contact_id,
+            "id": "CN123456"  # Contact doesn't have openphone_id field,
             "name": "Test Updated User",
             "firstName": "Test Updated",
             "lastName": "User",
@@ -369,7 +368,7 @@ class TestWebhookIntegrity:
         
         # Verify only one activity created
         activities = Activity.query.filter_by(
-            openphone_activity_id="MSG_DUP_123"
+            openphone_id="MSG_DUP_123"
         ).all()
         assert len(activities) == 1
     
@@ -389,7 +388,7 @@ class TestWebhookIntegrity:
         
         # Verify no partial data saved
         activity = Activity.query.filter_by(
-            openphone_activity_id="MSG_ERROR_123"
+            openphone_id="MSG_ERROR_123"
         ).first()
         assert activity is None
     
@@ -420,7 +419,7 @@ class TestWebhookIntegrity:
         
         # Verify activity linked to new contact
         activity = Activity.query.filter_by(
-            openphone_activity_id="MSG_UNKNOWN_123"
+            openphone_id="MSG_UNKNOWN_123"
         ).first()
         assert activity.contact_id == contact.id
     

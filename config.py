@@ -151,21 +151,27 @@ class ProductionConfig(Config):
     TESTING = False
     
     # Production database
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        Config.get_required_env('POSTGRES_URI')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', '')
     
     # Security settings for production
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_NAME = 'attackacrack_session'
     
-    # Production Redis
-    CELERY_BROKER_URL = Config.get_required_env('REDIS_URL')
-    CELERY_RESULT_BACKEND = Config.get_required_env('REDIS_URL')
+    # Production Redis - will be validated in init_app
+    CELERY_BROKER_URL = os.environ.get('REDIS_URL', '')
+    CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', '')
     
     @classmethod
     def init_app(cls, app):
         """Production-specific initialization"""
         Config.init_app(app)
+        
+        # Validate required environment variables
+        if not cls.SQLALCHEMY_DATABASE_URI:
+            cls.SQLALCHEMY_DATABASE_URI = cls.get_required_env('POSTGRES_URI')
+        if not cls.CELERY_BROKER_URL:
+            cls.CELERY_BROKER_URL = cls.get_required_env('REDIS_URL')
+            cls.CELERY_RESULT_BACKEND = cls.CELERY_BROKER_URL
         
         # Validate all required config
         cls.validate_required_config()

@@ -41,8 +41,20 @@ def app():
         reminder_template = Setting(key='appointment_reminder_template', value='Hi {first_name}, reminder for {appointment_date} at {appointment_time}.')
         review_template = Setting(key='review_request_template', value='Hi {first_name}, please leave a review!')
         
+        # Create test user for authentication
+        from crm_database import User
+        from flask_bcrypt import generate_password_hash
+        test_user = User(
+            email='test@example.com',
+            password_hash=generate_password_hash('testpassword').decode('utf-8'),
+            first_name='Test',
+            last_name='User',
+            role='admin',
+            is_active=True
+        )
+        
         # Add all the created objects to the database session
-        db.session.add_all([contact, prop, job, quote, invoice, appointment, reminder_template, review_template])
+        db.session.add_all([contact, prop, job, quote, invoice, appointment, reminder_template, review_template, test_user])
         
         # Commit the changes to the database
         db.session.commit()
@@ -63,6 +75,24 @@ def client(app):
     It depends on the 'app' fixture.
     """
     return app.test_client()
+
+@pytest.fixture(scope='function')
+def authenticated_client(app, client):
+    """
+    A fixture that provides an authenticated test client.
+    Logs in the test user before each test.
+    """
+    with app.app_context():
+        # Login the test user
+        response = client.post('/auth/login', data={
+            'email': 'test@example.com',
+            'password': 'testpassword'
+        }, follow_redirects=True)
+        
+        yield client
+        
+        # Logout after test
+        client.get('/auth/logout')
 
 @pytest.fixture(scope='function')
 def db_session(app):

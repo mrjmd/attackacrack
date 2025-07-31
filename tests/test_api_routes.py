@@ -7,13 +7,13 @@ import json
 import hmac
 import hashlib
 
-def test_get_contacts_api(client):
+def test_get_contacts_api(authenticated_client):
     """
-    GIVEN a test client
+    GIVEN an authenticated test client
     WHEN the '/api/contacts' endpoint is requested
     THEN check that the response is successful and contains the seeded contact data.
     """
-    response = client.get('/api/contacts')
+    response = authenticated_client.get('/api/contacts')
     assert response.status_code == 200
     data = json.loads(response.data)
     assert isinstance(data, list)

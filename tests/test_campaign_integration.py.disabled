@@ -8,8 +8,8 @@ from unittest.mock import Mock, patch, MagicMock
 from flask import url_for
 
 from crm_database import (
-    Contact, Campaign, CampaignList, CampaignRecipient,
-    CampaignMessage, Property, ContactProperty
+    Contact, Campaign, CampaignList, CampaignMembership,
+    CampaignListMember, Property, Activity, ContactFlag
 )
 from services.campaign_service import CampaignService
 from services.openphone_service import OpenPhoneService
@@ -92,11 +92,10 @@ class TestCampaignIntegration:
         """Create a sample campaign."""
         campaign = Campaign(
             name="Test Campaign",
-            type="sms",
+            campaign_type="blast",
             status="draft",
-            message_template="Hi {first_name}, this is a test message for {city} residents.",
-            total_recipients=0,
-            sent_count=0
+            template_a="Hi {first_name}, this is a test message for {city} residents.",
+            channel="sms"
         )
         db.session.add(campaign)
         db.session.commit()
@@ -116,7 +115,7 @@ class TestCampaignIntegration:
         )
         
         # Verify recipients were added
-        recipients = CampaignRecipient.query.filter_by(
+        recipients = CampaignMembership.query.filter_by(
             campaign_id=sample_campaign.id
         ).all()
         assert len(recipients) == 5
@@ -180,7 +179,7 @@ class TestCampaignIntegration:
         )
         
         # Verify correct recipients selected (5 SF contacts)
-        recipients = CampaignRecipient.query.filter_by(
+        recipients = CampaignMembership.query.filter_by(
             campaign_id=sample_campaign.id
         ).all()
         assert len(recipients) == 5
@@ -255,7 +254,7 @@ class TestCampaignIntegration:
         )
         
         # Only opted-in contact should be recipient
-        recipients = CampaignRecipient.query.filter_by(
+        recipients = CampaignMembership.query.filter_by(
             campaign_id=sample_campaign.id
         ).all()
         recipient_contact_ids = [r.contact_id for r in recipients]
@@ -317,7 +316,7 @@ class TestCampaignIntegration:
             mock_send.return_value = {'success': True, 'data': {'id': 'msg123'}}
             
             # Manually update first 2 recipients to sent
-            recipients = CampaignRecipient.query.filter_by(
+            recipients = CampaignMembership.query.filter_by(
                 campaign_id=sample_campaign.id
             ).limit(2).all()
             for r in recipients:
@@ -360,7 +359,7 @@ class TestCampaignIntegration:
         campaign_service.start_campaign(sample_campaign.id)
         
         # Simulate some messages sent, some failed
-        recipients = CampaignRecipient.query.filter_by(
+        recipients = CampaignMembership.query.filter_by(
             campaign_id=sample_campaign.id
         ).all()
         

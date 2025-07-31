@@ -1,7 +1,7 @@
 import pytest
 from flask import url_for
 
-def test_dashboard_route_with_mocking(client, mocker, app):
+def test_dashboard_route_with_mocking(authenticated_client, mocker, app):
     """
     GIVEN a test client and the pytest mocker
     WHEN the dashboard route is requested
@@ -22,7 +22,7 @@ def test_dashboard_route_with_mocking(client, mocker, app):
     mocker.patch('services.message_service.MessageService.get_latest_conversations_from_db', return_value=[])
     
     with app.test_request_context():
-        response = client.get(url_for('main.dashboard'))
+        response = authenticated_client.get(url_for('main.dashboard'))
     
     assert response.status_code == 200
     assert b'<h1 class="text-3xl font-bold text-white">Dashboard</h1>' in response.data

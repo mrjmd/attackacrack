@@ -65,7 +65,7 @@ class AIService:
             return extracted_text
             
         except Exception as e:
-            logger.error("Error calling Gemini API for address parsing", error=str(e), address=address)
+            logger.error("Error calling Gemini API for address parsing", error=str(e), text=text)
             return None
 
     # --- NEW METHOD FOR NAME DETECTION ---
@@ -106,7 +106,7 @@ class AIService:
             return first_name, last_name
             
         except Exception as e:
-            logger.error("Error calling Gemini API for name parsing", error=str(e), full_name=full_name)
+            logger.error("Error calling Gemini API for name parsing", error=str(e), text=text)
             return None, None
 
     # --- NEW METHOD ---
