@@ -129,25 +129,10 @@
                             Users
                         </a>
                         {% endif %}
-                        <a href="{{ url_for('settings.imports') }}" 
-                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'settings.imports' %}bg-gray-700 text-blue-400{% endif %}">
-                            <span class="mr-3 text-lg">📥</span>
-                            Data Imports
-                        </a>
-                        <a href="{{ url_for('settings.automation') }}" 
-                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'settings.automation' %}bg-gray-700 text-blue-400{% endif %}">
-                            <span class="mr-3 text-lg">⚙️</span>
-                            Automation
-                        </a>
-                        <a href="{{ url_for('settings.sync_health') }}" 
-                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'settings.sync_health' %}bg-gray-700 text-blue-400{% endif %}">
-                            <span class="mr-3 text-lg">🔄</span>
-                            Sync Health
-                        </a>
                         <a href="{{ url_for('main.settings') }}" 
-                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'main.settings' %}bg-gray-700 text-blue-400{% endif %}">
-                            <span class="mr-3 text-lg">🔧</span>
-                            System Settings
+                           class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'main.settings' or request.endpoint.startswith('settings.') %}bg-gray-700 text-blue-400{% endif %}">
+                            <span class="mr-3 text-lg">⚙️</span>
+                            Settings
                         </a>
                     </div>
                     

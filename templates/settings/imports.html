@@ -4,11 +4,36 @@
 
 {% block content %}
 <div class="space-y-6">
+    <h1 class="text-3xl font-bold text-white">Settings</h1>
+    
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-700">
+        <nav class="-mb-px flex space-x-8">
+            <a href="{{ url_for('main.settings') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                Overview
+            </a>
+            <a href="{{ url_for('settings.imports') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-400">
+                Data Imports
+            </a>
+            <a href="{{ url_for('settings.automation') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                Automation
+            </a>
+            <a href="{{ url_for('settings.quickbooks') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                QuickBooks
+            </a>
+            <a href="{{ url_for('settings.sync_health') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                Sync Health
+            </a>
+        </nav>
+    </div>
+    
     <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-white">Data Imports</h1>
-        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-            ➕ Add New Import
-        </button>
+        <h2 class="text-2xl font-semibold text-white">Data Imports</h2>
     </div>
 
     <!-- Import Sources Grid -->
@@ -63,7 +88,7 @@
         </div>
 
         <!-- PropertyRadar Import -->
-        <div class="bg-gray-700 rounded-lg p-6 opacity-75">
+        <div class="bg-gray-700 rounded-lg p-6">
             <div class="flex items-center mb-4">
                 <span class="text-2xl mr-3">🏠</span>
                 <div>
@@ -74,16 +99,16 @@
             <div class="space-y-2 mb-4">
                 <div class="flex justify-between text-sm">
                     <span class="text-gray-400">Status:</span>
-                    <span class="text-yellow-400">Coming Soon</span>
+                    <span class="text-green-400">Available</span>
                 </div>
                 <div class="flex justify-between text-sm">
                     <span class="text-gray-400">Import:</span>
-                    <span class="text-gray-400">Leads, Properties</span>
+                    <span class="text-gray-400">Properties</span>
                 </div>
             </div>
-            <button class="w-full bg-gray-600 text-gray-400 py-2 rounded cursor-not-allowed" disabled>
-                🔗 Connect
-            </button>
+            <a href="{{ url_for('main.import_property_radar') }}" class="block w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-center">
+                📤 Upload PropertyRadar CSV
+            </a>
         </div>
 
         <!-- CSV Import -->
@@ -105,9 +130,9 @@
                     <span class="text-white">Contacts, Properties</span>
                 </div>
             </div>
-            <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">
-                📤 Upload CSV
-            </button>
+            <a href="{{ url_for('main.import_csv') }}" class="block w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-center">
+                📤 Upload Contacts CSV
+            </a>
         </div>
 
         <!-- Google Calendar -->
