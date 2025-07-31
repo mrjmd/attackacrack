@@ -50,31 +50,29 @@ def marketer_user(db_session):
 
 
 @pytest.fixture
-def admin_client(app, client, admin_user):
+def admin_client(app, admin_user, db_session):
     """Fixture providing an authenticated admin client"""
-    with app.app_context():
-        response = client.post('/auth/login', data={
-            'email': admin_user.email,
-            'password': 'AdminPass123!'
-        }, follow_redirects=True)
-        
-        yield client
-        
-        client.get('/auth/logout')
+    client = app.test_client()
+    
+    with client.session_transaction() as sess:
+        # Manually log in the user by setting session
+        sess['_user_id'] = str(admin_user.id)
+        sess['_fresh'] = True
+    
+    return client
 
 
 @pytest.fixture
-def marketer_client(app, client, marketer_user):
+def marketer_client(app, marketer_user, db_session):
     """Fixture providing an authenticated marketer client"""
-    with app.app_context():
-        response = client.post('/auth/login', data={
-            'email': marketer_user.email,
-            'password': 'MarketerPass123!'
-        }, follow_redirects=True)
-        
-        yield client
-        
-        client.get('/auth/logout')
+    client = app.test_client()
+    
+    with client.session_transaction() as sess:
+        # Manually log in the user by setting session
+        sess['_user_id'] = str(marketer_user.id)
+        sess['_fresh'] = True
+    
+    return client
 
 
 @pytest.fixture
@@ -228,16 +226,18 @@ class TestRoleBasedAccess:
 class TestInviteFlow:
     """Test user invite flow"""
     
-    def test_invite_user_page_admin_only(self, admin_client, marketer_client):
+    def test_invite_user_page_admin_only(self, admin_client, marketer_client, app):
         """Test invite user page is admin only"""
         # Admin can access
-        response = admin_client.get('/auth/invite')
-        assert response.status_code == 200
-        assert b'Invite' in response.data or b'invite' in response.data
+        with app.app_context():
+            response = admin_client.get('/auth/invite')
+            assert response.status_code == 200
+            assert b'Invite' in response.data or b'invite' in response.data
         
         # Marketer cannot access
-        response = marketer_client.get('/auth/invite', follow_redirects=False)
-        assert response.status_code == 302  # Redirected
+        with app.app_context():
+            response = marketer_client.get('/auth/invite', follow_redirects=False)
+            assert response.status_code == 302  # Redirected
     
     @patch('services.auth_service.AuthService.send_invite_email')
     def test_invite_user_success(self, mock_send_email, admin_client, app):
@@ -322,18 +322,20 @@ class TestInviteFlow:
 class TestUserManagement:
     """Test user management functionality"""
     
-    def test_users_list_admin_only(self, admin_client, marketer_client, admin_user, marketer_user):
+    def test_users_list_admin_only(self, admin_client, marketer_client, admin_user, marketer_user, app):
         """Test users list is admin only"""
         # Admin can view
-        response = admin_client.get('/auth/users')
-        assert response.status_code == 200
-        # Check page loaded with user data
-        assert admin_user.email.encode() in response.data
-        assert marketer_user.email.encode() in response.data
+        with app.app_context():
+            response = admin_client.get('/auth/users')
+            assert response.status_code == 200
+            # Check page loaded with user data
+            assert admin_user.email.encode() in response.data
+            assert marketer_user.email.encode() in response.data
         
         # Marketer cannot view
-        response = marketer_client.get('/auth/users', follow_redirects=False)
-        assert response.status_code == 302  # Redirected
+        with app.app_context():
+            response = marketer_client.get('/auth/users', follow_redirects=False)
+            assert response.status_code == 302  # Redirected
     
     def test_toggle_user_status(self, admin_client, marketer_user, db_session):
         """Test toggling user status"""
