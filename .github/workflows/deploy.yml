@@ -1,0 +1,103 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+      tag:
+        description: 'Docker image tag to deploy (leave empty for latest)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: registry.digitalocean.com
+  IMAGE_NAME: attackacrack-crm
+
+jobs:
+  deploy:
+    name: Deploy to DigitalOcean App Platform
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+    
+    - name: Determine image tag
+      id: image-tag
+      run: |
+        if [ -z "${{ github.event.inputs.tag }}" ]; then
+          echo "tag=latest" >> $GITHUB_OUTPUT
+        else
+          echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Update app spec with new image
+      run: |
+        # Update the Docker image reference in app.yaml
+        IMAGE_REF="${{ env.REGISTRY }}/${{ secrets.DIGITALOCEAN_REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}"
+        
+        # Create a temporary app spec with the image reference
+        cp .do/app.yaml .do/app-deploy.yaml
+        echo "  image:" >> .do/app-deploy.yaml
+        echo "    registry_type: DOCR" >> .do/app-deploy.yaml
+        echo "    repository: ${{ env.IMAGE_NAME }}" >> .do/app-deploy.yaml
+        echo "    tag: ${{ steps.image-tag.outputs.tag }}" >> .do/app-deploy.yaml
+    
+    - name: Validate app spec
+      run: |
+        doctl apps spec validate .do/app-deploy.yaml
+    
+    - name: Deploy to DigitalOcean
+      run: |
+        # Get the app ID
+        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-crm | awk '{print $1}')
+        
+        if [ -z "$APP_ID" ]; then
+          echo "Creating new app..."
+          doctl apps create --spec .do/app-deploy.yaml --wait
+        else
+          echo "Updating existing app..."
+          doctl apps update $APP_ID --spec .do/app-deploy.yaml --wait
+        fi
+    
+    - name: Get deployment status
+      run: |
+        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-crm | awk '{print $1}')
+        doctl apps get-deployment $APP_ID $(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
+    
+    - name: Verify health check
+      run: |
+        echo "Waiting for health check..."
+        sleep 30
+        
+        # Get the app URL
+        APP_URL=$(doctl apps get $(doctl apps list --format ID,Name --no-header | grep attackacrack-crm | awk '{print $1}') --format DefaultIngress --no-header)
+        
+        # Check health endpoint
+        curl -f https://$APP_URL/health || exit 1
+        echo "Health check passed!"
+    
+    - name: Send deployment notification
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          Deployment to ${{ github.event.inputs.environment }} ${{ job.status }}
+          Tag: ${{ steps.image-tag.outputs.tag }}
+          Actor: ${{ github.actor }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

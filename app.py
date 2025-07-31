@@ -14,6 +14,34 @@ from logging_config import setup_logging, get_logger
 setup_logging(app_name="attackacrack-crm", log_level="INFO")
 logger = get_logger(__name__)
 
+# Configure Sentry for production error tracking
+def init_sentry():
+    """Initialize Sentry error tracking in production."""
+    sentry_dsn = os.environ.get('SENTRY_DSN')
+    if sentry_dsn and os.environ.get('FLASK_ENV') == 'production':
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            integrations=[
+                FlaskIntegration(
+                    transaction_style='endpoint'
+                ),
+                SqlalchemyIntegration(),
+                CeleryIntegration()
+            ],
+            traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
+            profiles_sample_rate=0.1,  # 10% of transactions for profiling
+            environment=os.environ.get('FLASK_ENV', 'development'),
+            release=os.environ.get('GIT_SHA', 'unknown')
+        )
+        logger.info("Sentry error tracking initialized")
+
+init_sentry()
+
 def create_app(config_name=None, test_config=None):
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)

@@ -1,0 +1,121 @@
+spec:
+  name: attackacrack-crm
+  region: nyc
+  
+  # Environment variables shared across all components
+  envs:
+    - key: FLASK_ENV
+      value: production
+    - key: FLASK_APP
+      value: app.py
+    - key: OPENPHONE_API_KEY
+      type: SECRET
+    - key: OPENPHONE_PHONE_NUMBER
+      type: SECRET
+    - key: OPENPHONE_PHONE_NUMBER_ID
+      type: SECRET
+    - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+      type: SECRET
+    - key: GOOGLE_CLIENT_ID
+      type: SECRET
+    - key: GOOGLE_CLIENT_SECRET
+      type: SECRET
+    - key: GOOGLE_PROJECT_ID
+      type: SECRET
+    - key: GEMINI_API_KEY
+      type: SECRET
+    - key: SECRET_KEY
+      type: SECRET
+    - key: DATABASE_URL
+      value: ${db.DATABASE_URL}
+    - key: POSTGRES_URI
+      value: ${db.DATABASE_URL}
+    - key: REDIS_URL
+      value: ${redis.REDIS_URL}
+    - key: CELERY_BROKER_URL
+      value: ${redis.REDIS_URL}
+    - key: CELERY_RESULT_BACKEND
+      value: ${redis.REDIS_URL}
+    - key: SENTRY_DSN
+      type: SECRET
+    - key: GIT_SHA
+      value: ${_self.COMMIT_HASH}
+
+  # Services
+  services:
+    # Main web application
+    - name: web
+      dockerfile_path: Dockerfile
+      source_dir: /
+      http_port: 5001
+      instance_count: 1
+      instance_size_slug: professional-xs
+      routes:
+        - path: /
+      health_check:
+        http_path: /health
+        initial_delay_seconds: 30
+        period_seconds: 30
+        timeout_seconds: 10
+        success_threshold: 1
+        failure_threshold: 3
+      run_command: gunicorn --bind :5001 --workers 2 --threads 4 --timeout 120 app:app
+
+  # Background workers
+  workers:
+    # Celery worker for async tasks
+    - name: celery-worker
+      dockerfile_path: Dockerfile
+      source_dir: /
+      instance_count: 1
+      instance_size_slug: professional-xs
+      run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
+      
+    # Celery beat for scheduled tasks
+    - name: celery-beat
+      dockerfile_path: Dockerfile
+      source_dir: /
+      instance_count: 1
+      instance_size_slug: professional-xs
+      run_command: celery -A celery_worker.celery beat --loglevel=info
+
+  # Databases
+  databases:
+    - name: db
+      engine: PG
+      version: "15"
+      size: db-s-dev-database
+      num_nodes: 1
+      production: true
+
+  # Job to run database migrations
+  jobs:
+    - name: migrate
+      kind: PRE_DEPLOY
+      dockerfile_path: Dockerfile
+      source_dir: /
+      run_command: flask db upgrade
+      instance_count: 1
+      instance_size_slug: professional-xs
+      envs:
+        - key: DATABASE_URL
+          value: ${db.DATABASE_URL}
+
+  # Redis for Celery
+  features:
+    - name: redis
+      type: redis
+      version: "7"
+
+  # Alerts
+  alerts:
+    - rule: DEPLOYMENT_FAILED
+    - rule: DEPLOYMENT_LIVE
+    - rule: DOMAIN_FAILED
+    - rule: DOMAIN_LIVE
+
+  # Domain configuration (update with your actual domain)
+  domains:
+    - domain: crm.attackacrack.com
+      type: PRIMARY
+      zone: attackacrack.com

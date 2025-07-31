@@ -11,6 +11,30 @@ from crm_database import Activity # Import Activity
 
 api_bp = Blueprint('api', __name__)
 
+@api_bp.route('/health')
+def health_check():
+    """Health check endpoint for monitoring."""
+    try:
+        # Check database connection
+        from extensions import db
+        db.session.execute('SELECT 1')
+        
+        # Check Redis connection
+        from celery_worker import celery
+        celery.backend.get('health_check_test')
+        
+        return jsonify({
+            'status': 'healthy',
+            'service': 'attackacrack-crm',
+            'database': 'connected',
+            'redis': 'connected'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 503
+
 def verify_openphone_signature(f):
     """Decorator to verify webhook signature."""
     @wraps(f)
