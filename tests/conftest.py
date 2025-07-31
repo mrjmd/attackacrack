@@ -17,12 +17,8 @@ def app():
     This ensures that tests within a module run against a clean, consistent
     application and database state.
     """
-    # Create a new app instance with a test-specific configuration
-    app = create_app(test_config={
-        'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:', # Use an in-memory SQLite database for tests
-        'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'WTF_CSRF_ENABLED': False, # Disable CSRF for easier form testing
+    # Create a new app instance with testing configuration
+    app = create_app(config_name='testing', test_config={
         'SERVER_NAME': 'localhost.localdomain' # Required for url_for in tests
     })
 

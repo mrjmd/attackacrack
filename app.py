@@ -2,7 +2,7 @@
 
 from flask import Flask, g, request
 from flask_migrate import Migrate
-from config import Config
+from config import get_config
 from extensions import db, login_manager, bcrypt
 from datetime import datetime
 import os
@@ -14,11 +14,15 @@ from logging_config import setup_logging, get_logger
 setup_logging(app_name="attackacrack-crm", log_level="INFO")
 logger = get_logger(__name__)
 
-def create_app(config_class=Config, test_config=None):
+def create_app(config_name=None, test_config=None):
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
     
+    config_class = get_config(config_name)
     app.config.from_object(config_class)
+    
+    # Initialize app with config
+    config_class.init_app(app)
     
     if test_config:
         app.config.update(test_config)
