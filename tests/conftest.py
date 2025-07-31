@@ -6,7 +6,7 @@ Fixtures defined here are automatically available to all tests.
 import pytest
 from app import create_app
 from extensions import db
-from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Setting
+from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Setting, InviteToken
 from datetime import date, time
 from unittest.mock import MagicMock # Import MagicMock
 
