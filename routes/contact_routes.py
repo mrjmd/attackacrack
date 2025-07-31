@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, curren
 from flask_login import login_required
 from datetime import datetime, timedelta
 from sqlalchemy import or_, and_, func
+from sqlalchemy.orm import joinedload, selectinload
 from services.contact_service import ContactService
 from services.message_service import MessageService 
 from extensions import db
@@ -13,8 +14,33 @@ contact_bp = Blueprint('contact', __name__)
 @login_required
 def list_all():
     contact_service = ContactService()
-    all_contacts = contact_service.get_all_contacts()
-    return render_template('contact_list.html', contacts=all_contacts)
+    
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 100, type=int)
+    search = request.args.get('search', '').strip()
+    
+    # Get paginated contacts
+    if search:
+        contacts_paginated = Contact.query.filter(
+            db.or_(
+                Contact.first_name.ilike(f'%{search}%'),
+                Contact.last_name.ilike(f'%{search}%'),
+                Contact.phone.ilike(f'%{search}%'),
+                Contact.email.ilike(f'%{search}%')
+            )
+        ).order_by(Contact.last_name, Contact.first_name).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        contacts_paginated = Contact.query.order_by(
+            Contact.last_name, Contact.first_name
+        ).paginate(page=page, per_page=per_page, error_out=False)
+    
+    return render_template('contact_list.html', 
+                         contacts=contacts_paginated.items,
+                         pagination=contacts_paginated,
+                         search=search)
 
 @contact_bp.route('/conversations')
 @login_required
@@ -30,7 +56,11 @@ def conversation_list():
     per_page = 20
     
     # Start with base query - only conversations with activities
-    query = db.session.query(Conversation).join(Contact).filter(
+    # Use eager loading to prevent N+1 queries
+    query = db.session.query(Conversation).options(
+        joinedload(Conversation.contact),
+        selectinload(Conversation.activities)
+    ).join(Contact).filter(
         Conversation.id.in_(
             db.session.query(Activity.conversation_id).distinct()
         )
@@ -103,43 +133,46 @@ def conversation_list():
     total_conversations = query.count()
     conversations = query.offset((page - 1) * per_page).limit(per_page).all()
     
-    # Enhance conversations with metadata
+    # Get all contact IDs for flag lookup
+    contact_ids = [conv.contact_id for conv in conversations]
+    
+    # Batch query for office flags
+    office_flags = set()
+    if contact_ids:
+        office_flag_results = db.session.query(ContactFlag.contact_id).filter(
+            ContactFlag.contact_id.in_(contact_ids),
+            ContactFlag.flag_type == 'office_number'
+        ).all()
+        office_flags = {flag.contact_id for flag in office_flag_results}
+    
+    # Enhance conversations with metadata using pre-loaded data
     enhanced_conversations = []
     for conv in conversations:
-        # Get latest activity
-        latest_activity = Activity.query.filter_by(conversation_id=conv.id).order_by(Activity.created_at.desc()).first()
+        # Process pre-loaded activities
+        activities = conv.activities  # Already loaded via selectinload
         
-        # Check for unread status
-        latest_incoming = Activity.query.filter_by(
-            conversation_id=conv.id, 
-            direction='incoming'
-        ).order_by(Activity.created_at.desc()).first()
+        # Get latest activity from pre-loaded activities
+        latest_activity = max(activities, key=lambda a: a.created_at) if activities else None
         
-        latest_outgoing = Activity.query.filter_by(
-            conversation_id=conv.id, 
-            direction='outgoing'
-        ).order_by(Activity.created_at.desc()).first()
+        # Check for unread status using pre-loaded activities
+        incoming_activities = [a for a in activities if a.direction == 'incoming']
+        outgoing_activities = [a for a in activities if a.direction == 'outgoing']
+        
+        latest_incoming = max(incoming_activities, key=lambda a: a.created_at) if incoming_activities else None
+        latest_outgoing = max(outgoing_activities, key=lambda a: a.created_at) if outgoing_activities else None
         
         is_unread = (latest_incoming and 
                     (not latest_outgoing or latest_incoming.created_at > latest_outgoing.created_at))
         
-        # Check for attachments
-        has_attachments = Activity.query.filter(
-            Activity.conversation_id == conv.id,
-            Activity.media_urls.isnot(None)
-        ).first() is not None
+        # Check for attachments and AI content in pre-loaded activities
+        has_attachments = any(a.media_urls for a in activities)
+        has_ai_summary = any(a.ai_summary for a in activities)
         
-        # Check for AI content
-        has_ai_summary = Activity.query.filter(
-            Activity.conversation_id == conv.id,
-            Activity.ai_summary.isnot(None)
-        ).first() is not None
+        # Check if office number using pre-fetched flags
+        is_office_number = conv.contact_id in office_flags
         
-        # Check if office number
-        is_office_number = ContactFlag.query.filter_by(
-            contact_id=conv.contact_id,
-            flag_type='office_number'
-        ).first() is not None
+        # Message count from pre-loaded activities
+        message_count = len(activities)
         
         enhanced_conversations.append({
             'conversation': conv,
@@ -148,7 +181,7 @@ def conversation_list():
             'has_attachments': has_attachments,
             'has_ai_summary': has_ai_summary,
             'is_office_number': is_office_number,
-            'message_count': Activity.query.filter_by(conversation_id=conv.id).count()
+            'message_count': message_count
         })
     
     # Calculate pagination
@@ -314,17 +347,26 @@ def contact_detail(contact_id):
 def conversation(contact_id):
     contact_service = ContactService()
     message_service = MessageService()
-    contact = contact_service.get_contact_by_id(contact_id)
-    activities = message_service.get_activities_for_contact(contact_id)
     
     # Additional data for enhanced view
-    from crm_database import Job, ContactFlag, CampaignMembership, Campaign
+    from crm_database import Job, ContactFlag, CampaignMembership, Campaign, Property
     
-    # Get recent jobs
+    # Get contact with eager loading for properties and their jobs
+    contact = Contact.query.options(
+        selectinload(Contact.properties).selectinload(Property.jobs)
+    ).filter_by(id=contact_id).first()
+    
+    if not contact:
+        flash('Contact not found', 'error')
+        return redirect(url_for('contact.list_all'))
+    
+    activities = message_service.get_activities_for_contact(contact_id)
+    
+    # Get recent jobs from pre-loaded properties
     recent_jobs = []
     if contact.properties:
         for prop in contact.properties:
-            recent_jobs.extend(prop.jobs)
+            recent_jobs.extend(prop.jobs)  # Jobs are already loaded
     recent_jobs = sorted(recent_jobs, key=lambda x: x.completed_at if x.completed_at else datetime.min, reverse=True)[:3]
     
     # Check for flags
@@ -338,10 +380,12 @@ def conversation(contact_id):
         flag_type='opted_out'
     ).first() is not None
     
-    # Get campaign memberships
-    campaign_memberships = CampaignMembership.query.filter_by(
+    # Get campaign memberships with eager loading
+    campaign_memberships = CampaignMembership.query.options(
+        joinedload(CampaignMembership.campaign)
+    ).filter_by(
         contact_id=contact_id
-    ).join(Campaign).order_by(CampaignMembership.sent_at.desc()).limit(3).all()
+    ).order_by(CampaignMembership.sent_at.desc()).limit(3).all()
     
     # Calculate statistics
     call_count = sum(1 for a in activities if a.activity_type == 'call')

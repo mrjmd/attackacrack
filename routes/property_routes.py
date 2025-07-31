@@ -2,6 +2,8 @@ from flask import Blueprint, render_template, request, redirect, url_for
 from flask_login import login_required
 from services.property_service import PropertyService
 from services.contact_service import ContactService
+from crm_database import Property
+from extensions import db
 
 property_bp = Blueprint('property', __name__)
 property_service = PropertyService()
@@ -10,8 +12,29 @@ contact_service = ContactService()
 @property_bp.route('/')
 @login_required
 def list_all():
-    all_properties = property_service.get_all_properties()
-    return render_template('property_list.html', properties=all_properties)
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 100, type=int)
+    search = request.args.get('search', '').strip()
+    
+    # Get paginated properties
+    query = Property.query
+    if search:
+        query = query.filter(
+            db.or_(
+                Property.address.ilike(f'%{search}%'),
+                Property.property_type.ilike(f'%{search}%')
+            )
+        )
+    
+    properties_paginated = query.order_by(Property.address).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return render_template('property_list.html', 
+                         properties=properties_paginated.items,
+                         pagination=properties_paginated,
+                         search=search)
 
 @property_bp.route('/<int:property_id>')
 @login_required

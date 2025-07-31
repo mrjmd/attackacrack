@@ -102,6 +102,10 @@ class Contact(db.Model):
     last_payment_date = db.Column(db.DateTime, nullable=True)
     average_days_to_pay = db.Column(db.Integer, nullable=True)
     
+    # Production-required fields
+    lead_source = db.Column(db.String(100), nullable=True)  # e.g., 'website', 'referral', 'cold-call'
+    customer_since = db.Column(db.Date, nullable=True)  # Date when prospect became customer
+    
     properties = db.relationship('Property', backref='contact', lazy=True, cascade="all, delete-orphan")
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
     # A contact can now have multiple conversations
@@ -111,6 +115,7 @@ class Property(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     address = db.Column(db.String(200), nullable=False)
     contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
+    property_type = db.Column(db.String(50), nullable=True)  # e.g., 'residential', 'commercial', 'industrial'
     jobs = db.relationship('Job', backref='property', lazy=True, cascade="all, delete-orphan")
 
 class Job(db.Model):

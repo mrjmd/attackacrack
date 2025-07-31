@@ -32,6 +32,7 @@ def index():
 def dashboard():
     from datetime import datetime, timedelta
     from sqlalchemy import func
+    from sqlalchemy.orm import selectinload, joinedload
     from crm_database import Contact, Campaign, CampaignMembership, Activity, Conversation
     from services.campaign_service import CampaignService
     
@@ -54,13 +55,20 @@ def dashboard():
     active_campaigns = Campaign.query.filter_by(status='running').count()
     
     # Campaign response rate (average across all campaigns)
-    all_campaigns = Campaign.query.all()
+    # Use eager loading to get campaigns with their memberships
+    all_campaigns = Campaign.query.options(
+        selectinload(Campaign.memberships)
+    ).all()
+    
     response_rates = []
     try:
         for campaign in all_campaigns:
-            analytics = campaign_service.get_campaign_analytics(campaign.id)
-            if analytics.get('sent_count', 0) > 0:
-                response_rates.append(analytics['response_rate'] * 100)
+            # Calculate response rate using pre-loaded memberships
+            sent_count = sum(1 for m in campaign.memberships if m.status in ['sent', 'replied_positive', 'replied_negative'])
+            if sent_count > 0:
+                replied_count = sum(1 for m in campaign.memberships if m.status in ['replied_positive', 'replied_negative'])
+                response_rate = (replied_count / sent_count) * 100
+                response_rates.append(response_rate)
     except Exception as e:
         # Handle case where campaign service fails
         pass
@@ -104,11 +112,15 @@ def dashboard():
     }
     
     # Activity Timeline Data (get more conversations and sort by most recent activity)
-    latest_conversations = message_service.get_latest_conversations_from_db(limit=20)
+    # Use eager loading for conversations with their contacts and activities
+    latest_conversations = Conversation.query.options(
+        joinedload(Conversation.contact),
+        selectinload(Conversation.activities)
+    ).order_by(Conversation.last_activity_at.desc()).limit(20).all()
     
     openphone_texts = []
     for conv in latest_conversations:
-        # Get the most recent activity for this conversation
+        # Get the most recent activity from pre-loaded activities
         last_activity = max(conv.activities, key=lambda act: act.created_at) if conv.activities else None
         if last_activity:
             # Determine content based on activity type
