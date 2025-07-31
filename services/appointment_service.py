@@ -55,7 +55,7 @@ class AppointmentService:
 
         except Exception as e:
             # It's generally better to log the error than just print it in a production app
-            logger.error("Failed to create Google Calendar event after saving appointment", error=str(e), appointment_id=appointment.id)
+            logger.error("Failed to create Google Calendar event after saving appointment", error=str(e), appointment_id=new_appointment.id)
 
         return new_appointment
 
@@ -73,7 +73,7 @@ class AppointmentService:
         """
         # --- DELETE GOOGLE EVENT FIRST ---
         if appointment.google_calendar_event_id:
-            logger.info("Deleting corresponding Google Calendar event", event_id=appointment.google_calendar_event_id, appointment_id=appointment_id)
+            logger.info("Deleting corresponding Google Calendar event", event_id=appointment.google_calendar_event_id, appointment_id=appointment.id)
             delete_google_calendar_event(appointment.google_calendar_event_id)
         # --- END DELETE ---
         

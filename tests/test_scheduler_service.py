@@ -12,11 +12,11 @@ from services import scheduler_service
 class TestAppointmentReminders:
     """Test appointment reminder task functionality"""
     
-    @patch('services.scheduler_service.send_sms')
+    @patch('services.scheduler_service.OpenPhoneService')
     @patch('services.scheduler_service.date')
     @patch('services.scheduler_service.Setting')
     @patch('services.scheduler_service.db.session')
-    def test_send_appointment_reminders_success(self, mock_session, mock_setting, mock_date, mock_send_sms):
+    def test_send_appointment_reminders_success(self, mock_session, mock_setting, mock_date, mock_openphone_service):
         """Test successful sending of appointment reminders"""
         mock_date.today.return_value = date(2025, 1, 1)
         
@@ -37,9 +37,14 @@ class TestAppointmentReminders:
         
         mock_session.query.return_value.filter.return_value.all.return_value = [mock_appointment]
         
+        # Mock OpenPhoneService instance and its send_message method
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message.return_value = {'success': True}
+        mock_openphone_service.return_value = mock_service_instance
+        
         scheduler_service.send_appointment_reminders()
         
-        mock_send_sms.assert_called_once_with(
+        mock_service_instance.send_message.assert_called_once_with(
             "+1555123456",
             "Hi John, this is a reminder about your appointment on January 02, 2025 at 10:00 am."
         )
@@ -56,14 +61,18 @@ class TestAppointmentReminders:
             "Appointment reminder template not found in settings. Aborting task."
         )
     
-    @patch('services.scheduler_service.send_sms')
+    @patch('services.scheduler_service.OpenPhoneService')
     @patch('services.scheduler_service.date')
     @patch('services.scheduler_service.Setting')  
     @patch('services.scheduler_service.db.session')
-    def test_send_appointment_reminders_sms_failure(self, mock_session, mock_setting, mock_date, mock_send_sms):
+    def test_send_appointment_reminders_sms_failure(self, mock_session, mock_setting, mock_date, mock_openphone_service):
         """Test appointment reminders when SMS sending fails"""
         mock_date.today.return_value = date(2025, 1, 1)
-        mock_send_sms.side_effect = Exception("SMS API Error")
+        
+        # Mock OpenPhoneService to raise exception
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message.side_effect = Exception("SMS API Error")
+        mock_openphone_service.return_value = mock_service_instance
         
         # Mock template
         mock_template = MagicMock()
@@ -90,11 +99,11 @@ class TestAppointmentReminders:
 class TestReviewRequests:
     """Test review request task functionality"""
     
-    @patch('services.scheduler_service.send_sms')
+    @patch('services.scheduler_service.OpenPhoneService')
     @patch('services.scheduler_service.datetime')
     @patch('services.scheduler_service.Setting')
     @patch('services.scheduler_service.Job')
-    def test_send_review_requests_success(self, mock_job, mock_setting, mock_datetime, mock_send_sms):
+    def test_send_review_requests_success(self, mock_job, mock_setting, mock_datetime, mock_openphone_service):
         """Test successful sending of review requests"""
         mock_datetime.utcnow.return_value = datetime(2025, 1, 2)
         
@@ -117,9 +126,14 @@ class TestReviewRequests:
         
         mock_job.query.filter.return_value.all.return_value = [mock_job_instance]
         
+        # Mock OpenPhoneService instance and its send_message method
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message.return_value = {'success': True}
+        mock_openphone_service.return_value = mock_service_instance
+        
         scheduler_service.send_review_requests()
         
-        mock_send_sms.assert_called_once_with(
+        mock_service_instance.send_message.assert_called_once_with(
             "+1555987654",
             "Hi Jane, please leave us a review!"
         )
@@ -212,11 +226,11 @@ class TestDailyTaskRunner:
 class TestSchedulerServiceErrorHandling:
     """Test error handling and edge cases"""
     
-    @patch('services.scheduler_service.send_sms')
+    @patch('services.scheduler_service.OpenPhoneService')
     @patch('services.scheduler_service.date')
     @patch('services.scheduler_service.Setting')
     @patch('services.scheduler_service.db.session')
-    def test_appointment_reminder_missing_contact(self, mock_session, mock_setting, mock_date, mock_send_sms):
+    def test_appointment_reminder_missing_contact(self, mock_session, mock_setting, mock_date, mock_openphone_service):
         """Test appointment reminders when contact is missing"""
         mock_date.today.return_value = date(2025, 1, 1)
         
@@ -238,7 +252,7 @@ class TestSchedulerServiceErrorHandling:
             mock_logging.warning.assert_called_with(
                 "Skipping reminder for appointment 1: contact or phone number missing."
             )
-            mock_send_sms.assert_not_called()
+            mock_openphone_service.assert_not_called()
     
     @patch('services.scheduler_service.InvoiceService')
     @patch('services.scheduler_service.date')

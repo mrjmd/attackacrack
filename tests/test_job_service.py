@@ -203,8 +203,8 @@ class TestJobService:
         property_jobs = [j for j in all_jobs if j.property_id == property_obj.id]
         assert len(property_jobs) == 2
     
-    @patch('builtins.print')  # Mock print statements
-    def test_get_or_create_active_job_logging(self, mock_print, job_service, test_contact_with_property):
+    @patch('services.job_service.logger')  # Mock logger instead of print
+    def test_get_or_create_active_job_logging(self, mock_logger, job_service, test_contact_with_property):
         """Test that get_or_create_active_job logs appropriately"""
         contact, property_obj = test_contact_with_property
         
@@ -212,17 +212,16 @@ class TestJobService:
         job_service.get_or_create_active_job(property_obj.id)
         
         # Should have logged about creating new job
-        mock_print.assert_any_call(f"No active job found for property {property_obj.id}. Creating a new one.")
+        mock_logger.info.assert_any_call("No active job found for property, creating new job", property_id=property_obj.id)
         
         # Reset mock and test existing scenario
-        mock_print.reset_mock()
+        mock_logger.reset_mock()
         
         # Now get the existing active job
         job_service.get_or_create_active_job(property_obj.id)
         
         # Should have logged about finding existing job
-        print_calls = [call[0][0] for call in mock_print.call_args_list]
-        assert any(f"Found existing active job" in call for call in print_calls)
+        mock_logger.info.assert_any_call("Found existing active job", job_id=mock_logger.info.call_args_list[0][1]['job_id'], property_id=property_obj.id)
 
 
 class TestJobServiceErrorHandling:
