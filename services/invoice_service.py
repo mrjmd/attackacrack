@@ -17,7 +17,9 @@ class InvoiceService:
     def create_invoice(data):
         new_invoice = Invoice(
             job_id=data['job_id'],
-            amount=data['amount'],
+            subtotal=data.get('subtotal', 0),
+            tax_amount=data.get('tax_amount', 0),
+            total_amount=data.get('total_amount', data.get('subtotal', 0)),
             due_date=data['due_date'],
             status=data.get('status', 'Draft')
         )
@@ -30,7 +32,9 @@ class InvoiceService:
         invoice = Invoice.query.get(invoice_id)
         if invoice:
             invoice.job_id = data.get('job_id', invoice.job_id)
-            invoice.amount = data.get('amount', invoice.amount)
+            invoice.subtotal = data.get('subtotal', invoice.subtotal)
+            invoice.tax_amount = data.get('tax_amount', invoice.tax_amount)
+            invoice.total_amount = data.get('total_amount', invoice.total_amount)
             invoice.due_date = data.get('due_date', invoice.due_date)
             invoice.status = data.get('status', invoice.status)
             db.session.commit()
@@ -64,7 +68,9 @@ class InvoiceService:
         # Create a new invoice based on the quote's data
         new_invoice = Invoice(
             job_id=quote.job_id,
-            amount=quote.amount,
+            subtotal=quote.subtotal,
+            tax_amount=quote.tax_amount,
+            total_amount=quote.total_amount,
             due_date=datetime.utcnow().date() + timedelta(days=30),
             status='Unpaid'  # Set initial status for the new invoice
         )
