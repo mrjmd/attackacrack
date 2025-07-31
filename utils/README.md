@@ -7,7 +7,6 @@ This directory contains various utility scripts for maintenance and data managem
 ### imports/
 Import and migration scripts for bringing data into the system:
 - `enhanced_openphone_import.py` - Enhanced import script for OpenPhone data
-- `full_openphone_import.py` - Full OpenPhone data import
 - `large_scale_import.py` - Script for handling large-scale data imports
 - `safe_dry_run_import.py` - Safe dry-run testing for imports
 - `import_manager.py` - General import management utilities
