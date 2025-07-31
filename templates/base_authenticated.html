@@ -108,11 +108,13 @@
                             <span class="mr-3 text-lg">📋</span>
                             Lists
                         </a>
+                        {# Temporarily hidden until financial dashboard is implemented
                         <a href="{{ url_for('growth.financials') }}" 
                            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors hover:bg-gray-700 {% if request.endpoint == 'growth.financials' %}bg-gray-700 text-blue-400{% endif %}">
                             <span class="mr-3 text-lg">📈</span>
                             Financials
                         </a>
+                        #}
                     </div>
                     
                     <!-- Settings Section -->
