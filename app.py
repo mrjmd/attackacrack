@@ -124,7 +124,7 @@ def create_app(config_name=None, test_config=None):
     # The background task scheduling is now handled by Celery Beat.
     
     # Register CLI commands
-    from utils import commands
+    from scripts import commands
     commands.init_app(app)
     
     return app

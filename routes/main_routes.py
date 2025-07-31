@@ -10,8 +10,8 @@ from services.job_service import JobService
 from services.quote_service import QuoteService
 from services.appointment_service import AppointmentService
 from services.message_service import MessageService
-from utils.csv_importer import CsvImporter
-from utils.property_radar_importer import PropertyRadarImporter
+from scripts.data_management.csv_importer import CsvImporter
+from scripts.data_management.property_radar_importer import PropertyRadarImporter
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 from extensions import db
 from crm_database import Setting, Activity, Conversation
