@@ -1,30 +1,33 @@
 from app import create_app
 from extensions import db
 from flask_migrate import upgrade
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 def run_reset():
     """
     Drops all database tables and recreates them based on the
     latest migration script. This is for a clean start.
     """
-    print("--- Starting Database Reset ---")
+    logger.info("Starting Database Reset")
     
     app = create_app()
     
     with app.app_context():
-        print("Dropping all database tables...")
+        logger.info("Dropping all database tables...")
         # The session.close() and drop_all() ensure all connections are closed
         # before we try to drop the tables, avoiding hangs.
         db.session.close()
         db.drop_all()
-        print("-> Tables dropped.")
+        logger.info("Tables dropped.")
 
-        print("Recreating all tables from migration history...")
+        logger.info("Recreating all tables from migration history...")
         # The 'head' argument tells migrate to apply all migrations up to the latest one.
         upgrade()
-        print("-> Tables recreated successfully.")
+        logger.info("Tables recreated successfully.")
         
-    print("\n--- Database Reset Complete ---")
+    logger.info("Database Reset Complete")
 
 if __name__ == '__main__':
     # A simple confirmation step to prevent accidental data loss.
@@ -32,4 +35,4 @@ if __name__ == '__main__':
     if confirm.lower() == 'yes':
         run_reset()
     else:
-        print("Reset cancelled.")
+        logger.info("Reset cancelled.")

@@ -1,6 +1,9 @@
 import google.generativeai as genai
 from flask import current_app
 import json
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class AIService:
     def __init__(self):
@@ -22,9 +25,9 @@ class AIService:
                     raise ValueError("GEMINI_API_KEY not found in configuration.")
                 genai.configure(api_key=api_key)
                 self.model = genai.GenerativeModel('gemini-1.5-flash')
-                print("--- AIService model configured successfully ---")
+                logger.info("AIService model configured successfully")
             except Exception as e:
-                print(f"Error initializing AIService model: {e}")
+                logger.error("Error initializing AIService model", error=str(e))
                 self.model = False
 
     def extract_address_from_text(self, text: str) -> str | None:
@@ -62,7 +65,7 @@ class AIService:
             return extracted_text
             
         except Exception as e:
-            print(f"Error calling Gemini API for address parsing: {e}")
+            logger.error("Error calling Gemini API for address parsing", error=str(e), address=address)
             return None
 
     # --- NEW METHOD FOR NAME DETECTION ---
@@ -103,7 +106,7 @@ class AIService:
             return first_name, last_name
             
         except Exception as e:
-            print(f"Error calling Gemini API for name parsing: {e}")
+            logger.error("Error calling Gemini API for name parsing", error=str(e), full_name=full_name)
             return None, None
 
     # --- NEW METHOD ---
@@ -135,6 +138,6 @@ class AIService:
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
-            print(f"Error calling Gemini API for summary: {e}")
+            logger.error("Error calling Gemini API for summary", error=str(e))
             return "Could not generate summary."
     # --- END NEW METHOD ---

@@ -1,5 +1,8 @@
 from extensions import db
 from crm_database import Job
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class JobService:
     def __init__(self):
@@ -18,11 +21,11 @@ class JobService:
         ).first()
 
         if active_job:
-            print(f"Found existing active job (ID: {active_job.id}) for property {property_id}.")
+            logger.info("Found existing active job", job_id=active_job.id, property_id=property_id)
             return active_job
         else:
             # If no active job exists, create a new one.
-            print(f"No active job found for property {property_id}. Creating a new one.")
+            logger.info("No active job found for property, creating new job", property_id=property_id)
             # We need the Property model to get the address for the description
             from crm_database import Property
             prop = self.session.query(Property).get(property_id)

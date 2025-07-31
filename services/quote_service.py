@@ -1,5 +1,8 @@
 from extensions import db
 from crm_database import Quote, QuoteLineItem
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class QuoteService:
     def __init__(self):
@@ -50,7 +53,7 @@ class QuoteService:
             return new_quote
         except Exception as e:
             db.session.rollback()
-            print(f"Error creating quote: {e}") # For debugging
+            logger.error("Error creating quote", error=str(e))
             return None
 
     def update_quote(self, quote_id, data):
@@ -103,7 +106,7 @@ class QuoteService:
             return quote
         except Exception as e:
             db.session.rollback()
-            print(f"Error updating quote: {e}") # For debugging
+            logger.error("Error updating quote", error=str(e), quote_id=quote_data.get('id'))
             return None
     # --- FIX END ---
 

@@ -6,6 +6,9 @@ Handles background sending and queue processing
 from datetime import datetime
 from celery_worker import celery
 from services.campaign_service import CampaignService
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 @celery.task(bind=True)
@@ -16,7 +19,7 @@ def process_campaign_queue(self):
         stats = campaign_service.process_campaign_queue()
         
         # Log results
-        print(f"Campaign queue processed: {stats}")
+        logger.info("Campaign queue processed", stats=stats)
         
         return {
             'success': True,
@@ -25,7 +28,7 @@ def process_campaign_queue(self):
         }
         
     except Exception as e:
-        print(f"Campaign queue processing failed: {str(e)}")
+        logger.error("Campaign queue processing failed", error=str(e))
         
         # Retry up to 3 times with exponential backoff
         self.retry(countdown=60 * (2 ** self.request.retries), max_retries=3)
@@ -45,7 +48,7 @@ def handle_incoming_message_opt_out(phone: str, message: str):
         is_opt_out = campaign_service.handle_opt_out(phone, message)
         
         if is_opt_out:
-            print(f"Processed opt-out request from {phone}: {message}")
+            logger.info("Processed opt-out request", phone=phone, message=message)
         
         return {
             'success': True,
@@ -55,7 +58,7 @@ def handle_incoming_message_opt_out(phone: str, message: str):
         }
         
     except Exception as e:
-        print(f"Error processing opt-out for {phone}: {str(e)}")
+        logger.error("Error processing opt-out", phone=phone, error=str(e))
         return {
             'success': False,
             'error': str(e),

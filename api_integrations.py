@@ -8,6 +8,9 @@ import json
 from flask import current_app
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import requests
@@ -33,8 +36,8 @@ def get_google_creds():
             try:
                 creds.refresh(Request())
             except Exception as e:
-                print(f"Error refreshing Google token: {e}")
-                print("Please delete token.pickle and re-run the application.")
+                logger.error("Error refreshing Google token", error=str(e))
+                logger.error("Please delete token.pickle and re-run the application.")
                 return None
         else:
             try:
@@ -42,10 +45,10 @@ def get_google_creds():
                 client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET')
 
                 if not client_id or not client_secret:
-                    print("="*80)
-                    print("FATAL OAUTH ERROR: 'GOOGLE_CLIENT_ID' or 'GOOGLE_CLIENT_SECRET' is missing.")
-                    print("ACTION: Please ensure these variables are correctly set in your .env file.")
-                    print("="*80)
+                    logger.critical("="*80)
+                    logger.critical("FATAL OAUTH ERROR: 'GOOGLE_CLIENT_ID' or 'GOOGLE_CLIENT_SECRET' is missing.")
+                    logger.critical("ACTION: Please ensure these variables are correctly set in your .env file.")
+                    logger.critical("="*80)
                     return None
 
                 client_config = {
@@ -62,8 +65,8 @@ def get_google_creds():
                 flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
                 creds = flow.run_local_server(port=8989) 
             except Exception as e:
-                print(f"FATAL: Could not get new Google credentials. Error: {e}")
-                print("ACTION: Please verify your .env file and Google Cloud project settings.")
+                logger.critical("FATAL: Could not get new Google credentials", error=str(e))
+                logger.critical("ACTION: Please verify your .env file and Google Cloud project settings.")
                 return None
         
         with open(TOKEN_FILE, 'wb') as token:
@@ -79,7 +82,7 @@ def get_upcoming_calendar_events(count=5):
         events_result = service.events().list(calendarId='primary', timeMin=now, maxResults=count, singleEvents=True, orderBy='startTime').execute()
         return events_result.get('items', [])
     except Exception as e:
-        print(f"Error fetching Google Calendar events: {e}")
+        logger.error("Error fetching Google Calendar events", error=str(e))
         return []
 
 def get_recent_gmail_messages(count=5):
@@ -98,7 +101,7 @@ def get_recent_gmail_messages(count=5):
             emails.append({'id': msg['id'], 'threadId': msg['threadId'], 'subject': subject, 'sender': sender})
         return emails
     except Exception as e:
-        print(f"Error fetching Gmail messages: {e}")
+        logger.error("Error fetching Gmail messages", error=str(e))
         return []
 
 def get_emails_for_contact(email_address, count=5):
@@ -123,7 +126,7 @@ def get_emails_for_contact(email_address, count=5):
             emails.append({'subject': subject, 'sender': sender, 'date': date})
         return emails
     except Exception as e:
-        print(f"Error fetching emails for contact {email_address}: {e}")
+        logger.error("Error fetching emails for contact", email_address=email_address, error=str(e))
         return []
 
 
@@ -177,15 +180,15 @@ def get_recent_openphone_texts(contact_service: ContactService, count=5):
 
     except Exception as e:
         # We can leave the detailed exception logging for now, it's useful.
-        print(f"\n--- [DEBUG] An exception occurred in get_recent_openphone_texts ---")
-        print(f"--- [DEBUG] Exception Type: {type(e).__name__}")
-        print(f"--- [DEBUG] Exception Details: {e}")
+        logger.debug("An exception occurred in get_recent_openphone_texts", 
+                     exception_type=type(e).__name__, 
+                     exception_details=str(e))
         return ([], str(e))
 
 def create_google_calendar_event(title, description, start_time, end_time, attendees: list, location: str = None):
     creds = get_google_creds()
     if not creds:
-        print("Could not create Google Calendar event: invalid credentials.")
+        logger.error("Could not create Google Calendar event: invalid credentials.")
         return None
     try:
         service = build('calendar', 'v3', credentials=creds)
@@ -199,22 +202,22 @@ def create_google_calendar_event(title, description, start_time, end_time, atten
         if location:
             event['location'] = location
         created_event = service.events().insert(calendarId='primary', body=event).execute()
-        print(f"Event created: {created_event.get('htmlLink')}")
+        logger.info("Google Calendar event created", event_link=created_event.get('htmlLink'))
         return created_event
     except Exception as e:
-        print(f"Error creating Google Calendar event: {e}")
+        logger.error("Error creating Google Calendar event", error=str(e))
         return None
 
 def delete_google_calendar_event(event_id: str):
     creds = get_google_creds()
     if not creds:
-        print("Could not delete Google Calendar event: invalid credentials.")
+        logger.error("Could not delete Google Calendar event: invalid credentials.")
         return False
     try:
         service = build('calendar', 'v3', credentials=creds)
         service.events().delete(calendarId='primary', eventId=event_id).execute()
-        print(f"Successfully deleted Google Calendar event: {event_id}")
+        logger.info("Successfully deleted Google Calendar event", event_id=event_id)
         return True
     except Exception as e:
-        print(f"Error deleting Google Calendar event {event_id}: {e}")
+        logger.error("Error deleting Google Calendar event", event_id=event_id, error=str(e))
         return False

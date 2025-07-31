@@ -2,6 +2,9 @@ from extensions import db
 from crm_database import Appointment
 from api_integrations import create_google_calendar_event, delete_google_calendar_event
 from datetime import datetime, timedelta
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class AppointmentService:
     def __init__(self):
@@ -52,7 +55,7 @@ class AppointmentService:
 
         except Exception as e:
             # It's generally better to log the error than just print it in a production app
-            print(f"Failed to create Google Calendar event after saving appointment: {e}")
+            logger.error("Failed to create Google Calendar event after saving appointment", error=str(e), appointment_id=appointment.id)
 
         return new_appointment
 
@@ -70,7 +73,7 @@ class AppointmentService:
         """
         # --- DELETE GOOGLE EVENT FIRST ---
         if appointment.google_calendar_event_id:
-            print(f"Deleting corresponding Google Calendar event: {appointment.google_calendar_event_id}")
+            logger.info("Deleting corresponding Google Calendar event", event_id=appointment.google_calendar_event_id, appointment_id=appointment_id)
             delete_google_calendar_event(appointment.google_calendar_event_id)
         # --- END DELETE ---
         
