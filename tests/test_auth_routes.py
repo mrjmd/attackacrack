@@ -364,6 +364,9 @@ class TestUserManagement:
     
     def test_change_password_success(self, admin_client, admin_user, app):
         """Test successful password change"""
+        with admin_client.session_transaction() as sess:
+            sess.pop('_flashes', None)
+        
         response = admin_client.post('/auth/profile', data={
             'action': 'change_password',
             'current_password': 'AdminPass123!',
@@ -372,6 +375,7 @@ class TestUserManagement:
         }, follow_redirects=True)
         
         assert response.status_code == 200
+        # The flash message should be in the rendered template
         assert b'Password changed successfully' in response.data
         
         # Verify new password works
@@ -388,6 +392,9 @@ class TestUserManagement:
     
     def test_change_password_wrong_current(self, admin_client):
         """Test change password with wrong current password"""
+        with admin_client.session_transaction() as sess:
+            sess.pop('_flashes', None)
+        
         response = admin_client.post('/auth/profile', data={
             'action': 'change_password',
             'current_password': 'WrongPass123!',
@@ -400,6 +407,10 @@ class TestUserManagement:
     
     def test_change_password_mismatch(self, admin_client):
         """Test change password with password mismatch"""
+        with admin_client.session_transaction() as sess:
+            # Clear any existing flashes
+            sess.pop('_flashes', None)
+        
         response = admin_client.post('/auth/profile', data={
             'action': 'change_password',
             'current_password': 'AdminPass123!',
@@ -408,7 +419,8 @@ class TestUserManagement:
         }, follow_redirects=True)
         
         assert response.status_code == 200
-        assert b'Passwords do not match' in response.data
+        
+        assert b'New passwords do not match' in response.data
 
 
 class TestSecurityFeatures:
