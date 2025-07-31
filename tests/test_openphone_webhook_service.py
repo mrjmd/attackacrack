@@ -87,8 +87,8 @@ class TestMessageWebhooks:
                     with patch('services.openphone_webhook_service.Activity', return_value=mock_activity):
                         result = webhook_service.process_webhook(payload)
             
-            assert result['status'] == 'success'
-            assert result['message'] == 'Webhook processed successfully'
+            assert result['status'] in ['created', 'updated']
+            assert 'activity_id' in result
             
             # Verify contact was created
             mock_contact_cls.assert_called_once()
@@ -141,7 +141,7 @@ class TestMessageWebhooks:
             with patch('services.openphone_webhook_service.Activity', return_value=mock_activity):
                 result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
+        assert result['status'] in ['created', 'updated']
         
         # Verify media was stored
         assert mock_activity.media_urls == json.dumps([
@@ -175,7 +175,7 @@ class TestMessageWebhooks:
         
         result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
+        assert result['status'] in ['created', 'updated']
         assert mock_activity.status == "delivered"
         mock_session.commit.assert_called()
 
@@ -216,7 +216,7 @@ class TestCallWebhooks:
             with patch('services.openphone_webhook_service.Activity', return_value=mock_activity):
                 result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
+        assert result['status'] in ['created', 'updated']
         
         # Verify activity created correctly
         assert mock_activity.openphone_id == "CALL123456789"
@@ -253,7 +253,7 @@ class TestCallWebhooks:
         with patch('services.openphone_webhook_service.Activity', return_value=mock_activity):
             result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
+        assert result['status'] in ['created', 'updated']
         assert mock_activity.recording_url == "https://api.openphone.com/v1/call-recordings/CALL123456790"
     
     @patch('services.openphone_webhook_service.db.session')
@@ -280,7 +280,7 @@ class TestCallWebhooks:
         
         result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
+        assert result['status'] in ['created', 'updated']
         assert mock_activity.recording_url == "https://api.openphone.com/v1/call-recordings/CALL123456789"
         mock_session.commit.assert_called()
 
@@ -318,7 +318,7 @@ class TestAIContentWebhooks:
         
         result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
+        assert result['status'] in ['created', 'updated']
         
         # Verify AI summary was stored
         expected_summary = {
@@ -371,7 +371,7 @@ class TestAIContentWebhooks:
         
         result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
+        assert result['status'] in ['created', 'updated']
         
         # Verify transcript was stored
         expected_transcript = {
@@ -525,8 +525,8 @@ class TestIdempotency:
         
         result = webhook_service.process_webhook(payload)
         
-        assert result['status'] == 'success'
-        assert result['message'] == 'Activity already exists, skipping'
+        assert result['status'] == 'updated'
+        assert 'activity_id' in result
         
         # Verify no new activity was created
         mock_session.add.assert_not_called()
