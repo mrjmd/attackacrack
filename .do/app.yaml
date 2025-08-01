@@ -44,9 +44,9 @@ services:
       - key: DATABASE_URL
         # This special syntax binds the connection string from the managed database.
         value: ${db.DATABASE_URL}
-      - key: REDIS_URL
-        # This special syntax binds the connection string from the managed Redis instance.
-        value: ${redis.DATABASE_URL}
+      # REDIS_URL should be set in the DO App Platform UI
+      # - key: REDIS_URL
+      #   value: "redis://your-redis-host:6379"
       # --- ADD ALL OTHER SECRET ENV VARS IN THE DO UI ---
       # - key: SECRET_KEY
       # - key: OPENPHONE_API_TOKEN
@@ -76,8 +76,9 @@ workers:
         value: "app.py"
       - key: DATABASE_URL
         value: ${db.DATABASE_URL}
-      - key: REDIS_URL
-        value: ${redis.DATABASE_URL}
+      # REDIS_URL should be set in the DO App Platform UI
+      # - key: REDIS_URL
+      #   value: "redis://your-redis-host:6379"
       # --- ADD ALL OTHER SECRET ENV VARS IN THE DO UI ---
 
 # Define the managed databases and other addons for the application.
@@ -89,9 +90,4 @@ databases:
     # The name of the production database inside the cluster.
     db_name: attackacrack_prod
     # The size of the database cluster. Start small.
-    size: db-s-1vcpu-1gb
-  - name: redis
-    # Use Redis for the Celery message broker.
-    engine: REDIS
-    # The size of the Redis cluster.
     size: db-s-1vcpu-1gb
