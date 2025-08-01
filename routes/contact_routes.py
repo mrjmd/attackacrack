@@ -206,6 +206,7 @@ def conversation_list():
                          available_campaigns=available_campaigns)
 
 @contact_bp.route('/conversations/bulk-action', methods=['POST'])
+@login_required
 def bulk_conversation_action():
     """Handle bulk actions on conversations"""
     action = request.form.get('action')
@@ -326,6 +327,7 @@ def bulk_conversation_action():
     return redirect(url_for('contact.conversation_list'))
 
 @contact_bp.route('/<int:contact_id>')
+@login_required
 def contact_detail(contact_id):
     contact_service = ContactService()
     message_service = MessageService()
@@ -344,6 +346,7 @@ def contact_detail(contact_id):
     )
 
 @contact_bp.route('/<int:contact_id>/conversation')
+@login_required
 def conversation(contact_id):
     contact_service = ContactService()
     message_service = MessageService()
@@ -404,6 +407,7 @@ def conversation(contact_id):
                          last_activity_date=last_activity_date)
 
 @contact_bp.route('/<int:contact_id>/send-message', methods=['POST'])
+@login_required
 def send_message(contact_id):
     """Send a message to a contact via OpenPhone"""
     from services.openphone_service import OpenPhoneService
@@ -434,6 +438,7 @@ def send_message(contact_id):
     return redirect(url_for('contact.conversation', contact_id=contact_id))
 
 @contact_bp.route('/add', methods=['GET', 'POST'])
+@login_required
 def add_contact():
     contact_service = ContactService()
     if request.method == 'POST':
@@ -447,6 +452,7 @@ def add_contact():
     return render_template('add_edit_contact_form.html')
 
 @contact_bp.route('/<int:contact_id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_contact(contact_id):
     contact_service = ContactService()
     contact = contact_service.get_contact_by_id(contact_id)
@@ -462,6 +468,7 @@ def edit_contact(contact_id):
     return render_template('add_edit_contact_form.html', contact=contact)
 
 @contact_bp.route('/<int:contact_id>/delete', methods=['POST'])
+@login_required
 def delete_contact(contact_id):
     contact_service = ContactService()
     contact = contact_service.get_contact_by_id(contact_id)
