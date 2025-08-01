@@ -331,6 +331,30 @@ class TestWebhookSignatureVerification:
 class TestWebhookEndpointSecurity:
     """Test general webhook endpoint security"""
     
+    def generate_valid_signature(self, payload_str, signing_key, timestamp=None):
+        """Generate a valid OpenPhone webhook signature"""
+        if timestamp is None:
+            timestamp = str(int(time.time() * 1000))
+        
+        # OpenPhone signature format: timestamp.payload
+        signed_data = timestamp.encode() + b'.' + payload_str.encode()
+        
+        # Decode the base64 signing key
+        signing_key_bytes = base64.b64decode(signing_key)
+        
+        # Calculate HMAC-SHA256
+        signature_bytes = hmac.new(
+            signing_key_bytes,
+            signed_data,
+            hashlib.sha256
+        ).digest()
+        
+        # Encode to base64
+        signature_base64 = base64.b64encode(signature_bytes).decode()
+        
+        # OpenPhone header format: t=timestamp,v1=signature
+        return f't={timestamp},v1={signature_base64}'
+    
     def test_webhook_endpoint_requires_post(self, client, app):
         """Test that webhook endpoint only accepts POST requests"""
         with app.app_context():

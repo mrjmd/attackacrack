@@ -14,10 +14,21 @@ class CampaignListService:
                    filter_criteria: Dict = None, is_dynamic: bool = False,
                    created_by: str = None) -> CampaignList:
         """Create a new campaign list"""
+        # Convert datetime objects to ISO strings for JSON serialization
+        if filter_criteria:
+            serializable_criteria = {}
+            for key, value in filter_criteria.items():
+                if isinstance(value, datetime):
+                    serializable_criteria[key] = value.isoformat()
+                else:
+                    serializable_criteria[key] = value
+        else:
+            serializable_criteria = filter_criteria
+            
         campaign_list = CampaignList(
             name=name,
             description=description,
-            filter_criteria=filter_criteria,
+            filter_criteria=serializable_criteria,
             is_dynamic=is_dynamic,
             created_by=created_by
         )
@@ -123,12 +134,18 @@ class CampaignListService:
         if 'import_source' in criteria:
             query = query.filter_by(import_source=criteria['import_source'])
         
-        # Date range filters
+        # Date range filters - handle both datetime objects and ISO strings
         if 'imported_after' in criteria:
-            query = query.filter(Contact.imported_at >= criteria['imported_after'])
+            date_value = criteria['imported_after']
+            if isinstance(date_value, str):
+                date_value = datetime.fromisoformat(date_value)
+            query = query.filter(Contact.imported_at >= date_value)
         
         if 'imported_before' in criteria:
-            query = query.filter(Contact.imported_at <= criteria['imported_before'])
+            date_value = criteria['imported_before']
+            if isinstance(date_value, str):
+                date_value = datetime.fromisoformat(date_value)
+            query = query.filter(Contact.imported_at <= date_value)
         
         # Contact history filters
         if 'no_recent_contact' in criteria:
@@ -139,7 +156,7 @@ class CampaignListService:
             recent_contacts = db.session.query(Activity.contact_id).filter(
                 Activity.created_at > cutoff_date,
                 Activity.direction == 'outgoing'
-            ).subquery()
+            )
             
             query = query.filter(~Contact.id.in_(recent_contacts))
         
@@ -149,7 +166,7 @@ class CampaignListService:
                 ContactFlag.flag_type == 'opted_out',
                 or_(ContactFlag.expires_at.is_(None), 
                     ContactFlag.expires_at > datetime.utcnow())
-            ).subquery()
+            )
             
             query = query.filter(~Contact.id.in_(opted_out))
         

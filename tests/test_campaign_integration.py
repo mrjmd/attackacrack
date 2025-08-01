@@ -12,6 +12,14 @@ from services.campaign_list_service import CampaignListService
 from crm_database import Campaign, CampaignMembership, Contact, CampaignList, CampaignListMember, Activity, ContactFlag
 
 
+def mock_openphone_service(campaign_service):
+    """Helper to mock OpenPhone service on a campaign service instance"""
+    mock = MagicMock()
+    mock.send_message.return_value = {'success': True, 'message_id': 'MSG123'}
+    campaign_service.openphone_service = mock
+    return mock
+
+
 @pytest.fixture
 def campaign_service():
     """Fixture providing campaign service instance"""
@@ -35,7 +43,7 @@ def test_contacts_batch(db_session):
             first_name=f'Contact{i}',
             last_name=f'Test{i}',
             phone=f'+155{unique_suffix}{i:04d}',
-            email=f'contact{i}@example.com' if i % 2 == 0 else None
+            email=f'contact{i}_{unique_suffix}@example.com' if i % 2 == 0 else None
         )
         contacts.append(contact)
     db_session.add_all(contacts)
@@ -46,10 +54,12 @@ def test_contacts_batch(db_session):
 class TestFullCampaignLifecycle:
     """Test complete campaign workflow from creation to completion"""
     
-    @patch('services.campaign_service.OpenPhoneService')
-    def test_blast_campaign_full_lifecycle(self, mock_openphone, campaign_service, list_service, 
+    def test_blast_campaign_full_lifecycle(self, campaign_service, list_service, 
                                          test_contacts_batch, db_session):
         """Test a complete blast campaign lifecycle"""
+        # Mock the OpenPhone service
+        mock_openphone = mock_openphone_service(campaign_service)
+        
         # Step 1: Create a campaign list
         campaign_list = list_service.create_list(
             name='Summer Sale List',
@@ -85,12 +95,7 @@ class TestFullCampaignLifecycle:
         db_session.refresh(campaign)
         assert campaign.status == 'running'
         
-        # Step 6: Mock OpenPhone service
-        mock_openphone_instance = MagicMock()
-        mock_openphone.return_value = mock_openphone_instance
-        mock_openphone_instance.send_message.return_value = (True, 'MSG123')
-        
-        # Step 7: Process the campaign queue
+        # Step 6: Process the campaign queue
         stats = campaign_service.process_campaign_queue()
         
         # Verify results
@@ -99,7 +104,7 @@ class TestFullCampaignLifecycle:
         assert len(stats['errors']) == 0
         
         # Verify OpenPhone was called for each recipient
-        assert mock_openphone_instance.send_message.call_count == 10
+        assert mock_openphone.send_message.call_count == 10
         
         # Verify campaign memberships updated
         sent_members = CampaignMembership.query.filter_by(
@@ -108,7 +113,7 @@ class TestFullCampaignLifecycle:
         ).count()
         assert sent_members == 10
         
-        # Step 8: Check campaign completion
+        # Step 7: Check campaign completion
         pending_members = CampaignMembership.query.filter_by(
             campaign_id=campaign.id,
             status='pending'
@@ -119,10 +124,11 @@ class TestFullCampaignLifecycle:
         db_session.refresh(campaign)
         assert campaign.status == 'running'
     
-    @patch('services.campaign_service.OpenPhoneService')
-    def test_ab_test_campaign_lifecycle(self, mock_openphone, campaign_service, list_service,
+    def test_ab_test_campaign_lifecycle(self, campaign_service, list_service,
                                        test_contacts_batch, db_session):
         """Test A/B test campaign with winner declaration"""
+        # Mock the OpenPhone service
+        mock_openphone = mock_openphone_service(campaign_service)
         # Create campaign list with all contacts
         campaign_list = list_service.create_list(
             name='A/B Test List',
@@ -146,11 +152,6 @@ class TestFullCampaignLifecycle:
         campaign_service.add_recipients_from_list(campaign.id, campaign_list.id)
         campaign_service.start_campaign(campaign.id)
         
-        # Mock OpenPhone
-        mock_openphone_instance = MagicMock()
-        mock_openphone.return_value = mock_openphone_instance
-        mock_openphone_instance.send_message.return_value = (True, 'MSG123')
-        
         # Process first batch
         stats = campaign_service.process_campaign_queue()
         assert stats['messages_sent'] == 20
@@ -170,10 +171,11 @@ class TestFullCampaignLifecycle:
         assert 5 <= variant_b_count <= 15
         assert variant_a_count + variant_b_count == 20
     
-    @patch('services.campaign_service.OpenPhoneService')
-    def test_campaign_with_opt_outs(self, mock_openphone, campaign_service, list_service,
+    def test_campaign_with_opt_outs(self, campaign_service, list_service,
                                    test_contacts_batch, db_session):
         """Test campaign respects opt-outs"""
+        # Mock the OpenPhone service
+        mock_openphone = mock_openphone_service(campaign_service)
         # Add opt-out flags for some contacts
         for i in range(0, 5):
             opt_out = ContactFlag(
@@ -188,30 +190,37 @@ class TestFullCampaignLifecycle:
         # Create campaign
         campaign = campaign_service.create_campaign(
             name='Opt-out Test Campaign',
-            template_a='Test message. Reply STOP to opt out.'
+            template_a='Test message. Reply STOP to opt out.',
+            business_hours_only=False  # Disable business hours check for test
         )
         
-        # Add recipients with opt-out filter
-        filters = {'exclude_opted_out': True}
-        added = campaign_service.add_recipients(campaign.id, filters)
+        # Create a list with all test contacts
+        campaign_list = list_service.create_list(
+            name='Opt-out Test List',
+            description='Test list for opt-out campaign'
+        )
         
-        # Should exclude the 5 opted-out contacts
-        assert added == 15
+        # Add all test contacts to the list
+        contact_ids = [c.id for c in test_contacts_batch]
+        list_service.add_contacts_to_list(campaign_list.id, contact_ids)
+        
+        # Add recipients from the list (will add all 20)
+        added = campaign_service.add_recipients_from_list(campaign.id, campaign_list.id)
+        assert added == 20  # All contacts are added to campaign
         
         # Start and process
         campaign_service.start_campaign(campaign.id)
         
-        mock_openphone_instance = MagicMock()
-        mock_openphone.return_value = mock_openphone_instance
-        mock_openphone_instance.send_message.return_value = (True, 'MSG123')
-        
+        # Process campaign - should skip opted-out contacts
         stats = campaign_service.process_campaign_queue()
-        assert stats['messages_sent'] == 15
+        assert stats['messages_sent'] == 15  # Only 15 sent (5 skipped due to opt-out)
+        assert stats['messages_skipped'] == 5  # 5 skipped
     
-    @patch('services.campaign_service.OpenPhoneService')
-    def test_campaign_daily_limit_enforcement(self, mock_openphone, campaign_service,
+    def test_campaign_daily_limit_enforcement(self, campaign_service,
                                             test_contacts_batch, db_session):
         """Test that daily limits are enforced"""
+        # Mock the OpenPhone service
+        mock_openphone = mock_openphone_service(campaign_service)
         # Create campaign with low daily limit
         campaign = campaign_service.create_campaign(
             name='Limited Campaign',
@@ -234,11 +243,6 @@ class TestFullCampaignLifecycle:
         # Start campaign
         campaign_service.start_campaign(campaign.id)
         
-        # Mock OpenPhone
-        mock_openphone_instance = MagicMock()
-        mock_openphone.return_value = mock_openphone_instance
-        mock_openphone_instance.send_message.return_value = (True, 'MSG123')
-        
         # First process - should send 5
         stats1 = campaign_service.process_campaign_queue()
         assert stats1['messages_sent'] == 5
@@ -248,10 +252,11 @@ class TestFullCampaignLifecycle:
         assert stats2['messages_sent'] == 0
         assert campaign.name in stats2['daily_limits_reached']
     
-    @patch('services.campaign_service.OpenPhoneService')
-    def test_campaign_business_hours_enforcement(self, mock_openphone, campaign_service,
+    def test_campaign_business_hours_enforcement(self, campaign_service,
                                                test_contacts_batch, db_session):
         """Test that business hours are enforced"""
+        # Mock the OpenPhone service
+        mock_openphone = mock_openphone_service(campaign_service)
         # Create campaign with business hours only
         campaign = campaign_service.create_campaign(
             name='Business Hours Campaign',
@@ -272,11 +277,6 @@ class TestFullCampaignLifecycle:
         
         campaign_service.start_campaign(campaign.id)
         
-        # Mock OpenPhone
-        mock_openphone_instance = MagicMock()
-        mock_openphone.return_value = mock_openphone_instance
-        mock_openphone_instance.send_message.return_value = (True, 'MSG123')
-        
         # Mock current time as outside business hours (8 PM)
         with patch('services.campaign_service.datetime') as mock_datetime:
             mock_datetime.utcnow.return_value = datetime(2025, 7, 29, 20, 0, 0)  # 8 PM
@@ -292,10 +292,12 @@ class TestFullCampaignLifecycle:
 class TestCampaignErrorHandling:
     """Test error handling during campaign lifecycle"""
     
-    @patch('services.campaign_service.OpenPhoneService')
-    def test_openphone_send_failure_handling(self, mock_openphone, campaign_service,
+    def test_openphone_send_failure_handling(self, campaign_service,
                                            test_contacts_batch, db_session):
         """Test handling of OpenPhone send failures"""
+        # Mock the OpenPhone service to fail
+        mock_openphone = mock_openphone_service(campaign_service)
+        mock_openphone.send_message.return_value = {'success': False, 'error': 'API Error'}
         # Create and start campaign
         campaign = campaign_service.create_campaign(
             name='Error Test Campaign',
@@ -312,11 +314,6 @@ class TestCampaignErrorHandling:
         db_session.commit()
         
         campaign_service.start_campaign(campaign.id)
-        
-        # Mock OpenPhone to fail
-        mock_openphone_instance = MagicMock()
-        mock_openphone.return_value = mock_openphone_instance
-        mock_openphone_instance.send_message.return_value = (False, 'API Error')
         
         # Process queue
         stats = campaign_service.process_campaign_queue()

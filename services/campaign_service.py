@@ -139,7 +139,7 @@ class CampaignService:
             # Exclude contacts flagged as office numbers
             office_contact_ids = db.session.query(ContactFlag.contact_id).filter(
                 ContactFlag.flag_type == 'office_number'
-            ).subquery()
+            )
             query = query.filter(~Contact.id.in_(office_contact_ids))
         
         if contact_filters.get('exclude_opted_out'):
@@ -149,7 +149,7 @@ class CampaignService:
                     ContactFlag.flag_type == 'opted_out',
                     ContactFlag.applies_to.in_(['sms', 'both'])
                 )
-            ).subquery()
+            )
             query = query.filter(~Contact.id.in_(opted_out_ids))
         
         if contact_filters.get('min_days_since_contact'):
@@ -160,7 +160,7 @@ class CampaignService:
                     ContactFlag.flag_type == 'recently_texted',
                     ContactFlag.created_at > days_ago
                 )
-            ).subquery()
+            )
             query = query.filter(~Contact.id.in_(recent_contact_ids))
         
         # Get contacts
@@ -251,11 +251,18 @@ class CampaignService:
         if campaign.business_hours_only and not self._is_business_hours():
             return stats
         
-        # Get pending recipients
+        # Get how many we've already sent today
+        sent_today = self._get_daily_send_count(campaign.id)
+        remaining_today = max(0, campaign.daily_limit - sent_today)
+        
+        if remaining_today == 0:
+            return stats
+        
+        # Get pending recipients, limited by remaining daily quota
         pending = CampaignMembership.query.filter_by(
             campaign_id=campaign.id,
             status='pending'
-        ).limit(50).all()  # Process in batches
+        ).limit(min(50, remaining_today)).all()  # Process in batches, respecting daily limit
         
         for membership in pending:
             try:

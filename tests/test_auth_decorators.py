@@ -306,19 +306,34 @@ class TestRoleBasedAccessControl:
     
     def test_admin_only_routes(self, admin_client, marketer_client):
         """Test routes that only admins can access"""
-        admin_only_routes = [
+        admin_only_get_routes = [
             '/auth/users',
-            '/auth/invite',
+            '/auth/invite'
+        ]
+        
+        admin_only_post_routes = [
             '/auth/users/1/toggle-status'
         ]
         
-        for route in admin_only_routes:
+        # Test GET routes
+        for route in admin_only_get_routes:
             # Admin can access
             admin_response = admin_client.get(route, follow_redirects=False)
             assert admin_response.status_code != 403  # Not forbidden
             
             # Marketer cannot access
             marketer_response = marketer_client.get(route, follow_redirects=False)
+            assert marketer_response.status_code == 302  # Redirected
+            assert '/dashboard' in marketer_response.location
+        
+        # Test POST routes
+        for route in admin_only_post_routes:
+            # Admin can access (might get 404 if user doesn't exist, but not 403)
+            admin_response = admin_client.post(route, follow_redirects=False)
+            assert admin_response.status_code != 403  # Not forbidden
+            
+            # Marketer cannot access
+            marketer_response = marketer_client.post(route, follow_redirects=False)
             assert marketer_response.status_code == 302  # Redirected
             assert '/dashboard' in marketer_response.location
     
@@ -332,9 +347,9 @@ class TestRoleBasedAccessControl:
             '/quotes/',
             '/invoices/',
             '/appointments/',
-            '/campaigns/campaigns',  # The campaigns blueprint uses /campaigns prefix
+            '/campaigns',  # Campaigns list route
             '/settings',
-            '/marketing'  # No /growth route exists
+            '/marketing'
         ]
         
         for route in general_routes:
@@ -409,6 +424,9 @@ class TestAuthenticationFlow:
     
     def test_next_url_redirect(self, client, admin_user, app):
         """Test redirect to next URL after login"""
+        # Ensure user is logged out first
+        client.get('/auth/logout')
+        
         # Try to access protected page
         response = client.get('/properties/', follow_redirects=False)
         assert response.status_code == 302

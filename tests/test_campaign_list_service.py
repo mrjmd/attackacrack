@@ -101,9 +101,10 @@ class TestListCreation:
     
     def test_create_dynamic_list(self, list_service, test_contacts, db_session):
         """Test creating a dynamic list with filter criteria"""
+        imported_after = datetime.utcnow() - timedelta(days=7)
         criteria = {
             'has_email': True,
-            'imported_after': datetime.utcnow() - timedelta(days=7)
+            'imported_after': imported_after
         }
         
         campaign_list = list_service.create_list(
@@ -114,7 +115,9 @@ class TestListCreation:
         )
         
         assert campaign_list.is_dynamic is True
-        assert campaign_list.filter_criteria == criteria
+        # Check that datetime was serialized to ISO string
+        assert campaign_list.filter_criteria['has_email'] is True
+        assert campaign_list.filter_criteria['imported_after'] == imported_after.isoformat()
         
         # Should auto-populate based on criteria
         members = CampaignListMember.query.filter_by(
@@ -307,7 +310,7 @@ class TestContactFiltering:
         
         found_contacts = list_service.find_contacts_by_criteria(criteria)
         
-        # Should find c1 (10 days ago is too old), c2 (5 days), and c4 (2 days)
+        # Should find c2 (5 days) and c4 (2 days), not c1 (10 days ago) or c3 (30 days ago)
         assert len(found_contacts) == 2
         assert test_contacts[1] in found_contacts  # Jane (5 days)
         assert test_contacts[3] in found_contacts  # Alice (2 days)
