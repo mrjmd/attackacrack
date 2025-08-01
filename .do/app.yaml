@@ -87,7 +87,8 @@ databases:
     # Use PostgreSQL version 13.
     engine: PG
     version: "13"
-    # The name of the production database inside the cluster.
-    db_name: attackacrack_prod
+    # The production database name will be auto-created as 'db'
+    # matching the component name
+    production: true
     # The size of the database cluster. Start small.
     size: db-s-1vcpu-1gb
