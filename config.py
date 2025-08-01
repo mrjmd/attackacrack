@@ -201,8 +201,11 @@ class ProductionConfig(Config):
         if not cls.SQLALCHEMY_DATABASE_URI:
             cls.SQLALCHEMY_DATABASE_URI = cls.get_required_env('POSTGRES_URI')
         if not cls.CELERY_BROKER_URL:
-            cls.CELERY_BROKER_URL = cls.get_required_env('REDIS_URL')
-            cls.CELERY_RESULT_BACKEND = cls.CELERY_BROKER_URL
+            # Make Redis optional for initial deployment
+            redis_url = os.environ.get('REDIS_URL')
+            if redis_url:
+                cls.CELERY_BROKER_URL = redis_url
+                cls.CELERY_RESULT_BACKEND = redis_url
             
             # Handle rediss:// URLs
             if cls.CELERY_BROKER_URL.startswith('rediss://'):
