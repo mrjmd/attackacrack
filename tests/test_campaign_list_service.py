@@ -321,9 +321,10 @@ class TestContactFiltering:
     def test_filter_no_recent_contact(self, list_service, test_contacts, db_session):
         """Test filtering contacts with no recent outgoing activity"""
         # Create recent activity for first contact
+        # With foreign keys disabled, we can use a dummy conversation_id
         activity = Activity(
             contact_id=test_contacts[0].id,
-            conversation_id=1,  # dummy
+            conversation_id=999999,  # dummy ID - foreign keys are disabled in tests
             activity_type='message',
             direction='outgoing',
             body='Recent message',

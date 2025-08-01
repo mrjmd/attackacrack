@@ -118,6 +118,9 @@ class TestLoginLogout:
     
     def test_login_invalid_credentials(self, client):
         """Test login with invalid credentials"""
+        # Ensure we're logged out first
+        client.get('/auth/logout')
+        
         response = client.post('/auth/login', data={
             'email': 'wrong@example.com',
             'password': 'WrongPass123!'
@@ -206,8 +209,13 @@ class TestRoleBasedAccess:
         response = marketer_client.get('/contacts/')
         assert response.status_code == 200
     
-    def test_login_required_decorator(self, client):
+    def test_login_required_decorator(self, client, app):
         """Test login_required decorator protection"""
+        # Ensure we're logged out
+        with app.test_request_context():
+            if hasattr(client, 'get'):
+                client.get('/auth/logout')
+        
         protected_routes = [
             '/contacts/',
             '/properties/',
@@ -218,8 +226,8 @@ class TestRoleBasedAccess:
         ]
         
         for route in protected_routes:
-            response = client.get(route)
-            assert response.status_code == 302  # Redirect to login
+            response = client.get(route, follow_redirects=False)
+            assert response.status_code == 302, f"Expected redirect for {route}, got {response.status_code}"
             assert '/auth/login' in response.location
 
 

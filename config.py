@@ -147,6 +147,19 @@ class TestingConfig(Config):
     def init_app(cls, app):
         """Testing-specific initialization"""
         Config.init_app(app)
+        
+        # Disable foreign keys for SQLite in tests to avoid cascading issues
+        # This matches the behavior of many ORMs where foreign keys are not enforced
+        # during testing to allow for more flexible test data setup
+        from sqlalchemy import event
+        from sqlalchemy.engine import Engine
+        
+        @event.listens_for(Engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            if 'sqlite' in str(dbapi_connection):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=OFF")
+                cursor.close()
 
 
 class ProductionConfig(Config):

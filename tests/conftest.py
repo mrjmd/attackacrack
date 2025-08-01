@@ -131,11 +131,11 @@ def clean_campaign_data(db_session):
     This ensures tests don't interfere with each other.
     """
     yield
-    # Clean up after test
+    # Clean up after test - be selective about what we delete
     from crm_database import Campaign, CampaignMembership, CampaignList, CampaignListMember, ContactFlag
     try:
-        # Delete in correct order to respect foreign keys
-        db_session.query(ContactFlag).delete()
+        # Only delete campaign-specific data, not all activities/conversations
+        db_session.query(ContactFlag).filter_by(flag_type='recently_texted').delete()
         db_session.query(CampaignListMember).delete()
         db_session.query(CampaignMembership).delete()
         db_session.query(CampaignList).delete()
