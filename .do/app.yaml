@@ -47,15 +47,47 @@ services:
       - key: POSTGRES_URI
         # Also set POSTGRES_URI to the same value for compatibility
         value: ${db.DATABASE_URL}
-      # REDIS_URL should be set in the DO App Platform UI
-      # - key: REDIS_URL
-      #   value: "redis://your-redis-host:6379"
-      # --- ADD ALL OTHER SECRET ENV VARS IN THE DO UI ---
-      # - key: SECRET_KEY
-      # - key: OPENPHONE_API_TOKEN
-      # - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-      # - key: OPENAI_API_KEY
-      # etc.
+      # Environment variables that reference app-level env vars
+      # This prevents them from being overwritten during deployment
+      - key: REDIS_URL
+        type: SECRET
+        value: ${REDIS_URL}
+      - key: SECRET_KEY
+        type: SECRET
+        value: ${SECRET_KEY}
+      - key: OPENPHONE_API_KEY
+        type: SECRET
+        value: ${OPENPHONE_API_KEY}
+      - key: OPENPHONE_PHONE_NUMBER
+        value: ${OPENPHONE_PHONE_NUMBER}
+      - key: OPENPHONE_PHONE_NUMBER_ID
+        value: ${OPENPHONE_PHONE_NUMBER_ID}
+      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+        type: SECRET
+        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+      - key: GOOGLE_CLIENT_ID
+        value: ${GOOGLE_CLIENT_ID}
+      - key: GOOGLE_CLIENT_SECRET
+        type: SECRET
+        value: ${GOOGLE_CLIENT_SECRET}
+      - key: GOOGLE_PROJECT_ID
+        value: ${GOOGLE_PROJECT_ID}
+      - key: GEMINI_API_KEY
+        type: SECRET
+        value: ${GEMINI_API_KEY}
+      - key: MAIL_SERVER
+        value: ${MAIL_SERVER}
+      - key: MAIL_PORT
+        value: ${MAIL_PORT}
+      - key: MAIL_USE_TLS
+        value: ${MAIL_USE_TLS}
+      - key: MAIL_USERNAME
+        value: ${MAIL_USERNAME}
+      - key: MAIL_PASSWORD
+        type: SECRET
+        value: ${MAIL_PASSWORD}
+      - key: MAIL_DEFAULT_SENDER
+        value: ${MAIL_DEFAULT_SENDER}
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -81,10 +113,33 @@ workers:
         value: ${db.DATABASE_URL}
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
-      # REDIS_URL should be set in the DO App Platform UI
-      # - key: REDIS_URL
-      #   value: "redis://your-redis-host:6379"
-      # --- ADD ALL OTHER SECRET ENV VARS IN THE DO UI ---
+      # Same environment variables as web service
+      - key: REDIS_URL
+        type: SECRET
+        value: ${REDIS_URL}
+      - key: SECRET_KEY
+        type: SECRET
+        value: ${SECRET_KEY}
+      - key: OPENPHONE_API_KEY
+        type: SECRET
+        value: ${OPENPHONE_API_KEY}
+      - key: OPENPHONE_PHONE_NUMBER
+        value: ${OPENPHONE_PHONE_NUMBER}
+      - key: OPENPHONE_PHONE_NUMBER_ID
+        value: ${OPENPHONE_PHONE_NUMBER_ID}
+      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+        type: SECRET
+        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+      - key: GOOGLE_CLIENT_ID
+        value: ${GOOGLE_CLIENT_ID}
+      - key: GOOGLE_CLIENT_SECRET
+        type: SECRET
+        value: ${GOOGLE_CLIENT_SECRET}
+      - key: GOOGLE_PROJECT_ID
+        value: ${GOOGLE_PROJECT_ID}
+      - key: GEMINI_API_KEY
+        type: SECRET
+        value: ${GEMINI_API_KEY}
 
 # Define the managed databases and other addons for the application.
 databases:
