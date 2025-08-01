@@ -47,39 +47,24 @@ services:
       - key: POSTGRES_URI
         # Also set POSTGRES_URI to the same value for compatibility
         value: ${db.DATABASE_URL}
-      # Environment variables - secrets will use app-level values
-      - key: REDIS_URL
-        scope: RUN_AND_BUILD_TIME
-      - key: SECRET_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_PROJECT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: GEMINI_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: MAIL_SERVER
-        scope: RUN_AND_BUILD_TIME
-      - key: MAIL_PORT
-        scope: RUN_AND_BUILD_TIME
-      - key: MAIL_USE_TLS
-        scope: RUN_AND_BUILD_TIME
-      - key: MAIL_USERNAME
-        scope: RUN_AND_BUILD_TIME
-      - key: MAIL_PASSWORD
-        scope: RUN_AND_BUILD_TIME
-      - key: MAIL_DEFAULT_SENDER
-        scope: RUN_AND_BUILD_TIME
+      # IMPORTANT: Add these environment variables through the DigitalOcean UI
+      # to prevent them from being overwritten during deployment:
+      # - REDIS_URL (required)
+      # - SECRET_KEY (required) 
+      # - OPENPHONE_API_KEY (required)
+      # - OPENPHONE_PHONE_NUMBER
+      # - OPENPHONE_PHONE_NUMBER_ID
+      # - OPENPHONE_WEBHOOK_SIGNING_KEY
+      # - GOOGLE_CLIENT_ID
+      # - GOOGLE_CLIENT_SECRET
+      # - GOOGLE_PROJECT_ID
+      # - GEMINI_API_KEY
+      # - MAIL_SERVER
+      # - MAIL_PORT
+      # - MAIL_USE_TLS
+      # - MAIL_USERNAME
+      # - MAIL_PASSWORD
+      # - MAIL_DEFAULT_SENDER
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -105,27 +90,7 @@ workers:
         value: ${db.DATABASE_URL}
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
-      # Same environment variables as web service
-      - key: REDIS_URL
-        scope: RUN_AND_BUILD_TIME
-      - key: SECRET_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_PROJECT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: GEMINI_API_KEY
-        scope: RUN_AND_BUILD_TIME
+      # Environment variables must be set through the DigitalOcean UI
 
 # Define the managed databases and other addons for the application.
 databases:
