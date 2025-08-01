@@ -25,7 +25,7 @@ services:
     # Define the number of instances. Start with 1 and enable auto-scaling.
     instance_count: 1
     # Define the HTTP port the application listens on inside the container.
-    http_port: 8080
+    http_port: 5000
     # Define the routes for incoming traffic.
     routes:
       - path: /
@@ -47,24 +47,8 @@ services:
       - key: POSTGRES_URI
         # Also set POSTGRES_URI to the same value for compatibility
         value: ${db.DATABASE_URL}
-      # IMPORTANT: Add these environment variables through the DigitalOcean UI
-      # to prevent them from being overwritten during deployment:
-      # - REDIS_URL (required)
-      # - SECRET_KEY (required) 
-      # - OPENPHONE_API_KEY (required)
-      # - OPENPHONE_PHONE_NUMBER
-      # - OPENPHONE_PHONE_NUMBER_ID
-      # - OPENPHONE_WEBHOOK_SIGNING_KEY
-      # - GOOGLE_CLIENT_ID
-      # - GOOGLE_CLIENT_SECRET
-      # - GOOGLE_PROJECT_ID
-      # - GEMINI_API_KEY
-      # - MAIL_SERVER
-      # - MAIL_PORT
-      # - MAIL_USE_TLS
-      # - MAIL_USERNAME
-      # - MAIL_PASSWORD
-      # - MAIL_DEFAULT_SENDER
+      # IMPORTANT: Environment variables must be set in DigitalOcean UI
+      # They will be preserved across deployments if not defined here
 
 # Define the workers (background task processors) for your application.
 workers:
