@@ -75,7 +75,8 @@ workers:
       repository: attackacrack-crm
       tag: main
     # Define the command to run the Celery worker.
-    run_command: celery -A celery_worker.celery worker --loglevel=info
+    # Limit concurrency to 2 workers for basic-xxs instance
+    run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
     # Define the instance size.
     instance_size_slug: basic-xxs
     # Define the number of instances.
