@@ -101,8 +101,49 @@ def db_session(app):
     This ensures that tests are isolated from each other by rolling back any changes.
     """
     with app.app_context():
-        yield db.session
-        db.session.rollback() # Rollback any changes after each test
+        # For SQLite (used in CI), we need different transaction handling
+        if 'sqlite' in str(db.engine.url):
+            # SQLite doesn't support nested transactions well
+            # Just use the session directly and clean up after
+            yield db.session
+            db.session.rollback()
+            db.session.remove()
+        else:
+            # For PostgreSQL, use nested transactions
+            connection = db.engine.connect()
+            transaction = connection.begin()
+            
+            # Configure session to use this connection
+            session = db.session
+            session.configure(bind=connection)
+            
+            yield session
+            
+            # Rollback the transaction to ensure clean state
+            session.close()
+            transaction.rollback()
+            connection.close()
+
+@pytest.fixture(autouse=True)
+def clean_campaign_data(db_session):
+    """
+    Automatically clean up campaign-related data after each test.
+    This ensures tests don't interfere with each other.
+    """
+    yield
+    # Clean up after test
+    from crm_database import Campaign, CampaignMembership, CampaignList, CampaignListMember, ContactFlag
+    try:
+        # Delete in correct order to respect foreign keys
+        db_session.query(ContactFlag).delete()
+        db_session.query(CampaignListMember).delete()
+        db_session.query(CampaignMembership).delete()
+        db_session.query(CampaignList).delete()
+        db_session.query(Campaign).delete()
+        db_session.commit()
+    except Exception as e:
+        print(f"Error cleaning campaign data: {e}")
+        db_session.rollback()
 
 # ADDED THIS FIXTURE: To globally mock get_google_creds for application_pages tests
 @pytest.fixture(autouse=True)

@@ -293,8 +293,13 @@ class TestCampaignErrorHandling:
     def test_openphone_send_failure_handling(self, campaign_service,
                                            test_contacts_batch, db_session):
         """Test handling of OpenPhone send failures"""
+        # Ensure no existing campaigns
+        Campaign.query.delete()
+        db_session.commit()
+        
         # Mock the OpenPhone service to fail
         mock_openphone = mock_openphone_service(campaign_service)
+        mock_openphone.reset_mock()  # Clear any previous calls
         mock_openphone.send_message.return_value = {'success': False, 'error': 'API Error'}
         # Create and start campaign
         campaign = campaign_service.create_campaign(
@@ -320,6 +325,9 @@ class TestCampaignErrorHandling:
         # Should mark as failed
         assert stats['messages_sent'] == 0
         assert stats['messages_skipped'] == 1
+        
+        # Check mock was called exactly once
+        assert mock_openphone.send_message.call_count == 1, f"Expected 1 call, got {mock_openphone.send_message.call_count}"
         
         # Verify membership marked as failed
         db_session.refresh(membership)

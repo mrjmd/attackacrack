@@ -366,8 +366,13 @@ class TestCampaignLifecycle:
     
     def test_process_campaign_queue(self, campaign_service, test_campaign, test_contact, db_session):
         """Test processing campaign queue"""
+        # Ensure no other campaigns are running
+        Campaign.query.filter(Campaign.id != test_campaign.id).delete()
+        db_session.commit()
+        
         # Mock OpenPhone service on the campaign_service instance
         mock_openphone = MagicMock()
+        mock_openphone.reset_mock()  # Clear any previous calls
         mock_openphone.send_message.return_value = {'success': True, 'message_id': 'MSG123'}
         campaign_service.openphone_service = mock_openphone
         
