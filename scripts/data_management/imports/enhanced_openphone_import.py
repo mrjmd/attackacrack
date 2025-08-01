@@ -520,23 +520,22 @@ class EnhancedOpenPhoneImporter:
             recording_url = self._fetch_call_recording_url(call_id)
             if recording_url:
                 try:
-                response = requests.get(recording_url, verify=True, timeout=(5, 30))
-                if response.status_code == 200:
-                    filename = f"recording_{activity.id}_{call_data.get('id', 'unknown')}.mp3"
-                    local_path = os.path.join(RECORDINGS_FOLDER, filename)
-                    
-                    with open(local_path, 'wb') as f:
-                        f.write(response.content)
-                    
-                    # Update activity with local recording path
-                    activity.recording_url = local_path
-                    
-                    self.stats['recordings_downloaded'] += 1
-                    logger.info(f"Downloaded recording: {filename}")
-                    
-            except Exception as e:
-                logger.error(f"Error downloading recording: {e}")
-                self.stats['errors'].append(f"Recording download: {str(e)}")
+                    response = requests.get(recording_url, verify=True, timeout=(5, 30))
+                    if response.status_code == 200:
+                        filename = f"recording_{activity.id}_{call_data.get('id', 'unknown')}.mp3"
+                        local_path = os.path.join(RECORDINGS_FOLDER, filename)
+                        
+                        with open(local_path, 'wb') as f:
+                            f.write(response.content)
+                        
+                        # Update activity with local recording path
+                        activity.recording_url = local_path
+                        
+                        self.stats['recordings_downloaded'] += 1
+                        logger.info(f"Downloaded recording: {filename}")
+                except Exception as e:
+                    logger.error(f"Error downloading recording: {e}")
+                    self.stats['errors'].append(f"Recording download: {str(e)}")
         
         # Download voicemail
         voicemail_url = call_data.get('voicemailUrl')

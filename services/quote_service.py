@@ -106,7 +106,7 @@ class QuoteService:
             return quote
         except Exception as e:
             db.session.rollback()
-            logger.error("Error updating quote", error=str(e), quote_id=quote_data.get('id'))
+            logger.error("Error updating quote", error=str(e), quote_id=quote_id)
             return None
     # --- FIX END ---
 

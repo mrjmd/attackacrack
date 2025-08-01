@@ -1,0 +1,25 @@
+[flake8]
+# Exclude directories
+exclude = 
+    .git,
+    __pycache__,
+    docs,
+    old_env,
+    venv,
+    env,
+    .venv,
+    migrations,
+    node_modules,
+    htmlcov,
+    .pytest_cache
+
+# Configure line length
+max-line-length = 120
+max-complexity = 10
+
+# Ignore specific warnings if needed
+# ignore = E203, W503
+
+# Show source code for errors
+show-source = True
+statistics = True
