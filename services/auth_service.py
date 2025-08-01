@@ -1,8 +1,8 @@
 # services/auth_service.py
 
 from flask_bcrypt import Bcrypt
-from flask_login import LoginManager, login_user, logout_user
-from extensions import db
+from flask_login import login_user, logout_user
+from extensions import db, login_manager, bcrypt
 from crm_database import User, InviteToken
 from datetime import datetime, timedelta
 import secrets
@@ -11,8 +11,7 @@ from flask_mail import Mail, Message
 from flask import current_app
 import re
 
-bcrypt = Bcrypt()
-login_manager = LoginManager()
+# Use the instances from extensions.py
 mail = Mail()
 
 
@@ -22,20 +21,12 @@ class AuthService:
     @staticmethod
     def init_app(app):
         """Initialize authentication services with app"""
-        bcrypt.init_app(app)
-        login_manager.init_app(app)
-        login_manager.login_view = 'auth.login'
-        login_manager.login_message = 'Please log in to access this page.'
+        # Note: bcrypt and login_manager are already initialized in app.py
+        # We only need to initialize mail here
         
         # Initialize mail if configured
         if app.config.get('MAIL_SERVER'):
             mail.init_app(app)
-    
-    @staticmethod
-    @login_manager.user_loader
-    def load_user(user_id):
-        """Load user for Flask-Login"""
-        return User.query.get(int(user_id))
     
     @staticmethod
     def validate_password(password):
