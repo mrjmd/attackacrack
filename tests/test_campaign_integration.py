@@ -277,13 +277,8 @@ class TestFullCampaignLifecycle:
         
         campaign_service.start_campaign(campaign.id)
         
-        # Mock current time as outside business hours (8 PM)
-        with patch('services.campaign_service.datetime') as mock_datetime:
-            # Mock both utcnow and now
-            mock_datetime.utcnow.return_value = datetime(2025, 7, 29, 20, 0, 0)  # 8 PM UTC
-            mock_datetime.now.return_value = datetime(2025, 7, 29, 20, 0, 0)  # 8 PM local
-            mock_datetime.strptime = datetime.strptime
-            
+        # Mock _is_business_hours to return False
+        with patch.object(campaign_service, '_is_business_hours', return_value=False):
             stats = campaign_service.process_campaign_queue()
             
             # Should skip all due to business hours

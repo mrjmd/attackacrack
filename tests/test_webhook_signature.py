@@ -352,8 +352,8 @@ class TestWebhookEndpointSecurity:
         # Encode to base64
         signature_base64 = base64.b64encode(signature_bytes).decode()
         
-        # OpenPhone header format: t=timestamp,v1=signature
-        return f't={timestamp},v1={signature_base64}'
+        # Return OpenPhone format: hmac;version;timestamp;signature
+        return f"hmac;1;{timestamp};{signature_base64}"
     
     def test_webhook_endpoint_requires_post(self, client, app):
         """Test that webhook endpoint only accepts POST requests"""
