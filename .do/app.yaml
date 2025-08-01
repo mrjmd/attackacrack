@@ -1,41 +1,97 @@
-name: attackacrack
+# This is the specification for the Attack-a-Crack application on Digital Ocean App Platform.
+# Version 3: Corrected syntax for worker and database components.
+
+name: attackacrack-prod
+
+# Define the region for your app. Choose one close to your users.
+# e.g., nyc3, sfo3, ams3, sgp1, fra1
+region: nyc3
+
+# Define the services (public-facing web containers) for your application.
 services:
-- name: attackacrack
-  dockerfile_path: Dockerfile
-  github:
-    branch: main
-    deploy_on_push: true
-    repo: mrjmd/attackacrack
-  run_command: gunicorn --worker-tmp-dir /dev/shm -b 0.0.0.0:5000 app:app
-  http_port: 5000
-  instance_count: 1
-  instance_size_slug: basic-xxs
-  routes:
-  - path: /
-- name: worker
-  dockerfile_path: Dockerfile
-  github:
-    branch: main
-    deploy_on_push: true
-    repo: mrjmd/attackacrack
-  run_command: celery -A celery_worker.celery worker --loglevel=info
-  instance_count: 1
-  instance_size_slug: basic-xxs
-- name: beat
-  dockerfile_path: Dockerfile
-  github:
-    branch: main
-    deploy_on_push: true
-    repo: mrjmd/attackacrack
-  run_command: celery -A celery_worker.celery beat --loglevel=info -s /tmp/celerybeat-schedule
-  instance_count: 1
-  instance_size_slug: basic-xxs
+  - name: attackacrack-web
+    # Build the image from the Dockerfile in the root of the repository.
+    dockerfile_path: Dockerfile
+    # Reference the GitHub repository.
+    github:
+      repo: mrjmd/attackacrack
+      branch: main
+    # Define the command to run the web server.
+    # This overrides the Dockerfile's CMD or ENTRYPOINT for this specific service.
+    # We use gunicorn for a production-ready WSGI server.
+    run_command: ./entrypoint.sh
+    # Define the instance size. Start with the smallest and scale up as needed.
+    instance_size_slug: basic-xxs
+    # Define the number of instances. Start with 1 and enable auto-scaling.
+    instance_count: 1
+    # Define the HTTP port the application listens on inside the container.
+    http_port: 8080
+    # Define the routes for incoming traffic.
+    routes:
+      - path: /
+    # CRITICAL: Health checks for production readiness.
+    # The App Platform will hit this endpoint to ensure the container is healthy.
+    # If this fails, the deployment will be rolled back.
+    health_check:
+      http_path: /health # We must create this route in our Flask app.
+    # Define environment variables.
+    # Secrets like SECRET_KEY, OPENPHONE_API_TOKEN, etc., should be set in the App Platform UI.
+    envs:
+      - key: FLASK_ENV
+        value: "production"
+      - key: FLASK_APP
+        value: "app.py"
+      - key: DATABASE_URL
+        # This special syntax binds the connection string from the managed database.
+        value: ${db.DATABASE_URL}
+      - key: REDIS_URL
+        # This special syntax binds the connection string from the managed Redis instance.
+        value: ${redis.DATABASE_URL}
+      # --- ADD ALL OTHER SECRET ENV VARS IN THE DO UI ---
+      # - key: SECRET_KEY
+      # - key: OPENPHONE_API_TOKEN
+      # - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+      # - key: OPENAI_API_KEY
+      # etc.
+
+# Define the workers (background task processors) for your application.
+workers:
+  - name: attackacrack-worker
+    # Use the same Docker build as the web service.
+    dockerfile_path: Dockerfile
+    github:
+      repo: mrjmd/attackacrack
+      branch: main
+    # Define the command to run the Celery worker.
+    run_command: celery -A celery_worker.celery worker --loglevel=info
+    # Define the instance size.
+    instance_size_slug: basic-xxs
+    # Define the number of instances.
+    instance_count: 1
+    # Define environment variables (must match the web service).
+    envs:
+      - key: FLASK_ENV
+        value: "production"
+      - key: FLASK_APP
+        value: "app.py"
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+      - key: REDIS_URL
+        value: ${redis.DATABASE_URL}
+      # --- ADD ALL OTHER SECRET ENV VARS IN THE DO UI ---
+
+# Define the managed databases and other addons for the application.
 databases:
-- name: attackacrack-db
-  engine: PG
-  production: true
-  version: "12"
-- name: attackacrack-cache
-  engine: REDIS
-  production: true
-  version: "6"
+  - name: db
+    # Use PostgreSQL version 13.
+    engine: PG
+    version: "13"
+    # The name of the production database inside the cluster.
+    db_name: attackacrack_prod
+    # The size of the database cluster. Start small.
+    size: db-s-1vcpu-1gb
+  - name: redis
+    # Use Redis for the Celery message broker.
+    engine: REDIS
+    # The size of the Redis cluster.
+    size: db-s-1vcpu-1gb
