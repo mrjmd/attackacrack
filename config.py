@@ -29,12 +29,16 @@ class Config:
         if os.environ.get('FLASK_ENV') == 'testing':
             return
             
-        required_vars = [
-            'OPENPHONE_API_KEY',
-            'DB_USER', 
-            'DB_PASSWORD',
-            'DB_NAME'
-        ]
+        # In production, we use DATABASE_URL instead of individual DB vars
+        if os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URI'):
+            required_vars = ['OPENPHONE_API_KEY']
+        else:
+            required_vars = [
+                'OPENPHONE_API_KEY',
+                'DB_USER', 
+                'DB_PASSWORD',
+                'DB_NAME'
+            ]
         
         missing_vars = []
         for var in required_vars:
