@@ -47,47 +47,39 @@ services:
       - key: POSTGRES_URI
         # Also set POSTGRES_URI to the same value for compatibility
         value: ${db.DATABASE_URL}
-      # Environment variables that reference app-level env vars
-      # This prevents them from being overwritten during deployment
+      # Environment variables - secrets will use app-level values
       - key: REDIS_URL
-        type: SECRET
-        value: ${REDIS_URL}
+        scope: RUN_AND_BUILD_TIME
       - key: SECRET_KEY
-        type: SECRET
-        value: ${SECRET_KEY}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_API_KEY
-        type: SECRET
-        value: ${OPENPHONE_API_KEY}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_PHONE_NUMBER
-        value: ${OPENPHONE_PHONE_NUMBER}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_PHONE_NUMBER_ID
-        value: ${OPENPHONE_PHONE_NUMBER_ID}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        type: SECRET
-        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        scope: RUN_AND_BUILD_TIME
       - key: GOOGLE_CLIENT_ID
-        value: ${GOOGLE_CLIENT_ID}
+        scope: RUN_AND_BUILD_TIME
       - key: GOOGLE_CLIENT_SECRET
-        type: SECRET
-        value: ${GOOGLE_CLIENT_SECRET}
+        scope: RUN_AND_BUILD_TIME
       - key: GOOGLE_PROJECT_ID
-        value: ${GOOGLE_PROJECT_ID}
+        scope: RUN_AND_BUILD_TIME
       - key: GEMINI_API_KEY
-        type: SECRET
-        value: ${GEMINI_API_KEY}
+        scope: RUN_AND_BUILD_TIME
       - key: MAIL_SERVER
-        value: ${MAIL_SERVER}
+        scope: RUN_AND_BUILD_TIME
       - key: MAIL_PORT
-        value: ${MAIL_PORT}
+        scope: RUN_AND_BUILD_TIME
       - key: MAIL_USE_TLS
-        value: ${MAIL_USE_TLS}
+        scope: RUN_AND_BUILD_TIME
       - key: MAIL_USERNAME
-        value: ${MAIL_USERNAME}
+        scope: RUN_AND_BUILD_TIME
       - key: MAIL_PASSWORD
-        type: SECRET
-        value: ${MAIL_PASSWORD}
+        scope: RUN_AND_BUILD_TIME
       - key: MAIL_DEFAULT_SENDER
-        value: ${MAIL_DEFAULT_SENDER}
+        scope: RUN_AND_BUILD_TIME
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -115,31 +107,25 @@ workers:
         value: ${db.DATABASE_URL}
       # Same environment variables as web service
       - key: REDIS_URL
-        type: SECRET
-        value: ${REDIS_URL}
+        scope: RUN_AND_BUILD_TIME
       - key: SECRET_KEY
-        type: SECRET
-        value: ${SECRET_KEY}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_API_KEY
-        type: SECRET
-        value: ${OPENPHONE_API_KEY}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_PHONE_NUMBER
-        value: ${OPENPHONE_PHONE_NUMBER}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_PHONE_NUMBER_ID
-        value: ${OPENPHONE_PHONE_NUMBER_ID}
+        scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        type: SECRET
-        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        scope: RUN_AND_BUILD_TIME
       - key: GOOGLE_CLIENT_ID
-        value: ${GOOGLE_CLIENT_ID}
+        scope: RUN_AND_BUILD_TIME
       - key: GOOGLE_CLIENT_SECRET
-        type: SECRET
-        value: ${GOOGLE_CLIENT_SECRET}
+        scope: RUN_AND_BUILD_TIME
       - key: GOOGLE_PROJECT_ID
-        value: ${GOOGLE_PROJECT_ID}
+        scope: RUN_AND_BUILD_TIME
       - key: GEMINI_API_KEY
-        type: SECRET
-        value: ${GEMINI_API_KEY}
+        scope: RUN_AND_BUILD_TIME
 
 # Define the managed databases and other addons for the application.
 databases:
