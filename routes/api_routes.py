@@ -11,6 +11,23 @@ from crm_database import Activity # Import Activity
 
 api_bp = Blueprint('api', __name__)
 
+@api_bp.route('/debug-session')
+def debug_session():
+    """Debug endpoint to check session and request info"""
+    from flask import session, request
+    from flask_login import current_user
+    
+    return jsonify({
+        'is_authenticated': current_user.is_authenticated,
+        'user_id': current_user.id if current_user.is_authenticated else None,
+        'session_data': dict(session),
+        'scheme': request.scheme,
+        'is_secure': request.is_secure,
+        'host': request.host,
+        'headers': dict(request.headers),
+        'cookies_received': dict(request.cookies)
+    })
+
 @api_bp.route('/health')
 def health_check():
     """Health check endpoint for monitoring."""
