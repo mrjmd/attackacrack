@@ -120,7 +120,8 @@ class OpenPhoneWebhookService:
             contact_phone = from_number
             db_direction = 'incoming'
         else:
-            contact_phone = to_number  
+            # 'to' is a list, get the first number
+            contact_phone = to_number[0] if isinstance(to_number, list) and to_number else to_number
             db_direction = 'outgoing'
         
         # Get or create contact
