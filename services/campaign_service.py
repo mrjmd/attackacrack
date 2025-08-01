@@ -266,6 +266,13 @@ class CampaignService:
         
         for membership in pending:
             try:
+                # Skip if contact has no phone number
+                if not membership.contact.phone:
+                    membership.status = 'skipped'
+                    membership.error_message = 'No phone number'
+                    stats['skipped'] += 1
+                    continue
+                    
                 # Check contact history
                 history = self._check_contact_history(membership.contact, campaign)
                 
@@ -324,9 +331,9 @@ class CampaignService:
                 )
                 
                 # Send message
-                success = self._send_message(membership.contact.phone, personalized_message)
+                result = self._send_message(membership.contact.phone, personalized_message)
                 
-                if success:
+                if result.get('success', False):
                     membership.status = 'sent'
                     membership.variant_sent = variant
                     membership.message_sent = personalized_message
@@ -338,9 +345,12 @@ class CampaignService:
                     stats['sent'] += 1
                 else:
                     membership.status = 'failed'
+                    membership.error_message = result.get('error', 'Send failed')
+                    stats['skipped'] += 1
                 
             except Exception as e:
                 membership.status = 'failed'
+                membership.error_message = str(e)
                 stats['skipped'] += 1
         
         db.session.commit()
@@ -485,14 +495,14 @@ class CampaignService:
         
         return message.strip()
     
-    def _send_message(self, phone: str, message: str) -> bool:
+    def _send_message(self, phone: str, message: str) -> Dict:
         """Send SMS message via OpenPhone"""
         try:
             # Use OpenPhone service to send message
             result = self.openphone_service.send_message(phone, message)
-            return result.get('success', False)
+            return result
         except Exception as e:
-            return False
+            return {'success': False, 'error': str(e)}
     
     def _check_contact_history(self, contact: Contact, campaign: Campaign) -> Dict:
         """Check contact's previous interactions"""
