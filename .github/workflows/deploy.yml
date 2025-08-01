@@ -61,14 +61,14 @@ jobs:
       run: |
         # First, list all apps to debug
         echo "Listing all apps:"
-        doctl apps list --format ID,Name
+        doctl apps list
         
         # Get the app ID (try exact match first, then partial match)
-        APP_ID=$(doctl apps list --format ID,Name --no-header | grep -E "^[a-f0-9-]+\s+attackacrack-prod$" | awk '{print $1}')
+        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep -E "^[a-f0-9-]+\s+attackacrack-prod$" | awk '{print $1}')
         
         # If not found, try partial match
         if [ -z "$APP_ID" ]; then
-          APP_ID=$(doctl apps list --format ID,Name --no-header | grep "attackacrack" | awk '{print $1}')
+          APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep "attackacrack" | awk '{print $1}')
         fi
         
         if [ -z "$APP_ID" ]; then
@@ -82,7 +82,7 @@ jobs:
     
     - name: Get deployment status
       run: |
-        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-prod | awk '{print $1}')
+        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
         doctl apps get-deployment $APP_ID $(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
     
     - name: Verify health check
@@ -91,7 +91,7 @@ jobs:
         sleep 30
         
         # Get the app URL
-        APP_URL=$(doctl apps get $(doctl apps list --format ID,Name --no-header | grep attackacrack-prod | awk '{print $1}') --format DefaultIngress --no-header)
+        APP_URL=$(doctl apps get $(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}') --format DefaultIngress --no-header)
         
         # Check health endpoint
         curl -f https://$APP_URL/health || exit 1
