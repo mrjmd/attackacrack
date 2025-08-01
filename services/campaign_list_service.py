@@ -4,7 +4,7 @@ Campaign List Service - Manage campaign lists and contact selection
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
-from sqlalchemy import and_, or_, not_
+from sqlalchemy import and_, or_, not_, func
 from crm_database import db, Contact, CampaignList, CampaignListMember, CSVImport, Activity, ContactFlag
 
 
@@ -173,7 +173,11 @@ class CampaignListService:
         # Metadata filters
         if 'has_metadata' in criteria:
             for key in criteria['has_metadata']:
-                query = query.filter(Contact.contact_metadata.has_key(key))
+                # For SQLite compatibility, use LIKE operator on JSON string
+                query = query.filter(
+                    Contact.contact_metadata.isnot(None),
+                    func.json_extract(Contact.contact_metadata, f'$.{key}').isnot(None)
+                )
         
         return query.all()
     
