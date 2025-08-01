@@ -10,12 +10,12 @@ region: nyc3
 # Define the services (public-facing web containers) for your application.
 services:
   - name: attackacrack-web
-    # Build the image from the Dockerfile in the root of the repository.
-    dockerfile_path: Dockerfile
-    # Reference the GitHub repository.
-    github:
-      repo: mrjmd/attackacrack
-      branch: main
+    # Use pre-built image from DigitalOcean Container Registry
+    # The deploy workflow will update this with the correct tag
+    image:
+      registry_type: DOCR
+      repository: attackacrack-crm
+      tag: main
     # Define the command to run the web server.
     # This overrides the Dockerfile's CMD or ENTRYPOINT for this specific service.
     # We use gunicorn for a production-ready WSGI server.
@@ -57,11 +57,11 @@ services:
 # Define the workers (background task processors) for your application.
 workers:
   - name: attackacrack-worker
-    # Use the same Docker build as the web service.
-    dockerfile_path: Dockerfile
-    github:
-      repo: mrjmd/attackacrack
-      branch: main
+    # Use pre-built image from DigitalOcean Container Registry
+    image:
+      registry_type: DOCR
+      repository: attackacrack-crm
+      tag: main
     # Define the command to run the Celery worker.
     run_command: celery -A celery_worker.celery worker --loglevel=info
     # Define the instance size.

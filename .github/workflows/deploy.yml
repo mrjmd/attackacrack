@@ -45,15 +45,13 @@ jobs:
     
     - name: Update app spec with new image
       run: |
-        # Update the Docker image reference in app.yaml
-        IMAGE_REF="${{ env.REGISTRY }}/${{ secrets.DIGITALOCEAN_REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}"
-        
-        # Create a temporary app spec with the image reference
+        # Create a temporary app spec with updated image tags
         cp .do/app.yaml .do/app-deploy.yaml
-        echo "  image:" >> .do/app-deploy.yaml
-        echo "    registry_type: DOCR" >> .do/app-deploy.yaml
-        echo "    repository: ${{ env.IMAGE_NAME }}" >> .do/app-deploy.yaml
-        echo "    tag: ${{ steps.image-tag.outputs.tag }}" >> .do/app-deploy.yaml
+        
+        # Update the tag in the app spec using sed
+        sed -i "s/tag: main/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
+        
+        echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }}"
     
     - name: Validate app spec
       run: |
@@ -89,15 +87,15 @@ jobs:
         curl -f https://$APP_URL/health || exit 1
         echo "Health check passed!"
     
-    - name: Send deployment notification
-      if: always()
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        text: |
-          Deployment to ${{ github.event.inputs.environment }} ${{ job.status }}
-          Tag: ${{ steps.image-tag.outputs.tag }}
-          Actor: ${{ github.actor }}
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+    # Slack notification commented out - add SLACK_WEBHOOK_URL secret to enable
+    # - name: Send deployment notification
+    #   if: always()
+    #   uses: 8398a7/action-slack@v3
+    #   with:
+    #     status: ${{ job.status }}
+    #     text: |
+    #       Deployment to ${{ github.event.inputs.environment }} ${{ job.status }}
+    #       Tag: ${{ steps.image-tag.outputs.tag }}
+    #       Actor: ${{ github.actor }}
+    #   env:
+    #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
