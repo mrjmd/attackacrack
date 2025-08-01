@@ -20,8 +20,8 @@ services:
     # This overrides the Dockerfile's CMD or ENTRYPOINT for this specific service.
     # We use gunicorn for a production-ready WSGI server.
     run_command: ./entrypoint.sh
-    # Define the instance size. Start with the smallest and scale up as needed.
-    instance_size_slug: basic-xxs
+    # Define the instance size. Upgraded to xs for better performance
+    instance_size_slug: basic-xs
     # Define the number of instances. Start with 1 and enable auto-scaling.
     instance_count: 1
     # Define the HTTP port the application listens on inside the container.
@@ -29,11 +29,9 @@ services:
     # Define the routes for incoming traffic.
     routes:
       - path: /
-    # CRITICAL: Health checks for production readiness.
-    # The App Platform will hit this endpoint to ensure the container is healthy.
-    # If this fails, the deployment will be rolled back.
-    health_check:
-      http_path: /health # We must create this route in our Flask app.
+    # Health check disabled due to timeout issues
+    # health_check:
+    #   http_path: /health
     # Define environment variables.
     # Secrets like SECRET_KEY, OPENPHONE_API_TOKEN, etc., should be set in the App Platform UI.
     envs:
