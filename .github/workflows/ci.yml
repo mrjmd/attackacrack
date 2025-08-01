@@ -132,7 +132,7 @@ jobs:
         FLASK_APP: app.py
       run: |
         pytest --cov=. --cov-report=xml --cov-report=html \
-          --cov-config=.coveragerc || true
+          --cov-config=.coveragerc
     
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
@@ -185,8 +185,8 @@ jobs:
       run: |
         # Test upgrade
         flask db upgrade
-        # Test downgrade one revision
-        flask db downgrade -1
+        # Test downgrade to base (since we only have one migration now)
+        flask db downgrade base
         # Test upgrade again
         flask db upgrade
 
