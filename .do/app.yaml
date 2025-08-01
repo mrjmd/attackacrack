@@ -77,8 +77,8 @@ workers:
     # Define the command to run the Celery worker.
     # Limit concurrency to 2 workers for basic-xxs instance
     run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
-    # Define the instance size.
-    instance_size_slug: basic-xxs
+    # Define the instance size - xs for worker to handle memory requirements
+    instance_size_slug: basic-xs
     # Define the number of instances.
     instance_count: 1
     # Define environment variables (must match the web service).
