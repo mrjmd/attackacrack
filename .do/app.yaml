@@ -44,6 +44,9 @@ services:
       - key: DATABASE_URL
         # This special syntax binds the connection string from the managed database.
         value: ${db.DATABASE_URL}
+      - key: POSTGRES_URI
+        # Also set POSTGRES_URI to the same value for compatibility
+        value: ${db.DATABASE_URL}
       # REDIS_URL should be set in the DO App Platform UI
       # - key: REDIS_URL
       #   value: "redis://your-redis-host:6379"
@@ -75,6 +78,8 @@ workers:
       - key: FLASK_APP
         value: "app.py"
       - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+      - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
       # REDIS_URL should be set in the DO App Platform UI
       # - key: REDIS_URL

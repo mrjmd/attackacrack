@@ -60,7 +60,7 @@ jobs:
     - name: Deploy to DigitalOcean
       run: |
         # Get the app ID
-        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-crm | awk '{print $1}')
+        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-prod | awk '{print $1}')
         
         if [ -z "$APP_ID" ]; then
           echo "Creating new app..."
@@ -72,7 +72,7 @@ jobs:
     
     - name: Get deployment status
       run: |
-        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-crm | awk '{print $1}')
+        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-prod | awk '{print $1}')
         doctl apps get-deployment $APP_ID $(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
     
     - name: Verify health check
@@ -81,7 +81,7 @@ jobs:
         sleep 30
         
         # Get the app URL
-        APP_URL=$(doctl apps get $(doctl apps list --format ID,Name --no-header | grep attackacrack-crm | awk '{print $1}') --format DefaultIngress --no-header)
+        APP_URL=$(doctl apps get $(doctl apps list --format ID,Name --no-header | grep attackacrack-prod | awk '{print $1}') --format DefaultIngress --no-header)
         
         # Check health endpoint
         curl -f https://$APP_URL/health || exit 1
