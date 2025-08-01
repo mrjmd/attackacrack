@@ -90,5 +90,7 @@ databases:
     # The production database name will be auto-created as 'db'
     # matching the component name
     production: true
+    # Cluster name for the production database
+    cluster_name: attackacrack-db
     # The size of the database cluster. Start small.
     size: db-s-1vcpu-1gb
