@@ -10,7 +10,10 @@ set -e
 
 # Apply database migrations
 echo "Applying database migrations..."
+# Set a flag to skip validation during migrations
+export SKIP_ENV_VALIDATION=1
 flask db upgrade
+unset SKIP_ENV_VALIDATION
 
 # Start the Gunicorn server
 echo "Starting Gunicorn..."

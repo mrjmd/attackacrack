@@ -25,13 +25,14 @@ class Config:
     @classmethod
     def validate_required_config(cls) -> None:
         """Validate that all required configuration is present"""
-        # Skip validation in testing environment
-        if os.environ.get('FLASK_ENV') == 'testing':
+        # Skip validation in testing environment or during migrations
+        if os.environ.get('FLASK_ENV') == 'testing' or os.environ.get('SKIP_ENV_VALIDATION'):
             return
             
         # In production, we use DATABASE_URL instead of individual DB vars
         if os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URI'):
-            required_vars = ['OPENPHONE_API_KEY']
+            # Make API keys optional for initial deployment
+            required_vars = []
         else:
             required_vars = [
                 'OPENPHONE_API_KEY',
