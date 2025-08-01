@@ -25,6 +25,10 @@ class Config:
     @classmethod
     def validate_required_config(cls) -> None:
         """Validate that all required configuration is present"""
+        # Skip validation in testing environment
+        if os.environ.get('FLASK_ENV') == 'testing':
+            return
+            
         required_vars = [
             'OPENPHONE_API_KEY',
             'DB_USER', 

@@ -175,8 +175,13 @@ jobs:
     - name: Test migrations
       env:
         DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        POSTGRES_URI: postgresql://test_user:test_password@localhost:5432/test_db
         SECRET_KEY: test-secret-key
         FLASK_APP: app.py
+        OPENPHONE_API_KEY: test-api-key
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        DB_NAME: test_db
       run: |
         # Test upgrade
         flask db upgrade
