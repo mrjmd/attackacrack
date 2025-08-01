@@ -38,3 +38,9 @@ celery.conf.beat_schedule = {
     },
 }
 celery.conf.timezone = 'UTC'
+
+# Import tasks to ensure they're registered with Celery
+# This must be done after the Flask app is created
+with flask_app.app_context():
+    import services.scheduler_service
+    import tasks.campaign_tasks
