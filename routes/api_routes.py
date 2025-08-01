@@ -14,26 +14,40 @@ api_bp = Blueprint('api', __name__)
 @api_bp.route('/health')
 def health_check():
     """Health check endpoint for monitoring."""
+    health_status = {
+        'status': 'healthy',
+        'service': 'attackacrack-crm',
+        'database': 'unknown',
+        'redis': 'unknown'
+    }
+    
     try:
         # Check database connection
         from extensions import db
         db.session.execute('SELECT 1')
-        
-        # Check Redis connection
-        from celery_worker import celery
-        celery.backend.get('health_check_test')
-        
-        return jsonify({
-            'status': 'healthy',
-            'service': 'attackacrack-crm',
-            'database': 'connected',
-            'redis': 'connected'
-        }), 200
+        health_status['database'] = 'connected'
     except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 503
+        health_status['database'] = f'error: {str(e)}'
+        health_status['status'] = 'degraded'
+    
+    try:
+        # Check Redis connection (optional)
+        import os
+        if os.environ.get('REDIS_URL'):
+            from celery_worker import celery
+            celery.backend.get('health_check_test')
+            health_status['redis'] = 'connected'
+        else:
+            health_status['redis'] = 'not configured'
+    except Exception as e:
+        health_status['redis'] = f'error: {str(e)}'
+        # Don't fail health check for Redis issues
+    
+    # Return 200 if database is connected (minimum requirement)
+    if health_status['database'] == 'connected':
+        return jsonify(health_status), 200
+    else:
+        return jsonify(health_status), 503
 
 def verify_openphone_signature(f):
     """Decorator to verify webhook signature."""
