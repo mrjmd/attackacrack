@@ -59,13 +59,23 @@ jobs:
     
     - name: Deploy to DigitalOcean
       run: |
-        # Get the app ID
-        APP_ID=$(doctl apps list --format ID,Name --no-header | grep attackacrack-prod | awk '{print $1}')
+        # First, list all apps to debug
+        echo "Listing all apps:"
+        doctl apps list --format ID,Name
+        
+        # Get the app ID (try exact match first, then partial match)
+        APP_ID=$(doctl apps list --format ID,Name --no-header | grep -E "^[a-f0-9-]+\s+attackacrack-prod$" | awk '{print $1}')
+        
+        # If not found, try partial match
+        if [ -z "$APP_ID" ]; then
+          APP_ID=$(doctl apps list --format ID,Name --no-header | grep "attackacrack" | awk '{print $1}')
+        fi
         
         if [ -z "$APP_ID" ]; then
           echo "Creating new app..."
           doctl apps create --spec .do/app-deploy.yaml --wait
         else
+          echo "Found existing app with ID: $APP_ID"
           echo "Updating existing app..."
           doctl apps update $APP_ID --spec .do/app-deploy.yaml --wait
         fi

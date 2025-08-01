@@ -182,6 +182,16 @@ class ProductionConfig(Config):
     CELERY_BROKER_URL = os.environ.get('REDIS_URL', '')
     CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', '')
     
+    # If using rediss:// (SSL), append required parameters
+    if CELERY_BROKER_URL.startswith('rediss://'):
+        # Append SSL parameters if not already present
+        if 'ssl_cert_reqs' not in CELERY_BROKER_URL:
+            # Use CERT_NONE for managed Redis/Valkey services
+            separator = '&' if '?' in CELERY_BROKER_URL else '?'
+            ssl_params = f"{separator}ssl_cert_reqs=CERT_NONE"
+            CELERY_BROKER_URL += ssl_params
+            CELERY_RESULT_BACKEND += ssl_params
+    
     @classmethod
     def init_app(cls, app):
         """Production-specific initialization"""
@@ -193,6 +203,14 @@ class ProductionConfig(Config):
         if not cls.CELERY_BROKER_URL:
             cls.CELERY_BROKER_URL = cls.get_required_env('REDIS_URL')
             cls.CELERY_RESULT_BACKEND = cls.CELERY_BROKER_URL
+            
+            # Handle rediss:// URLs
+            if cls.CELERY_BROKER_URL.startswith('rediss://'):
+                if 'ssl_cert_reqs' not in cls.CELERY_BROKER_URL:
+                    separator = '&' if '?' in cls.CELERY_BROKER_URL else '?'
+                    ssl_params = f"{separator}ssl_cert_reqs=CERT_NONE"
+                    cls.CELERY_BROKER_URL += ssl_params
+                    cls.CELERY_RESULT_BACKEND += ssl_params
         
         # Validate all required config
         cls.validate_required_config()
