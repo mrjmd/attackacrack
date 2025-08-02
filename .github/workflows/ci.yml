@@ -195,6 +195,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, security, test, migration-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
     
     steps:
     - uses: actions/checkout@v4
@@ -228,3 +230,105 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to DigitalOcean
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+    
+    - name: Update app spec with new image
+      run: |
+        # Create a temporary app spec with updated image tags
+        cp .do/app.yaml .do/app-deploy.yaml
+        
+        # Update the tag in the app spec to use latest
+        sed -i "s/tag: main/tag: latest/g" .do/app-deploy.yaml
+        
+        echo "Updated app spec to use tag: latest"
+    
+    - name: Validate app spec
+      run: |
+        doctl apps spec validate .do/app-deploy.yaml
+    
+    - name: Deploy to DigitalOcean
+      run: |
+        # First, list all apps to debug
+        echo "Listing all apps:"
+        doctl apps list
+        
+        # Get the app ID (try exact match first, then partial match)
+        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep -E "^[a-f0-9-]+\s+attackacrack-prod$" | awk '{print $1}')
+        
+        # If not found, try partial match
+        if [ -z "$APP_ID" ]; then
+          APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep "attackacrack" | awk '{print $1}')
+        fi
+        
+        if [ -z "$APP_ID" ]; then
+          echo "Creating new app..."
+          doctl apps create --spec .do/app-deploy.yaml --wait
+        else
+          echo "Found existing app with ID: $APP_ID"
+          echo "Updating existing app..."
+          doctl apps update $APP_ID --spec .do/app-deploy.yaml --wait
+        fi
+    
+    - name: Get deployment status
+      run: |
+        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
+        doctl apps get-deployment $APP_ID $(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
+    
+    - name: Verify health check
+      run: |
+        echo "Waiting for health check..."
+        sleep 30
+        
+        # Debug: List all apps
+        echo "\n=== Listing all apps ==="
+        doctl apps list
+        
+        # Get the app ID
+        echo "\n=== Getting app ID ==="
+        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
+        echo "App ID: $APP_ID"
+        
+        # Get full app details
+        echo "\n=== Getting app details ==="
+        doctl apps get $APP_ID
+        
+        # Get the app URL
+        echo "\n=== Getting app URL ==="
+        APP_URL=$(doctl apps get $APP_ID --format DefaultIngress --no-header)
+        echo "App URL: $APP_URL"
+        
+        # Debug: Check what the URL looks like
+        echo "\n=== Constructed health check URL ==="
+        echo "Health check URL: $APP_URL/api/health"
+        
+        # Try to get more info about the endpoint
+        echo "\n=== Testing health endpoint with verbose curl ==="
+        curl -v -f $APP_URL/api/health || {
+          echo "\n=== Health check failed, trying without -f flag to see response ==="
+          curl -v $APP_URL/api/health || true
+          
+          echo "\n=== Trying root endpoint to see if app is responding ==="
+          curl -v $APP_URL/ || true
+          
+          echo "\n=== Getting recent deployment logs ==="
+          DEPLOYMENT_ID=$(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
+          doctl apps get-logs $APP_ID --type=deploy --deployment=$DEPLOYMENT_ID --tail=50
+          
+          exit 1
+        }
+        echo "\n=== Health check passed! ==="

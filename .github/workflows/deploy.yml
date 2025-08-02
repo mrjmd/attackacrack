@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Manual Deploy to Production
 
 on:
   workflow_dispatch:
@@ -90,12 +90,44 @@ jobs:
         echo "Waiting for health check..."
         sleep 30
         
-        # Get the app URL
-        APP_URL=$(doctl apps get $(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}') --format DefaultIngress --no-header)
+        # Debug: List all apps
+        echo "\n=== Listing all apps ==="
+        doctl apps list
         
-        # Check health endpoint (APP_URL already includes https://)
-        curl -f $APP_URL/api/health || exit 1
-        echo "Health check passed!"
+        # Get the app ID
+        echo "\n=== Getting app ID ==="
+        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
+        echo "App ID: $APP_ID"
+        
+        # Get full app details
+        echo "\n=== Getting app details ==="
+        doctl apps get $APP_ID
+        
+        # Get the app URL
+        echo "\n=== Getting app URL ==="
+        APP_URL=$(doctl apps get $APP_ID --format DefaultIngress --no-header)
+        echo "App URL: $APP_URL"
+        
+        # Debug: Check what the URL looks like
+        echo "\n=== Constructed health check URL ==="
+        echo "Health check URL: $APP_URL/api/health"
+        
+        # Try to get more info about the endpoint
+        echo "\n=== Testing health endpoint with verbose curl ==="
+        curl -v -f $APP_URL/api/health || {
+          echo "\n=== Health check failed, trying without -f flag to see response ==="
+          curl -v $APP_URL/api/health || true
+          
+          echo "\n=== Trying root endpoint to see if app is responding ==="
+          curl -v $APP_URL/ || true
+          
+          echo "\n=== Getting recent deployment logs ==="
+          DEPLOYMENT_ID=$(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
+          doctl apps get-logs $APP_ID --type=deploy --deployment=$DEPLOYMENT_ID --tail=50
+          
+          exit 1
+        }
+        echo "\n=== Health check passed! ==="
     
     # Slack notification commented out - add SLACK_WEBHOOK_URL secret to enable
     # - name: Send deployment notification
