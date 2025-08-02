@@ -9,6 +9,15 @@ from app import create_app
 celery_broker_url = os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
 celery_result_backend = os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
 
+# Handle SSL Redis URLs (rediss://)
+if celery_broker_url.startswith('rediss://'):
+    # Append SSL parameters if not already present
+    if 'ssl_cert_reqs' not in celery_broker_url:
+        separator = '&' if '?' in celery_broker_url else '?'
+        ssl_params = f"{separator}ssl_cert_reqs=CERT_NONE"
+        celery_broker_url += ssl_params
+        celery_result_backend += ssl_params
+
 celery = Celery(
     __name__,
     broker=celery_broker_url,

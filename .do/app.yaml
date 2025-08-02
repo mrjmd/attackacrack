@@ -15,7 +15,7 @@ services:
     image:
       registry_type: DOCR
       repository: attackacrack-crm
-      tag: main
+      tag: latest
     # Define the command to run the web server.
     # This overrides the Dockerfile's CMD or ENTRYPOINT for this specific service.
     # We use gunicorn for a production-ready WSGI server.
@@ -51,32 +51,32 @@ services:
       # They will be preserved across deployments if not defined here
 
 # Define the workers (background task processors) for your application.
-# TEMPORARILY DISABLED - uncomment when ready
-# workers:
-#   - name: attackacrack-worker
-#     # Use pre-built image from DigitalOcean Container Registry
-#     image:
-#       registry_type: DOCR
-#       repository: attackacrack-crm
-#       tag: main
-#     # Define the command to run the Celery worker.
-#     # Limit concurrency to 2 workers for basic-xxs instance
-#     run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
-#     # Define the instance size - xs for worker to handle memory requirements
-#     instance_size_slug: basic-xs
-#     # Define the number of instances.
-#     instance_count: 1
-#     # Define environment variables (must match the web service).
-#     envs:
-#       - key: FLASK_ENV
-#         value: "production"
-#       - key: FLASK_APP
-#         value: "app.py"
-#       - key: DATABASE_URL
-#         value: ${db.DATABASE_URL}
-#       - key: POSTGRES_URI
-#         value: ${db.DATABASE_URL}
-#       # Environment variables must be set through the DigitalOcean UI
+workers:
+  - name: attackacrack-worker
+    # Use pre-built image from DigitalOcean Container Registry
+    image:
+      registry_type: DOCR
+      repository: attackacrack-crm
+      tag: latest
+    # Define the command to run the Celery worker.
+    # Limit concurrency to 2 workers for basic-xs instance
+    run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
+    # Define the instance size - xs for worker to handle memory requirements
+    instance_size_slug: basic-xs
+    # Define the number of instances.
+    instance_count: 1
+    # Define environment variables (must match the web service).
+    envs:
+      - key: FLASK_ENV
+        value: "production"
+      - key: FLASK_APP
+        value: "app.py"
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+      - key: POSTGRES_URI
+        value: ${db.DATABASE_URL}
+      # REDIS_URL must be set through the DigitalOcean UI
+      # All other environment variables must also be set through the UI
 
 # Define the managed databases and other addons for the application.
 databases:
