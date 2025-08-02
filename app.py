@@ -108,6 +108,7 @@ def create_app(config_name=None, test_config=None):
     def health_check():
         """Health check endpoint for monitoring - no auth required"""
         from flask import jsonify
+        from sqlalchemy import text
         health_status = {
             'status': 'healthy',
             'service': 'attackacrack-crm'
@@ -115,7 +116,7 @@ def create_app(config_name=None, test_config=None):
         
         try:
             # Quick database check
-            db.session.execute('SELECT 1')
+            db.session.execute(text('SELECT 1'))
             health_status['database'] = 'connected'
         except Exception as e:
             health_status['database'] = 'error'
