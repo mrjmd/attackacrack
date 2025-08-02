@@ -94,7 +94,7 @@ jobs:
         APP_URL=$(doctl apps get $(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}') --format DefaultIngress --no-header)
         
         # Check health endpoint (APP_URL already includes https://)
-        curl -f $APP_URL/health || exit 1
+        curl -f $APP_URL/api/health || exit 1
         echo "Health check passed!"
     
     # Slack notification commented out - add SLACK_WEBHOOK_URL secret to enable
