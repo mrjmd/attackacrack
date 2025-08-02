@@ -47,8 +47,19 @@ services:
       - key: POSTGRES_URI
         # Also set POSTGRES_URI to the same value for compatibility
         value: ${db.DATABASE_URL}
-      # IMPORTANT: Environment variables must be set in DigitalOcean UI
-      # They will be preserved across deployments if not defined here
+      # Sensitive environment variables (set these as GitHub Secrets)
+      - key: SECRET_KEY
+        value: ${SECRET_KEY}
+        type: SECRET
+      - key: REDIS_URL
+        value: ${REDIS_URL}
+        type: SECRET
+      - key: OPENPHONE_API_KEY
+        value: ${OPENPHONE_API_KEY}
+        type: SECRET
+      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        type: SECRET
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -75,8 +86,19 @@ workers:
         value: ${db.DATABASE_URL}
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
-      # REDIS_URL must be set through the DigitalOcean UI
-      # All other environment variables must also be set through the UI
+      # Same sensitive environment variables as web service
+      - key: SECRET_KEY
+        value: ${SECRET_KEY}
+        type: SECRET
+      - key: REDIS_URL
+        value: ${REDIS_URL}
+        type: SECRET
+      - key: OPENPHONE_API_KEY
+        value: ${OPENPHONE_API_KEY}
+        type: SECRET
+      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        type: SECRET
 
 # Define the managed databases and other addons for the application.
 databases:

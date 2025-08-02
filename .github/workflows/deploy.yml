@@ -51,7 +51,13 @@ jobs:
         # Update the tag in the app spec using sed
         sed -i "s/tag: main/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
         
-        echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }}"
+        # Replace environment variable placeholders with actual values
+        sed -i "s|\${SECRET_KEY}|${{ secrets.SECRET_KEY }}|g" .do/app-deploy.yaml
+        sed -i "s|\${REDIS_URL}|${{ secrets.REDIS_URL }}|g" .do/app-deploy.yaml
+        sed -i "s|\${OPENPHONE_API_KEY}|${{ secrets.OPENPHONE_API_KEY }}|g" .do/app-deploy.yaml
+        sed -i "s|\${OPENPHONE_WEBHOOK_SIGNING_KEY}|${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY }}|g" .do/app-deploy.yaml
+        
+        echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }} and environment variables"
     
     - name: Validate app spec
       run: |
