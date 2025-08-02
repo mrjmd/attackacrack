@@ -6,23 +6,58 @@ from app import create_app
 # --- FIXED: Configure Celery directly from environment variables ---
 # This ensures the Celery CLI can start reliably without depending on the
 # full Flask app context being available at import time.
-celery_broker_url = os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
-celery_result_backend = os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
+redis_url = os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
 
-# Handle SSL Redis URLs (rediss://)
-if celery_broker_url.startswith('rediss://'):
-    # Append SSL parameters if not already present
-    if 'ssl_cert_reqs' not in celery_broker_url:
-        separator = '&' if '?' in celery_broker_url else '?'
+# For Celery with SSL Redis, we need to configure it differently
+import ssl
+if redis_url.startswith('rediss://'):
+    # Parse the URL to separate it into components
+    from urllib.parse import urlparse, parse_qs
+    parsed = urlparse(redis_url)
+    
+    # Check if ssl_cert_reqs is already in the URL
+    query_params = parse_qs(parsed.query)
+    
+    # Build the Redis URL with proper SSL parameters
+    if 'ssl_cert_reqs' not in query_params:
+        # Add SSL parameters to the URL
+        separator = '&' if parsed.query else '?'
         ssl_params = f"{separator}ssl_cert_reqs=CERT_NONE"
-        celery_broker_url += ssl_params
-        celery_result_backend += ssl_params
+        celery_broker_url = redis_url + ssl_params
+        celery_result_backend = redis_url + ssl_params
+    else:
+        celery_broker_url = redis_url
+        celery_result_backend = redis_url
+    
+    # Create Celery instance with SSL configuration
+    celery = Celery(
+        __name__,
+        broker=celery_broker_url,
+        backend=celery_result_backend,
+        broker_use_ssl={
+            'ssl_cert_reqs': ssl.CERT_NONE,
+            'ssl_ca_certs': None,
+            'ssl_certfile': None,
+            'ssl_keyfile': None,
+        },
+        redis_backend_use_ssl={
+            'ssl_cert_reqs': ssl.CERT_NONE,
+            'ssl_ca_certs': None,
+            'ssl_certfile': None,
+            'ssl_keyfile': None,
+        }
+    )
+else:
+    # Non-SSL Redis
+    celery = Celery(
+        __name__,
+        broker=redis_url,
+        backend=redis_url
+    )
 
-celery = Celery(
-    __name__,
-    broker=celery_broker_url,
-    backend=celery_result_backend
-)
+# Debug logging
+print(f"Redis URL: {redis_url}")
+print(f"Using SSL: {redis_url.startswith('rediss://')}")
 
 # Create the Flask app instance. This is still needed to provide context for tasks when they run.
 flask_app = create_app()
