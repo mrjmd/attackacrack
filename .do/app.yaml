@@ -29,9 +29,11 @@ services:
     # Define the routes for incoming traffic.
     routes:
       - path: /
-    # Health check disabled due to timeout issues
-    # health_check:
-    #   http_path: /health
+    # Health check for monitoring
+    health_check:
+      http_path: /health
+      timeout_seconds: 10
+      port: 5000
     # Define environment variables.
     # Secrets like SECRET_KEY, OPENPHONE_API_TOKEN, etc., should be set in the App Platform UI.
     envs:

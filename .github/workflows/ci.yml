@@ -314,13 +314,13 @@ jobs:
         
         # Debug: Check what the URL looks like
         echo "\n=== Constructed health check URL ==="
-        echo "Health check URL: $APP_URL/api/health"
+        echo "Health check URL: $APP_URL/health"
         
         # Try to get more info about the endpoint
         echo "\n=== Testing health endpoint with verbose curl ==="
-        curl -v -f $APP_URL/api/health || {
+        curl -v -f $APP_URL/health || {
           echo "\n=== Health check failed, trying without -f flag to see response ==="
-          curl -v $APP_URL/api/health || true
+          curl -v $APP_URL/health || true
           
           echo "\n=== Trying root endpoint to see if app is responding ==="
           curl -v $APP_URL/ || true

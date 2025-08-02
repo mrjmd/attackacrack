@@ -102,6 +102,27 @@ def create_app(config_name=None, test_config=None):
                       request_id=getattr(g, 'request_id', None),
                       path=request.path if hasattr(request, 'path') else None)
         return "Page not found", 404
+    
+    # Health check endpoint - must be defined before blueprints to avoid auth
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for monitoring - no auth required"""
+        from flask import jsonify
+        health_status = {
+            'status': 'healthy',
+            'service': 'attackacrack-crm'
+        }
+        
+        try:
+            # Quick database check
+            db.session.execute('SELECT 1')
+            health_status['database'] = 'connected'
+        except Exception as e:
+            health_status['database'] = 'error'
+            health_status['status'] = 'degraded'
+            logger.error(f"Health check database error: {e}")
+        
+        return jsonify(health_status), 200 if health_status['status'] == 'healthy' else 503
 
     @app.template_filter('format_google_date')
     def format_google_date(date_string):
