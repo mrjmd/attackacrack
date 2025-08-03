@@ -38,7 +38,17 @@ def sync_health():
     
     try:
         from celery.result import AsyncResult
-        from celery_worker import celery
+        import os
+        
+        # Handle SSL Redis configuration
+        redis_url = os.environ.get('REDIS_URL', '')
+        if redis_url.startswith('rediss://'):
+            # For production SSL Redis, we need to configure Celery properly
+            from celery_config import create_celery_app
+            celery = create_celery_app('attackacrack')
+        else:
+            # For local non-SSL Redis, use the regular approach
+            from celery_worker import celery
         
         # Check if Celery is available
         inspect = celery.control.inspect()
@@ -112,7 +122,20 @@ def openphone_sync():
         logger = logging.getLogger(__name__)
         logger.info(f"Attempting to queue sync task for {days_back} days")
         
-        task = sync_openphone_messages.delay(days_back=days_back)
+        # Handle SSL Redis configuration
+        import os
+        redis_url = os.environ.get('REDIS_URL', '')
+        if redis_url.startswith('rediss://'):
+            # For production SSL Redis, we need to configure Celery properly
+            from celery_config import create_celery_app
+            celery = create_celery_app('attackacrack')
+            # Import the task with the properly configured Celery instance
+            from tasks.sync_tasks import sync_openphone_messages
+            task = sync_openphone_messages.apply_async(args=[days_back], app=celery)
+        else:
+            # For local non-SSL Redis, use the regular approach
+            task = sync_openphone_messages.delay(days_back=days_back)
+        
         logger.info(f"Task queued successfully with ID: {task.id}")
         
         flash(f'OpenPhone sync started for last {days_back} days. Task ID: {task.id}', 'success')

@@ -195,7 +195,16 @@ def task_status(task_id):
     """Get the status of a Celery task"""
     try:
         # Import celery here to avoid circular import
-        from celery_worker import celery
+        import os
+        redis_url = os.environ.get('REDIS_URL', '')
+        if redis_url.startswith('rediss://'):
+            # For production SSL Redis, we need to configure Celery properly
+            from celery_config import create_celery_app
+            celery = create_celery_app('attackacrack')
+        else:
+            # For local non-SSL Redis, use the regular approach
+            from celery_worker import celery
+        
         result = AsyncResult(task_id, app=celery)
         
         response = {
