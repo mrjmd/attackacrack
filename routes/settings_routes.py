@@ -30,21 +30,32 @@ def automation():
 @login_required
 def sync_health():
     """Sync health monitoring - webhook status, reconciliation, etc."""
-    from celery.result import AsyncResult
-    from celery_worker import celery
-    
-    # Get recent task IDs from session or database
+    # Initialize with empty data
+    active_tasks = None
+    scheduled_tasks = None
     recent_tasks = []
+    celery_available = False
     
-    # Check active tasks
-    inspect = celery.control.inspect()
-    active_tasks = inspect.active()
-    scheduled_tasks = inspect.scheduled()
+    try:
+        from celery.result import AsyncResult
+        from celery_worker import celery
+        
+        # Check if Celery is available
+        inspect = celery.control.inspect()
+        active_tasks = inspect.active()
+        scheduled_tasks = inspect.scheduled()
+        celery_available = True
+    except Exception as e:
+        # Log the error but don't crash the page
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Celery not available for sync health: {e}")
     
     return render_template('settings/sync_health.html',
                          active_tasks=active_tasks,
                          scheduled_tasks=scheduled_tasks,
-                         recent_tasks=recent_tasks)
+                         recent_tasks=recent_tasks,
+                         celery_available=celery_available)
 
 
 @settings_bp.route('/openphone')

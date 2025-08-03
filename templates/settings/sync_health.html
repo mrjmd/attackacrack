@@ -39,11 +39,31 @@
         </a>
     </div>
 
+    {% if not celery_available %}
+    <!-- Celery Not Available Warning -->
+    <div class="bg-yellow-600 bg-opacity-20 border border-yellow-600 rounded-lg p-6 mb-6">
+        <div class="flex items-center">
+            <span class="text-yellow-400 text-2xl mr-3">⚠️</span>
+            <div>
+                <h3 class="text-lg font-semibold text-yellow-400">Background Workers Not Available</h3>
+                <p class="text-yellow-300 mt-1">
+                    Background task processing is not currently available. This may be because:
+                </p>
+                <ul class="list-disc list-inside text-yellow-300 mt-2 space-y-1">
+                    <li>Celery workers are not deployed in this environment</li>
+                    <li>Redis connection is not configured</li>
+                    <li>Workers are temporarily unavailable</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Active Tasks -->
     <div class="bg-gray-700 rounded-lg p-6">
         <h3 class="text-lg font-semibold text-white mb-4">Active Background Tasks</h3>
         <div id="active-tasks-container">
-            {% if active_tasks %}
+            {% if celery_available and active_tasks %}
                 <div class="space-y-3">
                     {% for worker, tasks in active_tasks.items() %}
                         {% for task in tasks %}
@@ -81,7 +101,7 @@
     <!-- Scheduled Tasks -->
     <div class="bg-gray-700 rounded-lg p-6">
         <h3 class="text-lg font-semibold text-white mb-4">Scheduled Tasks</h3>
-        {% if scheduled_tasks %}
+        {% if celery_available and scheduled_tasks %}
             <div class="space-y-3">
                 {% for worker, tasks in scheduled_tasks.items() %}
                     {% for task in tasks %}
@@ -145,6 +165,7 @@
 </div>
 
 <script>
+{% if celery_available %}
 // Function to fetch and display task progress
 async function updateTaskProgress() {
     const taskElements = document.querySelectorAll('[data-task-id]');
@@ -246,5 +267,6 @@ if (document.querySelectorAll('[data-task-id]').length > 0) {
 setTimeout(() => {
     location.reload();
 }, 30000);
+{% endif %}
 </script>
 {% endblock %}
