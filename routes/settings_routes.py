@@ -151,7 +151,13 @@ def openphone_sync():
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Error queuing sync task: {str(e)}", exc_info=True)
-        flash(f'Error starting sync: {str(e)}', 'error')
+        
+        # If Celery fails in production, provide alternative
+        if os.environ.get('FLASK_ENV') == 'production':
+            flash('Background task queueing failed. Use manual import script via console for now.', 'error')
+            flash(f'Command: python scripts/data_management/imports/enhanced_openphone_import.py --days-back {days_back}', 'info')
+        else:
+            flash(f'Error starting sync: {str(e)}', 'error')
     
     return redirect(url_for('settings.openphone'))
 

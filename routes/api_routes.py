@@ -1,6 +1,7 @@
 import hmac
 import hashlib
 import base64
+import os
 from functools import wraps
 from flask import Blueprint, jsonify, request, current_app, abort
 from flask_login import login_required
@@ -70,6 +71,107 @@ def health_check():
         return jsonify(health_status), 200
     else:
         return jsonify(health_status), 503
+
+
+@api_bp.route('/health/redis')
+@login_required
+def redis_health():
+    """Redis connectivity diagnostic endpoint"""
+    import socket
+    from urllib.parse import urlparse
+    
+    diagnostics = {
+        'redis_url_configured': False,
+        'redis_url_scheme': None,
+        'network_reachable': False,
+        'redis_ping': False,
+        'celery_configured': False,
+        'errors': []
+    }
+    
+    redis_url = os.environ.get('REDIS_URL', '')
+    
+    if redis_url:
+        diagnostics['redis_url_configured'] = True
+        parsed = urlparse(redis_url)
+        diagnostics['redis_url_scheme'] = parsed.scheme
+        diagnostics['redis_host'] = parsed.hostname
+        diagnostics['redis_port'] = parsed.port or 6379
+        
+        # Test network connectivity
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            result = sock.connect_ex((parsed.hostname, parsed.port or 6379))
+            sock.close()
+            diagnostics['network_reachable'] = (result == 0)
+            if result != 0:
+                diagnostics['errors'].append(f"Network connection failed with error code: {result}")
+        except Exception as e:
+            diagnostics['errors'].append(f"Network test error: {str(e)}")
+        
+        # Test Redis connection
+        if diagnostics['network_reachable']:
+            try:
+                import redis
+                import ssl
+                
+                if redis_url.startswith('rediss://'):
+                    # SSL connection
+                    if 'ssl_cert_reqs' not in redis_url:
+                        separator = '&' if '?' in redis_url else '?'
+                        redis_url_test = redis_url + f"{separator}ssl_cert_reqs=CERT_NONE"
+                    else:
+                        redis_url_test = redis_url
+                    
+                    r = redis.from_url(
+                        redis_url_test,
+                        socket_connect_timeout=5,
+                        socket_timeout=5,
+                        ssl_cert_reqs=ssl.CERT_NONE,
+                        ssl_check_hostname=False
+                    )
+                else:
+                    r = redis.from_url(
+                        redis_url,
+                        socket_connect_timeout=5,
+                        socket_timeout=5
+                    )
+                
+                # Test ping
+                r.ping()
+                diagnostics['redis_ping'] = True
+                
+                # Get Redis info
+                info = r.info('server')
+                diagnostics['redis_version'] = info.get('redis_version', 'Unknown')
+                
+            except Exception as e:
+                diagnostics['errors'].append(f"Redis connection error: {type(e).__name__}: {str(e)}")
+    else:
+        diagnostics['errors'].append("REDIS_URL environment variable not set")
+    
+    # Test Celery configuration
+    try:
+        from celery_config import create_celery_app
+        celery = create_celery_app('diagnostic')
+        diagnostics['celery_configured'] = True
+    except Exception as e:
+        diagnostics['errors'].append(f"Celery configuration error: {str(e)}")
+    
+    # Determine overall status
+    if diagnostics['redis_ping']:
+        status_code = 200
+        diagnostics['status'] = 'healthy'
+    elif diagnostics['network_reachable']:
+        status_code = 503
+        diagnostics['status'] = 'redis_connection_failed'
+    else:
+        status_code = 503
+        diagnostics['status'] = 'network_unreachable'
+    
+    return jsonify(diagnostics), status_code
+
 
 def verify_openphone_signature(f):
     """Decorator to verify webhook signature."""
