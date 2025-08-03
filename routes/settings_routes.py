@@ -9,6 +9,7 @@ from services.quickbooks_sync_service import QuickBooksSyncService
 from crm_database import db, QuickBooksAuth
 from datetime import datetime, timedelta
 import uuid
+import os
 
 settings_bp = Blueprint('settings', __name__)
 
