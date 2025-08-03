@@ -1,0 +1,188 @@
+{% extends "base_authenticated.html" %}
+
+{% block title %}OpenPhone Sync - Settings{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-3xl font-bold text-white">Settings</h1>
+    
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-700">
+        <nav class="-mb-px flex space-x-8">
+            <a href="{{ url_for('main.settings') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                Overview
+            </a>
+            <a href="{{ url_for('settings.imports') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                Data Imports
+            </a>
+            <a href="{{ url_for('settings.automation') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                Automation
+            </a>
+            <a href="{{ url_for('settings.quickbooks') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                QuickBooks
+            </a>
+            <a href="{{ url_for('settings.sync_health') }}" 
+               class="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300">
+                Sync Health
+            </a>
+        </nav>
+    </div>
+    
+    <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-semibold text-white">OpenPhone Sync</h2>
+        <a href="{{ url_for('settings.imports') }}" class="text-blue-400 hover:text-blue-300">
+            ← Back to Imports
+        </a>
+    </div>
+
+    <!-- Sync Status Card -->
+    <div class="bg-gray-700 rounded-lg p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+                <span class="text-3xl mr-4">📞</span>
+                <div>
+                    <h3 class="text-xl font-semibold text-white">OpenPhone Integration</h3>
+                    <p class="text-gray-400">Sync messages and contacts from OpenPhone</p>
+                </div>
+            </div>
+            <span class="px-3 py-1 bg-green-600 text-white rounded-full text-sm">✅ Connected</span>
+        </div>
+
+        <!-- Statistics -->
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-gray-600 rounded-lg p-4">
+                <div class="text-2xl font-bold text-white">{{ "{:,}".format(total_contacts) }}</div>
+                <div class="text-gray-400 text-sm">Total Contacts</div>
+            </div>
+            <div class="bg-gray-600 rounded-lg p-4">
+                <div class="text-2xl font-bold text-white">{{ "{:,}".format(total_messages) }}</div>
+                <div class="text-gray-400 text-sm">Total Messages</div>
+            </div>
+            <div class="bg-gray-600 rounded-lg p-4">
+                <div class="text-2xl font-bold text-white">
+                    {% if last_sync %}
+                        {{ last_sync.strftime('%b %d, %I:%M %p') }}
+                    {% else %}
+                        Never
+                    {% endif %}
+                </div>
+                <div class="text-gray-400 text-sm">Last Sync</div>
+            </div>
+        </div>
+
+        <!-- Manual Sync Form -->
+        <div class="border-t border-gray-600 pt-6">
+            <h4 class="text-lg font-semibold text-white mb-4">Run Manual Sync</h4>
+            
+            <form method="POST" action="{{ url_for('settings.openphone_sync') }}" class="space-y-4">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">
+                        Select Time Range
+                    </label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="sync_type" value="last_7" class="mr-2 text-blue-600" checked>
+                            <span class="text-white">Last 7 days</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="sync_type" value="last_30" class="mr-2 text-blue-600">
+                            <span class="text-white">Last 30 days</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="sync_type" value="last_90" class="mr-2 text-blue-600">
+                            <span class="text-white">Last 90 days</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="sync_type" value="full" class="mr-2 text-blue-600">
+                            <span class="text-white">Full sync (all historical data)</span>
+                            <span class="text-yellow-400 ml-2 text-xs">⚠️ May take several hours</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="sync_type" value="custom" class="mr-2 text-blue-600" 
+                                   onchange="document.getElementById('custom_days').disabled = !this.checked;">
+                            <span class="text-white mr-2">Custom:</span>
+                            <input type="number" name="custom_days" id="custom_days" 
+                                   class="bg-gray-600 text-white px-2 py-1 rounded w-20" 
+                                   min="1" max="365" placeholder="Days" disabled>
+                            <span class="text-gray-400 ml-2">days back</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-600 bg-opacity-20 border border-yellow-600 rounded-lg p-4">
+                    <div class="flex">
+                        <span class="text-yellow-400 mr-2">⚠️</span>
+                        <div class="text-sm text-yellow-400">
+                            <strong>Note:</strong> 
+                            <span id="sync-warning-text">Large date ranges may take several minutes to sync.</span>
+                            The sync will run in the background and you can check progress in the Sync Health tab.
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg">
+                    🔄 Start Sync
+                </button>
+            </form>
+        </div>
+
+        <!-- Automatic Sync Info -->
+        <div class="border-t border-gray-600 pt-6 mt-6">
+            <h4 class="text-lg font-semibold text-white mb-4">Automatic Sync</h4>
+            <div class="bg-gray-600 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-300">Daily Reconciliation</span>
+                    <span class="px-2 py-1 bg-green-600 text-white rounded text-sm">Active</span>
+                </div>
+                <p class="text-sm text-gray-400">
+                    Automatically syncs the last 2 days of messages every night at midnight to ensure data consistency.
+                </p>
+            </div>
+            <div class="bg-gray-600 rounded-lg p-4 mt-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-300">Real-time Webhooks</span>
+                    <span class="px-2 py-1 bg-yellow-600 text-white rounded text-sm">Coming Soon</span>
+                </div>
+                <p class="text-sm text-gray-400">
+                    Instant sync of new messages and contacts as they happen in OpenPhone.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import History -->
+    <div class="bg-gray-700 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Recent Sync History</h3>
+        <div class="text-gray-400 text-center py-8">
+            Sync history will appear here after running imports.
+        </div>
+    </div>
+</div>
+
+<script>
+// Enable/disable custom days input based on radio selection
+document.querySelectorAll('input[name="sync_type"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        document.getElementById('custom_days').disabled = this.value !== 'custom';
+        
+        // Update warning text based on selection
+        const warningText = document.getElementById('sync-warning-text');
+        if (this.value === 'full') {
+            warningText.textContent = 'Full sync may take 2-4 hours for large accounts (7000+ conversations).';
+            warningText.classList.add('font-bold');
+        } else if (this.value === 'last_90') {
+            warningText.textContent = 'Syncing 90 days may take 30-60 minutes depending on activity.';
+            warningText.classList.remove('font-bold');
+        } else {
+            warningText.textContent = 'Large date ranges may take several minutes to sync.';
+            warningText.classList.remove('font-bold');
+        }
+    });
+});
+</script>
+{% endblock %}

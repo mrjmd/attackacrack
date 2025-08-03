@@ -19,7 +19,7 @@ import time
 import json
 import requests
 from datetime import datetime, timezone
-from enhanced_openphone_import import EnhancedOpenPhoneImporter
+from scripts.data_management.imports.enhanced_openphone_import import EnhancedOpenPhoneImporter
 
 class LargeScaleImporter(EnhancedOpenPhoneImporter):
     """Enhanced importer optimized for large scale imports with timeout handling"""
@@ -125,6 +125,10 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
                 return self._make_api_request(url, params, retry_count)
             else:
                 raise
+    
+    def run_comprehensive_import(self):
+        """Override parent method to add large scale features"""
+        return self.run_large_scale_import()
     
     def run_large_scale_import(self):
         """Main large scale import with checkpoint and resume capabilities"""

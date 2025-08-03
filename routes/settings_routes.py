@@ -7,6 +7,7 @@ from flask_login import login_required
 from services.quickbooks_service import QuickBooksService
 from services.quickbooks_sync_service import QuickBooksSyncService
 from crm_database import db, QuickBooksAuth
+from datetime import datetime, timedelta
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -29,7 +30,88 @@ def automation():
 @login_required
 def sync_health():
     """Sync health monitoring - webhook status, reconciliation, etc."""
-    return render_template('settings/sync_health.html')
+    from celery.result import AsyncResult
+    from celery_worker import celery
+    
+    # Get recent task IDs from session or database
+    recent_tasks = []
+    
+    # Check active tasks
+    inspect = celery.control.inspect()
+    active_tasks = inspect.active()
+    scheduled_tasks = inspect.scheduled()
+    
+    return render_template('settings/sync_health.html',
+                         active_tasks=active_tasks,
+                         scheduled_tasks=scheduled_tasks,
+                         recent_tasks=recent_tasks)
+
+
+@settings_bp.route('/openphone')
+@login_required
+def openphone():
+    """OpenPhone sync management"""
+    from services.openphone_service import OpenPhoneService
+    from crm_database import Activity, Contact
+    from datetime import datetime, timedelta
+    
+    # Get sync statistics
+    total_contacts = Contact.query.filter(Contact.phone.isnot(None)).count()
+    total_messages = Activity.query.filter_by(activity_type='sms').count()
+    
+    # Get last sync time (most recent message)
+    last_activity = Activity.query.filter_by(activity_type='sms').order_by(Activity.created_at.desc()).first()
+    last_sync = last_activity.created_at if last_activity else None
+    
+    return render_template('settings/openphone.html',
+                         total_contacts=total_contacts,
+                         total_messages=total_messages,
+                         last_sync=last_sync)
+
+
+@settings_bp.route('/openphone/sync', methods=['POST'])
+@login_required
+def openphone_sync():
+    """Run manual OpenPhone sync"""
+    from services.openphone_service import OpenPhoneService
+    from tasks.sync_tasks import sync_openphone_messages
+    
+    # Get parameters from form
+    sync_type = request.form.get('sync_type', 'recent')
+    custom_days = request.form.get('custom_days', type=int)
+    
+    # Determine days to sync
+    if sync_type == 'last_7':
+        days_back = 7
+    elif sync_type == 'last_30':
+        days_back = 30
+    elif sync_type == 'last_90':
+        days_back = 90
+    elif sync_type == 'full':
+        # Full sync - use a very large number of days (10 years)
+        days_back = 3650
+    elif sync_type == 'custom' and custom_days:
+        days_back = custom_days
+    else:
+        days_back = 30  # default
+    
+    try:
+        # Queue the sync task
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Attempting to queue sync task for {days_back} days")
+        
+        task = sync_openphone_messages.delay(days_back=days_back)
+        logger.info(f"Task queued successfully with ID: {task.id}")
+        
+        flash(f'OpenPhone sync started for last {days_back} days. Task ID: {task.id}', 'success')
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error queuing sync task: {str(e)}", exc_info=True)
+        flash(f'Error starting sync: {str(e)}', 'error')
+    
+    return redirect(url_for('settings.openphone'))
 
 
 @settings_bp.route('/quickbooks')

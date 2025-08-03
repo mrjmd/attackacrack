@@ -89,6 +89,7 @@ try:
     with flask_app.app_context():
         import services.scheduler_service
         import tasks.campaign_tasks
+        import tasks.sync_tasks
         print("Successfully imported tasks")
         print(f"Registered tasks: {list(celery.tasks.keys())}")
 except Exception as e:

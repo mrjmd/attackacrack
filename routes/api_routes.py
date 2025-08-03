@@ -8,6 +8,7 @@ from services.contact_service import ContactService
 from services.message_service import MessageService
 from services.ai_service import AIService
 from crm_database import Activity # Import Activity
+from celery.result import AsyncResult
 
 api_bp = Blueprint('api', __name__)
 
@@ -51,9 +52,13 @@ def health_check():
         # Check Redis connection (optional)
         import os
         if os.environ.get('REDIS_URL'):
-            from celery_worker import celery
-            celery.backend.get('health_check_test')
-            health_status['redis'] = 'connected'
+            try:
+                from celery_worker import celery
+                celery.backend.get('health_check_test')
+                health_status['redis'] = 'connected'
+            except ImportError:
+                # Celery worker might not be available in all contexts
+                health_status['redis'] = 'celery not available'
         else:
             health_status['redis'] = 'not configured'
     except Exception as e:
@@ -183,6 +188,52 @@ def generate_appointment_summary(contact_id):
     summary = ai_service.summarize_conversation_for_appointment(activities)
     
     return jsonify({'summary': summary})
+
+@api_bp.route('/task-status/<task_id>')
+@login_required
+def task_status(task_id):
+    """Get the status of a Celery task"""
+    try:
+        # Import celery here to avoid circular import
+        from celery_worker import celery
+        result = AsyncResult(task_id, app=celery)
+        
+        response = {
+            'task_id': task_id,
+            'state': result.state,
+            'ready': result.ready()
+        }
+        
+        if result.state == 'PENDING':
+            # Task hasn't started yet
+            response['meta'] = {'status': 'Task is waiting to be processed...'}
+        elif result.state == 'PROGRESS':
+            # Task is running with progress updates
+            response['meta'] = result.info
+        elif result.state == 'SUCCESS':
+            # Task completed successfully
+            response['result'] = result.result
+            response['meta'] = result.info if hasattr(result, 'info') else None
+        elif result.state == 'FAILURE':
+            # Task failed
+            response['error'] = str(result.info)
+            response['meta'] = {
+                'exc_type': result.info.get('exc_type', 'Unknown') if isinstance(result.info, dict) else 'Unknown',
+                'exc_message': result.info.get('exc_message', str(result.info)) if isinstance(result.info, dict) else str(result.info),
+                'status': 'Task failed'
+            }
+        else:
+            # Some other state
+            response['meta'] = result.info
+            
+        return jsonify(response)
+        
+    except Exception as e:
+        return jsonify({
+            'task_id': task_id,
+            'state': 'ERROR',
+            'error': f'Could not fetch task status: {str(e)}'
+        }), 500
 
 @api_bp.route('/webhooks/openphone', methods=['POST'])
 @verify_openphone_signature
