@@ -88,39 +88,91 @@ def _run_standard_sync(self, start_date, end_date, days_back):
     # Create importer instance with date filtering
     importer = DateFilteredImporter(days_back=days_back)
     
-    # Periodic progress updates during standard sync
-    import threading
-    should_stop = threading.Event()
+    # Store reference to celery task for progress updates
+    importer._celery_task = self
+    importer._sync_start_time = sync_start_time
+    importer._start_date = start_date
+    importer._end_date = end_date
     
-    def update_progress_periodically():
-        while not should_stop.is_set():
-            stats = importer.stats if hasattr(importer, 'stats') else {}
-            conversations = stats.get('conversations_processed', 0)
+    # Wrap the importer's _process_conversations method to add progress tracking
+    original_process_conversations = importer._process_conversations
+    
+    def process_conversations_with_progress(conversations):
+        total_conversations = len(conversations)
+        logger.info(f"Total conversations to process: {total_conversations}")
+        
+        # Update with discovered total
+        self.update_state(state='PROGRESS', meta={
+            'current': 0,
+            'total': total_conversations,
+            'percent': 0,
+            'status': f'Processing {total_conversations} conversations...',
+            'start_time': sync_start_time.isoformat(),
+            'stats': importer.stats
+        })
+        
+        # Call original method to process all conversations
+        original_process_conversations(conversations)
+        
+    # Also wrap individual conversation processing for progress updates
+    from crm_database import Conversation
+    original_import_activities = importer._import_conversation_activities
+    conversations_processed = 0
+    
+    def import_activities_with_progress(conversation: Conversation, participants: list):
+        nonlocal conversations_processed
+        
+        # Call original method
+        original_import_activities(conversation, participants)
+        
+        # Update progress
+        conversations_processed += 1
+        if hasattr(importer, '_total_conversations'):
+            total = importer._total_conversations
+        else:
+            total = conversations_processed + 50  # Estimate
+            
+        # Update every 5 conversations
+        if conversations_processed % 5 == 0 or conversations_processed == total:
+            percent = int((conversations_processed / total) * 100) if total > 0 else 0
             
             self.update_state(state='PROGRESS', meta={
-                'current': conversations,
-                'total': conversations + 50,  # Always show some headroom
-                'percent': 0,  # Unknown for standard sync
-                'status': f'Processing conversations... ({conversations} so far)',
-                'stats': stats,
-                'start_time': sync_start_time.isoformat()
+                'current': conversations_processed,
+                'total': total,
+                'percent': percent,
+                'status': f'Processing conversation {conversations_processed}/{total}',
+                'stats': {
+                    'conversations': importer.stats.get('conversations_processed', conversations_processed),
+                    'messages': importer.stats.get('messages_imported', 0),
+                    'calls': importer.stats.get('calls_imported', 0),
+                    'media': importer.stats.get('media_downloaded', 0),
+                    'recordings': importer.stats.get('recordings_downloaded', 0),
+                    'errors': len(importer.stats.get('errors', [])),
+                },
+                'start_time': sync_start_time.isoformat(),
+                'date_range': {
+                    'start': start_date.isoformat(),
+                    'end': end_date.isoformat()
+                }
             })
-            
-            # Wait 5 seconds before next update
-            should_stop.wait(5)
     
-    # Start progress thread
-    progress_thread = threading.Thread(target=update_progress_periodically)
-    progress_thread.daemon = True
-    progress_thread.start()
+    # Store the original fetch method before replacing
+    original_fetch_all = importer._fetch_all_conversations
+    
+    # Set total conversations when we fetch them
+    def fetch_with_total():
+        conversations = original_fetch_all()
+        importer._total_conversations = len(conversations)
+        return conversations
+    
+    # Replace the methods
+    importer._process_conversations = process_conversations_with_progress
+    importer._import_conversation_activities = import_activities_with_progress
+    importer._fetch_all_conversations = fetch_with_total
     
     try:
         # Run the sync
         importer.run_comprehensive_import()
-        
-        # Stop progress updates
-        should_stop.set()
-        progress_thread.join(timeout=1)
         
         # Final stats
         final_stats = importer.stats
@@ -148,7 +200,6 @@ def _run_standard_sync(self, start_date, end_date, days_back):
             }
         }
     except Exception as e:
-        should_stop.set()
         raise
 
 

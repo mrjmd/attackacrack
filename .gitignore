@@ -13,3 +13,4 @@ openphone.key
 .python-version
 *.egg-info
 .coverage
+uploads/
