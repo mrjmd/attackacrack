@@ -50,16 +50,16 @@ services:
       # Sensitive environment variables (set these as GitHub Secrets)
       - key: SECRET_KEY
         value: ${SECRET_KEY}
-        type: SECRET
       - key: REDIS_URL
         value: ${REDIS_URL}
-        type: SECRET
+      - key: CELERY_BROKER_URL
+        value: ${REDIS_URL}
+      - key: CELERY_RESULT_BACKEND
+        value: ${REDIS_URL}
       - key: OPENPHONE_API_KEY
         value: ${OPENPHONE_API_KEY}
-        type: SECRET
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
         value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
-        type: SECRET
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -89,16 +89,16 @@ workers:
       # Same sensitive environment variables as web service
       - key: SECRET_KEY
         value: ${SECRET_KEY}
-        type: SECRET
       - key: REDIS_URL
         value: ${REDIS_URL}
-        type: SECRET
+      - key: CELERY_BROKER_URL
+        value: ${REDIS_URL}
+      - key: CELERY_RESULT_BACKEND
+        value: ${REDIS_URL}
       - key: OPENPHONE_API_KEY
         value: ${OPENPHONE_API_KEY}
-        type: SECRET
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
         value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
-        type: SECRET
 
 # Define the managed databases and other addons for the application.
 databases:
