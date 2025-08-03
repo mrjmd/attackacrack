@@ -45,6 +45,13 @@ def create_celery_app(app_name=__name__):
                 'ssl_ca_certs': None,
                 'ssl_certfile': None,
                 'ssl_keyfile': None,
+            },
+            broker_connection_retry_on_startup=True,
+            broker_connection_retry=True,
+            broker_connection_max_retries=3,
+            broker_transport_options={
+                'socket_connect_timeout': 30,
+                'socket_timeout': 30,
             }
         )
     else:

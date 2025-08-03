@@ -8,6 +8,7 @@ from services.quickbooks_service import QuickBooksService
 from services.quickbooks_sync_service import QuickBooksSyncService
 from crm_database import db, QuickBooksAuth
 from datetime import datetime, timedelta
+import uuid
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -131,14 +132,21 @@ def openphone_sync():
             celery = create_celery_app('attackacrack')
             # Import the task with the properly configured Celery instance
             from tasks.sync_tasks import sync_openphone_messages
-            task = sync_openphone_messages.apply_async(args=[days_back], app=celery)
+            # Use fire-and-forget mode to avoid timeout
+            task_id = str(uuid.uuid4())
+            sync_openphone_messages.apply_async(
+                args=[days_back], 
+                app=celery,
+                task_id=task_id,
+                ignore_result=True  # Don't wait for backend connection
+            )
+            logger.info(f"Task queued successfully with ID: {task_id}")
+            flash(f'OpenPhone sync started for last {days_back} days. Check sync health for progress.', 'success')
         else:
             # For local non-SSL Redis, use the regular approach
             task = sync_openphone_messages.delay(days_back=days_back)
-        
-        logger.info(f"Task queued successfully with ID: {task.id}")
-        
-        flash(f'OpenPhone sync started for last {days_back} days. Task ID: {task.id}', 'success')
+            logger.info(f"Task queued successfully with ID: {task.id}")
+            flash(f'OpenPhone sync started for last {days_back} days. Task ID: {task.id}', 'success')
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
