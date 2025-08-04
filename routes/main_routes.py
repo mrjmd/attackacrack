@@ -14,7 +14,7 @@ from scripts.data_management.csv_importer import CsvImporter
 from scripts.data_management.property_radar_importer import PropertyRadarImporter
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 from extensions import db
-from crm_database import Setting, Activity, Conversation
+from crm_database import Setting, Activity, Conversation, Todo
 
 main_bp = Blueprint('main', __name__)
 
@@ -212,6 +212,26 @@ def dashboard():
     contacts_with_emails = Contact.query.filter(Contact.email.isnot(None), Contact.email != '').count()
     data_quality_score = round(((contacts_with_names + contacts_with_emails) / (total_contacts * 2)) * 100) if total_contacts > 0 else 0
     
+    # Get todos for the current user
+    from flask_login import current_user
+    todos = Todo.query.filter_by(
+        user_id=current_user.id,
+        is_completed=False
+    ).order_by(
+        db.case(
+            (Todo.priority == 'high', 1),
+            (Todo.priority == 'medium', 2),
+            (Todo.priority == 'low', 3),
+            else_=4
+        ),
+        Todo.created_at.desc()
+    ).limit(5).all()
+    
+    pending_tasks_count = Todo.query.filter_by(
+        user_id=current_user.id,
+        is_completed=False
+    ).count()
+    
     return render_template(
         'dashboard.html', 
         stats=stats, 
@@ -222,7 +242,8 @@ def dashboard():
         recent_campaigns=recent_campaigns_with_perf,
         campaign_queue_size=campaign_queue_size,
         data_quality_score=data_quality_score,
-        pending_tasks=3  # Placeholder
+        pending_tasks=pending_tasks_count,
+        todos=todos
     )
 
 # ... (rest of file is unchanged) ...

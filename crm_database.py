@@ -503,3 +503,37 @@ class QuickBooksSync(db.Model):
     __table_args__ = (
         db.UniqueConstraint('entity_type', 'entity_id', name='unique_qb_entity'),
     )
+
+
+class Todo(db.Model):
+    """Todo items for task management"""
+    __tablename__ = 'todos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    is_completed = db.Column(db.Boolean, default=False)
+    priority = db.Column(db.String(20), default='medium')  # low, medium, high
+    due_date = db.Column(db.DateTime)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    
+    # User association (if you want per-user todos)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship('User', backref='todos')
+    
+    def __repr__(self):
+        return f'<Todo {self.id}: {self.title}>'
+    
+    def mark_complete(self):
+        """Mark todo as completed"""
+        self.is_completed = True
+        self.completed_at = datetime.utcnow()
+        
+    def mark_incomplete(self):
+        """Mark todo as incomplete"""
+        self.is_completed = False
+        self.completed_at = None

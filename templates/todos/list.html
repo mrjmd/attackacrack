@@ -1,0 +1,326 @@
+{% extends "base_authenticated.html" %}
+
+{% block title %}Tasks & Reminders{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Tasks & Reminders</h1>
+            <p class="text-gray-400 mt-1">Manage your tasks and stay organized</p>
+        </div>
+        <button onclick="showAddTodoModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Task
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-gray-700 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm">Total Tasks</p>
+                    <p class="text-2xl font-bold text-white">{{ todos|length }}</p>
+                </div>
+                <span class="text-3xl opacity-50">📋</span>
+            </div>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm">Pending</p>
+                    <p class="text-2xl font-bold text-orange-400">{{ todos|selectattr('is_completed', 'false')|list|length }}</p>
+                </div>
+                <span class="text-3xl opacity-50">⏳</span>
+            </div>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm">Completed</p>
+                    <p class="text-2xl font-bold text-green-400">{{ todos|selectattr('is_completed', 'true')|list|length }}</p>
+                </div>
+                <span class="text-3xl opacity-50">✅</span>
+            </div>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm">High Priority</p>
+                    <p class="text-2xl font-bold text-red-400">{{ todos|selectattr('priority', 'equalto', 'high')|selectattr('is_completed', 'false')|list|length }}</p>
+                </div>
+                <span class="text-3xl opacity-50">🔥</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="border-b border-gray-700">
+        <nav class="-mb-px flex space-x-8">
+            <button onclick="filterTodos('all')" class="filter-tab py-2 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-400" data-filter="all">
+                All Tasks
+            </button>
+            <button onclick="filterTodos('pending')" class="filter-tab py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300" data-filter="pending">
+                Pending
+            </button>
+            <button onclick="filterTodos('completed')" class="filter-tab py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300" data-filter="completed">
+                Completed
+            </button>
+            <button onclick="filterTodos('high')" class="filter-tab py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-400 hover:text-gray-300" data-filter="high">
+                High Priority
+            </button>
+        </nav>
+    </div>
+
+    <!-- Todo List -->
+    <div class="bg-gray-700 rounded-lg p-6">
+        <div class="space-y-3" id="todo-list">
+            {% for todo in todos %}
+            <div class="todo-item flex items-start gap-3 p-4 bg-gray-600 rounded-lg hover:bg-gray-500 transition-colors {{ 'opacity-50' if todo.is_completed else '' }}" 
+                 data-todo-id="{{ todo.id }}"
+                 data-completed="{{ 'true' if todo.is_completed else 'false' }}"
+                 data-priority="{{ todo.priority }}">
+                <input type="checkbox" 
+                       class="rounded border-gray-500 cursor-pointer mt-1" 
+                       onchange="toggleTodo({{ todo.id }})"
+                       {{ 'checked' if todo.is_completed else '' }}>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-white font-medium {{ 'line-through' if todo.is_completed else '' }}">{{ todo.title }}</span>
+                        {% if todo.priority == 'high' and not todo.is_completed %}
+                        <span class="text-xs bg-red-600 text-white px-2 py-1 rounded">High</span>
+                        {% elif todo.priority == 'low' and not todo.is_completed %}
+                        <span class="text-xs bg-gray-500 text-white px-2 py-1 rounded">Low</span>
+                        {% endif %}
+                        {% if todo.is_completed %}
+                        <span class="text-xs bg-green-600 text-white px-2 py-1 rounded">Completed</span>
+                        {% endif %}
+                    </div>
+                    {% if todo.description %}
+                    <p class="text-gray-300 text-sm mb-2">{{ todo.description }}</p>
+                    {% endif %}
+                    <div class="flex items-center gap-4 text-xs text-gray-400">
+                        <span>Created: {{ todo.created_at.strftime('%b %d, %Y') }}</span>
+                        {% if todo.completed_at %}
+                        <span>Completed: {{ todo.completed_at.strftime('%b %d, %Y') }}</span>
+                        {% endif %}
+                        {% if todo.due_date %}
+                        <span class="text-orange-400">Due: {{ todo.due_date.strftime('%b %d, %Y') }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="editTodo({{ todo.id }})" class="text-blue-400 hover:text-blue-300">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                    </button>
+                    <button onclick="deleteTodo({{ todo.id }})" class="text-red-400 hover:text-red-300">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not todos %}
+            <div class="text-center py-12">
+                <span class="text-6xl">📝</span>
+                <p class="text-gray-400 mt-4">No tasks yet. Create your first task!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Filter todos
+function filterTodos(filter) {
+    // Update active tab
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        if (tab.dataset.filter === filter) {
+            tab.classList.add('border-blue-500', 'text-blue-400');
+            tab.classList.remove('border-transparent', 'text-gray-400');
+        } else {
+            tab.classList.remove('border-blue-500', 'text-blue-400');
+            tab.classList.add('border-transparent', 'text-gray-400');
+        }
+    });
+    
+    // Filter items
+    document.querySelectorAll('.todo-item').forEach(item => {
+        const isCompleted = item.dataset.completed === 'true';
+        const priority = item.dataset.priority;
+        
+        let show = false;
+        switch(filter) {
+            case 'all':
+                show = true;
+                break;
+            case 'pending':
+                show = !isCompleted;
+                break;
+            case 'completed':
+                show = isCompleted;
+                break;
+            case 'high':
+                show = !isCompleted && priority === 'high';
+                break;
+        }
+        
+        item.style.display = show ? 'flex' : 'none';
+    });
+}
+
+// Todo management functions (similar to dashboard)
+function toggleTodo(todoId) {
+    fetch(`/api/todos/${todoId}/toggle`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Reload to update the list
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function deleteTodo(todoId) {
+    if (confirm('Are you sure you want to delete this task?')) {
+        fetch(`/api/todos/${todoId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const todoItem = document.querySelector(`[data-todo-id="${todoId}"]`);
+                todoItem.style.opacity = '0';
+                todoItem.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    todoItem.remove();
+                }, 300);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+}
+
+function editTodo(todoId) {
+    // TODO: Implement edit functionality
+    alert('Edit functionality coming soon!');
+}
+
+// Add todo modal (same as dashboard)
+function showAddTodoModal() {
+    let modal = document.getElementById('add-todo-modal');
+    if (!modal) {
+        modal = createAddTodoModal();
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+}
+
+function createAddTodoModal() {
+    const modal = document.createElement('div');
+    modal.id = 'add-todo-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.style.display = 'none';
+    
+    modal.innerHTML = `
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-semibold text-white mb-4">Add New Task</h2>
+            <form id="add-todo-form" onsubmit="submitTodo(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Task Title</label>
+                    <input type="text" id="todo-title" required
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                           placeholder="Enter task title...">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Priority</label>
+                    <select id="todo-priority" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Description (optional)</label>
+                    <textarea id="todo-description" rows="3"
+                              class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                              placeholder="Add any additional details..."></textarea>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeAddTodoModal()"
+                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                        Add Task
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeAddTodoModal();
+        }
+    });
+    
+    return modal;
+}
+
+function closeAddTodoModal() {
+    const modal = document.getElementById('add-todo-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.getElementById('add-todo-form').reset();
+    }
+}
+
+function submitTodo(event) {
+    event.preventDefault();
+    
+    const todoData = {
+        title: document.getElementById('todo-title').value,
+        priority: document.getElementById('todo-priority').value,
+        description: document.getElementById('todo-description').value
+    };
+    
+    fetch('/api/todos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(todoData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Reload to show new todo
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+</script>
+
+<style>
+.todo-item {
+    transition: all 0.3s ease;
+}
+</style>
+{% endblock %}

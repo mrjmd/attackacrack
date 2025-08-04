@@ -156,6 +156,7 @@ def create_app(config_name=None, test_config=None):
     from routes.growth_routes import growth_bp
     from routes.settings_routes import settings_bp
     from routes.auth import auth_bp
+    from routes.todo_routes import todo_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(contact_bp, url_prefix='/contacts')
@@ -169,6 +170,7 @@ def create_app(config_name=None, test_config=None):
     app.register_blueprint(growth_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(todo_bp)
     
     # --- REMOVED APScheduler ---
     # The background task scheduling is now handled by Celery Beat.
