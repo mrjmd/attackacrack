@@ -521,9 +521,10 @@ class Todo(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
     
-    # User association (if you want per-user todos)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    user = db.relationship('User', backref='todos')
+    # User association (optional for now to avoid migration issues)
+    user_id = db.Column(db.Integer, nullable=True)
+    # Note: Foreign key relationship commented out to avoid migration issues
+    # user = db.relationship('User', backref='todos')
     
     def __repr__(self):
         return f'<Todo {self.id}: {self.title}>'
