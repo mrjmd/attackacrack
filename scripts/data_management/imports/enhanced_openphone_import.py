@@ -9,6 +9,7 @@ Comprehensive data import including all new database models:
 """
 
 import os
+import sys
 import requests
 import json
 import logging
@@ -16,6 +17,10 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from urllib3.exceptions import InsecureRequestWarning
 from collections import Counter
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+sys.path.insert(0, project_root)
 
 # Suppress the InsecureRequestWarning from urllib3
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
