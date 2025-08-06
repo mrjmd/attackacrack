@@ -55,6 +55,11 @@ jobs:
         # Debug: Show which environment we're using
         echo "Deployment environment: ${{ github.event.inputs.environment }}"
         
+        # Debug: Show initial state
+        echo "=== Checking initial state of app-deploy.yaml ==="
+        echo "Looking for CELERY_BROKER_URL placeholder:"
+        grep -n "CELERY_BROKER_URL" .do/app-deploy.yaml | head -3
+        
         # Replace environment variable placeholders with actual values
         sed -i "s|\${SECRET_KEY}|${{ secrets.SECRET_KEY }}|g" .do/app-deploy.yaml
         sed -i "s|\${REDIS_URL}|${{ secrets.REDIS_URL }}|g" .do/app-deploy.yaml
@@ -77,6 +82,19 @@ jobs:
         sed -i "s|\${SMARTLEAD_API_KEY}|${{ secrets.SMARTLEAD_API_KEY }}|g" .do/app-deploy.yaml
         
         echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }} and environment variables"
+        
+        # Debug: Check if replacements worked
+        echo "=== Checking if replacements worked ==="
+        echo "Looking for CELERY_BROKER_URL after replacement:"
+        grep -n "CELERY_BROKER_URL" .do/app-deploy.yaml | head -3
+        
+        # Debug: Check if the secret exists
+        echo "=== Checking secret availability ==="
+        if [ -z "${{ secrets.CELERY_BROKER_URL }}" ]; then
+          echo "WARNING: CELERY_BROKER_URL secret appears to be empty!"
+        else
+          echo "CELERY_BROKER_URL secret exists (length: ${#CELERY_BROKER_URL})"
+        fi
     
     - name: Validate app spec
       run: |
