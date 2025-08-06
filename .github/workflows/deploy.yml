@@ -53,6 +53,9 @@ jobs:
         
         # Replace environment variable placeholders with actual values
         sed -i "s|\${SECRET_KEY}|${{ secrets.SECRET_KEY }}|g" .do/app-deploy.yaml
+        sed -i "s|\${REDIS_URL}|${{ secrets.REDIS_URL }}|g" .do/app-deploy.yaml
+        sed -i "s|\${CELERY_BROKER_URL}|${{ secrets.CELERY_BROKER_URL }}|g" .do/app-deploy.yaml
+        sed -i "s|\${CELERY_RESULT_BACKEND}|${{ secrets.CELERY_RESULT_BACKEND }}|g" .do/app-deploy.yaml
         sed -i "s|\${OPENPHONE_API_KEY}|${{ secrets.OPENPHONE_API_KEY }}|g" .do/app-deploy.yaml
         sed -i "s|\${OPENPHONE_WEBHOOK_SIGNING_KEY}|${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY }}|g" .do/app-deploy.yaml
         sed -i "s|\${OPENPHONE_PHONE_NUMBER}|${{ secrets.OPENPHONE_PHONE_NUMBER }}|g" .do/app-deploy.yaml

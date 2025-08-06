@@ -51,11 +51,11 @@ services:
       - key: SECRET_KEY
         value: ${SECRET_KEY}
       - key: REDIS_URL
-        value: ${valkey.REDIS_URL}
+        value: ${REDIS_URL}
       - key: CELERY_BROKER_URL
-        value: ${valkey.REDIS_URL}
+        value: ${CELERY_BROKER_URL}
       - key: CELERY_RESULT_BACKEND
-        value: ${valkey.REDIS_URL}
+        value: ${CELERY_RESULT_BACKEND}
       - key: OPENPHONE_API_KEY
         value: ${OPENPHONE_API_KEY}
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
@@ -116,11 +116,11 @@ workers:
       - key: SECRET_KEY
         value: ${SECRET_KEY}
       - key: REDIS_URL
-        value: ${valkey.REDIS_URL}
+        value: ${REDIS_URL}
       - key: CELERY_BROKER_URL
-        value: ${valkey.REDIS_URL}
+        value: ${CELERY_BROKER_URL}
       - key: CELERY_RESULT_BACKEND
-        value: ${valkey.REDIS_URL}
+        value: ${CELERY_RESULT_BACKEND}
       - key: OPENPHONE_API_KEY
         value: ${OPENPHONE_API_KEY}
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
@@ -164,15 +164,4 @@ databases:
     # Cluster name for the production database
     cluster_name: attackacrack-db
     # The size of the database cluster. Start small.
-    size: db-s-1vcpu-1gb
-  
-  - name: valkey
-    # Use Valkey for Celery broker and caching
-    engine: REDIS
-    version: "8"
-    # The production Valkey instance
-    production: true
-    # Cluster name for the Valkey instance
-    cluster_name: db-valkey-nyc3-14182
-    # The size of the Valkey cluster
     size: db-s-1vcpu-1gb
