@@ -23,7 +23,8 @@ jobs:
   deploy:
     name: Deploy to DigitalOcean App Platform
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
+    # Removed environment to use repository-level secrets
+    # environment: ${{ github.event.inputs.environment }}
     
     steps:
     - name: Checkout code
@@ -50,6 +51,9 @@ jobs:
         
         # Update the tag in the app spec using sed
         sed -i "s/tag: main/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
+        
+        # Debug: Show which environment we're using
+        echo "Deployment environment: ${{ github.event.inputs.environment }}"
         
         # Replace environment variable placeholders with actual values
         sed -i "s|\${SECRET_KEY}|${{ secrets.SECRET_KEY }}|g" .do/app-deploy.yaml
