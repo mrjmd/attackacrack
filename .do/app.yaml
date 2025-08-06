@@ -51,15 +51,41 @@ services:
       - key: SECRET_KEY
         value: ${SECRET_KEY}
       - key: REDIS_URL
-        value: ${REDIS_URL}
+        value: ${valkey.REDIS_URL}
       - key: CELERY_BROKER_URL
-        value: ${REDIS_URL}
+        value: ${valkey.REDIS_URL}
       - key: CELERY_RESULT_BACKEND
-        value: ${REDIS_URL}
+        value: ${valkey.REDIS_URL}
       - key: OPENPHONE_API_KEY
         value: ${OPENPHONE_API_KEY}
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
         value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+      - key: OPENPHONE_PHONE_NUMBER
+        value: ${OPENPHONE_PHONE_NUMBER}
+      - key: OPENPHONE_PHONE_NUMBER_ID
+        value: ${OPENPHONE_PHONE_NUMBER_ID}
+      - key: ENCRYPTION_KEY
+        value: ${ENCRYPTION_KEY}
+      - key: GEMINI_API_KEY
+        value: ${GEMINI_API_KEY}
+      - key: GOOGLE_CLIENT_ID
+        value: ${GOOGLE_CLIENT_ID}
+      - key: GOOGLE_CLIENT_SECRET
+        value: ${GOOGLE_CLIENT_SECRET}
+      - key: GOOGLE_PROJECT_ID
+        value: ${GOOGLE_PROJECT_ID}
+      - key: PROPERTY_RADAR_API_KEY
+        value: ${PROPERTY_RADAR_API_KEY}
+      - key: QUICKBOOKS_CLIENT_ID
+        value: ${QUICKBOOKS_CLIENT_ID}
+      - key: QUICKBOOKS_CLIENT_SECRET
+        value: ${QUICKBOOKS_CLIENT_SECRET}
+      - key: QUICKBOOKS_REDIRECT_URI
+        value: ${QUICKBOOKS_REDIRECT_URI}
+      - key: QUICKBOOKS_SANDBOX
+        value: ${QUICKBOOKS_SANDBOX}
+      - key: SMARTLEAD_API_KEY
+        value: ${SMARTLEAD_API_KEY}
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -90,15 +116,41 @@ workers:
       - key: SECRET_KEY
         value: ${SECRET_KEY}
       - key: REDIS_URL
-        value: ${REDIS_URL}
+        value: ${valkey.REDIS_URL}
       - key: CELERY_BROKER_URL
-        value: ${REDIS_URL}
+        value: ${valkey.REDIS_URL}
       - key: CELERY_RESULT_BACKEND
-        value: ${REDIS_URL}
+        value: ${valkey.REDIS_URL}
       - key: OPENPHONE_API_KEY
         value: ${OPENPHONE_API_KEY}
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
         value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+      - key: OPENPHONE_PHONE_NUMBER
+        value: ${OPENPHONE_PHONE_NUMBER}
+      - key: OPENPHONE_PHONE_NUMBER_ID
+        value: ${OPENPHONE_PHONE_NUMBER_ID}
+      - key: ENCRYPTION_KEY
+        value: ${ENCRYPTION_KEY}
+      - key: GEMINI_API_KEY
+        value: ${GEMINI_API_KEY}
+      - key: GOOGLE_CLIENT_ID
+        value: ${GOOGLE_CLIENT_ID}
+      - key: GOOGLE_CLIENT_SECRET
+        value: ${GOOGLE_CLIENT_SECRET}
+      - key: GOOGLE_PROJECT_ID
+        value: ${GOOGLE_PROJECT_ID}
+      - key: PROPERTY_RADAR_API_KEY
+        value: ${PROPERTY_RADAR_API_KEY}
+      - key: QUICKBOOKS_CLIENT_ID
+        value: ${QUICKBOOKS_CLIENT_ID}
+      - key: QUICKBOOKS_CLIENT_SECRET
+        value: ${QUICKBOOKS_CLIENT_SECRET}
+      - key: QUICKBOOKS_REDIRECT_URI
+        value: ${QUICKBOOKS_REDIRECT_URI}
+      - key: QUICKBOOKS_SANDBOX
+        value: ${QUICKBOOKS_SANDBOX}
+      - key: SMARTLEAD_API_KEY
+        value: ${SMARTLEAD_API_KEY}
 
 # Define the managed databases and other addons for the application.
 databases:
@@ -112,4 +164,15 @@ databases:
     # Cluster name for the production database
     cluster_name: attackacrack-db
     # The size of the database cluster. Start small.
+    size: db-s-1vcpu-1gb
+  
+  - name: valkey
+    # Use Valkey for Celery broker and caching
+    engine: REDIS
+    version: "8"
+    # The production Valkey instance
+    production: true
+    # Cluster name for the Valkey instance
+    cluster_name: db-valkey-nyc3-14182
+    # The size of the Valkey cluster
     size: db-s-1vcpu-1gb

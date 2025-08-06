@@ -53,9 +53,21 @@ jobs:
         
         # Replace environment variable placeholders with actual values
         sed -i "s|\${SECRET_KEY}|${{ secrets.SECRET_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${REDIS_URL}|${{ secrets.REDIS_URL }}|g" .do/app-deploy.yaml
         sed -i "s|\${OPENPHONE_API_KEY}|${{ secrets.OPENPHONE_API_KEY }}|g" .do/app-deploy.yaml
         sed -i "s|\${OPENPHONE_WEBHOOK_SIGNING_KEY}|${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY }}|g" .do/app-deploy.yaml
+        sed -i "s|\${OPENPHONE_PHONE_NUMBER}|${{ secrets.OPENPHONE_PHONE_NUMBER }}|g" .do/app-deploy.yaml
+        sed -i "s|\${OPENPHONE_PHONE_NUMBER_ID}|${{ secrets.OPENPHONE_PHONE_NUMBER_ID }}|g" .do/app-deploy.yaml
+        sed -i "s|\${ENCRYPTION_KEY}|${{ secrets.ENCRYPTION_KEY }}|g" .do/app-deploy.yaml
+        sed -i "s|\${GEMINI_API_KEY}|${{ secrets.GEMINI_API_KEY }}|g" .do/app-deploy.yaml
+        sed -i "s|\${GOOGLE_CLIENT_ID}|${{ secrets.GOOGLE_CLIENT_ID }}|g" .do/app-deploy.yaml
+        sed -i "s|\${GOOGLE_CLIENT_SECRET}|${{ secrets.GOOGLE_CLIENT_SECRET }}|g" .do/app-deploy.yaml
+        sed -i "s|\${GOOGLE_PROJECT_ID}|${{ secrets.GOOGLE_PROJECT_ID }}|g" .do/app-deploy.yaml
+        sed -i "s|\${PROPERTY_RADAR_API_KEY}|${{ secrets.PROPERTY_RADAR_API_KEY }}|g" .do/app-deploy.yaml
+        sed -i "s|\${QUICKBOOKS_CLIENT_ID}|${{ secrets.QUICKBOOKS_CLIENT_ID }}|g" .do/app-deploy.yaml
+        sed -i "s|\${QUICKBOOKS_CLIENT_SECRET}|${{ secrets.QUICKBOOKS_CLIENT_SECRET }}|g" .do/app-deploy.yaml
+        sed -i "s|\${QUICKBOOKS_REDIRECT_URI}|${{ secrets.QUICKBOOKS_REDIRECT_URI }}|g" .do/app-deploy.yaml
+        sed -i "s|\${QUICKBOOKS_SANDBOX}|${{ secrets.QUICKBOOKS_SANDBOX }}|g" .do/app-deploy.yaml
+        sed -i "s|\${SMARTLEAD_API_KEY}|${{ secrets.SMARTLEAD_API_KEY }}|g" .do/app-deploy.yaml
         
         echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }} and environment variables"
     
