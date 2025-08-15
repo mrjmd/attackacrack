@@ -54,7 +54,6 @@ services:
       # Secrets - no value specified, uses existing DO values
       - key: SECRET_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: REDIS_URL
         scope: RUN_AND_BUILD_TIME
       - key: CELERY_BROKER_URL
@@ -63,49 +62,34 @@ services:
         scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: ENCRYPTION_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GEMINI_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GOOGLE_CLIENT_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GOOGLE_CLIENT_SECRET
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GOOGLE_PROJECT_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: PROPERTY_RADAR_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_CLIENT_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_CLIENT_SECRET
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_REDIRECT_URI
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_SANDBOX
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: SMARTLEAD_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -141,7 +125,6 @@ workers:
       # Secrets - no value specified, uses existing DO values
       - key: SECRET_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: REDIS_URL
         scope: RUN_AND_BUILD_TIME
       - key: CELERY_BROKER_URL
@@ -150,49 +133,34 @@ workers:
         scope: RUN_AND_BUILD_TIME
       - key: OPENPHONE_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: ENCRYPTION_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GEMINI_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GOOGLE_CLIENT_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GOOGLE_CLIENT_SECRET
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: GOOGLE_PROJECT_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: PROPERTY_RADAR_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_CLIENT_ID
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_CLIENT_SECRET
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_REDIRECT_URI
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: QUICKBOOKS_SANDBOX
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: SMARTLEAD_API_KEY
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
 
 # Define the managed databases and other addons for the application.
 databases:
