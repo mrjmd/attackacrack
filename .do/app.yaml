@@ -213,3 +213,6 @@ databases:
     cluster_name: attackacrack-db
     # The size of the database cluster. Start small.
     size: db-s-1vcpu-1gb
+
+# Note: Valkey (Redis) database is managed separately as db-valkey-nyc3-14182
+# Connection is handled via REDIS_URL, CELERY_BROKER_URL, and CELERY_RESULT_BACKEND env vars

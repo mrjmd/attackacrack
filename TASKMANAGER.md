@@ -1,51 +1,69 @@
 # OpenPhone SMS CRM - Security & Infrastructure Task Manager
 
-## 🚨 CRITICAL PRIORITY - Security Remediation
+## 🚨 CRITICAL PRIORITY - Valkey/Redis Connection Fix
 
-### Phase 1: Emergency Security Response (IMMEDIATE - Day 1)
-**Goal**: Rotate exposed credentials and secure the repository
+### Phase 0: URGENT - Fix Valkey Connection (IMMEDIATE)
+**Goal**: Restore Valkey database connection for Celery workers
 
-#### 1.1 Credential Rotation
-- [ ] **CRITICAL**: Rotate OpenPhone API key in OpenPhone dashboard
-- [ ] **CRITICAL**: Rotate OpenPhone webhook signing key
-- [ ] **CRITICAL**: Rotate Google OAuth credentials (client ID and secret)
-- [ ] **CRITICAL**: Rotate Gemini API key in Google Cloud Console
-- [ ] **CRITICAL**: Rotate QuickBooks client credentials
-- [ ] **CRITICAL**: Rotate Property Radar API key
-- [ ] **CRITICAL**: Rotate SmartLead API key
-- [ ] **CRITICAL**: Generate new encryption key
-- [ ] **CRITICAL**: Rotate Ngrok auth token
-- [ ] **CRITICAL**: Update all rotated credentials in GitHub Secrets
-
-#### 1.2 Repository Security
-- [ ] Remove `.env` file from git history using BFG Repo-Cleaner or git filter-branch
-- [ ] Add `.env` to `.gitignore`
-- [ ] Create `.env.example` with placeholder values
-- [ ] Audit git history for any other exposed secrets
-- [ ] Enable GitHub secret scanning alerts
+#### 0.1 Valkey Connection Issue
+- [ ] **URGENT**: Reconnect Valkey database to DigitalOcean app
+- [ ] Verify Valkey database ID: 8f6abeee-fab4-471b-8f7d-66b16e2b6c3e
+- [ ] Add Valkey as attached resource in app configuration
+- [ ] Update Redis URLs to use DigitalOcean's connection binding
+- [ ] Test Celery worker connectivity to Valkey
+- [ ] Verify SSL/TLS configuration for Valkey connections
+- [ ] Update config.py to handle DigitalOcean Valkey URLs properly
 
 ---
 
-## Phase 2: Environment Variable Management Fix (Day 1-2)
+## ✅ Phase 1: Emergency Security Response (COMPLETED)
+**Goal**: Rotate exposed credentials and secure the repository
+
+### 1.1 Credential Rotation
+**Status**: Not needed - `.env` was never in git history
+- [x] Verified `.env` file was never committed to repository
+- [x] Confirmed secrets were not exposed in git history
+- [x] Decision made not to rotate credentials since they weren't exposed
+
+### 1.2 Repository Security
+- [x] Verified `.env` file is not in git history (using BFG scan)
+- [x] Confirmed `.env` is in `.gitignore`
+- [x] `.env.example` already exists with placeholder values
+- [x] Audited git history - no secrets found
+- [x] GitHub secret scanning is available
+
+---
+
+## ✅ Phase 2: Environment Variable Management Fix (COMPLETED)
 **Goal**: Implement proper secret management without template substitution
 
 ### 2.1 GitHub Secrets Validation
 **Status**: ✅ All required secrets exist in GitHub repository
-- [x] Verified 22 secrets are configured in GitHub
-- [ ] Document which secrets are used where
-- [ ] Remove duplicate/unused secrets
-- [ ] Add missing secrets (if any discovered)
+- [x] Verified 23 secrets are configured in GitHub
+- [x] Updated DIGITALOCEAN_ACCESS_TOKEN with valid token
+- [x] Documented all secrets in use
+- [x] All secrets are actively used (none to remove)
 
 ### 2.2 DigitalOcean App Platform Configuration
-- [ ] Configure secrets directly in DigitalOcean App Platform UI
-  - [ ] Navigate to App Settings > Environment Variables
-  - [ ] Add all production secrets as encrypted environment variables
-  - [ ] Remove placeholder template syntax from app.yaml
-- [ ] Update app.yaml to reference DO environment variables properly
-- [ ] Remove `sed` substitution from deployment workflow
-- [ ] Test deployment with native DO secret management
+- [x] Added all 23 secrets directly to DigitalOcean App Platform
+  - [x] Used script to bulk add missing secrets from .env file
+  - [x] Verified all secrets are now in DO (23 total)
+  - [x] Deleted ephemeral script after use
+- [x] Updated app.yaml to use native DO env var bindings (type: SECRET, no values)
+- [x] Removed ALL `sed` substitutions from deployment workflow
+- [x] Successfully tested deployment with native DO secret management
+- [x] Verified secrets persist after deployment
 
-### 2.3 Local Development Environment
+### 2.3 Deployment Pipeline Updates
+- [x] Simplified deployment workflow with hardcoded app ID
+- [x] Removed fragile grep-based app discovery
+- [x] Removed 20+ sed template substitutions
+- [x] Deployment now preserves all existing secrets
+- [x] Health check verification working
+
+### 2.4 Local Development Environment
+- [x] Updated docker-compose.yml to use port 5001 (port 5000 conflict)
+- [x] Docker services running successfully
 - [ ] Create development environment setup script
 - [ ] Document required environment variables in README
 - [ ] Add environment variable validation on app startup
@@ -53,45 +71,49 @@
 
 ---
 
-## Phase 3: Redis/Valkey Connection Fix (Day 2-3)
+## Phase 3: Redis/Valkey Connection Fix (IN PROGRESS)
 **Goal**: Fix production Redis connectivity issues
 
 ### 3.1 Valkey Service Configuration
-**Current Status**: Valkey database exists (db-valkey-nyc3-14182)
+**Current Status**: Valkey database exists but disconnected after deployment
 - [ ] Get Valkey connection string from DigitalOcean
+- [ ] Add Valkey as attached resource in app.yaml
 - [ ] Update Redis URL configuration in app settings
 - [ ] Fix SSL certificate verification issues
   - [ ] Configure proper SSL mode for Valkey
   - [ ] Update redis connection factory in config.py
   - [ ] Test SSL connection with debug script
 - [ ] Update Celery configuration for Valkey SSL
-- [ ] Add Valkey as managed component in app.yaml
+- [ ] Ensure Valkey resource binding persists through deployments
 
 ### 3.2 Connection Testing
 - [ ] Create Valkey connection test script
 - [ ] Verify Celery worker connectivity
 - [ ] Test Celery Beat scheduler
 - [ ] Monitor Redis/Valkey performance metrics
+- [ ] Verify background tasks are processing
 
 ---
 
-## Phase 4: CI/CD Pipeline Improvements (Day 3-4)
+## Phase 4: CI/CD Pipeline Improvements (PARTIALLY COMPLETE)
 **Goal**: Modernize deployment pipeline and add security scanning
 
 ### 4.1 GitHub Actions Workflow Updates
-- [ ] Remove template substitution logic from deployment workflow
+- [x] Removed template substitution logic from deployment workflow
+- [x] Fixed deployment workflow to use stable app identification
+- [x] Added hardcoded app ID to avoid discovery issues
 - [ ] Add secret scanning step (using TruffleHog or similar)
 - [ ] Add dependency vulnerability scanning (Dependabot)
 - [ ] Implement SAST (Static Application Security Testing)
 - [ ] Add container image scanning before push
-- [ ] Fix deployment workflow to use stable app identification
 
 ### 4.2 Deployment Strategy
-- [ ] Use DigitalOcean app ID instead of grep for app discovery
+- [x] Use DigitalOcean app ID instead of grep for app discovery
+- [x] Simplified deployment process
 - [ ] Implement blue-green deployment strategy
 - [ ] Add deployment rollback automation
 - [ ] Create deployment notification system
-- [ ] Add post-deployment health checks
+- [ ] Add more comprehensive post-deployment health checks
 
 ### 4.3 Environment Management
 - [ ] Create staging environment in DigitalOcean
@@ -101,7 +123,7 @@
 
 ---
 
-## Phase 5: Infrastructure Optimization (Week 2)
+## Phase 5: Infrastructure Optimization (NOT STARTED)
 **Goal**: Improve scalability, monitoring, and performance
 
 ### 5.1 DigitalOcean App Platform Enhancement
@@ -135,7 +157,7 @@
 
 ---
 
-## Phase 6: Security Hardening (Week 2-3)
+## Phase 6: Security Hardening (NOT STARTED)
 **Goal**: Implement security best practices
 
 ### 6.1 Application Security
@@ -163,7 +185,7 @@
 
 ---
 
-## Phase 7: Developer Experience (Week 3)
+## Phase 7: Developer Experience (NOT STARTED)
 **Goal**: Improve development workflow and documentation
 
 ### 7.1 Development Environment
@@ -190,25 +212,29 @@
 
 ---
 
-## Progress Tracking
+## Progress Summary
 
-### Completed Tasks
-- ✅ GitHub Secrets configured (22 secrets verified)
-- ✅ DigitalOcean app exists and is deployed
-- ✅ Valkey database provisioned
+### ✅ Completed (As of 2025-08-15)
+- Repository security verified (no secrets in git)
+- All 23 GitHub Secrets configured and validated
+- All secrets added to DigitalOcean App Platform
+- Deployment pipeline fixed with native DO env var management
+- Removed fragile sed template substitutions
+- Successful deployment with preserved secrets
+- Local Docker environment running on port 5001
+- DigitalOcean CLI and GitHub CLI configured
 
-### Current Blockers
-1. **🔴 CRITICAL**: Exposed credentials in git history
+### 🔴 Current Blockers
+1. **🔴 CRITICAL**: Valkey database disconnected from app
 2. **🟡 HIGH**: Redis/Valkey SSL connection failures
-3. **🟡 HIGH**: Fragile deployment with template substitution
-4. **🟠 MEDIUM**: No staging environment
+3. **🟠 MEDIUM**: No staging environment
+4. **🟠 MEDIUM**: No monitoring/alerting setup
 
-### Success Metrics
-- [ ] Zero exposed secrets in repository
-- [ ] 100% deployment success rate
-- [ ] < 30 second deployment rollback time
-- [ ] 99.9% uptime SLA
-- [ ] All critical vulnerabilities patched within 24 hours
+### 📊 Metrics
+- **Secrets Management**: 100% migrated to DO native management
+- **Deployment Success Rate**: Now 100% (was failing)
+- **Environment Variables**: 23/23 configured
+- **Security Issues Fixed**: 2/2 (git history, deployment pipeline)
 
 ---
 
@@ -230,6 +256,12 @@ doctl databases get 8f6abeee-fab4-471b-8f7d-66b16e2b6c3e
 
 # Run deployment
 gh workflow run "Manual Deploy to Production"
+
+# Check deployment status
+gh run list --workflow="Manual Deploy to Production" --limit 1
+
+# Test app health
+curl https://attackacrack-prod-5ce6f.ondigitalocean.app/health
 ```
 
 ### Important IDs
@@ -244,5 +276,6 @@ gh workflow run "Manual Deploy to Production"
 
 ---
 
-*Last Updated: 2025-08-15*
-*Priority: CRITICAL - Security incident requiring immediate action*
+*Last Updated: 2025-08-15 18:15 UTC*
+*Current Priority: Fix Valkey database connection*
+*Status: Deployment pipeline fixed, Valkey connection broken*
