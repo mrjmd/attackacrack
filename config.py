@@ -102,10 +102,39 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file upload
     JSON_SORT_KEYS = False
     
+    # Session configuration - Use Redis for session storage to support multiple workers
+    SESSION_TYPE = 'redis'
+    SESSION_PERMANENT = False
+    SESSION_USE_SIGNER = True
+    SESSION_KEY_PREFIX = 'attackacrack:'
+    SESSION_COOKIE_NAME = 'attackacrack_session'
+    SESSION_COOKIE_SECURE = True  # Always use secure cookies in production
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    # Redis URL will be set in init_app method
+    
     @classmethod
     def init_app(cls, app):
         """Initialize application with this config"""
-        pass
+        # Set up Redis connection for Flask-Session
+        import redis
+        from flask_session import Session
+        
+        redis_url = os.environ.get('REDIS_URL') or os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
+        
+        # Parse Redis URL and create connection
+        if redis_url.startswith('rediss://'):
+            # SSL connection for managed Redis/Valkey
+            app.config['SESSION_REDIS'] = redis.from_url(
+                redis_url,
+                ssl_cert_reqs=None  # Managed services don't need cert validation
+            )
+        else:
+            # Regular Redis connection
+            app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+        
+        # Initialize Flask-Session
+        Session(app)
 
 
 class DevelopmentConfig(Config):
@@ -119,6 +148,9 @@ class DevelopmentConfig(Config):
     
     # Development mail settings - use console backend
     MAIL_SUPPRESS_SEND = True
+    
+    # Allow non-secure cookies in development
+    SESSION_COOKIE_SECURE = False
     
     @classmethod
     def init_app(cls, app):

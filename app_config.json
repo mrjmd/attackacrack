@@ -1,0 +1,870 @@
+[
+  {
+    "id": "4d1674ef-bfba-4fd3-9a97-943fa02c1f70",
+    "owner_uuid": "e4cef147-d83b-4f0f-85bb-a49da6706746",
+    "spec": {
+      "name": "attackacrack-prod",
+      "services": [
+        {
+          "name": "attackacrack-web",
+          "image": {
+            "registry_type": "DOCR",
+            "registry": "attack-a-crack",
+            "repository": "attackacrack-crm",
+            "tag": "latest"
+          },
+          "run_command": "./entrypoint.sh",
+          "envs": [
+            {
+              "key": "FLASK_ENV",
+              "value": "production",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "FLASK_APP",
+              "value": "app.py",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "DATABASE_URL",
+              "value": "${db.DATABASE_URL}",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "POSTGRES_URI",
+              "value": "${db.DATABASE_URL}",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "SECRET_KEY",
+              "value": "EV[1:/ELkT0APHK18Q6Xix6uKJsp3U8q5Yoww:KwE9YW2CHUgB+a2yrOMrpQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "REDIS_URL",
+              "value": "EV[1:Rd87uh3l+luaUFmXykPgMFbiD0SbTNGS:AvIIavz032nIKOayQW+3lg==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "CELERY_BROKER_URL",
+              "value": "EV[1:x8hy7PhElugOFDDir2cjcwntZvcGHpUj:dCo+x4u2uFgtihAChzB4iA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "CELERY_RESULT_BACKEND",
+              "value": "EV[1:zifnuiRvPKFLzT2xsX6ryIlEH68Ka3Xb:aMxvqXcfPka1xtVz6NuknA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_API_KEY",
+              "value": "EV[1:ETnHHm6lvNarWq64OgQxbNigdtjEYGiW:Von6DXL2dB1iVmUF1kcIaA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_WEBHOOK_SIGNING_KEY",
+              "value": "EV[1:an2ivFpl122ERyIgsNfoeNAcPUIP2B0m:uPhBEfEWBj5b+DNHHw3O0Q==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_PHONE_NUMBER",
+              "value": "EV[1:L0mRfa3U9ZfIAGONW88wKGXevk4R1Hjy:GmGbKyl218Rzyx23WGqbpQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_PHONE_NUMBER_ID",
+              "value": "EV[1:1j4POuR59FoId1bvCC44BqqufZH1eH11:XMtmx8PEpd38vBL+lnFMlA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "ENCRYPTION_KEY",
+              "value": "EV[1:saEqBsi/5+L46lCeYLvFzNjpCQ6OFHbI:cz+feRWchjIDFHi+BTYbGQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GEMINI_API_KEY",
+              "value": "EV[1:fwWc3aXNhYLl3ZID9xrlqZLwQJe+yYEH:vL2Lx0Z1Wbe1l0H1MSPZGg==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GOOGLE_CLIENT_ID",
+              "value": "EV[1:16L5J2ZezHxX2MojscDGQZdOMldjxt5z:CkCJ4H3RagcMbxpcvFaeMA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GOOGLE_CLIENT_SECRET",
+              "value": "EV[1:rIxSlGR/3RFN9IGUW/KQG99lWOx+2Tnw:m6OrSjNo4ZYExbBxQiOX5A==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GOOGLE_PROJECT_ID",
+              "value": "EV[1:ZKW6abCYT2tBs7pY0X7wdigOdtFMIIC0:X9yw87vT3WQkoYT5oL0HNw==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "PROPERTY_RADAR_API_KEY",
+              "value": "EV[1:ApfRsSKOWC7x6OqukAen/K+Wa67XLNVG:hXoY4KH0dTfZJDEPXxp1aQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_CLIENT_ID",
+              "value": "EV[1:zGHykqJ2SsEYKZLPM38nnio4u9BKInLs:TQIVbuaZ/bWd+kwSvfq6mA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_CLIENT_SECRET",
+              "value": "EV[1:kdfMb5Eh0pltyAbbFYK55fOT1DGXAXZ+:5Fs27pyp7hqJQtbaNWYIdw==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_REDIRECT_URI",
+              "value": "EV[1:+8j6RSOKz4OLgKvtApCk4JNbnZMC2sit:VV/Kyp906D9sgr04DwUzfA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_SANDBOX",
+              "value": "EV[1:llgWM/4ri2wklawG+w/VMZbHu4YRwjK2:8Wv1nGG54C/5CX0L2nFwDQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "SMARTLEAD_API_KEY",
+              "value": "EV[1:DEtSUA5ssAnh4nW+J2LLZJ16Aap+8icg:l2Gaz/ejLzlE6wWSjRHaeQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            }
+          ],
+          "instance_size_slug": "basic-xs",
+          "instance_count": 1,
+          "http_port": 5000,
+          "health_check": {
+            "timeout_seconds": 10,
+            "http_path": "/health",
+            "port": 5000
+          }
+        }
+      ],
+      "workers": [
+        {
+          "name": "attackacrack-worker",
+          "image": {
+            "registry_type": "DOCR",
+            "registry": "attack-a-crack",
+            "repository": "attackacrack-crm",
+            "tag": "latest"
+          },
+          "run_command": "celery -A celery_worker.celery worker --loglevel=info --concurrency=2",
+          "envs": [
+            {
+              "key": "FLASK_ENV",
+              "value": "production",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "FLASK_APP",
+              "value": "app.py",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "DATABASE_URL",
+              "value": "${db.DATABASE_URL}",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "POSTGRES_URI",
+              "value": "${db.DATABASE_URL}",
+              "scope": "RUN_AND_BUILD_TIME"
+            },
+            {
+              "key": "SECRET_KEY",
+              "value": "EV[1:FTAwurALhxsTnLuLuxHOolanLoJBv1XK:ZNULIeb4lEI8oaWvoBKniQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "REDIS_URL",
+              "value": "EV[1:lhaUWfZzWLTnWDjXRoS/823BOijmzmIp:QMcpFnH+XofJwrwTH21X1NOP08MO8IMyo8sj/rQhEWayeROEfTRRmfXoEa6ZbL7T77Z4S/5jwrZKKpSydrMr+JsqoajWozhdf2Wfk0MJnyRiF8gkqzeDlBQLfPINZ/wY9QdujNUTRRZrdFmrrP+w2nJRGg/JDO7mj7426wUSKA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "CELERY_BROKER_URL",
+              "value": "EV[1:IGkcTKs4aLguP6uJ8L8a9fGYa2VHu0b/:TMb5XiR5o5WfNz8TiuR1pA/3CcBZ/k+RnhVEq800kd9Ku3RsD7wkdomgPWhoz4Z206Mf80Icwv9CB7626O+ZAUToBjUBqoeyI2U3jxBE7uQ6RodI0kg6dAyhmsoi+7s4oQp7E2/46WgP7PmW5JLosQTxNWdQ3xP1ISd25r2vJw==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "CELERY_RESULT_BACKEND",
+              "value": "EV[1:ukRfh00QpO8rtA4PxJX/j5KRMc/JjxUx:nLVME/YnJhMQdKa9d8ig2HQDnN8rm9AV5KWPgSZTmWdkJy813FGWqYXxgw/3QbYWEUvoxfVbm0FIhRAjPoJzywyppw05HskLQQx7SBAvMTzmedFdwzDe2JDsEC2rG9j06hO/hyN8xi4bfdo3P9YAoRBT9krze4jQHYd7NO9nlg==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_API_KEY",
+              "value": "EV[1:5ViudT9vvb28WJgCOD4doMe2Cux8e2cc:LLmqbDtpxYlfIM1E6nTP6Q==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_WEBHOOK_SIGNING_KEY",
+              "value": "EV[1:ifL8Z/yxQis4syZBNVw+gOVUhXQfuXW+:+dBxDtqtYWcfNa0H16K6DQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_PHONE_NUMBER",
+              "value": "EV[1:4MkGQh8KY2yflKo/6QtKD3QtE8+jr0z7:oVveTg+4+vVWeFwxhELo4Q==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "OPENPHONE_PHONE_NUMBER_ID",
+              "value": "EV[1:yKjAGPbHIm0AImh5eJxGo0W4dBg1fxCC:Xr2xuVnzDapywCXBvmaLgA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "ENCRYPTION_KEY",
+              "value": "EV[1:OnTFIkfnnfHFFDr6rFdtOSk9XoT+fVjB:IcIskX7YNvPJ74DzZYpkPA==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GEMINI_API_KEY",
+              "value": "EV[1:/Y6vXt3luJSr+E3tmtpsUWYEDPPRxt5A:GhdXEMMP0T+021quM3nVwg==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GOOGLE_CLIENT_ID",
+              "value": "EV[1:jL2CNiRb+42Y9flT9BOPbuSAnzA9QPlq:g/n5wZ5xKcbiKew4eTPk8g==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GOOGLE_CLIENT_SECRET",
+              "value": "EV[1:EiQ5+0ToJhKYUYxR6B16ZG8U7hEn7rz7:xDZlms2gtrwKvkh97tEZqQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "GOOGLE_PROJECT_ID",
+              "value": "EV[1:S7s9CLux0yEvHa2c1ICKC00Xje3Yfuo8:U0DbGiK8AsDkW+ViAJMRow==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "PROPERTY_RADAR_API_KEY",
+              "value": "EV[1:l5ekApp1i1A7tBV/rmGb50rPskKTAfff:4JMNlZMoyi7Q9zrm7NKKwg==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_CLIENT_ID",
+              "value": "EV[1:o7rTOnHLBU+BYhxkl8lprx3qU/HQUyJa:nwan9IBrkpp7Ydgy63w8jQ==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_CLIENT_SECRET",
+              "value": "EV[1:r/tig/3FozztErmlXuH67tA1USRQrIPu:aveGszoAra7hgzDl6VCsDg==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_REDIRECT_URI",
+              "value": "EV[1:hQBH98ih8T2tFOwhwWAQYjSp7FI8CEU4:oPg35gE/A0o8DkZhyx4nqw==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "QUICKBOOKS_SANDBOX",
+              "value": "EV[1:uUZEVM3KQXwsf9gBS/++MZpqbt+Qr1Uy:F4jyz4MBApqm04QTely1og==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            },
+            {
+              "key": "SMARTLEAD_API_KEY",
+              "value": "EV[1:lGlFGO/Llp5jz7seS8isN0aKmjaeDC4X:zQSqvO+tUUNh1a8T33mhmw==]",
+              "scope": "RUN_AND_BUILD_TIME",
+              "type": "SECRET"
+            }
+          ],
+          "instance_size_slug": "basic-xs",
+          "instance_count": 1
+        }
+      ],
+      "databases": [
+        {
+          "name": "db",
+          "engine": "PG",
+          "version": "13",
+          "size": "db-s-1vcpu-1gb",
+          "production": true,
+          "cluster_name": "attackacrack-db"
+        }
+      ],
+      "region": "nyc",
+      "ingress": {
+        "rules": [
+          {
+            "match": {
+              "path": {
+                "prefix": "/"
+              }
+            },
+            "component": {
+              "name": "attackacrack-web"
+            }
+          }
+        ]
+      }
+    },
+    "last_deployment_active_at": "2025-08-15T18:49:27Z",
+    "default_ingress": "https://attackacrack-prod-5ce6f.ondigitalocean.app",
+    "created_at": "2025-08-01T15:57:43Z",
+    "updated_at": "2025-08-15T18:49:31Z",
+    "active_deployment": {
+      "id": "9d011161-2f6b-40df-aa7f-f7cb556d8adf",
+      "spec": {
+        "name": "attackacrack-prod",
+        "services": [
+          {
+            "name": "attackacrack-web",
+            "image": {
+              "registry_type": "DOCR",
+              "registry": "attack-a-crack",
+              "repository": "attackacrack-crm",
+              "tag": "latest"
+            },
+            "run_command": "./entrypoint.sh",
+            "envs": [
+              {
+                "key": "FLASK_ENV",
+                "value": "production",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "FLASK_APP",
+                "value": "app.py",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "DATABASE_URL",
+                "value": "${db.DATABASE_URL}",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "POSTGRES_URI",
+                "value": "${db.DATABASE_URL}",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "SECRET_KEY",
+                "value": "EV[1:/ELkT0APHK18Q6Xix6uKJsp3U8q5Yoww:KwE9YW2CHUgB+a2yrOMrpQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "REDIS_URL",
+                "value": "EV[1:Rd87uh3l+luaUFmXykPgMFbiD0SbTNGS:AvIIavz032nIKOayQW+3lg==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "CELERY_BROKER_URL",
+                "value": "EV[1:x8hy7PhElugOFDDir2cjcwntZvcGHpUj:dCo+x4u2uFgtihAChzB4iA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "CELERY_RESULT_BACKEND",
+                "value": "EV[1:zifnuiRvPKFLzT2xsX6ryIlEH68Ka3Xb:aMxvqXcfPka1xtVz6NuknA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_API_KEY",
+                "value": "EV[1:ETnHHm6lvNarWq64OgQxbNigdtjEYGiW:Von6DXL2dB1iVmUF1kcIaA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_WEBHOOK_SIGNING_KEY",
+                "value": "EV[1:an2ivFpl122ERyIgsNfoeNAcPUIP2B0m:uPhBEfEWBj5b+DNHHw3O0Q==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_PHONE_NUMBER",
+                "value": "EV[1:L0mRfa3U9ZfIAGONW88wKGXevk4R1Hjy:GmGbKyl218Rzyx23WGqbpQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_PHONE_NUMBER_ID",
+                "value": "EV[1:1j4POuR59FoId1bvCC44BqqufZH1eH11:XMtmx8PEpd38vBL+lnFMlA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "ENCRYPTION_KEY",
+                "value": "EV[1:saEqBsi/5+L46lCeYLvFzNjpCQ6OFHbI:cz+feRWchjIDFHi+BTYbGQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GEMINI_API_KEY",
+                "value": "EV[1:fwWc3aXNhYLl3ZID9xrlqZLwQJe+yYEH:vL2Lx0Z1Wbe1l0H1MSPZGg==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GOOGLE_CLIENT_ID",
+                "value": "EV[1:16L5J2ZezHxX2MojscDGQZdOMldjxt5z:CkCJ4H3RagcMbxpcvFaeMA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GOOGLE_CLIENT_SECRET",
+                "value": "EV[1:rIxSlGR/3RFN9IGUW/KQG99lWOx+2Tnw:m6OrSjNo4ZYExbBxQiOX5A==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GOOGLE_PROJECT_ID",
+                "value": "EV[1:ZKW6abCYT2tBs7pY0X7wdigOdtFMIIC0:X9yw87vT3WQkoYT5oL0HNw==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "PROPERTY_RADAR_API_KEY",
+                "value": "EV[1:ApfRsSKOWC7x6OqukAen/K+Wa67XLNVG:hXoY4KH0dTfZJDEPXxp1aQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_CLIENT_ID",
+                "value": "EV[1:zGHykqJ2SsEYKZLPM38nnio4u9BKInLs:TQIVbuaZ/bWd+kwSvfq6mA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_CLIENT_SECRET",
+                "value": "EV[1:kdfMb5Eh0pltyAbbFYK55fOT1DGXAXZ+:5Fs27pyp7hqJQtbaNWYIdw==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_REDIRECT_URI",
+                "value": "EV[1:+8j6RSOKz4OLgKvtApCk4JNbnZMC2sit:VV/Kyp906D9sgr04DwUzfA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_SANDBOX",
+                "value": "EV[1:llgWM/4ri2wklawG+w/VMZbHu4YRwjK2:8Wv1nGG54C/5CX0L2nFwDQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "SMARTLEAD_API_KEY",
+                "value": "EV[1:DEtSUA5ssAnh4nW+J2LLZJ16Aap+8icg:l2Gaz/ejLzlE6wWSjRHaeQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              }
+            ],
+            "instance_size_slug": "basic-xs",
+            "instance_count": 1,
+            "http_port": 5000,
+            "health_check": {
+              "timeout_seconds": 10,
+              "http_path": "/health",
+              "port": 5000
+            }
+          }
+        ],
+        "workers": [
+          {
+            "name": "attackacrack-worker",
+            "image": {
+              "registry_type": "DOCR",
+              "registry": "attack-a-crack",
+              "repository": "attackacrack-crm",
+              "tag": "latest"
+            },
+            "run_command": "celery -A celery_worker.celery worker --loglevel=info --concurrency=2",
+            "envs": [
+              {
+                "key": "FLASK_ENV",
+                "value": "production",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "FLASK_APP",
+                "value": "app.py",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "DATABASE_URL",
+                "value": "${db.DATABASE_URL}",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "POSTGRES_URI",
+                "value": "${db.DATABASE_URL}",
+                "scope": "RUN_AND_BUILD_TIME"
+              },
+              {
+                "key": "SECRET_KEY",
+                "value": "EV[1:FTAwurALhxsTnLuLuxHOolanLoJBv1XK:ZNULIeb4lEI8oaWvoBKniQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "REDIS_URL",
+                "value": "EV[1:lhaUWfZzWLTnWDjXRoS/823BOijmzmIp:QMcpFnH+XofJwrwTH21X1NOP08MO8IMyo8sj/rQhEWayeROEfTRRmfXoEa6ZbL7T77Z4S/5jwrZKKpSydrMr+JsqoajWozhdf2Wfk0MJnyRiF8gkqzeDlBQLfPINZ/wY9QdujNUTRRZrdFmrrP+w2nJRGg/JDO7mj7426wUSKA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "CELERY_BROKER_URL",
+                "value": "EV[1:IGkcTKs4aLguP6uJ8L8a9fGYa2VHu0b/:TMb5XiR5o5WfNz8TiuR1pA/3CcBZ/k+RnhVEq800kd9Ku3RsD7wkdomgPWhoz4Z206Mf80Icwv9CB7626O+ZAUToBjUBqoeyI2U3jxBE7uQ6RodI0kg6dAyhmsoi+7s4oQp7E2/46WgP7PmW5JLosQTxNWdQ3xP1ISd25r2vJw==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "CELERY_RESULT_BACKEND",
+                "value": "EV[1:ukRfh00QpO8rtA4PxJX/j5KRMc/JjxUx:nLVME/YnJhMQdKa9d8ig2HQDnN8rm9AV5KWPgSZTmWdkJy813FGWqYXxgw/3QbYWEUvoxfVbm0FIhRAjPoJzywyppw05HskLQQx7SBAvMTzmedFdwzDe2JDsEC2rG9j06hO/hyN8xi4bfdo3P9YAoRBT9krze4jQHYd7NO9nlg==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_API_KEY",
+                "value": "EV[1:5ViudT9vvb28WJgCOD4doMe2Cux8e2cc:LLmqbDtpxYlfIM1E6nTP6Q==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_WEBHOOK_SIGNING_KEY",
+                "value": "EV[1:ifL8Z/yxQis4syZBNVw+gOVUhXQfuXW+:+dBxDtqtYWcfNa0H16K6DQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_PHONE_NUMBER",
+                "value": "EV[1:4MkGQh8KY2yflKo/6QtKD3QtE8+jr0z7:oVveTg+4+vVWeFwxhELo4Q==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "OPENPHONE_PHONE_NUMBER_ID",
+                "value": "EV[1:yKjAGPbHIm0AImh5eJxGo0W4dBg1fxCC:Xr2xuVnzDapywCXBvmaLgA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "ENCRYPTION_KEY",
+                "value": "EV[1:OnTFIkfnnfHFFDr6rFdtOSk9XoT+fVjB:IcIskX7YNvPJ74DzZYpkPA==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GEMINI_API_KEY",
+                "value": "EV[1:/Y6vXt3luJSr+E3tmtpsUWYEDPPRxt5A:GhdXEMMP0T+021quM3nVwg==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GOOGLE_CLIENT_ID",
+                "value": "EV[1:jL2CNiRb+42Y9flT9BOPbuSAnzA9QPlq:g/n5wZ5xKcbiKew4eTPk8g==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GOOGLE_CLIENT_SECRET",
+                "value": "EV[1:EiQ5+0ToJhKYUYxR6B16ZG8U7hEn7rz7:xDZlms2gtrwKvkh97tEZqQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "GOOGLE_PROJECT_ID",
+                "value": "EV[1:S7s9CLux0yEvHa2c1ICKC00Xje3Yfuo8:U0DbGiK8AsDkW+ViAJMRow==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "PROPERTY_RADAR_API_KEY",
+                "value": "EV[1:l5ekApp1i1A7tBV/rmGb50rPskKTAfff:4JMNlZMoyi7Q9zrm7NKKwg==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_CLIENT_ID",
+                "value": "EV[1:o7rTOnHLBU+BYhxkl8lprx3qU/HQUyJa:nwan9IBrkpp7Ydgy63w8jQ==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_CLIENT_SECRET",
+                "value": "EV[1:r/tig/3FozztErmlXuH67tA1USRQrIPu:aveGszoAra7hgzDl6VCsDg==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_REDIRECT_URI",
+                "value": "EV[1:hQBH98ih8T2tFOwhwWAQYjSp7FI8CEU4:oPg35gE/A0o8DkZhyx4nqw==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "QUICKBOOKS_SANDBOX",
+                "value": "EV[1:uUZEVM3KQXwsf9gBS/++MZpqbt+Qr1Uy:F4jyz4MBApqm04QTely1og==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              },
+              {
+                "key": "SMARTLEAD_API_KEY",
+                "value": "EV[1:lGlFGO/Llp5jz7seS8isN0aKmjaeDC4X:zQSqvO+tUUNh1a8T33mhmw==]",
+                "scope": "RUN_AND_BUILD_TIME",
+                "type": "SECRET"
+              }
+            ],
+            "instance_size_slug": "basic-xs",
+            "instance_count": 1
+          }
+        ],
+        "databases": [
+          {
+            "name": "db",
+            "engine": "PG",
+            "version": "13",
+            "size": "db-s-1vcpu-1gb",
+            "production": true,
+            "cluster_name": "attackacrack-db"
+          }
+        ],
+        "region": "nyc",
+        "ingress": {
+          "rules": [
+            {
+              "match": {
+                "path": {
+                  "prefix": "/"
+                }
+              },
+              "component": {
+                "name": "attackacrack-web"
+              }
+            }
+          ]
+        }
+      },
+      "services": [
+        {
+          "name": "attackacrack-web"
+        }
+      ],
+      "workers": [
+        {
+          "name": "attackacrack-worker"
+        }
+      ],
+      "phase_last_updated_at": "2025-08-15T18:49:27Z",
+      "created_at": "2025-08-15T18:48:33Z",
+      "updated_at": "2025-08-15T18:49:27Z",
+      "cause": "app spec updated",
+      "progress": {
+        "success_steps": 10,
+        "total_steps": 10,
+        "steps": [
+          {
+            "name": "build",
+            "status": "SUCCESS",
+            "steps": [
+              {
+                "name": "initialize",
+                "status": "SUCCESS",
+                "started_at": "2025-08-15T18:48:36.952481082Z",
+                "ended_at": "2025-08-15T18:48:37.32423882Z"
+              },
+              {
+                "name": "components",
+                "status": "SUCCESS",
+                "steps": [
+                  {
+                    "name": "attackacrack-web",
+                    "status": "SUCCESS",
+                    "started_at": "0001-01-01T00:00:00Z",
+                    "ended_at": "0001-01-01T00:00:00Z",
+                    "reason": {
+                      "code": "PreBuiltImage",
+                      "message": "Your build job was skipped because you specified a pre-built image."
+                    },
+                    "component_name": "attackacrack-web",
+                    "message_base": "Building service"
+                  },
+                  {
+                    "name": "attackacrack-worker",
+                    "status": "SUCCESS",
+                    "started_at": "0001-01-01T00:00:00Z",
+                    "ended_at": "0001-01-01T00:00:00Z",
+                    "reason": {
+                      "code": "PreBuiltImage",
+                      "message": "Your build job was skipped because you specified a pre-built image."
+                    },
+                    "component_name": "attackacrack-worker",
+                    "message_base": "Building worker"
+                  },
+                  {
+                    "name": "db",
+                    "status": "SUCCESS",
+                    "started_at": "0001-01-01T00:00:00Z",
+                    "ended_at": "0001-01-01T00:00:00Z",
+                    "component_name": "db",
+                    "message_base": "Creating database"
+                  }
+                ],
+                "started_at": "2025-08-15T18:48:37.324279275Z",
+                "ended_at": "2025-08-15T18:48:38.261733436Z"
+              }
+            ],
+            "started_at": "2025-08-15T18:48:36.952344697Z",
+            "ended_at": "2025-08-15T18:48:38.261920715Z"
+          },
+          {
+            "name": "deploy",
+            "status": "SUCCESS",
+            "steps": [
+              {
+                "name": "initialize",
+                "status": "SUCCESS",
+                "started_at": "2025-08-15T18:48:42.138677829Z",
+                "ended_at": "2025-08-15T18:48:43.096249214Z"
+              },
+              {
+                "name": "components",
+                "status": "SUCCESS",
+                "steps": [
+                  {
+                    "name": "attackacrack-web",
+                    "status": "SUCCESS",
+                    "steps": [
+                      {
+                        "name": "deploy",
+                        "status": "SUCCESS",
+                        "started_at": "0001-01-01T00:00:00Z",
+                        "ended_at": "0001-01-01T00:00:00Z",
+                        "component_name": "attackacrack-web",
+                        "message_base": "Deploying service"
+                      },
+                      {
+                        "name": "wait",
+                        "status": "SUCCESS",
+                        "started_at": "0001-01-01T00:00:00Z",
+                        "ended_at": "0001-01-01T00:00:00Z",
+                        "component_name": "attackacrack-web",
+                        "message_base": "Waiting for service"
+                      }
+                    ],
+                    "started_at": "0001-01-01T00:00:00Z",
+                    "ended_at": "0001-01-01T00:00:00Z",
+                    "component_name": "attackacrack-web"
+                  },
+                  {
+                    "name": "attackacrack-worker",
+                    "status": "SUCCESS",
+                    "steps": [
+                      {
+                        "name": "deploy",
+                        "status": "SUCCESS",
+                        "started_at": "0001-01-01T00:00:00Z",
+                        "ended_at": "0001-01-01T00:00:00Z",
+                        "component_name": "attackacrack-worker",
+                        "message_base": "Deploying worker"
+                      },
+                      {
+                        "name": "wait",
+                        "status": "SUCCESS",
+                        "started_at": "0001-01-01T00:00:00Z",
+                        "ended_at": "0001-01-01T00:00:00Z",
+                        "component_name": "attackacrack-worker",
+                        "message_base": "Waiting for worker"
+                      }
+                    ],
+                    "started_at": "0001-01-01T00:00:00Z",
+                    "ended_at": "0001-01-01T00:00:00Z",
+                    "component_name": "attackacrack-worker"
+                  }
+                ],
+                "started_at": "2025-08-15T18:48:43.096281404Z",
+                "ended_at": "2025-08-15T18:49:25.720395807Z"
+              },
+              {
+                "name": "finalize",
+                "status": "SUCCESS",
+                "started_at": "2025-08-15T18:49:25.949349747Z",
+                "ended_at": "2025-08-15T18:49:26.616002868Z"
+              }
+            ],
+            "started_at": "2025-08-15T18:48:42.138657541Z",
+            "ended_at": "2025-08-15T18:49:26.616104709Z"
+          }
+        ]
+      },
+      "phase": "ACTIVE",
+      "tier_slug": "basic",
+      "previous_deployment_id": "48bb0127-cd63-414f-8133-7df58ca4797a",
+      "cause_details": {
+        "digitalocean_user_action": {
+          "user": {
+            "uuid": "7345f7c3-d6b7-490d-941f-c23c39922a93",
+            "email": "attackacrackma@gmail.com",
+            "full_name": "attackacrackma@gmail.com"
+          },
+          "name": "UPDATE_SPEC"
+        },
+        "type": "MANUAL"
+      },
+      "timing": {
+        "pending": "3.952481082s",
+        "build_total": "1.309439633s",
+        "build_billable": "0s",
+        "database_provision": "0.936776576s"
+      }
+    },
+    "last_deployment_created_at": "2025-08-15T18:48:33Z",
+    "live_url": "https://attackacrack-prod-5ce6f.ondigitalocean.app",
+    "region": {
+      "slug": "nyc",
+      "label": "New York",
+      "flag": "usa",
+      "continent": "North America",
+      "data_centers": [
+        "nyc1",
+        "nyc3"
+      ]
+    },
+    "tier_slug": "basic",
+    "live_url_base": "https://attackacrack-prod-5ce6f.ondigitalocean.app",
+    "live_domain": "attackacrack-prod-5ce6f.ondigitalocean.app",
+    "build_config": {},
+    "project_id": "71252b44-b245-4a75-9a88-d2b9369ea312"
+  }
+]
