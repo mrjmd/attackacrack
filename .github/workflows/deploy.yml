@@ -18,13 +18,12 @@ on:
 env:
   REGISTRY: registry.digitalocean.com
   IMAGE_NAME: attackacrack-crm
+  APP_ID: 4d1674ef-bfba-4fd3-9a97-943fa02c1f70  # Fixed app ID
 
 jobs:
   deploy:
     name: Deploy to DigitalOcean App Platform
     runs-on: ubuntu-latest
-    # Removed environment to use repository-level secrets
-    # environment: ${{ github.event.inputs.environment }}
     
     steps:
     - name: Checkout code
@@ -43,144 +42,83 @@ jobs:
         else
           echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
         fi
+        echo "Using image tag: ${{ github.event.inputs.tag || 'latest' }}"
     
-    - name: Update app spec with new image
+    - name: Update app spec with new image tag
       run: |
-        # Create a temporary app spec with updated image tags
+        # Copy the app spec
         cp .do/app.yaml .do/app-deploy.yaml
         
-        # Update the tag in the app spec using sed
-        sed -i "s/tag: main/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
+        # Only update the Docker image tag - nothing else
+        sed -i "s/tag: latest/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
         
-        # Debug: Show which environment we're using
-        echo "Deployment environment: ${{ github.event.inputs.environment }}"
+        echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }}"
         
-        # Debug: Show initial state
-        echo "=== Checking initial state of app-deploy.yaml ==="
-        echo "Looking for CELERY_BROKER_URL placeholder:"
-        grep -n "CELERY_BROKER_URL" .do/app-deploy.yaml | head -3
-        
-        # Replace environment variable placeholders with actual values
-        sed -i "s|\${SECRET_KEY}|${{ secrets.SECRET_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${REDIS_URL}|${{ secrets.REDIS_URL }}|g" .do/app-deploy.yaml
-        sed -i "s|\${CELERY_BROKER_URL}|${{ secrets.CELERY_BROKER_URL }}|g" .do/app-deploy.yaml
-        sed -i "s|\${CELERY_RESULT_BACKEND}|${{ secrets.CELERY_RESULT_BACKEND }}|g" .do/app-deploy.yaml
-        sed -i "s|\${OPENPHONE_API_KEY}|${{ secrets.OPENPHONE_API_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${OPENPHONE_WEBHOOK_SIGNING_KEY}|${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${OPENPHONE_PHONE_NUMBER}|${{ secrets.OPENPHONE_PHONE_NUMBER }}|g" .do/app-deploy.yaml
-        sed -i "s|\${OPENPHONE_PHONE_NUMBER_ID}|${{ secrets.OPENPHONE_PHONE_NUMBER_ID }}|g" .do/app-deploy.yaml
-        sed -i "s|\${ENCRYPTION_KEY}|${{ secrets.ENCRYPTION_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${GEMINI_API_KEY}|${{ secrets.GEMINI_API_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${GOOGLE_CLIENT_ID}|${{ secrets.GOOGLE_CLIENT_ID }}|g" .do/app-deploy.yaml
-        sed -i "s|\${GOOGLE_CLIENT_SECRET}|${{ secrets.GOOGLE_CLIENT_SECRET }}|g" .do/app-deploy.yaml
-        sed -i "s|\${GOOGLE_PROJECT_ID}|${{ secrets.GOOGLE_PROJECT_ID }}|g" .do/app-deploy.yaml
-        sed -i "s|\${PROPERTY_RADAR_API_KEY}|${{ secrets.PROPERTY_RADAR_API_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${QUICKBOOKS_CLIENT_ID}|${{ secrets.QUICKBOOKS_CLIENT_ID }}|g" .do/app-deploy.yaml
-        sed -i "s|\${QUICKBOOKS_CLIENT_SECRET}|${{ secrets.QUICKBOOKS_CLIENT_SECRET }}|g" .do/app-deploy.yaml
-        sed -i "s|\${QUICKBOOKS_REDIRECT_URI}|${{ secrets.QUICKBOOKS_REDIRECT_URI }}|g" .do/app-deploy.yaml
-        sed -i "s|\${QUICKBOOKS_SANDBOX}|${{ secrets.QUICKBOOKS_SANDBOX }}|g" .do/app-deploy.yaml
-        sed -i "s|\${SMARTLEAD_API_KEY}|${{ secrets.SMARTLEAD_API_KEY }}|g" .do/app-deploy.yaml
-        
-        echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }} and environment variables"
-        
-        # Debug: Check if replacements worked
-        echo "=== Checking if replacements worked ==="
-        echo "Looking for CELERY_BROKER_URL after replacement:"
-        grep -n "CELERY_BROKER_URL" .do/app-deploy.yaml | head -3
-        
-        # Debug: Check if the secret exists
-        echo "=== Checking secret availability ==="
-        if [ -z "${{ secrets.CELERY_BROKER_URL }}" ]; then
-          echo "WARNING: CELERY_BROKER_URL secret appears to be empty!"
-        else
-          echo "CELERY_BROKER_URL secret exists (length: ${#CELERY_BROKER_URL})"
-        fi
+        # Show what we're deploying
+        echo "=== Image configuration ==="
+        grep -A 3 "image:" .do/app-deploy.yaml | head -10
     
     - name: Validate app spec
       run: |
+        echo "Validating app specification..."
         doctl apps spec validate .do/app-deploy.yaml
     
     - name: Deploy to DigitalOcean
       run: |
-        # First, list all apps to debug
-        echo "Listing all apps:"
-        doctl apps list
+        echo "Deploying to app ID: ${{ env.APP_ID }}"
         
-        # Get the app ID (try exact match first, then partial match)
-        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep -E "^[a-f0-9-]+\s+attackacrack-prod$" | awk '{print $1}')
+        # Show current app status
+        echo "=== Current app status ==="
+        doctl apps get ${{ env.APP_ID }} --format ID,Status,DefaultIngress --no-header
         
-        # If not found, try partial match
-        if [ -z "$APP_ID" ]; then
-          APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep "attackacrack" | awk '{print $1}')
-        fi
+        # Update the app with the new spec
+        # This will preserve all existing environment variables
+        echo "=== Updating app with new spec ==="
+        doctl apps update ${{ env.APP_ID }} --spec .do/app-deploy.yaml --wait
         
-        if [ -z "$APP_ID" ]; then
-          echo "Creating new app..."
-          doctl apps create --spec .do/app-deploy.yaml --wait
-        else
-          echo "Found existing app with ID: $APP_ID"
-          echo "Updating existing app..."
-          doctl apps update $APP_ID --spec .do/app-deploy.yaml --wait
-        fi
+        echo "Deployment initiated successfully"
     
     - name: Get deployment status
       run: |
-        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
-        doctl apps get-deployment $APP_ID $(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
+        echo "=== Getting latest deployment status ==="
+        DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
+        echo "Latest deployment ID: $DEPLOYMENT_ID"
+        
+        doctl apps get-deployment ${{ env.APP_ID }} $DEPLOYMENT_ID
     
     - name: Verify health check
       run: |
-        echo "Waiting for health check..."
+        echo "Waiting 30 seconds for deployment to stabilize..."
         sleep 30
         
-        # Debug: List all apps
-        echo "\n=== Listing all apps ==="
-        doctl apps list
-        
-        # Get the app ID
-        echo "\n=== Getting app ID ==="
-        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
-        echo "App ID: $APP_ID"
-        
-        # Get full app details
-        echo "\n=== Getting app details ==="
-        doctl apps get $APP_ID
-        
         # Get the app URL
-        echo "\n=== Getting app URL ==="
-        APP_URL=$(doctl apps get $APP_ID --format DefaultIngress --no-header)
+        APP_URL=$(doctl apps get ${{ env.APP_ID }} --format DefaultIngress --no-header)
         echo "App URL: $APP_URL"
         
-        # Debug: Check what the URL looks like
-        echo "\n=== Constructed health check URL ==="
-        echo "Health check URL: $APP_URL/health"
-        
-        # Try to get more info about the endpoint
-        echo "\n=== Testing health endpoint with verbose curl ==="
-        curl -v -f $APP_URL/health || {
-          echo "\n=== Health check failed, trying without -f flag to see response ==="
-          curl -v $APP_URL/health || true
+        # Test health endpoint
+        echo "=== Testing health endpoint ==="
+        if curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health | grep -q "200"; then
+          echo "✅ Health check passed!"
+        else
+          echo "❌ Health check failed"
           
-          echo "\n=== Trying root endpoint to see if app is responding ==="
-          curl -v $APP_URL/ || true
-          
-          echo "\n=== Getting recent deployment logs ==="
-          DEPLOYMENT_ID=$(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
-          doctl apps get-logs $APP_ID --type=deploy --deployment=$DEPLOYMENT_ID --tail=50
+          # Get logs for debugging
+          echo "=== Recent deployment logs ==="
+          DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
+          doctl apps get-logs ${{ env.APP_ID }} --type=deploy --deployment=$DEPLOYMENT_ID --tail=50
           
           exit 1
-        }
-        echo "\n=== Health check passed! ==="
+        fi
     
-    # Slack notification commented out - add SLACK_WEBHOOK_URL secret to enable
-    # - name: Send deployment notification
-    #   if: always()
-    #   uses: 8398a7/action-slack@v3
-    #   with:
-    #     status: ${{ job.status }}
-    #     text: |
-    #       Deployment to ${{ github.event.inputs.environment }} ${{ job.status }}
-    #       Tag: ${{ steps.image-tag.outputs.tag }}
-    #       Actor: ${{ github.actor }}
-    #   env:
-    #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    - name: Summary
+      if: success()
+      run: |
+        APP_URL=$(doctl apps get ${{ env.APP_ID }} --format DefaultIngress --no-header)
+        echo "## 🚀 Deployment Successful!"
+        echo ""
+        echo "- **Environment**: ${{ github.event.inputs.environment }}"
+        echo "- **Image Tag**: ${{ steps.image-tag.outputs.tag }}"
+        echo "- **App URL**: $APP_URL"
+        echo "- **Deployed by**: ${{ github.actor }}"
+        echo ""
+        echo "The application is now live and all secrets are preserved."

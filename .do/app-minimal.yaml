@@ -1,0 +1,58 @@
+# Minimal app.yaml that relies on DO UI for environment variables
+name: attackacrack-prod
+region: nyc3
+
+services:
+  - name: attackacrack-web
+    image:
+      registry_type: DOCR
+      repository: attackacrack-crm
+      tag: latest
+    run_command: ./entrypoint.sh
+    instance_size_slug: basic-xs
+    instance_count: 1
+    http_port: 5000
+    routes:
+      - path: /
+    health_check:
+      http_path: /health
+      timeout_seconds: 10
+      port: 5000
+    envs:
+      - key: FLASK_ENV
+        value: "production"
+      - key: FLASK_APP
+        value: "app.py"
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+      - key: POSTGRES_URI
+        value: ${db.DATABASE_URL}
+      # All other env vars managed in DO UI
+
+workers:
+  - name: attackacrack-worker
+    image:
+      registry_type: DOCR
+      repository: attackacrack-crm
+      tag: latest
+    run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
+    instance_size_slug: basic-xs
+    instance_count: 1
+    envs:
+      - key: FLASK_ENV
+        value: "production"
+      - key: FLASK_APP
+        value: "app.py"
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+      - key: POSTGRES_URI
+        value: ${db.DATABASE_URL}
+      # All other env vars managed in DO UI
+
+databases:
+  - name: db
+    engine: PG
+    version: "13"
+    production: true
+    cluster_name: attackacrack-db
+    size: db-s-1vcpu-1gb

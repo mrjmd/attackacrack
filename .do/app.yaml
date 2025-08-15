@@ -1,5 +1,5 @@
 # This is the specification for the Attack-a-Crack application on Digital Ocean App Platform.
-# Version 3: Corrected syntax for worker and database components.
+# Version 4: Using native DigitalOcean environment variable management (no placeholders)
 
 name: attackacrack-prod
 
@@ -35,57 +35,80 @@ services:
       timeout_seconds: 10
       port: 5000
     # Define environment variables.
-    # Secrets like SECRET_KEY, OPENPHONE_API_TOKEN, etc., should be set in the App Platform UI.
+    # Using native DO env var management - no values means it uses existing values
     envs:
+      # Static configuration values
       - key: FLASK_ENV
         value: "production"
+        scope: RUN_AND_BUILD_TIME
       - key: FLASK_APP
         value: "app.py"
+        scope: RUN_AND_BUILD_TIME
+      # Database bindings (special DO syntax)
       - key: DATABASE_URL
-        # This special syntax binds the connection string from the managed database.
         value: ${db.DATABASE_URL}
+        scope: RUN_AND_BUILD_TIME
       - key: POSTGRES_URI
-        # Also set POSTGRES_URI to the same value for compatibility
         value: ${db.DATABASE_URL}
-      # Sensitive environment variables (set these as GitHub Secrets)
+        scope: RUN_AND_BUILD_TIME
+      # Secrets - no value specified, uses existing DO values
       - key: SECRET_KEY
-        value: ${SECRET_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: REDIS_URL
-        value: ${REDIS_URL}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: CELERY_BROKER_URL
-        value: ${CELERY_BROKER_URL}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: CELERY_RESULT_BACKEND
-        value: ${CELERY_RESULT_BACKEND}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_API_KEY
-        value: ${OPENPHONE_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER
-        value: ${OPENPHONE_PHONE_NUMBER}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER_ID
-        value: ${OPENPHONE_PHONE_NUMBER_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: ENCRYPTION_KEY
-        value: ${ENCRYPTION_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GEMINI_API_KEY
-        value: ${GEMINI_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GOOGLE_CLIENT_ID
-        value: ${GOOGLE_CLIENT_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GOOGLE_CLIENT_SECRET
-        value: ${GOOGLE_CLIENT_SECRET}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GOOGLE_PROJECT_ID
-        value: ${GOOGLE_PROJECT_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: PROPERTY_RADAR_API_KEY
-        value: ${PROPERTY_RADAR_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_CLIENT_ID
-        value: ${QUICKBOOKS_CLIENT_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_CLIENT_SECRET
-        value: ${QUICKBOOKS_CLIENT_SECRET}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_REDIRECT_URI
-        value: ${QUICKBOOKS_REDIRECT_URI}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_SANDBOX
-        value: ${QUICKBOOKS_SANDBOX}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: SMARTLEAD_API_KEY
-        value: ${SMARTLEAD_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -104,53 +127,78 @@ workers:
     instance_count: 1
     # Define environment variables (must match the web service).
     envs:
+      # Static configuration values
       - key: FLASK_ENV
         value: "production"
+        scope: RUN_AND_BUILD_TIME
       - key: FLASK_APP
         value: "app.py"
+        scope: RUN_AND_BUILD_TIME
+      # Database bindings
       - key: DATABASE_URL
         value: ${db.DATABASE_URL}
+        scope: RUN_AND_BUILD_TIME
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
-      # Same sensitive environment variables as web service
+        scope: RUN_AND_BUILD_TIME
+      # Secrets - no value specified, uses existing DO values
       - key: SECRET_KEY
-        value: ${SECRET_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: REDIS_URL
-        value: ${REDIS_URL}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: CELERY_BROKER_URL
-        value: ${CELERY_BROKER_URL}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: CELERY_RESULT_BACKEND
-        value: ${CELERY_RESULT_BACKEND}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_API_KEY
-        value: ${OPENPHONE_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER
-        value: ${OPENPHONE_PHONE_NUMBER}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: OPENPHONE_PHONE_NUMBER_ID
-        value: ${OPENPHONE_PHONE_NUMBER_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: ENCRYPTION_KEY
-        value: ${ENCRYPTION_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GEMINI_API_KEY
-        value: ${GEMINI_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GOOGLE_CLIENT_ID
-        value: ${GOOGLE_CLIENT_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GOOGLE_CLIENT_SECRET
-        value: ${GOOGLE_CLIENT_SECRET}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: GOOGLE_PROJECT_ID
-        value: ${GOOGLE_PROJECT_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: PROPERTY_RADAR_API_KEY
-        value: ${PROPERTY_RADAR_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_CLIENT_ID
-        value: ${QUICKBOOKS_CLIENT_ID}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_CLIENT_SECRET
-        value: ${QUICKBOOKS_CLIENT_SECRET}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_REDIRECT_URI
-        value: ${QUICKBOOKS_REDIRECT_URI}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: QUICKBOOKS_SANDBOX
-        value: ${QUICKBOOKS_SANDBOX}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
       - key: SMARTLEAD_API_KEY
-        value: ${SMARTLEAD_API_KEY}
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
 
 # Define the managed databases and other addons for the application.
 databases:
