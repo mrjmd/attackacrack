@@ -21,7 +21,33 @@ client_secret.json
 token.pickle
 openphone.key
 
+# User uploads and media files (should be in persistent storage, not in image)
+uploads/
+*.mp3
+*.mp4
+*.wav
+
 # IDE and OS-specific files
 .idea/
 .vscode/
 .DS_Store
+
+# Test and development files
+test_*.py
+debug_*.py
+app_config.json
+celerybeat-schedule*
+.pytest_cache/
+htmlcov/
+.coverage
+*.log
+
+# Documentation
+*.md
+docs/
+README.md
+TASKMANAGER.md
+
+# CI/CD
+.github/
+.do/app-minimal.yaml
