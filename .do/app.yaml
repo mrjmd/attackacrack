@@ -57,13 +57,10 @@ services:
         type: SECRET
       - key: REDIS_URL
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: CELERY_BROKER_URL
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: CELERY_RESULT_BACKEND
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_API_KEY
         scope: RUN_AND_BUILD_TIME
         type: SECRET
@@ -147,13 +144,10 @@ workers:
         type: SECRET
       - key: REDIS_URL
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: CELERY_BROKER_URL
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: CELERY_RESULT_BACKEND
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
       - key: OPENPHONE_API_KEY
         scope: RUN_AND_BUILD_TIME
         type: SECRET

@@ -120,18 +120,44 @@ class Config:
         import redis
         from flask_session import Session
         
-        redis_url = os.environ.get('REDIS_URL') or os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
+        # Try multiple sources for Redis URL
+        redis_url = (
+            os.environ.get('REDIS_URL') or 
+            os.environ.get('CELERY_BROKER_URL') or
+            app.config.get('CELERY_BROKER_URL') or
+            app.config.get('REDIS_URL') or
+            'redis://localhost:6379/0'
+        )
+        
+        # Log the Redis URL being used (without password)
+        import logging
+        logger = logging.getLogger(__name__)
+        if 'rediss://' in redis_url:
+            logger.info(f"Using Redis URL: rediss://[REDACTED]@{redis_url.split('@')[1] if '@' in redis_url else 'unknown'}")
+        else:
+            logger.info(f"Using Redis URL: {redis_url.split('@')[1] if '@' in redis_url else redis_url}")
         
         # Parse Redis URL and create connection
-        if redis_url.startswith('rediss://'):
-            # SSL connection for managed Redis/Valkey
-            app.config['SESSION_REDIS'] = redis.from_url(
-                redis_url,
-                ssl_cert_reqs=None  # Managed services don't need cert validation
-            )
-        else:
-            # Regular Redis connection
-            app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+        try:
+            if redis_url.startswith('rediss://'):
+                # SSL connection for managed Redis/Valkey
+                app.config['SESSION_REDIS'] = redis.from_url(
+                    redis_url,
+                    ssl_cert_reqs=None,  # Managed services don't need cert validation
+                    decode_responses=False
+                )
+            else:
+                # Regular Redis connection
+                app.config['SESSION_REDIS'] = redis.from_url(redis_url, decode_responses=False)
+            
+            # Test the connection
+            app.config['SESSION_REDIS'].ping()
+            logger.info("Redis connection successful for Flask-Session")
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis for sessions: {e}")
+            # Fall back to filesystem sessions if Redis fails
+            app.config['SESSION_TYPE'] = 'filesystem'
+            logger.warning("Falling back to filesystem sessions")
         
         # Initialize Flask-Session
         Session(app)
@@ -211,7 +237,8 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_NAME = 'attackacrack_session'
     
-    # Production Redis - will be validated in init_app
+    # Production Redis - set immediately for Flask-Session
+    REDIS_URL = os.environ.get('REDIS_URL', '')
     CELERY_BROKER_URL = os.environ.get('REDIS_URL', '')
     CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', '')
     
