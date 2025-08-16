@@ -51,45 +51,8 @@ services:
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
         scope: RUN_AND_BUILD_TIME
-      # Secrets - no value specified, uses existing DO values
-      - key: SECRET_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: REDIS_URL
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_BROKER_URL
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_RESULT_BACKEND
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: ENCRYPTION_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: GEMINI_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_PROJECT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: PROPERTY_RADAR_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_REDIRECT_URI
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_SANDBOX
-        scope: RUN_AND_BUILD_TIME
-      - key: SMARTLEAD_API_KEY
-        scope: RUN_AND_BUILD_TIME
+      # Secrets are managed at the app level via DigitalOcean dashboard/CLI
+      # DO NOT declare them here or they will be cleared on deployment!
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -122,45 +85,8 @@ workers:
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
         scope: RUN_AND_BUILD_TIME
-      # Secrets - no value specified, uses existing DO values
-      - key: SECRET_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: REDIS_URL
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_BROKER_URL
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_RESULT_BACKEND
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: ENCRYPTION_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: GEMINI_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_PROJECT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: PROPERTY_RADAR_API_KEY
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_ID
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_REDIRECT_URI
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_SANDBOX
-        scope: RUN_AND_BUILD_TIME
-      - key: SMARTLEAD_API_KEY
-        scope: RUN_AND_BUILD_TIME
+      # Secrets are managed at the app level via DigitalOcean dashboard/CLI
+      # DO NOT declare them here or they will be cleared on deployment!
 
 # Define the managed databases and other addons for the application.
 databases:
