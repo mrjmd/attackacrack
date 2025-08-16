@@ -130,7 +130,44 @@
 
 ---
 
-## Phase 5: Infrastructure Optimization (NOT STARTED)
+## Phase 5: CSV Import & Field Mapping Enhancement
+**Goal**: Enhance CSV import system with intelligent field mapping
+
+### 5.1 Quick Wins (1-2 Days Each)
+- [ ] Add company_name and job_title as direct Contact fields
+- [ ] Create CSV template download feature
+- [ ] Improve error messages with line-by-line details
+
+### 5.2 Field Detection & Mapping UI (Phase 1 - High Priority)
+- [ ] Build CSV header analysis system
+- [ ] Create interactive field mapping UI with drag-and-drop
+- [ ] Implement data preview (first 10 rows) before import
+- [ ] Save and reuse mapping templates
+
+### 5.3 Enhanced Field Support (Phase 2 - High Priority)
+- [ ] Add standard field mappings for company, title, address
+- [ ] Create field validation rules (phone, email, address)
+- [ ] Build field transformation pipeline (formatting, normalization)
+- [ ] Support common field name variations (Company/Business/Organization)
+
+### 5.4 Relationship Management (Phase 3 - Medium Priority)
+- [ ] Create Property records from address fields
+- [ ] Create Job records from job-related fields
+- [ ] Extract and apply tags from category/type fields
+- [ ] Handle complex relationships between entities
+
+### 5.5 Enterprise Features (Phase 4-5)
+- [ ] Implement background processing with Celery for large files
+- [ ] Create import analytics dashboard
+- [ ] Add contact export to CSV functionality
+- [ ] Build intelligent field detection with AI/ML
+- [ ] Implement advanced duplicate detection strategies
+
+**Documentation**: See `/docs/CSV_IMPORT_FIELD_MAPPING.md` for complete specification
+
+---
+
+## Phase 6: Infrastructure Optimization (NOT STARTED)
 **Goal**: Improve scalability, monitoring, and performance
 
 ### 5.1 DigitalOcean App Platform Enhancement
@@ -221,18 +258,19 @@
 
 ## Progress Summary
 
-### ✅ Completed (As of 2025-08-15)
+### ✅ Completed (As of 2025-08-16)
 - Repository security verified (no secrets in git)
 - All 23 GitHub Secrets configured and validated
 - All secrets added to DigitalOcean App Platform
-- Deployment pipeline fixed with native DO env var management
-- Removed fragile sed template substitutions
+- Deployment pipeline fixed with encrypted environment variables
+- Environment variables saga documented and resolved
 - Successful deployment with preserved secrets
 - Local Docker environment running on port 5001
 - DigitalOcean CLI and GitHub CLI configured
 - **Valkey/Redis connection fixed - Celery workers operational**
-- **Worker environment variables fixed via doctl CLI**
-- **Background task processing restored**
+- **Valkey attached as managed database resource**
+- **CSV import system production-ready at `/campaigns/import-csv`**
+- **Contact enrichment system documented with enhancement roadmap**
 
 ### 🟢 Current Status
 - **All critical issues resolved!**

@@ -91,14 +91,16 @@ docker-compose restart celery celery-beat
 - **Production-ready deployment on DigitalOcean App Platform** ✨
 - **Large scale OpenPhone import (7000+ conversations successfully imported!)** 🎉
 - **Environment variables properly managed and preserved during deployments**
+- **CSV import system for contact enrichment (production-ready!)** 📊
 - Enhanced database models for all OpenPhone data types
-- Contact enrichment from multiple CSV sources
+- Contact enrichment from multiple CSV sources with smart merging
 - Webhook handling with signature verification
 - Background task processing with Celery + Valkey (Redis)
 - User authentication and authorization system
 - SMS campaign system with A/B testing
 - Flask-Session with Redis backend for multi-worker support
 - GitHub Actions CI/CD pipeline with proper env var preservation
+- Valkey attached as managed database resource
 
 ### 🚧 In Progress
 - QuickBooks Online integration (OAuth, customer sync, products/services)
@@ -106,11 +108,12 @@ docker-compose restart celery celery-beat
 - Advanced financial dashboards and reporting
 
 ### 📋 Priority Roadmap
-1. **IMMEDIATE - Contact Data Enrichment**
-   - Import CSV data for 79% of contacts missing critical information
-   - Map business names, addresses, and contact details
-   - Implement data validation and deduplication
-   - Create UI for manual data review and editing
+1. **IMMEDIATE - Contact Data Enrichment** ✅ Ready to Use!
+   - **Production-ready CSV import at `/campaigns/import-csv`**
+   - Handles phone, name, email + ANY additional fields in metadata
+   - Smart enrichment: Only fills missing data, preserves existing
+   - Automatic campaign list creation from imports
+   - See `/docs/CSV_IMPORT_FIELD_MAPPING.md` for complete documentation
 
 2. **HIGH PRIORITY - Business Operations**
    - SMS Campaign System enhancements
@@ -186,6 +189,12 @@ docker-compose restart celery celery-beat
 
 ## Development Guidelines
 
+### CRITICAL: Research vs Implementation
+- **RESEARCH TASKS**: When asked to research, investigate, or explore options - ONLY provide findings and recommendations. DO NOT implement without explicit approval.
+- **NEVER** start implementation that involves costs (API subscriptions, paid services) without explicit user approval
+- **ALWAYS** document findings comprehensively and let the user make implementation decisions
+- Research deliverables should include: findings, options, costs, recommendations, and wait for user direction
+
 ### Code Style
 - Use Flask blueprints for routes
 - Business logic in service modules
@@ -259,19 +268,19 @@ SMARTLEAD_API_KEY=your_smartlead_key
 - Region: nyc3
 
 ### GitHub Actions CI/CD
-- Automated deployment on push to main
-- **IMPORTANT**: Deployment workflow preserves environment variables by:
-  1. Fetching current spec from DigitalOcean
-  2. Updating only the Docker image tag
-  3. Deploying with the updated spec
-- Manual deployment trigger available
+- **AUTOMATIC DEPLOYMENT**: Pushing to main automatically triggers deployment
+- **DO NOT MANUALLY DEPLOY**: The CI/CD pipeline handles everything
+- **IMPORTANT**: Never run manual deployments after git push
+- Environment variables are now stored as encrypted values in app.yaml
+- The deployment workflow simply updates the app with the spec
 
-### Environment Variables Management
-**Critical**: Environment variables are stored in DigitalOcean, NOT in app.yaml
-- Never commit secrets to Git
-- app.yaml should NOT contain environment variable values
-- Environment variables persist across deployments (fixed in deploy.yml)
-- If env vars are lost, use the restoration script: `scripts/fix_env_vars.sh`
+### Environment Variables Management  
+**SOLVED**: Environment variables are now stored as ENCRYPTED values in app.yaml
+- Encrypted values (EV[1:...]) are SAFE to commit to Git
+- DigitalOcean automatically encrypts sensitive values when set
+- These encrypted values are app-specific and cannot be used elsewhere
+- To update values: Set them once, export spec, commit encrypted values
+- Emergency restoration script available: `scripts/fix_env_vars.sh`
 
 ### Production Commands
 ```bash
