@@ -46,11 +46,11 @@ jobs:
     
     - name: Update app spec with new image tag
       run: |
-        # Copy the app spec
-        cp .do/app.yaml .do/app-deploy.yaml
+        # Get the current spec from DigitalOcean (preserves all env vars)
+        doctl apps spec get ${{ env.APP_ID }} > .do/app-deploy.yaml
         
         # Only update the Docker image tag - nothing else
-        sed -i "s/tag: latest/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
+        sed -i "s/tag: .*/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
         
         echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }}"
         
