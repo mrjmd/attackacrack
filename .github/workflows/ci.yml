@@ -237,6 +237,8 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
+    env:
+      APP_ID: 4d1674ef-bfba-4fd3-9a97-943fa02c1f70  # Fixed app ID
     
     steps:
     - name: Checkout code
@@ -247,94 +249,44 @@ jobs:
       with:
         token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
     
-    - name: Update app spec with new image
-      run: |
-        # Create a temporary app spec with updated image tags
-        cp .do/app.yaml .do/app-deploy.yaml
-        
-        # Update the tag in the app spec to use latest
-        sed -i "s/tag: main/tag: latest/g" .do/app-deploy.yaml
-        
-        # Replace environment variable placeholders with actual values
-        sed -i "s|\${SECRET_KEY}|${{ secrets.SECRET_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${REDIS_URL}|${{ secrets.REDIS_URL }}|g" .do/app-deploy.yaml
-        sed -i "s|\${OPENPHONE_API_KEY}|${{ secrets.OPENPHONE_API_KEY }}|g" .do/app-deploy.yaml
-        sed -i "s|\${OPENPHONE_WEBHOOK_SIGNING_KEY}|${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY }}|g" .do/app-deploy.yaml
-        
-        echo "Updated app spec to use tag: latest and environment variables"
-    
-    - name: Validate app spec
-      run: |
-        doctl apps spec validate .do/app-deploy.yaml
-    
     - name: Deploy to DigitalOcean
       run: |
-        # First, list all apps to debug
-        echo "Listing all apps:"
-        doctl apps list
+        echo "Deploying to app ID: ${{ env.APP_ID }}"
         
-        # Get the app ID (try exact match first, then partial match)
-        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep -E "^[a-f0-9-]+\s+attackacrack-prod$" | awk '{print $1}')
+        # Update the app with the spec containing encrypted values
+        echo "=== Updating app with encrypted environment variables ==="
+        doctl apps update ${{ env.APP_ID }} --spec .do/app.yaml --wait
         
-        # If not found, try partial match
-        if [ -z "$APP_ID" ]; then
-          APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep "attackacrack" | awk '{print $1}')
-        fi
-        
-        if [ -z "$APP_ID" ]; then
-          echo "Creating new app..."
-          doctl apps create --spec .do/app-deploy.yaml --wait
-        else
-          echo "Found existing app with ID: $APP_ID"
-          echo "Updating existing app..."
-          doctl apps update $APP_ID --spec .do/app-deploy.yaml --wait
-        fi
+        echo "Deployment completed successfully"
     
     - name: Get deployment status
       run: |
-        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
-        doctl apps get-deployment $APP_ID $(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
+        echo "=== Getting latest deployment status ==="
+        DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
+        echo "Latest deployment ID: $DEPLOYMENT_ID"
+        
+        doctl apps get-deployment ${{ env.APP_ID }} $DEPLOYMENT_ID
     
     - name: Verify health check
       run: |
-        echo "Waiting for health check..."
+        echo "Waiting 30 seconds for deployment to stabilize..."
         sleep 30
         
-        # Debug: List all apps
-        echo "\n=== Listing all apps ==="
-        doctl apps list
-        
-        # Get the app ID
-        echo "\n=== Getting app ID ==="
-        APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | grep attackacrack-prod | awk '{print $1}')
-        echo "App ID: $APP_ID"
-        
-        # Get full app details
-        echo "\n=== Getting app details ==="
-        doctl apps get $APP_ID
-        
         # Get the app URL
-        echo "\n=== Getting app URL ==="
-        APP_URL=$(doctl apps get $APP_ID --format DefaultIngress --no-header)
+        APP_URL=$(doctl apps get ${{ env.APP_ID }} --format DefaultIngress --no-header)
         echo "App URL: $APP_URL"
         
-        # Debug: Check what the URL looks like
-        echo "\n=== Constructed health check URL ==="
-        echo "Health check URL: $APP_URL/health"
-        
-        # Try to get more info about the endpoint
-        echo "\n=== Testing health endpoint with verbose curl ==="
-        curl -v -f $APP_URL/health || {
-          echo "\n=== Health check failed, trying without -f flag to see response ==="
-          curl -v $APP_URL/health || true
+        # Test health endpoint
+        echo "=== Testing health endpoint ==="
+        if curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health | grep -q "200"; then
+          echo "✅ Health check passed!"
+        else
+          echo "❌ Health check failed"
           
-          echo "\n=== Trying root endpoint to see if app is responding ==="
-          curl -v $APP_URL/ || true
-          
-          echo "\n=== Getting recent deployment logs ==="
-          DEPLOYMENT_ID=$(doctl apps list-deployments $APP_ID --format ID --no-header | head -1)
-          doctl apps get-logs $APP_ID --type=deploy --deployment=$DEPLOYMENT_ID --tail=50
+          # Get logs for debugging
+          echo "=== Recent deployment logs ==="
+          DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
+          doctl apps logs ${{ env.APP_ID }} --tail=50
           
           exit 1
-        }
-        echo "\n=== Health check passed! ==="
+        fi
