@@ -24,8 +24,8 @@ from scripts.data_management.imports.enhanced_openphone_import import EnhancedOp
 class LargeScaleImporter(EnhancedOpenPhoneImporter):
     """Enhanced importer optimized for large scale imports with timeout handling"""
     
-    def __init__(self, batch_size: int = 50, checkpoint_interval: int = 10, reset: bool = False):
-        super().__init__()
+    def __init__(self, batch_size: int = 50, checkpoint_interval: int = 10, reset: bool = False, track_bounces: bool = False):
+        super().__init__(track_bounces=track_bounces)
         self.batch_size = batch_size
         self.checkpoint_interval = checkpoint_interval
         self.progress_file = 'import_progress.json'

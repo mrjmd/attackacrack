@@ -100,6 +100,11 @@ def dashboard():
     
     overall_response_rate = round((total_incoming / total_outgoing * 100), 1) if total_outgoing > 0 else 0
     
+    # Get SMS bounce metrics for dashboard
+    from services.sms_metrics_service import SMSMetricsService
+    metrics_service = SMSMetricsService()
+    sms_metrics = metrics_service.get_global_metrics(days=30)
+    
     stats = {
         'contact_count': total_contacts,
         'contacts_added_this_week': contacts_added_this_week,
@@ -108,7 +113,11 @@ def dashboard():
         'monthly_revenue': monthly_revenue,
         'revenue_growth': revenue_growth,
         'overall_response_rate': overall_response_rate,
-        'messages_today': messages_today
+        'messages_today': messages_today,
+        'bounce_rate': sms_metrics.get('bounce_rate', 0),
+        'delivery_rate': sms_metrics.get('delivery_rate', 0),
+        'total_messages_30d': sms_metrics.get('total_sent', 0),
+        'bounced_messages_30d': sms_metrics.get('bounced', 0)
     }
     
     # Activity Timeline Data (get more conversations and sort by most recent activity)

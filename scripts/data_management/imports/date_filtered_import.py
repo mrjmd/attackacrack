@@ -23,11 +23,13 @@ logger = logging.getLogger(__name__)
 class DateFilteredImporter(EnhancedOpenPhoneImporter):
     """Enhanced importer that filters by date range"""
     
-    def __init__(self, days_back: int = 30, dry_run_limit: Optional[int] = None):
-        super().__init__(dry_run_limit=dry_run_limit)
+    def __init__(self, days_back: int = 30, dry_run_limit: Optional[int] = None, track_bounces: bool = False):
+        super().__init__(dry_run_limit=dry_run_limit, track_bounces=track_bounces)
         self.days_back = days_back
         self.cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
         logger.info(f"📅 Date filter initialized: importing data from {self.cutoff_date.date()} onwards")
+        if track_bounces:
+            logger.info("📊 Bounce tracking enabled")
     
     def _fetch_all_conversations(self) -> List[Dict]:
         """Override to fetch conversations updated after cutoff date using API filtering"""

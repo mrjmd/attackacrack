@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
     time_limit=7500,  # 2 hour 5 min hard limit
     acks_late=True,  # Ensure task survives worker restart
 )
-def sync_openphone_messages(self, days_back=30, force_large_scale=False):
+def sync_openphone_messages(self, days_back=30, force_large_scale=False, track_bounces=False):
     """
     Unified Celery task to sync OpenPhone messages
     Automatically chooses between enhanced and large-scale importers based on scope
@@ -29,6 +29,7 @@ def sync_openphone_messages(self, days_back=30, force_large_scale=False):
     Args:
         days_back: Number of days to sync back from today
         force_large_scale: Force use of large scale importer
+        track_bounces: Enable bounce tracking and analysis
     """
     logger.info(f"Starting OpenPhone sync for last {days_back} days")
     
@@ -43,10 +44,10 @@ def sync_openphone_messages(self, days_back=30, force_large_scale=False):
         
         if use_large_scale:
             logger.info("Using large scale importer with progress tracking")
-            return _run_large_scale_sync(self, start_date, end_date)
+            return _run_large_scale_sync(self, start_date, end_date, track_bounces)
         else:
             logger.info("Using standard enhanced importer")
-            return _run_standard_sync(self, start_date, end_date, days_back)
+            return _run_standard_sync(self, start_date, end_date, days_back, track_bounces)
             
     except Exception as e:
         logger.error(f"OpenPhone sync failed: {str(e)}", exc_info=True)
@@ -62,7 +63,7 @@ def sync_openphone_messages(self, days_back=30, force_large_scale=False):
         raise
 
 
-def _run_standard_sync(self, start_date, end_date, days_back):
+def _run_standard_sync(self, start_date, end_date, days_back, track_bounces=False):
     """Run standard enhanced import for smaller syncs"""
     sync_start_time = datetime.now()
     
@@ -86,7 +87,7 @@ def _run_standard_sync(self, start_date, end_date, days_back):
     from scripts.data_management.imports.date_filtered_import import DateFilteredImporter
     
     # Create importer instance with date filtering
-    importer = DateFilteredImporter(days_back=days_back)
+    importer = DateFilteredImporter(days_back=days_back, track_bounces=track_bounces)
     
     # Store reference to celery task for progress updates
     importer._celery_task = self
@@ -203,7 +204,7 @@ def _run_standard_sync(self, start_date, end_date, days_back):
         raise
 
 
-def _run_large_scale_sync(self, start_date, end_date):
+def _run_large_scale_sync(self, start_date, end_date, track_bounces=False):
     """Run large scale import with progress tracking"""
     from scripts.data_management.imports.large_scale_import import LargeScaleImporter
     from extensions import db
@@ -212,7 +213,8 @@ def _run_large_scale_sync(self, start_date, end_date):
     importer = LargeScaleImporter(
         batch_size=50,
         checkpoint_interval=10,
-        reset=False  # Allow resume from previous attempts
+        reset=False,  # Allow resume from previous attempts
+        track_bounces=track_bounces
     )
     
     # Track start time

@@ -102,6 +102,7 @@ def openphone_sync():
     # Get parameters from form
     sync_type = request.form.get('sync_type', 'recent')
     custom_days = request.form.get('custom_days', type=int)
+    track_bounces = request.form.get('track_bounces') == 'true'
     
     # Determine days to sync
     if sync_type == 'last_7':
@@ -137,16 +138,23 @@ def openphone_sync():
             task_id = str(uuid.uuid4())
             sync_openphone_messages.apply_async(
                 args=[days_back], 
+                kwargs={'track_bounces': track_bounces},
                 task_id=task_id,
                 ignore_result=True  # Don't wait for backend connection
             )
-            logger.info(f"Task queued successfully with ID: {task_id}")
-            flash(f'OpenPhone sync started for last {days_back} days. Check sync health for progress.', 'success')
+            logger.info(f"Task queued successfully with ID: {task_id}, bounce tracking: {track_bounces}")
+            msg = f'OpenPhone sync started for last {days_back} days'
+            if track_bounces:
+                msg += ' with bounce tracking enabled'
+            flash(f'{msg}. Check sync health for progress.', 'success')
         else:
             # For local non-SSL Redis, use the regular approach
-            task = sync_openphone_messages.delay(days_back=days_back)
-            logger.info(f"Task queued successfully with ID: {task.id}")
-            flash(f'OpenPhone sync started for last {days_back} days. Task ID: {task.id}', 'success')
+            task = sync_openphone_messages.delay(days_back=days_back, track_bounces=track_bounces)
+            logger.info(f"Task queued successfully with ID: {task.id}, bounce tracking: {track_bounces}")
+            msg = f'OpenPhone sync started for last {days_back} days'
+            if track_bounces:
+                msg += ' with bounce tracking enabled'
+            flash(f'{msg}. Task ID: {task.id}', 'success')
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)

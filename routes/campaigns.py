@@ -131,6 +131,11 @@ def campaign_detail(campaign_id):
     campaign = Campaign.query.get_or_404(campaign_id)
     analytics = campaign_service.get_campaign_analytics(campaign_id)
     
+    # Get bounce metrics for this campaign
+    from services.sms_metrics_service import SMSMetricsService
+    metrics_service = SMSMetricsService()
+    bounce_metrics = metrics_service.get_campaign_metrics(campaign_id)
+    
     # Get recent sends for activity feed
     recent_sends = CampaignMembership.query.filter_by(
         campaign_id=campaign_id,
@@ -140,6 +145,7 @@ def campaign_detail(campaign_id):
     return render_template('campaigns/detail.html', 
                          campaign=campaign,
                          analytics=analytics,
+                         bounce_metrics=bounce_metrics,
                          recent_sends=recent_sends)
 
 

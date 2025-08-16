@@ -33,6 +33,7 @@ from crm_database import (
 )
 from services.contact_service import ContactService
 from services.ai_service import AIService
+from services.sms_metrics_service import SMSMetricsService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,9 +47,11 @@ VOICEMAILS_FOLDER = 'uploads/voicemails'
 class EnhancedOpenPhoneImporter:
     """Enhanced OpenPhone data importer with comprehensive data coverage"""
     
-    def __init__(self, dry_run_limit: Optional[int] = None, start_from_conversation: Optional[str] = None):
+    def __init__(self, dry_run_limit: Optional[int] = None, start_from_conversation: Optional[str] = None, 
+                 track_bounces: bool = False):
         self.dry_run_limit = dry_run_limit
         self.start_from_conversation = start_from_conversation  # Resume from specific conversation ID
+        self.track_bounces = track_bounces  # Whether to analyze and track bounce data
         self.stats = {
             'conversations_processed': 0,
             'messages_imported': 0,
@@ -57,6 +60,9 @@ class EnhancedOpenPhoneImporter:
             'recordings_downloaded': 0,
             'voicemails_downloaded': 0,
             'ai_summaries_generated': 0,
+            'bounces_tracked': 0,
+            'messages_delivered': 0,
+            'messages_failed': 0,
             'validation_issues': [],
             'errors': []
         }
@@ -89,12 +95,18 @@ class EnhancedOpenPhoneImporter:
             self.phone_number_id = phone_number_id
             self.contact_service = ContactService()
             self.ai_service = AIService()
+            self.metrics_service = SMSMetricsService() if self.track_bounces else None
             
             # Import sequence
             self._import_phone_numbers()
             conversations = self._fetch_all_conversations()
             self._process_conversations(conversations)
             self._generate_ai_content_batch()
+            
+            # Analyze bounces if enabled
+            if self.track_bounces:
+                self.analyze_existing_bounces()
+            
             self._validate_import_integrity()
             
             # Print final statistics
@@ -451,6 +463,25 @@ class EnhancedOpenPhoneImporter:
             else:
                 self.stats['messages_imported'] += 1
                 
+                # Track bounce data if enabled and message is outgoing
+                if self.track_bounces and new_activity.direction == 'outgoing':
+                    status = new_activity.status
+                    if status in ['failed', 'undelivered', 'rejected', 'blocked']:
+                        # Extract error details if available
+                        error_details = activity_data.get('errorMessage', activity_data.get('error', 'Unknown error'))
+                        self.metrics_service.track_message_status(
+                            new_activity.id,
+                            status,
+                            error_details
+                        )
+                        self.stats['messages_failed'] += 1
+                        self.stats['bounces_tracked'] += 1
+                        logger.info(f"Tracked bounce for message {activity_id}: {status} - {error_details}")
+                    elif status == 'delivered':
+                        self.metrics_service.track_message_status(new_activity.id, status)
+                        self.stats['messages_delivered'] += 1
+                        logger.debug(f"Tracked successful delivery for message {activity_id}")
+                
         except Exception as e:
             logger.error(f"Error processing activity {activity_id}: {e}")
             self.stats['errors'].append(f"Activity {activity_id}: {str(e)}")
@@ -801,6 +832,78 @@ class EnhancedOpenPhoneImporter:
         }
         return extensions.get(content_type, '.bin')
 
+    def analyze_existing_bounces(self):
+        """Retroactively analyze existing messages for bounce data"""
+        if not self.metrics_service:
+            logger.info("Bounce tracking not enabled, skipping analysis")
+            return
+            
+        logger.info("Analyzing existing messages for bounce data...")
+        
+        try:
+            # Get all outgoing messages that haven't been analyzed for bounces
+            outgoing_messages = db.session.query(Activity).filter(
+                Activity.activity_type == 'message',
+                Activity.direction == 'outgoing'
+            ).all()
+            
+            analyzed_count = 0
+            bounce_count = 0
+            delivered_count = 0
+            
+            for message in outgoing_messages:
+                # Skip if already has bounce metadata
+                if message.metadata and 'bounce_type' in message.metadata:
+                    continue
+                    
+                status = message.status
+                if status in ['failed', 'undelivered', 'rejected', 'blocked']:
+                    # Track as bounce
+                    error_details = f"Retroactive analysis: {status}"
+                    self.metrics_service.track_message_status(
+                        message.id,
+                        status,
+                        error_details
+                    )
+                    bounce_count += 1
+                    logger.debug(f"Found bounce: Message {message.id} - {status}")
+                elif status == 'delivered':
+                    # Track as delivered
+                    self.metrics_service.track_message_status(message.id, status)
+                    delivered_count += 1
+                
+                analyzed_count += 1
+                
+                # Commit every 100 messages
+                if analyzed_count % 100 == 0:
+                    db.session.commit()
+                    logger.info(f"Analyzed {analyzed_count} messages: {bounce_count} bounces, {delivered_count} delivered")
+            
+            db.session.commit()
+            
+            # Update stats
+            self.stats['bounces_tracked'] += bounce_count
+            self.stats['messages_delivered'] += delivered_count
+            
+            logger.info(f"Bounce analysis complete: Analyzed {analyzed_count} messages")
+            logger.info(f"  - Bounces found: {bounce_count}")
+            logger.info(f"  - Delivered: {delivered_count}")
+            logger.info(f"  - Unknown/Pending: {analyzed_count - bounce_count - delivered_count}")
+            
+            # Generate bounce rate report
+            if analyzed_count > 0:
+                bounce_rate = (bounce_count / analyzed_count) * 100
+                logger.info(f"  - Overall bounce rate: {bounce_rate:.2f}%")
+                
+                if bounce_rate > 5:
+                    logger.warning(f"⚠️ High bounce rate detected: {bounce_rate:.2f}%")
+                elif bounce_rate > 3:
+                    logger.warning(f"⚠️ Elevated bounce rate: {bounce_rate:.2f}%")
+                    
+        except Exception as e:
+            logger.error(f"Error analyzing bounces: {e}")
+            self.stats['errors'].append(f"Bounce analysis: {str(e)}")
+
     def _print_import_summary(self):
         """Print comprehensive import statistics"""
         print("\n" + "="*80)
@@ -813,6 +916,18 @@ class EnhancedOpenPhoneImporter:
         print(f"Recordings Downloaded: {self.stats['recordings_downloaded']}")
         print(f"Voicemails Downloaded: {self.stats['voicemails_downloaded']}")
         print(f"AI Summaries Generated: {self.stats['ai_summaries_generated']}")
+        
+        # Show bounce tracking stats if enabled
+        if self.track_bounces:
+            print("\nBOUNCE TRACKING STATISTICS:")
+            print(f"  Messages Delivered: {self.stats['messages_delivered']}")
+            print(f"  Messages Failed: {self.stats['messages_failed']}")
+            print(f"  Bounces Tracked: {self.stats['bounces_tracked']}")
+            if self.stats['messages_delivered'] + self.stats['messages_failed'] > 0:
+                bounce_rate = (self.stats['messages_failed'] / 
+                             (self.stats['messages_delivered'] + self.stats['messages_failed'])) * 100
+                print(f"  Bounce Rate: {bounce_rate:.2f}%")
+        
         print(f"Validation Issues: {len(self.stats.get('validation_issues', []))}")
         print(f"Errors Encountered: {len(self.stats['errors'])}")
         
@@ -831,31 +946,42 @@ class EnhancedOpenPhoneImporter:
         print("="*80)
 
 
-def run_enhanced_import(dry_run_limit: Optional[int] = None, start_from_conversation: Optional[str] = None):
+def run_enhanced_import(dry_run_limit: Optional[int] = None, start_from_conversation: Optional[str] = None,
+                       track_bounces: bool = False):
     """
     Main entry point for enhanced OpenPhone import
     
     Args:
         dry_run_limit: If provided, limits import to N conversations for testing
         start_from_conversation: If provided, resumes import from specific conversation ID
+        track_bounces: If True, analyzes and tracks bounce data for messages
     """
     importer = EnhancedOpenPhoneImporter(
         dry_run_limit=dry_run_limit,
-        start_from_conversation=start_from_conversation
+        start_from_conversation=start_from_conversation,
+        track_bounces=track_bounces
     )
     importer.run_comprehensive_import()
 
 
 if __name__ == '__main__':
     import sys
+    import argparse
     
-    # Check for dry run argument
-    dry_run_limit = None
-    if len(sys.argv) > 1:
-        try:
-            dry_run_limit = int(sys.argv[1])
-            print(f"Running in DRY RUN mode with limit: {dry_run_limit}")
-        except ValueError:
-            print("Invalid dry run limit. Using full import.")
+    parser = argparse.ArgumentParser(description='Enhanced OpenPhone Import with Bounce Tracking')
+    parser.add_argument('--dry-run', type=int, help='Limit import to N conversations for testing')
+    parser.add_argument('--track-bounces', action='store_true', help='Enable bounce tracking and analysis')
+    parser.add_argument('--start-from', type=str, help='Resume from specific conversation ID')
     
-    run_enhanced_import(dry_run_limit)
+    args = parser.parse_args()
+    
+    if args.dry_run:
+        print(f"Running in DRY RUN mode with limit: {args.dry_run}")
+    if args.track_bounces:
+        print("Bounce tracking ENABLED - will analyze message delivery status")
+    
+    run_enhanced_import(
+        dry_run_limit=args.dry_run,
+        start_from_conversation=args.start_from,
+        track_bounces=args.track_bounces
+    )

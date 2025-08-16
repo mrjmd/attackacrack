@@ -17,6 +17,7 @@ from typing import Dict, Any, Optional
 from extensions import db
 from crm_database import Activity, Contact, Conversation, WebhookEvent
 from services.contact_service import ContactService
+from services.sms_metrics_service import SMSMetricsService
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class OpenPhoneWebhookService:
     
     def __init__(self):
         self.contact_service = ContactService()
+        self.metrics_service = SMSMetricsService()
         
     def process_webhook(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -133,9 +135,28 @@ class OpenPhoneWebhookService:
         # Check if activity already exists
         existing_activity = Activity.query.filter_by(openphone_id=openphone_id).first()
         if existing_activity:
-            logger.info(f"Activity {openphone_id} already exists, updating status")
+            logger.info(f"Activity {openphone_id} already exists, updating status from {existing_activity.status} to {status}")
+            old_status = existing_activity.status
             existing_activity.status = status
             db.session.commit()
+            
+            # Track metrics for outgoing messages
+            if existing_activity.direction == 'outgoing':
+                # Track delivery status changes
+                if status in ['failed', 'undelivered', 'rejected', 'blocked']:
+                    # Message bounced - track it
+                    error_details = message_data.get('errorMessage', message_data.get('error', 'Unknown error'))
+                    self.metrics_service.track_message_status(
+                        existing_activity.id, 
+                        status,
+                        error_details
+                    )
+                    logger.warning(f"Message {openphone_id} bounced: {error_details}")
+                elif status == 'delivered' and old_status != 'delivered':
+                    # Message successfully delivered
+                    self.metrics_service.track_message_status(existing_activity.id, status)
+                    logger.info(f"Message {openphone_id} successfully delivered")
+            
             return {'status': 'updated', 'activity_id': existing_activity.id}
         
         # Create new activity
@@ -158,6 +179,22 @@ class OpenPhoneWebhookService:
         conversation.last_activity_at = created_at or datetime.utcnow()
         
         db.session.commit()
+        
+        # Track initial status for outgoing messages
+        if db_direction == 'outgoing':
+            if status in ['failed', 'undelivered', 'rejected', 'blocked']:
+                # Message bounced immediately
+                error_details = message_data.get('errorMessage', message_data.get('error', 'Unknown error'))
+                self.metrics_service.track_message_status(
+                    new_activity.id,
+                    status,
+                    error_details
+                )
+                logger.warning(f"New message {openphone_id} bounced: {error_details}")
+            elif status == 'delivered':
+                # Message delivered immediately
+                self.metrics_service.track_message_status(new_activity.id, status)
+                logger.info(f"New message {openphone_id} delivered")
         
         # Log if media was included
         if media_urls:
