@@ -91,9 +91,10 @@ docker-compose restart celery celery-beat
 - **Production-ready deployment on DigitalOcean App Platform** ✨
 - **Large scale OpenPhone import (7000+ conversations successfully imported!)** 🎉
 - **Environment variables properly managed and preserved during deployments**
-- **CSV import system for contact enrichment (production-ready!)** 📊
+- **Universal CSV import system with smart format detection (10+ formats!)** 📊
+- **SMS bounce tracking integrated with OpenPhone webhooks** 📈
 - Enhanced database models for all OpenPhone data types
-- Contact enrichment from multiple CSV sources with smart merging
+- Contact enrichment from multiple CSV sources with automatic merging
 - Webhook handling with signature verification
 - Background task processing with Celery + Valkey (Redis)
 - User authentication and authorization system
@@ -102,34 +103,60 @@ docker-compose restart celery celery-beat
 - GitHub Actions CI/CD pipeline with proper env var preservation
 - Valkey attached as managed database resource
 
-### 🚧 In Progress
-- QuickBooks Online integration (OAuth, customer sync, products/services)
-- Email integration via SmartLead API
-- Advanced financial dashboards and reporting
+### 🚧 In Progress - Week of August 18, 2025
+**TOP PRIORITY: Launch production text campaign by end of week**
+
+1. **Dashboard Activity Sorting** - Critical UX fix
+   - Currently sorts by import time (wrong!)
+   - MUST sort by most recent actual activity (text/call/voicemail)
+   
+2. **Contacts Page Overhaul** - Foundation for campaigns
+   - Fix broken filters
+   - Implement proper pagination
+   - Complete UX improvement pass
+   
+3. **Campaign System Production Ready**
+   - Vet list generation and templating
+   - Test campaign workflow end-to-end
+   - Launch first automated SMS campaign via OpenPhone API
+   
+4. **OpenPhone Webhooks** - Enable real-time updates
+   - Configure webhooks in production
+   - Verify signature validation working
+   - Test response tracking
 
 ### 📋 Priority Roadmap
-1. **IMMEDIATE - Contact Data Enrichment** ✅ Ready to Use!
-   - **Production-ready CSV import at `/campaigns/import-csv`**
-   - Handles phone, name, email + ANY additional fields in metadata
+1. **THIS WEEK - Campaign Launch Prerequisites**
+   - Fix dashboard activity sorting (sort by recent activity, not import time)
+   - Overhaul contacts page (filters, pagination, intuitive UX)
+   - Ensure OpenPhone webhooks working in production
+   - Vet campaign list generation and templating
+   - Send first automated text messages
+
+2. **NEXT WEEK - Campaign Operations**
+   - Monitor first campaign performance
+   - Implement response tracking and analytics
+   - Build automated follow-up sequences
+   - A/B testing refinements
+   - Daily limit compliance (125 texts/day for cold outreach)
+
+3. **HIGH PRIORITY - Contact Enrichment** ✅ Ready to Use!
+   - **Universal CSV import with smart detection at:**
+     - `/campaigns/import-csv` - For campaign list creation
+     - `/settings/imports` → CSV & PropertyRadar imports
+   - Automatically detects 10+ CSV formats (OpenPhone, Realtor, PropertyRadar, etc.)
+   - Phone number normalization to +1XXXXXXXXXX format
    - Smart enrichment: Only fills missing data, preserves existing
-   - Automatic campaign list creation from imports
    - See `/docs/CSV_IMPORT_FIELD_MAPPING.md` for complete documentation
 
-2. **HIGH PRIORITY - Business Operations**
-   - SMS Campaign System enhancements
-   - Automated follow-up sequences
-   - Response tracking and analytics
-   - Appointment scheduling integration
-   - Quote/estimate generation workflow
-
-3. **NEXT - QuickBooks Integration**
+4. **UPCOMING - QuickBooks Integration**
    - Complete OAuth authentication flow
    - Customer sync and enrichment
    - Products/services import
    - Quote/invoice bidirectional sync
    - Payment tracking and reconciliation
 
-4. **FUTURE - Advanced Features**
+5. **FUTURE - Advanced Features**
    - Financial dashboards and reporting
    - SmartLead email integration (Q2 2025)
    - Multi-channel campaigns (SMS + Email)
@@ -376,6 +403,8 @@ logging.basicConfig(level=logging.DEBUG)
 - `services/contact_service.py` - Contact management
 - `services/campaign_service.py` - Campaign operations
 - `services/ai_service.py` - Gemini AI integration
+- `services/csv_import_service.py` - Universal CSV import with smart detection
+- `services/sms_metrics_service.py` - SMS bounce tracking and analytics
 
 ### Routes (Controllers)
 - `routes/dashboard_routes.py` - Main dashboard
@@ -387,9 +416,30 @@ logging.basicConfig(level=logging.DEBUG)
 ### Import Scripts
 - `large_scale_import.py` - Production data import
 - `scripts/data_management/imports/enhanced_openphone_import.py` - Core import logic
-- `scripts/data_management/csv_importer.py` - CSV contact import
+- `scripts/data_management/universal_csv_enrichment.py` - Universal CSV enrichment
+- `scripts/data_management/csv_importer.py` - Legacy CSV contact import
+
+### Supported CSV Formats (Auto-Detected)
+The system automatically detects and imports from these CSV formats:
+- **OpenPhone** - Contact exports with phone, name, email, address
+- **Realtor.com** - Agent listings with contact info
+- **Sotheby's International Realty** - Agent directory exports
+- **Vicente Realty** - Agent contact lists
+- **Exit Realty (Cape & Premier)** - Agent rosters
+- **Jack Conway & Company** - Agent directories
+- **Lamacchia Realty** - Contact exports
+- **William Raveis** - Agent listings
+- **PropertyRadar** - Property and owner data with dual contacts
+- **Standard formats** - Any CSV with recognizable phone/name/email columns
 
 ## Recent Victories 🎉
+
+### January 2025 - Universal CSV Import & Bounce Tracking
+- **Implemented universal CSV import** with automatic format detection for 10+ formats
+- **Added SMS bounce tracking** using OpenPhone webhook data (FREE, no external APIs)
+- **Fixed duplicate key constraints** in production CSV imports
+- **Enhanced Settings import pages** with smart column detection and enrichment
+- **Achieved 100% contact enrichment** capability without creating duplicates
 
 ### January 2025 - Production Deployment Success
 - **Successfully imported 7000+ OpenPhone conversations** to production database
@@ -406,7 +456,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 ## Notes for Future Development
 
-1. **Contact Enrichment Priority**: 79% of contacts missing critical data - CSV import is urgent
+1. **Contact Enrichment**: ✅ COMPLETE - Universal CSV import now available in production
 2. **Media Handling**: OpenPhone API doesn't provide media URLs in messages endpoint, but webhooks do
 3. **Campaign Limits**: 125 texts/day for cold outreach per phone number
 4. **A/B Testing**: Requires minimum 100 contacts per variant for statistical significance
@@ -425,4 +475,4 @@ logging.basicConfig(level=logging.DEBUG)
 
 ---
 
-*This document should be updated as the project evolves. Last updated: January 2025*
+*This document should be updated as the project evolves. Last updated: January 16, 2025*

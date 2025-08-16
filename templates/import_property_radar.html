@@ -1,19 +1,102 @@
 {% extends "base_authenticated.html" %}
 
-{% block title %}Import from Property Radar{% endblock %}
+{% block title %}Import from PropertyRadar{% endblock %}
 
 {% block content %}
-    <h2 class="text-3xl font-bold mb-6">Import from Property Radar</h2>
+    <h2 class="text-3xl font-bold mb-6">Import from PropertyRadar</h2>
+    
+    <!-- Info Box -->
+    <div class="bg-blue-900/30 border border-blue-600 rounded-lg p-4 mb-6">
+        <div class="flex items-start space-x-3">
+            <svg class="w-5 h-5 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="text-sm text-gray-300">
+                <p class="font-semibold mb-1">PropertyRadar Data Import</p>
+                <p>This importer automatically detects PropertyRadar CSV format and imports:</p>
+                <ul class="mt-2 list-disc list-inside text-gray-400">
+                    <li>Primary & secondary contact information</li>
+                    <li>Property addresses and details</li>
+                    <li>Mailing addresses</li>
+                    <li>Property value and equity estimates</li>
+                    <li>Owner occupancy status</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
     <div class="bg-gray-900 rounded-lg shadow p-6">
         <form method="POST" enctype="multipart/form-data" class="space-y-4">
             <div>
-                <label for="file" class="block text-sm font-medium">Property Radar CSV File:</label>
-                <input type="file" id="file" name="file" accept=".csv" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 mt-1">
+                <label for="file" class="block text-sm font-medium mb-2">PropertyRadar CSV File:</label>
+                <input type="file" id="file" name="file" accept=".csv" required 
+                       class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2"
+                       onchange="updateFileName(this)">
+                <p id="file-name" class="text-sm text-gray-400 mt-2"></p>
             </div>
+            
+            <!-- Expected Columns -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <p class="text-sm font-medium text-gray-300 mb-2">Expected PropertyRadar columns:</p>
+                <div class="grid grid-cols-2 gap-2 text-sm text-gray-400">
+                    <div>
+                        <p class="font-medium text-gray-300">Contact Info:</p>
+                        <ul class="ml-4">
+                            <li>• Primary First/Last Name</li>
+                            <li>• Primary Mobile Phone1</li>
+                            <li>• Primary Email1</li>
+                            <li>• Secondary Name</li>
+                            <li>• Secondary Mobile Phone1</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-300">Property Info:</p>
+                        <ul class="ml-4">
+                            <li>• Address, City, ZIP</li>
+                            <li>• Mail Address/City/State/ZIP</li>
+                            <li>• Est Value</li>
+                            <li>• Est Equity $</li>
+                            <li>• Owner Occ?</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Features -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <p class="text-sm font-medium text-gray-300 mb-2">This import will:</p>
+                <ul class="text-sm text-gray-400 space-y-1">
+                    <li>✓ Automatically detect PropertyRadar format</li>
+                    <li>✓ Import both primary and secondary contacts</li>
+                    <li>✓ Normalize phone numbers to +1XXXXXXXXXX format</li>
+                    <li>✓ Create property records with full details</li>
+                    <li>✓ Link properties to contacts</li>
+                    <li>✓ Enrich existing contacts without duplicates</li>
+                </ul>
+            </div>
+            
             <div class="flex items-center space-x-4">
-                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Upload and Import</button>
-                <a href="{{ url_for('main.settings') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">Cancel</a>
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">
+                    Upload and Import
+                </button>
+                <a href="{{ url_for('settings.imports') }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg">
+                    Cancel
+                </a>
             </div>
         </form>
     </div>
+    
+    <script>
+    function updateFileName(input) {
+        const fileName = input.files[0]?.name || '';
+        const fileNameEl = document.getElementById('file-name');
+        if (fileName) {
+            fileNameEl.textContent = `Selected: ${fileName}`;
+            const lowerName = fileName.toLowerCase();
+            if (lowerName.includes('propertyradar') || lowerName.includes('cleaned_data_phone')) {
+                fileNameEl.textContent += ' - PropertyRadar format detected ✓';
+            }
+        }
+    }
+    </script>
 {% endblock %}

@@ -102,7 +102,117 @@
 
 ---
 
-## Phase 4: CI/CD Pipeline Improvements (PARTIALLY COMPLETE)
+## 🔥 Phase 4: URGENT - Campaign Launch Prerequisites (WEEK OF AUGUST 18)
+**Goal**: Launch production text campaign by end of week
+**Deadline**: Friday, August 23, 2025
+
+### 4.1 Fix Dashboard Activity Sorting (Critical UX Fix)
+**Problem**: Dashboard lists by import time, not actual activity time
+**Impact**: Users can't see their most recent interactions
+
+#### Tasks:
+- [ ] Analyze current dashboard query in `routes/dashboard_routes.py`
+- [ ] Identify sorting logic (likely using `created_at` instead of activity timestamps)
+- [ ] Update query to sort by most recent activity (`last_activity_at` or similar)
+- [ ] Test with multiple conversation types (SMS, calls, voicemails)
+- [ ] Verify performance with large datasets
+- [ ] Deploy and validate in production
+
+#### Technical Details:
+- Check `Conversation` model for activity timestamp fields
+- May need to join with `Activity` table for accurate timestamps
+- Consider adding index on sort field for performance
+
+### 4.2 Contacts Page Complete Overhaul
+**Problem**: Filters broken, no pagination, non-intuitive UX
+**Impact**: Can't effectively manage or search contacts for campaigns
+
+#### Tasks:
+- [ ] **Fix Filters**
+  - [ ] Debug current filter implementation in `routes/contact_routes.py`
+  - [ ] Test each filter type (name, phone, email, tags, etc.)
+  - [ ] Fix SQL query construction for filters
+  - [ ] Add filter validation and error handling
+  
+- [ ] **Implement Pagination**
+  - [ ] Add pagination controls to contacts template
+  - [ ] Implement backend pagination (limit/offset or cursor-based)
+  - [ ] Add "records per page" selector (25, 50, 100)
+  - [ ] Show total count and current range
+  
+- [ ] **UX Improvements**
+  - [ ] Add search bar with instant filtering
+  - [ ] Implement column sorting (click headers to sort)
+  - [ ] Add bulk actions (select multiple contacts)
+  - [ ] Improve visual hierarchy and spacing
+  - [ ] Add loading states for async operations
+
+### 4.3 Campaign System Production Validation
+**Goal**: Ensure campaign system is bulletproof before launch
+
+#### Tasks:
+- [ ] **List Generation Testing**
+  - [ ] Test CSV import with various formats
+  - [ ] Verify contact deduplication works
+  - [ ] Test tag-based list creation
+  - [ ] Validate phone number formatting (+1XXXXXXXXXX)
+  
+- [ ] **Template System Verification**
+  - [ ] Test variable substitution ({{first_name}}, {{company}}, etc.)
+  - [ ] Verify fallback values for missing data
+  - [ ] Test message length validation (SMS limits)
+  - [ ] Preview messages before sending
+  
+- [ ] **Campaign Workflow End-to-End**
+  - [ ] Create test campaign with small list (5-10 contacts)
+  - [ ] Test A/B variant creation
+  - [ ] Verify scheduling works correctly
+  - [ ] Test pause/resume functionality
+  - [ ] Confirm daily limit enforcement (125 texts/day)
+
+### 4.4 OpenPhone Webhooks Production Setup
+**Goal**: Enable real-time message tracking and responses
+
+#### Tasks:
+- [ ] **Configure Webhook Endpoint**
+  - [ ] Verify webhook URL in production: `https://attackacrack-prod-5ce6f.ondigitalocean.app/api/webhooks/openphone`
+  - [ ] Register webhook with OpenPhone API
+  - [ ] Test webhook signature validation
+  
+- [ ] **Test Event Processing**
+  - [ ] Send test message and verify `message.received` webhook
+  - [ ] Check `message.delivered` status updates
+  - [ ] Verify response tracking for campaigns
+  - [ ] Test error handling and retry logic
+  
+- [ ] **Monitor and Debug**
+  - [ ] Check `webhook_events` table for incoming events
+  - [ ] Verify events are processed correctly
+  - [ ] Set up alerts for webhook failures
+  - [ ] Document webhook troubleshooting steps
+
+### 4.5 Send First Production Campaign
+**Goal**: Successfully launch first automated SMS campaign
+
+#### Pre-Launch Checklist:
+- [ ] Dashboard sorting fixed and deployed
+- [ ] Contacts page functional for list management
+- [ ] Campaign templates tested and approved
+- [ ] Webhooks receiving events in production
+- [ ] Daily limits configured (125 texts/day)
+- [ ] Opt-out handling tested
+- [ ] Response tracking verified
+
+#### Launch Steps:
+1. [ ] Create production campaign list (start with 20-30 contacts)
+2. [ ] Write and approve message templates
+3. [ ] Set up A/B test (if applicable)
+4. [ ] Schedule campaign for optimal time
+5. [ ] Monitor first batch of sends
+6. [ ] Track delivery and response rates
+7. [ ] Adjust based on initial results
+
+## Phase 5: CI/CD Pipeline Improvements (PARTIALLY COMPLETE)
 **Goal**: Modernize deployment pipeline and add security scanning
 
 ### 4.1 GitHub Actions Workflow Updates
@@ -258,7 +368,7 @@
 
 ## Progress Summary
 
-### ✅ Completed (As of 2025-08-16)
+### ✅ Completed (As of August 16, 2025)
 - Repository security verified (no secrets in git)
 - All 23 GitHub Secrets configured and validated
 - All secrets added to DigitalOcean App Platform
@@ -273,14 +383,21 @@
 - **Contact enrichment system documented with enhancement roadmap**
 
 ### 🟢 Current Status
-- **All critical issues resolved!**
+- **Infrastructure: ✅ All critical issues resolved!**
 - Deployment pipeline: ✅ Working
 - Secret management: ✅ Working
 - Valkey/Redis: ✅ Connected
 - Celery workers: ✅ Running
 - Background tasks: ✅ Processing
 
-### 🟠 Remaining Improvements (Non-Critical)
+### 🔴 Week of August 18 - CRITICAL PRIORITIES
+1. **🔴 CRITICAL**: Fix dashboard activity sorting (shows import time, not activity time)
+2. **🔴 CRITICAL**: Fix contacts page (broken filters, no pagination, poor UX)
+3. **🔴 CRITICAL**: Validate campaign system for production launch
+4. **🔴 CRITICAL**: Configure OpenPhone webhooks in production
+5. **🔴 CRITICAL**: Launch first automated SMS campaign by Friday
+
+### 🟠 Remaining Improvements (Post-Campaign Launch)
 1. **🟠 MEDIUM**: No staging environment
 2. **🟠 MEDIUM**: No monitoring/alerting setup
 3. **🟠 LOW**: Could improve worker resource allocation
@@ -332,8 +449,8 @@ curl https://attackacrack-prod-5ce6f.ondigitalocean.app/health
 
 ---
 
-*Last Updated: 2025-08-15 18:50 UTC*
-*Status: ✅ All critical issues resolved - System fully operational*
+*Last Updated: August 16, 2025*
+*Status: ✅ Infrastructure operational | 🔴 Campaign launch priorities for week of August 18*
 
 ## 🎉 Success Summary
 All critical infrastructure and deployment issues have been successfully resolved:

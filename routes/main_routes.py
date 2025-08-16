@@ -10,8 +10,7 @@ from services.job_service import JobService
 from services.quote_service import QuoteService
 from services.appointment_service import AppointmentService
 from services.message_service import MessageService
-from scripts.data_management.csv_importer import CsvImporter
-from scripts.data_management.property_radar_importer import PropertyRadarImporter
+from services.csv_import_service import CSVImportService
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 from extensions import db
 from crm_database import Setting, Activity, Conversation, Todo
@@ -302,51 +301,86 @@ def automation_settings():
 @main_bp.route('/import_csv', methods=['GET', 'POST'])
 @login_required
 def import_csv():
+    """Import contacts from CSV using smart format detection"""
     contact_service = ContactService()
+    csv_service = CSVImportService(contact_service)
+    
     if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('No file part')
+        file = request.files.get('file')
+        if not file or not file.filename:
+            flash('Please select a file', 'error')
             return redirect(request.url)
-        file = request.files['file']
-        if file.filename == '':
-            flash('No selected file')
+        
+        if not file.filename.endswith('.csv'):
+            flash('Please upload a CSV file', 'error')
             return redirect(request.url)
-        if file:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join('/tmp', filename)
-            file.save(filepath)
-            
-            importer = CsvImporter(contact_service)
-            importer.import_data(filepath)
-            
-            flash('CSV data imported successfully!')
-            return redirect(url_for('contact.list_all'))
+        
+        # Import the CSV with smart detection
+        results = csv_service.import_contacts(
+            file=file,
+            create_list=False,  # Don't create campaign list from settings import
+            imported_by='settings_import'
+        )
+        
+        # Show results
+        if results['successful'] > 0:
+            message = f"Successfully imported {results['successful']} contacts"
+            if results.get('contacts_created'):
+                message += f" ({len(results['contacts_created'])} new)"
+            if results['duplicates'] > 0:
+                message += f" ({results['duplicates']} enriched)"
+            flash(message, 'success')
+        
+        if results['failed'] > 0:
+            flash(f"{results['failed']} contacts failed to import", 'warning')
+            for error in results['errors'][:3]:
+                flash(f"Error: {error}", 'error')
+        
+        return redirect(url_for('contact.list_all'))
             
     return render_template('import_csv.html')
 
 @main_bp.route('/import_property_radar', methods=['GET', 'POST'])
 @login_required
 def import_property_radar():
+    """Import PropertyRadar data using smart format detection"""
     contact_service = ContactService()
-    property_service = PropertyService()
+    csv_service = CSVImportService(contact_service)
+    
     if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('No file part')
+        file = request.files.get('file')
+        if not file or not file.filename:
+            flash('Please select a file', 'error')
             return redirect(request.url)
-        file = request.files['file']
-        if file.filename == '':
-            flash('No selected file')
+        
+        if not file.filename.endswith('.csv'):
+            flash('Please upload a CSV file', 'error')
             return redirect(request.url)
-        if file:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join('/tmp', filename)
-            file.save(filepath)
-
-            importer = PropertyRadarImporter(contact_service, property_service)
-            importer.import_data(filepath)
-
-            flash('Property Radar data imported successfully!')
-            return redirect(url_for('property.list_all'))
+        
+        # Import PropertyRadar CSV with smart detection
+        # The service will automatically detect it's PropertyRadar format
+        results = csv_service.import_contacts(
+            file=file,
+            create_list=False,  # Don't create campaign list from settings import
+            imported_by='propertyradar_import'
+        )
+        
+        # Show results
+        if results['successful'] > 0:
+            message = f"Successfully imported {results['successful']} PropertyRadar records"
+            if results.get('contacts_created'):
+                message += f" ({len(results['contacts_created'])} new properties)"
+            if results['duplicates'] > 0:
+                message += f" ({results['duplicates']} enriched)"
+            flash(message, 'success')
+        
+        if results['failed'] > 0:
+            flash(f"{results['failed']} records failed to import", 'warning')
+            for error in results['errors'][:3]:
+                flash(f"Error: {error}", 'error')
+        
+        # Redirect to property list since it's property data
+        return redirect(url_for('property.list_all'))
 
     return render_template('import_property_radar.html')
 
