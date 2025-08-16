@@ -353,14 +353,20 @@ class CSVImportService:
                             results['contacts_created'].append(contact.id)
                             is_new = True
                         
-                        # Create association between contact and CSV import
-                        contact_csv_import = ContactCSVImport(
+                        # Create association between contact and CSV import (check if already exists)
+                        existing_import_record = ContactCSVImport.query.filter_by(
                             contact_id=contact.id,
-                            csv_import_id=csv_import.id,
-                            is_new=is_new,
-                            data_updated=data_updated if data_updated else None
-                        )
-                        db.session.add(contact_csv_import)
+                            csv_import_id=csv_import.id
+                        ).first()
+                        
+                        if not existing_import_record:
+                            contact_csv_import = ContactCSVImport(
+                                contact_id=contact.id,
+                                csv_import_id=csv_import.id,
+                                is_new=is_new,
+                                data_updated=data_updated if data_updated else None
+                            )
+                            db.session.add(contact_csv_import)
                         
                         # Add to campaign list (for both new and existing contacts)
                         if campaign_list:
@@ -384,12 +390,28 @@ class CSVImportService:
                         
                         results['successful'] += 1
                         
+                        # Commit periodically to avoid large transactions
+                        if results['successful'] % 100 == 0:
+                            try:
+                                db.session.commit()
+                            except Exception as commit_error:
+                                db.session.rollback()
+                                results['errors'].append(f"Commit error at row {row_num}: {str(commit_error)}")
+                        
                     except Exception as e:
                         results['failed'] += 1
                         results['errors'].append(f"Row {row_num}: {str(e)}")
+                        # Rollback on error to prevent pending rollback state
+                        db.session.rollback()
+                        # Re-add the csv_import object since rollback cleared it
+                        db.session.add(csv_import)
+                        if campaign_list:
+                            db.session.add(campaign_list)
         
         except Exception as e:
             results['errors'].append(f"File processing error: {str(e)}")
+            # Ensure we rollback on any processing error
+            db.session.rollback()
         
         finally:
             # Clean up temp file
@@ -407,7 +429,19 @@ class CSVImportService:
             'enriched_contacts': results['duplicates']  # All duplicates were enriched
         }
         
-        db.session.commit()
+        # Final commit with error handling
+        try:
+            db.session.commit()
+        except Exception as final_error:
+            db.session.rollback()
+            results['errors'].append(f"Final commit error: {str(final_error)}")
+            # Try to at least save the import record
+            try:
+                db.session.add(csv_import)
+                csv_import.import_metadata['commit_error'] = str(final_error)
+                db.session.commit()
+            except:
+                pass
         
         results['import_id'] = csv_import.id
         results['list_id'] = campaign_list.id if campaign_list else None
