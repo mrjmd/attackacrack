@@ -30,6 +30,14 @@ Over the course of several weeks, we've battled with environment variables being
 - **Early morning**: Multiple attempts with manual fixes
 - Created `scripts/fix_env_vars.sh` to restore after each deploy
 - **11:37 AM**: Latest deployment cleared all but 4 env vars again
+- **1:30 PM**: Attempted to use official `digitalocean/app_action/deploy@v2`
+  - Added all secrets to GitHub repository (confirmed present)
+  - Updated app.yaml with `${VARIABLE}` placeholders
+  - Deployed using official action
+  - **RESULT**: Environment variables STILL not set!
+  - The action didn't substitute the placeholders as documented
+  - Deployed spec had only 8 env vars (the 4 static ones for each service)
+  - Worker still trying to connect to `redis://redis:6379/0`
 
 ## Timeline of Attempts
 
@@ -107,7 +115,25 @@ doctl apps update ${{ env.APP_ID }} --spec .do/app-deploy.yaml
 ```
 **Problem**: If previous deployment already cleared env vars, fetching spec gets empty vars
 **Result**: ❌ FAILED - Circular dependency problem
-**Current Status**: This is where we are now
+
+### Attempt 8: Official DigitalOcean GitHub Action
+**Commit**: `2eb38bb` 
+**Date**: August 16, 2025, 1:30 PM
+**Approach**: Use the official `digitalocean/app_action/deploy@v2`
+1. All secrets confirmed in GitHub repository settings
+2. Updated app.yaml with `${SECRET_KEY}` placeholders
+3. Marked all as `type: SECRET`
+4. Used official action instead of action-doctl
+**What Actually Happened**:
+- GitHub Actions showed env vars being passed: `SECRET_KEY: ***`, `REDIS_URL: ***`
+- Action said "app 'attackacrack-prod' already exists, updating..."
+- Deployment completed successfully in 56 seconds
+- BUT: Deployed spec only had 8 env vars (4 static ones × 2 services)
+- All `${VARIABLE}` placeholders were NOT substituted
+- App still trying to connect to default `redis://redis:6379/0`
+**Problem**: The official action didn't perform substitution as documented
+**Result**: ❌ FAILED - Substitution didn't happen despite using official action
+**Current Status**: This is where we are now - manual fix script still required
 
 ## Root Cause Analysis
 
@@ -375,19 +401,73 @@ We were so close! We had the right syntax (`${SECRET_KEY}`) but the wrong tool t
 ## Conclusion
 
 After weeks of attempts, we've learned that:
-1. We were using the wrong GitHub Action all along
-2. The `${VARIABLE}` syntax we tried only works with `digitalocean/app_action`
-3. Plain `doctl` commands don't do any substitution
-4. DigitalOcean App Platform has strong opinions about deployment patterns
+1. We were using the wrong GitHub Action initially (`action-doctl` vs `app_action`)
+2. Even the official `digitalocean/app_action` doesn't work as documented
+3. The `${VARIABLE}` substitution feature appears to be broken or undocumented
+4. Plain `doctl` commands don't do any substitution
+5. DigitalOcean App Platform has strong opinions but unclear documentation
 
-Our current approach of fetching and modifying specs is fragile and not the intended pattern.
+### August 16, 2025, 2:30 PM - THE BREAKTHROUGH! 🎉
 
-The sustainable solution is to either:
-1. Adopt the official GitHub Action with proper secret management
-2. Commit to encrypted secrets in the spec
-3. Build a robust merge/validation system
+**Discovery**: When we run the manual fix script, DigitalOcean automatically:
+1. Encrypts all the sensitive values
+2. Marks them as `type: SECRET`
+3. Returns encrypted values like `EV[1:xyz:abc...]`
+4. These encrypted values are SAFE to store in Git!
 
-The manual fix script works but isn't sustainable for production deployments.
+**The Solution**: 
+1. Run manual fix script to set all env vars
+2. Export the spec with `doctl apps spec get`
+3. Save the spec with encrypted values to app.yaml
+4. Commit the encrypted values (they're safe!)
+5. Deploy normally with simple `doctl apps update`
+
+**Current State (August 16, 2025, 2:30 PM)**:
+- All environment variables are now encrypted in app.yaml
+- Encrypted values are safe to commit to Git
+- Simple deployment workflow restored
+- THE SAGA MIGHT FINALLY BE OVER!
+
+Our current approach of using the manual fix script works but is not sustainable.
+
+## THE FINAL SOLUTION
+
+### Encrypted Values in app.yaml (August 16, 2025)
+
+After weeks of struggle, we discovered the simplest solution was right in front of us:
+
+1. **Set environment variables once** (via manual script or DO dashboard)
+2. **Export the spec** - DigitalOcean automatically encrypts sensitive values
+3. **Commit the encrypted spec** - Values like `EV[1:key:encrypted]` are safe
+4. **Deploy normally** - Encrypted values work across all deployments
+
+### Why This Works
+
+- **Encrypted values are app-specific**: Can't be used with other apps
+- **Safe to commit**: The `EV[1:...]` format is designed for version control
+- **No substitution needed**: DigitalOcean decrypts at runtime
+- **Simple deployment**: Just `doctl apps update --spec app.yaml`
+
+### Implementation
+
+```yaml
+# In app.yaml - these encrypted values are SAFE to commit
+envs:
+  - key: SECRET_KEY
+    type: SECRET
+    value: EV[1:xyz:encrypted_value_here]  # Safe!
+    scope: RUN_AND_BUILD_TIME
+```
+
+### The Journey's End
+
+What started as a complex problem with GitHub Actions, substitution, and circular dependencies ended with the simple realization that DigitalOcean's encrypted values feature was the solution all along. We just needed to:
+1. Set the values once
+2. Export the encrypted spec
+3. Commit it safely
+4. Deploy with confidence
+
+The environment variables saga is finally over. 🎉
 
 ---
 

@@ -1,256 +1,219 @@
-# This is the specification for the Attack-a-Crack application on Digital Ocean App Platform.
-# Version 4: Using native DigitalOcean environment variable management (no placeholders)
-
-name: attackacrack-prod
-
-# Define the region for your app. Choose one close to your users.
-# e.g., nyc3, sfo3, ams3, sgp1, fra1
-region: nyc3
-
-# Define the services (public-facing web containers) for your application.
-services:
-  - name: attackacrack-web
-    # Use pre-built image from DigitalOcean Container Registry
-    # The deploy workflow will update this with the correct tag
-    image:
-      registry_type: DOCR
-      repository: attackacrack-crm
-      tag: latest
-    # Define the command to run the web server.
-    # This overrides the Dockerfile's CMD or ENTRYPOINT for this specific service.
-    # We use gunicorn for a production-ready WSGI server.
-    run_command: ./entrypoint.sh
-    # Define the instance size. Upgraded to xs for better performance
-    instance_size_slug: basic-xs
-    # Define the number of instances. Start with 1 and enable auto-scaling.
-    instance_count: 1
-    # Define the HTTP port the application listens on inside the container.
-    http_port: 5000
-    # Define the routes for incoming traffic.
-    routes:
-      - path: /
-    # Health check for monitoring
-    health_check:
-      http_path: /health
-      timeout_seconds: 10
-      port: 5000
-    # Define environment variables.
-    # Using native DO env var management - no values means it uses existing values
-    envs:
-      # Static configuration values
-      - key: FLASK_ENV
-        value: "production"
-        scope: RUN_AND_BUILD_TIME
-      - key: FLASK_APP
-        value: "app.py"
-        scope: RUN_AND_BUILD_TIME
-      # Database bindings (special DO syntax)
-      - key: DATABASE_URL
-        value: ${db.DATABASE_URL}
-        scope: RUN_AND_BUILD_TIME
-      - key: POSTGRES_URI
-        value: ${db.DATABASE_URL}
-        scope: RUN_AND_BUILD_TIME
-      # Secrets - Using GitHub repository secrets with placeholder substitution
-      - key: SECRET_KEY
-        value: ${SECRET_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: REDIS_URL
-        value: ${REDIS_URL}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_BROKER_URL
-        value: ${CELERY_BROKER_URL}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_RESULT_BACKEND
-        value: ${CELERY_RESULT_BACKEND}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_API_KEY
-        value: ${OPENPHONE_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER
-        value: ${OPENPHONE_PHONE_NUMBER}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER_ID
-        value: ${OPENPHONE_PHONE_NUMBER_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: ENCRYPTION_KEY
-        value: ${ENCRYPTION_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GEMINI_API_KEY
-        value: ${GEMINI_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_ID
-        value: ${GOOGLE_CLIENT_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_SECRET
-        value: ${GOOGLE_CLIENT_SECRET}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_PROJECT_ID
-        value: ${GOOGLE_PROJECT_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: PROPERTY_RADAR_API_KEY
-        value: ${PROPERTY_RADAR_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_ID
-        value: ${QUICKBOOKS_CLIENT_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_SECRET
-        value: ${QUICKBOOKS_CLIENT_SECRET}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_REDIRECT_URI
-        value: ${QUICKBOOKS_REDIRECT_URI}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_SANDBOX
-        value: ${QUICKBOOKS_SANDBOX}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: SMARTLEAD_API_KEY
-        value: ${SMARTLEAD_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-
-# Define the workers (background task processors) for your application.
-workers:
-  - name: attackacrack-worker
-    # Use pre-built image from DigitalOcean Container Registry
-    image:
-      registry_type: DOCR
-      repository: attackacrack-crm
-      tag: latest
-    # Define the command to run the Celery worker.
-    # Limit concurrency to 2 workers for basic-xs instance
-    run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
-    # Define the instance size - xs for worker to handle memory requirements
-    instance_size_slug: basic-xs
-    # Define the number of instances.
-    instance_count: 1
-    # Define environment variables (must match the web service).
-    envs:
-      # Static configuration values
-      - key: FLASK_ENV
-        value: "production"
-        scope: RUN_AND_BUILD_TIME
-      - key: FLASK_APP
-        value: "app.py"
-        scope: RUN_AND_BUILD_TIME
-      # Database bindings
-      - key: DATABASE_URL
-        value: ${db.DATABASE_URL}
-        scope: RUN_AND_BUILD_TIME
-      - key: POSTGRES_URI
-        value: ${db.DATABASE_URL}
-        scope: RUN_AND_BUILD_TIME
-      # Secrets - Using GitHub repository secrets with placeholder substitution
-      - key: SECRET_KEY
-        value: ${SECRET_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: REDIS_URL
-        value: ${REDIS_URL}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_BROKER_URL
-        value: ${CELERY_BROKER_URL}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: CELERY_RESULT_BACKEND
-        value: ${CELERY_RESULT_BACKEND}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_API_KEY
-        value: ${OPENPHONE_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
-        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER
-        value: ${OPENPHONE_PHONE_NUMBER}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: OPENPHONE_PHONE_NUMBER_ID
-        value: ${OPENPHONE_PHONE_NUMBER_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: ENCRYPTION_KEY
-        value: ${ENCRYPTION_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GEMINI_API_KEY
-        value: ${GEMINI_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_ID
-        value: ${GOOGLE_CLIENT_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_CLIENT_SECRET
-        value: ${GOOGLE_CLIENT_SECRET}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: GOOGLE_PROJECT_ID
-        value: ${GOOGLE_PROJECT_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: PROPERTY_RADAR_API_KEY
-        value: ${PROPERTY_RADAR_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_ID
-        value: ${QUICKBOOKS_CLIENT_ID}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_CLIENT_SECRET
-        value: ${QUICKBOOKS_CLIENT_SECRET}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_REDIRECT_URI
-        value: ${QUICKBOOKS_REDIRECT_URI}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: QUICKBOOKS_SANDBOX
-        value: ${QUICKBOOKS_SANDBOX}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-      - key: SMARTLEAD_API_KEY
-        value: ${SMARTLEAD_API_KEY}
-        type: SECRET
-        scope: RUN_AND_BUILD_TIME
-
-# Define the managed databases and other addons for the application.
 databases:
-  - name: db
-    # Use PostgreSQL version 13.
-    engine: PG
-    version: "13"
-    # The production database name will be auto-created as 'db'
-    # matching the component name
-    production: true
-    # Cluster name for the production database
-    cluster_name: attackacrack-db
-    # The size of the database cluster. Start small.
-    size: db-s-1vcpu-1gb
-
-# Note: Valkey (Redis) database is managed separately as db-valkey-nyc3-14182
-# Connection is handled via REDIS_URL, CELERY_BROKER_URL, and CELERY_RESULT_BACKEND env vars
+- cluster_name: attackacrack-db
+  engine: PG
+  name: db
+  production: true
+  size: db-s-1vcpu-1gb
+  version: "13"
+ingress:
+  rules:
+  - component:
+      name: attackacrack-web
+    match:
+      path:
+        prefix: /
+name: attackacrack-prod
+region: nyc
+services:
+- envs:
+  - key: FLASK_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  - key: FLASK_APP
+    scope: RUN_AND_BUILD_TIME
+    value: app.py
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${db.DATABASE_URL}
+  - key: POSTGRES_URI
+    scope: RUN_AND_BUILD_TIME
+    value: ${db.DATABASE_URL}
+  - key: SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:21V5EqEXr8FVp7C5YWqLA0TC4QZV/TR0:1tsfVHmwSuL6w0VRkQFfjaMzxAfARSwkn/h4P1YsR62+PL8LZUTaLbW4OMgZAA==]
+  - key: REDIS_URL
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:eisG4Z/50lbBZlUxhNmYrmWLdi6nW6pK:/QjkplclJufseBjNTb6BSInn2N/+fq7QkvHbjuqkfSKxDd4VObGHd8b1WddTXFqmq/fqaSurT/l3ORy+7BUkgnDLDDCX8aB9AMqssAdusi1peFIgkMKz69FpdFbaYVZcp9XHAAakaZ2xFwhIoG0OL8XB7DylGompuWQAbYMeTQ==]
+  - key: CELERY_BROKER_URL
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:2kcMGadeObkhZVl38kbzYgvpZ3DhcqCp:EQpqzs+Dkpk7T5slxHtGpmP0+T9UCob+ypSuCQyTDvkyM5+s56MXDmf9mB9cGRk4lXGyuFW2XzkNUz0yZ6x5pnZ28ex5zmOOgO+ugRrU41+MXTM1znxuXCyrplc+/lyK2f8WT7d6z4u2qFaVjtbtPEKViKI4CYx+6xaHs43RxA==]
+  - key: CELERY_RESULT_BACKEND
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:34CGCKs9MiKXww7bS0CoqAT0V51RUMvs:PpolZK9O01jzHo21GQdSzf2Bc8StcMhMMUdW4ARuATQdCfrgSI4hwJl/ui28kfQFS/niQzhogzfX4V/S+zZhw9rVwfSlBLYLfWdwEBlTfU/R3AttQf7vP2I+pAyuepeyWQB0LhDNEPi3m6dP7rsTFEr6Nrg4Hvt0TY2euK1VCA==]
+  - key: OPENPHONE_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:UcllzLx2cdzihUfeL1u3qNWGZTMaI0Sh:Wtu5++hxiq9iitu0dm7b2S+oDsHrQYi7YEe52DQcErJTzZ6FBnT+eahY3Zmp920o]
+  - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:FtwGK03Iba1gir7wiV2S7Aaj+ieT4kNU:hZ15zkFHN0oNy+lVmfrjDS6PtkylVNMXUxMOvP8Hg8dpei9E25yxxDILGKknsRWU8H25DgeUIFvBKDKH]
+  - key: OPENPHONE_PHONE_NUMBER
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:GX/1LINCa0MnNH6ZQv4xnaErvhr1eSh7:+lMrnFsoaoffCqtSj+NCAbF8c76Of41a9Bt1iA==]
+  - key: OPENPHONE_PHONE_NUMBER_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:GRwYMSx4/9QD/atXq+OhwwZRod/f+iO1:PzWwxfL9vI/0zj4JMlg92xO5bDFwUmht/oo=]
+  - key: ENCRYPTION_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:qD3hP+7ZJICVi7kD6BfOeVU6LGG/V5sV:EHTSIQkzehX5FIw2tJRkD/PXVhEwf5x38mta83McYthqq0GbVQC5vGCKN0NIAZZpBIu829ptcHmkzsLe]
+  - key: GEMINI_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:zWNGZlv2M2D//0EzNy5sMXSvuypxzHRW:ysyW19hHXWqtjNG3zaQuKKzizlYx0XwTXfc/NIfTS1/ihh31ZNu1icmf3+AiQ6cQ2Db6iW2fxQ==]
+  - key: GOOGLE_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:xBNtj5nVk+MnFsbdP/K1l8BmeGc+xVJU:CR/wwyjLiIhaKNl4fLnHwbyEJ+LeJAh7FhR2DnlnjnVV2+g6HO2WCBg88HCHYlQLpEzQzUR0fZEBED/BvWo5uiAnWQFOlH9JnDonONkOlFeAZ+a8IUubuw==]
+  - key: GOOGLE_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:efNmOz5XS0rq6hku137cHd9wYsFXvK8p:FSnpINCmAoG+EQXVX5CXmX9wdTT62qQNcFhyUgSQrymL4wNPUPzBBY6uT9JVOGvQc79/]
+  - key: GOOGLE_PROJECT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:u/dVG9AlmNZX7QIzJzd23a/KCXk3+68u:3ww9+kHZWYlye7ussO+GrIuZtNIc/H9PPbcYAuV9Rku7hJceApja]
+  - key: PROPERTY_RADAR_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:AwM61MiTVB3D9qeHeYmSY7XME9yGD4AK:844vG1DjLl8tPFEJKAMq6EaN4i5yci44yHF590IEFMpoWx7kdrsos3wdngxv4CS0J7G3pRitKl0=]
+  - key: QUICKBOOKS_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:K5QWAEvHcgw6gSUCnFFtKlTVWYLJN4ZH:QTjvHPRrJrHSEHuDs5J6QyWeAh4TfMP1jSB/GTeUWXQWL2iuj7fGLfWRwuXteNPjOq0WnEXpS34VThcCjdb0TWE0]
+  - key: QUICKBOOKS_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:o5pxVNN3LP1bLicy9K6eEFJcq/5T8cPl:GweFHywssGe3Jq7IYvVUqLYaw+HsA4sqcs2PAvkAWHujJRbX+uSnA20gVxFqewRnOTAuMZZT/yA=]
+  - key: QUICKBOOKS_REDIRECT_URI
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:5uNUFb9vh8+rhh2fPUEL7jlKJAKTHahd:SNY8WbZXK/n+uX6WoRD2oFnoeQ9nRwbfkni7Xq+DFK0ou1yACHVdsx1yM/Yh9xChEJfSZLeLbQGzUDui40Y=]
+  - key: QUICKBOOKS_SANDBOX
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:tZ1eKSwXnbDrtIeP/KqDugOSDRWiQsAQ:ABf22K4g/hKcw1viQaw0kX0j4Lc=]
+  - key: SMARTLEAD_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:Fkkrf3dyhRxdQdnXffYqM3vMv5/lU2W7:g2CxEI+6dCpujlqxsmqF/mldvTmDbl0egd6zytcM1DCVevUrnIz+ny6dfpFzktErw+Y2VnkDxgv6N0b8]
+  health_check:
+    http_path: /health
+    port: 5000
+    timeout_seconds: 10
+  http_port: 5000
+  image:
+    registry: attack-a-crack
+    registry_type: DOCR
+    repository: attackacrack-crm
+    tag: latest
+  instance_count: 1
+  instance_size_slug: basic-xs
+  name: attackacrack-web
+  run_command: ./entrypoint.sh
+workers:
+- envs:
+  - key: FLASK_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  - key: FLASK_APP
+    scope: RUN_AND_BUILD_TIME
+    value: app.py
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${db.DATABASE_URL}
+  - key: POSTGRES_URI
+    scope: RUN_AND_BUILD_TIME
+    value: ${db.DATABASE_URL}
+  - key: SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:Zq+P0QeFCu3OtvTY054igBQQXNivWv/d:X6UtuEhAO85wwFyqJnTUIxlFvwqqbbuBH+Xl7MNQLS+YrpQXCsSOsYW3rboAUw==]
+  - key: REDIS_URL
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:wQbGuaSpdPuhdD+fK/XtEqssAAO/dlHt:cqJ5YLVD/O+Hsp1snK+ZPBVWhxDA7fFwoGtITL9LDPx5J23rgXsR8cjnS1vVonkgZm78a0eti7oASY082X8bBnS8MbYsTSsSGtsOiOtEB/CLYKjegWvryDc72wVMTsG/m8ieloF0CmpJLZbHoKsRt9V5ZDR6/RfOo8eg5Hm/Fg==]
+  - key: CELERY_BROKER_URL
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:xxtDHwpafKjtFWAb0YH8+tHUgqEyBZSt:oTgTF1V77oIag8xYEVPArd8YX/YiIo29D3PoSf72Z7XAfjo4CfucCzzGDQbHiI0qRZwFhxh0NmMYbHFVX/zpI4lK8BxlpRybD33mMvIrVsGfE+jsaVfRI9JllECwtvI+ZcGfci251Ni54yBCzMgxUzb6+M9XhBGbDeN+iexIaA==]
+  - key: CELERY_RESULT_BACKEND
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:boxUSK9Jhv4PLuUzk6Q76jTP4iA/IYh9:L1CsKkhfF7GjtcRxPNaqhAMQ407vQ4IuaRI9FeDOh/Nr2UwsXMQh16/mJR9el3oRdzD4mUe5qSzdNfmjn8y4kpqmKpY8k50hgRyoZkQ3JqoNgmWT4964wOHZGBIYK+PJt/yLx852rYBcbivjeGpsVMkwF+OuEW5Zv37ufaDilw==]
+  - key: OPENPHONE_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:3fIeth4gFA4L2hschC9DE9fY9lKxOe1o:LyKv7BUS9axkcDeWx2tgQqnew9ua3MIJh1nvmFUZhA2HWYdN1Lnw5E///ayL6iJz]
+  - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:v5HrX+0RjDXi37L5DCXe2xr6KXyuJ6qn:2BrK30phqYA5ZZO7UfbCCQFty9mbezw7Y5QrSAoyUi7BT5CWTU7xkxtec9qjn8VpNmf5pIGB2NUVdWnT]
+  - key: OPENPHONE_PHONE_NUMBER
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:4vEhIR0XAePSTv47Wh2pan0sY5k5gQku:37FrHzQXAW0dy/GPcHRnmKjA1mp5ox8ce+x6rw==]
+  - key: OPENPHONE_PHONE_NUMBER_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:623dcNXoKjgc/Q4jdh0ztSS7zYZh10Y6:uy/VSoeVQv8kLBPZLojr7e5v7dPl0XhWic4=]
+  - key: ENCRYPTION_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:j9eulz+KHayAu82fU5E/XbWczrfoB6eK:EhztXHXG1QADjG+OVCQ+SUzB0AWjHq0VBr76mUxfxIu4LesJika5HO5uO+L4/9eXySzdU/W+JDtgMVsF]
+  - key: GEMINI_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:PjxBK/SunPGcQxrSEGaZR9tQvMsOmLSz:VYwK0PZaYP6iG99X2zWMaKy/L5OcIv7ClzljY4n3si1Fse/gRA5Gc73d0/9yf54a/rFGs7rsVw==]
+  - key: GOOGLE_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:EF3QIX7f9F485a5v0unIZfHGC8iwA6+e:/wM5j4tDK1SgLzOxlJaIbg0/2yrPuFEbIYIfUikCnlaj5BaAlRllaE0b00QrNIiRmgsoTMx33jbyXX60dmeQXyXlZAicBDVOH1Dmd3yq3HXBoGGRF+P9Lg==]
+  - key: GOOGLE_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:VU2ClxyM5axQ+zF9pMyFp8h1c4lhzBLX:ycbUiA6NcdpqBW2fjeEhHitPuK1RRuwDn8bF3gfmVQXWaxTicRZWLxf0/7eFvp90PorI]
+  - key: GOOGLE_PROJECT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:iY4UzaZibSAw2RBwOrAJG6T2iHOmV9fz:DjurVeFLnvJHgnkcT1w9qmT7Xg4kZ8zPIlGWadxR+MMBvLv2jtYQ]
+  - key: PROPERTY_RADAR_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:M2PCMvCyGDtzG6C2xvw8lOxwFS30hLDU:jYivDUvMymZAgAPsyi1BMYgNOCgL5QEBs/4B9dr21SOx9LFEe2dtka/q/gcaW9O9tDOrjYHPib8=]
+  - key: QUICKBOOKS_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:ViP+xrZ358sE5w76pAZCu3BtDQGpFHSO:ry6RN1QIkZoK2sO+aOtAyfzLQTvDCCVXok1o/1oO2XL5VHuqotQNBN8tCeiyiMJtzzRRVcNLE9kzpoa6hQWd5VYP]
+  - key: QUICKBOOKS_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:upRv1WjcMfndixx/59Ng0o7ZkLbetr94:qimN1j/FRjVke82a6t1ltv0sU5oC1xm4/x94wIU3W67CtFf0AU0SeD8uK8LT8G3pSXah3QgTjx4=]
+  - key: QUICKBOOKS_REDIRECT_URI
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:WzZuAf3BbV0Gh1apHmBoRoAg3bpndRUD:H+LdD57yJUcg02pvlOCgBvAdLJaTWMhN9vthOLp0MiYs1dH/406MuoZvIM5LahTBKzbWHqzGHLhijovdBKU=]
+  - key: QUICKBOOKS_SANDBOX
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:Y14Q5PK5sgm2pvFVsnf97zTYnjFZytBx:ifdJ3oYiFGYsOYNjYUhuwhbrNNc=]
+  - key: SMARTLEAD_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:Ufom8xMOU5ijD0p1G060MRVgTLVZf8A/:D2PsxAOgrRcTUv254BMzR5qNuCpPkQ9zlhJCJAEoi0DZrDz6zX3NsGPfzo9d9OKhnnWbr4M7WbmF2mBP]
+  image:
+    registry: attack-a-crack
+    registry_type: DOCR
+    repository: attackacrack-crm
+    tag: latest
+  instance_count: 1
+  instance_size_slug: basic-xs
+  name: attackacrack-worker
+  run_command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2

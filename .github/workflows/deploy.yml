@@ -14,6 +14,9 @@ on:
         options:
           - production
 
+env:
+  APP_ID: 4d1674ef-bfba-4fd3-9a97-943fa02c1f70  # Fixed app ID
+
 jobs:
   deploy:
     name: Deploy to DigitalOcean App Platform
@@ -23,47 +26,63 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Deploy to DigitalOcean App Platform
-      uses: digitalocean/app_action/deploy@v2
-      env:
-        # Pass all secrets as environment variables for substitution
-        SECRET_KEY: ${{ secrets.SECRET_KEY }}
-        REDIS_URL: ${{ secrets.REDIS_URL }}
-        CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
-        CELERY_RESULT_BACKEND: ${{ secrets.CELERY_RESULT_BACKEND }}
-        OPENPHONE_API_KEY: ${{ secrets.OPENPHONE_API_KEY }}
-        OPENPHONE_WEBHOOK_SIGNING_KEY: ${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY }}
-        OPENPHONE_PHONE_NUMBER: ${{ secrets.OPENPHONE_PHONE_NUMBER }}
-        OPENPHONE_PHONE_NUMBER_ID: ${{ secrets.OPENPHONE_PHONE_NUMBER_ID }}
-        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-        GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
-        PROPERTY_RADAR_API_KEY: ${{ secrets.PROPERTY_RADAR_API_KEY }}
-        QUICKBOOKS_CLIENT_ID: ${{ secrets.QUICKBOOKS_CLIENT_ID }}
-        QUICKBOOKS_CLIENT_SECRET: ${{ secrets.QUICKBOOKS_CLIENT_SECRET }}
-        QUICKBOOKS_REDIRECT_URI: ${{ secrets.QUICKBOOKS_REDIRECT_URI }}
-        QUICKBOOKS_SANDBOX: ${{ secrets.QUICKBOOKS_SANDBOX }}
-        SMARTLEAD_API_KEY: ${{ secrets.SMARTLEAD_API_KEY }}
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
       with:
         token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-        app_name: attackacrack-prod
-        print_build_logs: true
-        print_deploy_logs: true
     
-    - name: Verify Deployment
+    - name: Deploy to DigitalOcean
       run: |
-        echo "## 🚀 Deployment Complete!"
+        echo "Deploying to app ID: ${{ env.APP_ID }}"
+        
+        # Update the app with the spec containing encrypted values
+        echo "=== Updating app with encrypted environment variables ==="
+        doctl apps update ${{ env.APP_ID }} --spec .do/app.yaml --wait
+        
+        echo "Deployment completed successfully"
+    
+    - name: Get deployment status
+      run: |
+        echo "=== Getting latest deployment status ==="
+        DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
+        echo "Latest deployment ID: $DEPLOYMENT_ID"
+        
+        doctl apps get-deployment ${{ env.APP_ID }} $DEPLOYMENT_ID
+    
+    - name: Verify health check
+      run: |
+        echo "Waiting 30 seconds for deployment to stabilize..."
+        sleep 30
+        
+        # Get the app URL
+        APP_URL=$(doctl apps get ${{ env.APP_ID }} --format DefaultIngress --no-header)
+        echo "App URL: $APP_URL"
+        
+        # Test health endpoint
+        echo "=== Testing health endpoint ==="
+        if curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health | grep -q "200"; then
+          echo "✅ Health check passed!"
+        else
+          echo "❌ Health check failed"
+          
+          # Get logs for debugging
+          echo "=== Recent deployment logs ==="
+          DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
+          doctl apps logs ${{ env.APP_ID }} --tail=50
+          
+          exit 1
+        fi
+    
+    - name: Summary
+      if: success()
+      run: |
+        APP_URL=$(doctl apps get ${{ env.APP_ID }} --format DefaultIngress --no-header)
+        echo "## 🚀 Deployment Successful!"
         echo ""
-        echo "The application has been deployed with all environment variables properly configured."
+        echo "- **Environment**: ${{ github.event.inputs.environment || 'production' }}"
+        echo "- **App URL**: $APP_URL"
+        echo "- **Deployed by**: ${{ github.actor }}"
         echo ""
-        echo "### Important Notes:"
-        echo "- Environment variables are now managed through GitHub Secrets"
-        echo "- The ${VARIABLE} placeholders in app.yaml are automatically substituted"
-        echo "- All sensitive values are encrypted as SECRET type in DigitalOcean"
-        echo ""
-        echo "### Next Steps:"
-        echo "1. Verify the app is running at: https://attackacrack-prod-5ce6f.ondigitalocean.app"
-        echo "2. Check that authentication works properly"
-        echo "3. Verify OpenPhone sync functionality"
+        echo "### Environment Variables Status"
+        echo "All environment variables are encrypted and stored in app.yaml"
+        echo "These encrypted values are safe to commit and will persist across deployments"
