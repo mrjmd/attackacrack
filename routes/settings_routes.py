@@ -137,7 +137,6 @@ def openphone_sync():
             task_id = str(uuid.uuid4())
             sync_openphone_messages.apply_async(
                 args=[days_back], 
-                app=celery,
                 task_id=task_id,
                 ignore_result=True  # Don't wait for backend connection
             )
