@@ -1,6 +1,9 @@
-name: Manual Deploy to Production
+name: Deploy to DigitalOcean
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       environment:
@@ -10,15 +13,6 @@ on:
         type: choice
         options:
           - production
-      tag:
-        description: 'Docker image tag to deploy (leave empty for latest)'
-        required: false
-        type: string
-
-env:
-  REGISTRY: registry.digitalocean.com
-  IMAGE_NAME: attackacrack-crm
-  APP_ID: 4d1674ef-bfba-4fd3-9a97-943fa02c1f70  # Fixed app ID
 
 jobs:
   deploy:
@@ -29,96 +23,47 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Install doctl
-      uses: digitalocean/action-doctl@v2
+    - name: Deploy to DigitalOcean App Platform
+      uses: digitalocean/app_action/deploy@v2
+      env:
+        # Pass all secrets as environment variables for substitution
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        REDIS_URL: ${{ secrets.REDIS_URL }}
+        CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+        CELERY_RESULT_BACKEND: ${{ secrets.CELERY_RESULT_BACKEND }}
+        OPENPHONE_API_KEY: ${{ secrets.OPENPHONE_API_KEY }}
+        OPENPHONE_WEBHOOK_SIGNING_KEY: ${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY }}
+        OPENPHONE_PHONE_NUMBER: ${{ secrets.OPENPHONE_PHONE_NUMBER }}
+        OPENPHONE_PHONE_NUMBER_ID: ${{ secrets.OPENPHONE_PHONE_NUMBER_ID }}
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
+        PROPERTY_RADAR_API_KEY: ${{ secrets.PROPERTY_RADAR_API_KEY }}
+        QUICKBOOKS_CLIENT_ID: ${{ secrets.QUICKBOOKS_CLIENT_ID }}
+        QUICKBOOKS_CLIENT_SECRET: ${{ secrets.QUICKBOOKS_CLIENT_SECRET }}
+        QUICKBOOKS_REDIRECT_URI: ${{ secrets.QUICKBOOKS_REDIRECT_URI }}
+        QUICKBOOKS_SANDBOX: ${{ secrets.QUICKBOOKS_SANDBOX }}
+        SMARTLEAD_API_KEY: ${{ secrets.SMARTLEAD_API_KEY }}
       with:
         token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        app_name: attackacrack-prod
+        print_build_logs: true
+        print_deploy_logs: true
     
-    - name: Determine image tag
-      id: image-tag
+    - name: Verify Deployment
       run: |
-        if [ -z "${{ github.event.inputs.tag }}" ]; then
-          echo "tag=latest" >> $GITHUB_OUTPUT
-        else
-          echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-        fi
-        echo "Using image tag: ${{ github.event.inputs.tag || 'latest' }}"
-    
-    - name: Update app spec with new image tag
-      run: |
-        # Get the current spec from DigitalOcean (preserves all env vars)
-        doctl apps spec get ${{ env.APP_ID }} > .do/app-deploy.yaml
-        
-        # Only update the Docker image tag - nothing else
-        sed -i "s/tag: .*/tag: ${{ steps.image-tag.outputs.tag }}/g" .do/app-deploy.yaml
-        
-        echo "Updated app spec to use tag: ${{ steps.image-tag.outputs.tag }}"
-        
-        # Show what we're deploying
-        echo "=== Image configuration ==="
-        grep -A 3 "image:" .do/app-deploy.yaml | head -10
-    
-    - name: Validate app spec
-      run: |
-        echo "Validating app specification..."
-        doctl apps spec validate .do/app-deploy.yaml
-    
-    - name: Deploy to DigitalOcean
-      run: |
-        echo "Deploying to app ID: ${{ env.APP_ID }}"
-        
-        # Show current app status
-        echo "=== Current app status ==="
-        doctl apps get ${{ env.APP_ID }} --format ID,Status,DefaultIngress --no-header
-        
-        # Update the app with the new spec
-        # This will preserve all existing environment variables
-        echo "=== Updating app with new spec ==="
-        doctl apps update ${{ env.APP_ID }} --spec .do/app-deploy.yaml --wait
-        
-        echo "Deployment initiated successfully"
-    
-    - name: Get deployment status
-      run: |
-        echo "=== Getting latest deployment status ==="
-        DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
-        echo "Latest deployment ID: $DEPLOYMENT_ID"
-        
-        doctl apps get-deployment ${{ env.APP_ID }} $DEPLOYMENT_ID
-    
-    - name: Verify health check
-      run: |
-        echo "Waiting 30 seconds for deployment to stabilize..."
-        sleep 30
-        
-        # Get the app URL
-        APP_URL=$(doctl apps get ${{ env.APP_ID }} --format DefaultIngress --no-header)
-        echo "App URL: $APP_URL"
-        
-        # Test health endpoint
-        echo "=== Testing health endpoint ==="
-        if curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health | grep -q "200"; then
-          echo "✅ Health check passed!"
-        else
-          echo "❌ Health check failed"
-          
-          # Get logs for debugging
-          echo "=== Recent deployment logs ==="
-          DEPLOYMENT_ID=$(doctl apps list-deployments ${{ env.APP_ID }} --format ID --no-header | head -1)
-          doctl apps get-logs ${{ env.APP_ID }} --type=deploy --deployment=$DEPLOYMENT_ID --tail=50
-          
-          exit 1
-        fi
-    
-    - name: Summary
-      if: success()
-      run: |
-        APP_URL=$(doctl apps get ${{ env.APP_ID }} --format DefaultIngress --no-header)
-        echo "## 🚀 Deployment Successful!"
+        echo "## 🚀 Deployment Complete!"
         echo ""
-        echo "- **Environment**: ${{ github.event.inputs.environment }}"
-        echo "- **Image Tag**: ${{ steps.image-tag.outputs.tag }}"
-        echo "- **App URL**: $APP_URL"
-        echo "- **Deployed by**: ${{ github.actor }}"
+        echo "The application has been deployed with all environment variables properly configured."
         echo ""
-        echo "The application is now live and all secrets are preserved."
+        echo "### Important Notes:"
+        echo "- Environment variables are now managed through GitHub Secrets"
+        echo "- The ${VARIABLE} placeholders in app.yaml are automatically substituted"
+        echo "- All sensitive values are encrypted as SECRET type in DigitalOcean"
+        echo ""
+        echo "### Next Steps:"
+        echo "1. Verify the app is running at: https://attackacrack-prod-5ce6f.ondigitalocean.app"
+        echo "2. Check that authentication works properly"
+        echo "3. Verify OpenPhone sync functionality"

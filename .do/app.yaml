@@ -51,8 +51,83 @@ services:
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
         scope: RUN_AND_BUILD_TIME
-      # Secrets are managed at the app level via DigitalOcean dashboard/CLI
-      # DO NOT declare them here or they will be cleared on deployment!
+      # Secrets - Using GitHub repository secrets with placeholder substitution
+      - key: SECRET_KEY
+        value: ${SECRET_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: REDIS_URL
+        value: ${REDIS_URL}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: CELERY_BROKER_URL
+        value: ${CELERY_BROKER_URL}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: CELERY_RESULT_BACKEND
+        value: ${CELERY_RESULT_BACKEND}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_API_KEY
+        value: ${OPENPHONE_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_PHONE_NUMBER
+        value: ${OPENPHONE_PHONE_NUMBER}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_PHONE_NUMBER_ID
+        value: ${OPENPHONE_PHONE_NUMBER_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: ENCRYPTION_KEY
+        value: ${ENCRYPTION_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GEMINI_API_KEY
+        value: ${GEMINI_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GOOGLE_CLIENT_ID
+        value: ${GOOGLE_CLIENT_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GOOGLE_CLIENT_SECRET
+        value: ${GOOGLE_CLIENT_SECRET}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GOOGLE_PROJECT_ID
+        value: ${GOOGLE_PROJECT_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: PROPERTY_RADAR_API_KEY
+        value: ${PROPERTY_RADAR_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_CLIENT_ID
+        value: ${QUICKBOOKS_CLIENT_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_CLIENT_SECRET
+        value: ${QUICKBOOKS_CLIENT_SECRET}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_REDIRECT_URI
+        value: ${QUICKBOOKS_REDIRECT_URI}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_SANDBOX
+        value: ${QUICKBOOKS_SANDBOX}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: SMARTLEAD_API_KEY
+        value: ${SMARTLEAD_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
 
 # Define the workers (background task processors) for your application.
 workers:
@@ -85,8 +160,83 @@ workers:
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
         scope: RUN_AND_BUILD_TIME
-      # Secrets are managed at the app level via DigitalOcean dashboard/CLI
-      # DO NOT declare them here or they will be cleared on deployment!
+      # Secrets - Using GitHub repository secrets with placeholder substitution
+      - key: SECRET_KEY
+        value: ${SECRET_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: REDIS_URL
+        value: ${REDIS_URL}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: CELERY_BROKER_URL
+        value: ${CELERY_BROKER_URL}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: CELERY_RESULT_BACKEND
+        value: ${CELERY_RESULT_BACKEND}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_API_KEY
+        value: ${OPENPHONE_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_WEBHOOK_SIGNING_KEY
+        value: ${OPENPHONE_WEBHOOK_SIGNING_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_PHONE_NUMBER
+        value: ${OPENPHONE_PHONE_NUMBER}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: OPENPHONE_PHONE_NUMBER_ID
+        value: ${OPENPHONE_PHONE_NUMBER_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: ENCRYPTION_KEY
+        value: ${ENCRYPTION_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GEMINI_API_KEY
+        value: ${GEMINI_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GOOGLE_CLIENT_ID
+        value: ${GOOGLE_CLIENT_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GOOGLE_CLIENT_SECRET
+        value: ${GOOGLE_CLIENT_SECRET}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: GOOGLE_PROJECT_ID
+        value: ${GOOGLE_PROJECT_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: PROPERTY_RADAR_API_KEY
+        value: ${PROPERTY_RADAR_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_CLIENT_ID
+        value: ${QUICKBOOKS_CLIENT_ID}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_CLIENT_SECRET
+        value: ${QUICKBOOKS_CLIENT_SECRET}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_REDIRECT_URI
+        value: ${QUICKBOOKS_REDIRECT_URI}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: QUICKBOOKS_SANDBOX
+        value: ${QUICKBOOKS_SANDBOX}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
+      - key: SMARTLEAD_API_KEY
+        value: ${SMARTLEAD_API_KEY}
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
 
 # Define the managed databases and other addons for the application.
 databases:
