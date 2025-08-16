@@ -14,3 +14,6 @@ openphone.key
 *.egg-info
 .coverage
 uploads/
+
+# CSV data files
+csvs/
