@@ -5,6 +5,11 @@ databases:
   production: true
   size: db-s-1vcpu-1gb
   version: "13"
+- cluster_name: db-valkey-nyc3-14182
+  engine: VALKEY
+  name: db-valkey-nyc3-14182
+  production: true
+  version: "8"
 ingress:
   rules:
   - component:

@@ -469,8 +469,29 @@ What started as a complex problem with GitHub Actions, substitution, and circula
 
 The environment variables saga is finally over. 🎉
 
+## Known Issues
+
+### Valkey Not Shown as Attached Resource (August 16, 2025)
+
+**Issue**: Valkey (Redis) database `db-valkey-nyc3-14182` doesn't appear as an attached resource in the DigitalOcean App Platform UI or spec, despite being fully functional.
+
+**Status**: ✅ **Confirmed Working** - This is a UI/spec display issue only
+
+**Verification**:
+- Valkey database exists and is online: `doctl databases list` shows it
+- Connection URI matches app configuration: `rediss://default:***@db-valkey-nyc3-14182-do-user-24328167-0.f.db.ondigitalocean.com:25061`
+- Web service connects successfully (logs show Redis URL)
+- Health checks pass (200 OK)
+- Session management working (Flask-Session uses Redis)
+- Background tasks processing (Celery uses Valkey as broker)
+
+**Why This Happens**: 
+DigitalOcean App Platform only shows databases in the `databases:` section of the spec as "attached resources". Valkey/Redis connections are made via environment variables (REDIS_URL, CELERY_BROKER_URL) rather than being formally attached like PostgreSQL databases. This is the standard pattern for Redis/Valkey with App Platform.
+
+**No Action Required**: The connection is working correctly. This is cosmetic only.
+
 ---
 
 *Document created: January 2025*
-*Last updated: Current*
-*Status: Problem identified, solution pending implementation*
+*Last updated: August 16, 2025*
+*Status: RESOLVED - Environment variables persisting correctly with encrypted values*
