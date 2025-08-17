@@ -252,12 +252,12 @@ def new_campaign_list():
         
         # Create the list
         try:
-            # Determine list type
-            list_type = "static"
+            # Determine if list is dynamic
+            is_dynamic = False
             criteria = None
             
-            if data.get("list_type") == "dynamic":
-                list_type = "dynamic"
+            if data.get("list_type") == "dynamic" or data.get("is_dynamic"):
+                is_dynamic = True
                 # Build criteria based on form inputs
                 criteria = {}
                 
@@ -281,12 +281,12 @@ def new_campaign_list():
             campaign_list = list_service.create_list(
                 name=data["name"],
                 description=data.get("description", ""),
-                list_type=list_type,
-                criteria=criteria
+                is_dynamic=is_dynamic,
+                filter_criteria=criteria
             )
             
             # If static list and contacts provided, add them
-            if list_type == "static" and data.get("contact_ids"):
+            if not is_dynamic and data.get("contact_ids"):
                 contact_ids = [int(id) for id in data.get("contact_ids", "").split(",") if id]
                 list_service.add_contacts_to_list(campaign_list.id, contact_ids)
             
@@ -317,16 +317,17 @@ def campaign_list_detail(list_id):
     
     campaign_list = CampaignList.query.get_or_404(list_id)
     stats = list_service.get_list_stats(list_id)
-    contacts = list_service.get_list_contacts(list_id, limit=50)  # Show first 50
+    all_contacts = list_service.get_list_contacts(list_id)
+    contacts = all_contacts[:50]  # Show first 50
     
     # Get campaigns using this list
     campaigns_using = Campaign.query.filter_by(list_id=list_id).all()
     
     return render_template("campaigns/list_detail.html",
-                         campaign_list=campaign_list,
+                         list=campaign_list,
                          stats=stats,
                          contacts=contacts,
-                         campaigns_using=campaigns_using)
+                         campaigns=campaigns_using)
 
 
 @campaigns_bp.route("/campaigns/lists/<int:list_id>/refresh", methods=["POST"])
