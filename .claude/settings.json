@@ -25,6 +25,15 @@
             "command": "echo '✅ File modified. Remember to run tests: docker-compose exec web pytest tests/ -v'"
           }
         ]
+      },
+      {
+        "matcher": "TodoWrite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/persist-todos.sh TodoWrite"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

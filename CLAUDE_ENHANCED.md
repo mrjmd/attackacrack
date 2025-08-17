@@ -170,16 +170,58 @@ When implementing ANY feature:
 4. Ensure README reflects new capabilities
 
 ### Progress Tracking
-Use TodoWrite tool for ALL multi-step tasks:
-```python
-# Example todo structure for Phase 2 refactoring
-todos = [
-    {"id": "1", "content": "Create BaseRepository interface", "status": "pending"},
-    {"id": "2", "content": "Write BaseRepository tests", "status": "pending"},
-    {"id": "3", "content": "Implement ContactRepository", "status": "pending"},
-    {"id": "4", "content": "Write ContactRepository tests", "status": "pending"},
-    {"id": "5", "content": "Migrate ContactService to use repository", "status": "pending"},
-]
+
+#### Automatic Todo Persistence
+**ALL todos are automatically saved to `.claude/session-todos.md`:**
+- Updates after EVERY task status change
+- Preserves context if session is interrupted
+- Includes recovery information
+- Never lose progress due to context squashing
+
+#### Three-Tier Todo System
+
+1. **`.claude/session-todos.md`** (Auto-Updated)
+   - Updated immediately after each TodoWrite
+   - Contains current session progress
+   - Includes context for recovery
+   - Modified files and next steps
+
+2. **`TODO.md`** (Project-Wide)
+   - Weekly priorities and sprints
+   - Long-term roadmap
+   - Manually updated for major milestones
+
+3. **In-Memory TodoWrite** (Real-Time)
+   - Tracks immediate progress
+   - Triggers auto-save to session-todos.md
+   - Shows in Claude's responses
+
+#### Recovery After Interruption
+```bash
+# If session is interrupted or context squashed:
+1. Read .claude/session-todos.md
+2. Check "🔍 Context for Recovery" section
+3. Resume from "Working On" status
+4. Continue with "In Progress" items
+5. Run commands from "Commands to Resume"
+```
+
+#### Todo Workflow
+```bash
+# Starting a task
+1. TodoWrite creates in-memory todos
+2. Automatically saved to .claude/session-todos.md
+3. File includes timestamp and context
+
+# During work
+- Each status change triggers auto-save
+- Session notes capture decisions
+- Modified files are tracked
+
+# After interruption
+- New session reads .claude/session-todos.md
+- Continues exactly where left off
+- No manual tracking needed
 ```
 
 ## 🚀 Phase 2 Refactoring Guidelines

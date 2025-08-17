@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
-from services.contact_service_result import ContactService
+from services.contact_service_refactored import ContactService
 from services.common.result import Result, PagedResult
 from repositories.contact_repository import ContactRepository
 from crm_database import Contact, ContactFlag, Campaign, CampaignMembership
@@ -162,8 +162,8 @@ class TestContactServiceResult:
         assert result.page == 1
         assert result.per_page == 2
     
-    @patch('services.contact_service_result.or_')
-    @patch('services.contact_service_result.Contact')
+    @patch('services.contact_service_refactored.or_')
+    @patch('services.contact_service_refactored.Contact')
     def test_search_contacts(self, mock_contact_class, mock_or, contact_service, mock_session):
         """Test searching contacts"""
         # Arrange
@@ -281,8 +281,8 @@ class TestContactServiceResult:
         assert result.is_failure == True
         assert result.error_code == "NO_CONTACTS"
     
-    @patch('services.contact_service_result.Campaign')
-    @patch('services.contact_service_result.CampaignMembership')
+    @patch('services.contact_service_refactored.Campaign')
+    @patch('services.contact_service_refactored.CampaignMembership')
     def test_add_to_campaign_success(self, mock_membership_class, mock_campaign_class, 
                                     contact_service, mock_contact_repo, mock_session):
         """Test adding contact to campaign"""
@@ -301,7 +301,7 @@ class TestContactServiceResult:
         mock_session.add.assert_called_once()
         mock_session.commit.assert_called_once()
     
-    @patch('services.contact_service_result.Campaign')
+    @patch('services.contact_service_refactored.Campaign')
     def test_add_to_campaign_not_found(self, mock_campaign_class, contact_service, mock_contact_repo):
         """Test adding to non-existent campaign"""
         # Arrange
@@ -348,7 +348,7 @@ class TestContactServiceResult:
         mock_query.distinct.return_value = mock_query
         mock_session.query.return_value = mock_query
         
-        with patch('services.contact_service_result.ContactFlag') as mock_flag:
+        with patch('services.contact_service_refactored.ContactFlag') as mock_flag:
             mock_flag.query.filter_by.return_value.distinct.return_value.count.return_value = 5
             
             # Act

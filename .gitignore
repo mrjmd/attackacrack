@@ -21,3 +21,9 @@ uploads/
 
 # CSV data files
 csvs/
+
+# Claude Code session files
+.claude/session-todos.md
+.claude/session-todos.md.backup
+.claude/last-update.txt
+.claude/*.tmp
