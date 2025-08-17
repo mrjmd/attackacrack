@@ -1029,3 +1029,7 @@ class CampaignService:
                 return True
         
         return False
+    
+    def get_campaigns_using_list(self, list_id: int) -> List[Campaign]:
+        """Get all campaigns that use a specific campaign list"""
+        return Campaign.query.filter_by(list_id=list_id).all()

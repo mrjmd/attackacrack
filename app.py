@@ -80,6 +80,9 @@ def create_app(config_name=None, test_config=None):
     from services.ai_service import AIService
     from services.quickbooks_service import QuickBooksService
     from services.quickbooks_sync_service import QuickBooksSyncService
+    from services.quote_service import QuoteService
+    from services.job_service import JobService
+    from services.invoice_service import InvoiceService
     
     # Create and populate service registry
     registry = ServiceRegistry()
@@ -102,6 +105,9 @@ def create_app(config_name=None, test_config=None):
     registry.register('ai', AIService())
     registry.register('quickbooks', QuickBooksService())
     registry.register('quickbooks_sync', QuickBooksSyncService())
+    registry.register('quote', QuoteService())
+    registry.register('job', JobService())
+    registry.register('invoice', InvoiceService())
     
     # Services with dependencies
     registry.register('campaign', CampaignService(

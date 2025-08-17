@@ -263,3 +263,7 @@ class CampaignListService:
         
         db.session.commit()
         return new_list
+    
+    def get_campaign_list_by_id(self, list_id: int) -> Optional[CampaignList]:
+        """Get a campaign list by ID"""
+        return CampaignList.query.get(list_id)

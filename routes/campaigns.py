@@ -297,14 +297,8 @@ def new_campaign_list():
             flash(f"Error creating list: {str(e)}", "error")
     
     # Get contact counts for filters
-    from crm_database import ContactFlag
-    filter_stats = {
-        "total_contacts": Contact.query.count(),
-        "with_phone": Contact.query.filter(Contact.phone.isnot(None)).count(),
-        "with_email": Contact.query.filter(Contact.email.isnot(None)).count(),
-        "opted_out": ContactFlag.query.filter_by(flag_type="opted_out").distinct(ContactFlag.contact_id).count(),
-        "office_numbers": ContactFlag.query.filter_by(flag_type="office_number").distinct(ContactFlag.contact_id).count()
-    }
+    contact_service = current_app.services.get('contact')
+    filter_stats = contact_service.get_contact_statistics()
     
     return render_template("campaigns/new_list.html", filter_stats=filter_stats)
 
@@ -315,13 +309,17 @@ def campaign_list_detail(list_id):
     """Show campaign list details"""
     list_service = current_app.services.get('campaign_list')
     
-    campaign_list = CampaignList.query.get_or_404(list_id)
+    campaign_list = list_service.get_campaign_list_by_id(list_id)
+    if not campaign_list:
+        from flask import abort
+        abort(404)
     stats = list_service.get_list_stats(list_id)
     all_contacts = list_service.get_list_contacts(list_id)
     contacts = all_contacts[:50]  # Show first 50
     
     # Get campaigns using this list
-    campaigns_using = Campaign.query.filter_by(list_id=list_id).all()
+    campaign_service = current_app.services.get('campaign')
+    campaigns_using = campaign_service.get_campaigns_using_list(list_id)
     
     return render_template("campaigns/list_detail.html",
                          list=campaign_list,
