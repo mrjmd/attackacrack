@@ -38,7 +38,7 @@ class ConversationRepository(BaseRepository):
             Conversation object or None if not found
         """
         return self.session.query(self.model_class)\
-            .filter_by(openphone_conversation_id=openphone_id)\
+            .filter_by(openphone_id=openphone_id)\
             .first()
     
     def find_recent_conversations(self, limit: int = 50) -> List:
@@ -137,28 +137,49 @@ class ConversationRepository(BaseRepository):
                 .filter(self.model_class.last_activity_at.is_(None))\
                 .count()
     
-    def find_or_create_for_contact(self, contact_id: int, **kwargs):
+    def find_or_create_for_contact(self, contact_id: int, openphone_id: str = None, **kwargs):
         """
         Find or create a conversation for a contact.
         
         Args:
             contact_id: ID of the contact
+            openphone_id: Optional OpenPhone conversation ID
             **kwargs: Additional conversation attributes
             
         Returns:
             Conversation object (existing or newly created)
         """
+        # Try to find by OpenPhone ID first if provided
+        if openphone_id:
+            conversation = self.session.query(self.model_class)\
+                .filter_by(openphone_id=openphone_id)\
+                .first()
+            if conversation:
+                return conversation
+        
+        # Try to find by contact ID
         conversation = self.session.query(self.model_class)\
             .filter_by(contact_id=contact_id)\
             .first()
         
-        if not conversation:
-            conversation = self.model_class(
-                contact_id=contact_id,
-                **kwargs
-            )
-            self.session.add(conversation)
-            self.session.commit()
+        if conversation:
+            # Update with OpenPhone ID if provided and not set
+            if openphone_id and not conversation.openphone_id:
+                conversation.openphone_id = openphone_id
+                self.session.commit()
+            return conversation
+        
+        # Create new conversation
+        conversation_data = {
+            'contact_id': contact_id,
+            'openphone_id': openphone_id,
+            'last_activity_at': datetime.utcnow(),
+            **kwargs
+        }
+        
+        conversation = self.model_class(**conversation_data)
+        self.session.add(conversation)
+        self.session.commit()
         
         return conversation
     
