@@ -66,7 +66,7 @@ class Conversation(db.Model):
     phone_number_id = db.Column(db.String(100), nullable=True)  # Associated OpenPhone number
     
     # Activity tracking
-    last_activity_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity_at = db.Column(db.DateTime, nullable=True)  # Should be set based on actual activity
     last_activity_type = db.Column(db.String(20), nullable=True)  # 'message' or 'call'
     last_activity_id = db.Column(db.String(100), nullable=True)  # OpenPhone activity ID
     

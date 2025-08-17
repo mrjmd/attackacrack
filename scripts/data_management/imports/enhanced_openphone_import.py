@@ -283,6 +283,16 @@ class EnhancedOpenPhoneImporter:
         ).first()
         
         if not conversation:
+            # Parse the last activity timestamp from the conversation data
+            last_activity_at = None
+            if convo_data.get('lastActivityAt'):
+                try:
+                    last_activity_at = datetime.fromisoformat(
+                        convo_data.get('lastActivityAt').replace('Z', '')
+                    ).replace(tzinfo=timezone.utc)
+                except:
+                    pass
+            
             conversation = Conversation(
                 openphone_id=openphone_id,
                 contact_id=contact.id,
@@ -290,7 +300,8 @@ class EnhancedOpenPhoneImporter:
                 participants=','.join(participants),
                 phone_number_id=self.phone_number_id,
                 last_activity_type=convo_data.get('lastActivityType'),
-                last_activity_id=convo_data.get('lastActivityId')
+                last_activity_id=convo_data.get('lastActivityId'),
+                last_activity_at=last_activity_at  # Set the actual last activity time
             )
             db.session.add(conversation)
             db.session.flush()  # Get the ID
