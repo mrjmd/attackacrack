@@ -36,12 +36,13 @@
 
 #### HIGH PRIORITY:
 1. **routes/contact_routes.py** - 15+ direct database queries
-   - [ ] Expand ContactService with:
-     - Bulk operations methods
-     - Campaign membership management
-     - Contact flag management
-     - Conversation handling
-     - Search/filter/pagination
+   - [x] Expand ContactService with:
+     - ✅ Bulk operations methods
+     - ✅ Campaign membership management  
+     - ✅ Contact flag management
+     - ✅ Conversation handling (via relations)
+     - ✅ Search/filter/pagination
+   - [ ] Refactor contact_routes.py to use ContactService methods
 
 2. **routes/main_routes.py** - 2 direct Todo queries
    - [ ] Update to use existing TodoService
