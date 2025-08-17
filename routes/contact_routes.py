@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_, and_, func
 from sqlalchemy.orm import joinedload, selectinload
 from services.contact_service import ContactService
-from services.message_service import MessageService 
+from services.message_service import MessageService
+from services.conversation_service import ConversationService 
 from extensions import db
 from crm_database import Activity, Conversation, Contact, ContactFlag
 
@@ -45,172 +46,47 @@ def list_all():
 @contact_bp.route('/conversations')
 @login_required
 def conversation_list():
-    # Refresh session to get latest data from webhooks
-    db.session.expire_all()
+    """Display paginated list of conversations with filters"""
+    conversation_service = ConversationService()
     
     # Get search and filter parameters
     search_query = request.args.get('search', '').strip()
-    filter_type = request.args.get('filter', 'all')  # all, unread, has_attachments, office_numbers
-    date_filter = request.args.get('date', 'all')  # all, today, week, month
+    filter_type = request.args.get('filter', 'all')
+    date_filter = request.args.get('date', 'all')
     page = int(request.args.get('page', 1))
-    per_page = 20
     
-    # Start with base query - only conversations with activities
-    # Use eager loading to prevent N+1 queries
-    query = db.session.query(Conversation).options(
-        joinedload(Conversation.contact),
-        selectinload(Conversation.activities)
-    ).join(Contact).filter(
-        Conversation.id.in_(
-            db.session.query(Activity.conversation_id).distinct()
-        )
+    # Get paginated conversations with filters
+    result = conversation_service.get_conversations_page(
+        search_query=search_query,
+        filter_type=filter_type,
+        date_filter=date_filter,
+        page=page,
+        per_page=20
     )
     
-    # Apply search filters
-    if search_query:
-        query = query.filter(
-            or_(
-                Contact.first_name.ilike(f'%{search_query}%'),
-                Contact.last_name.ilike(f'%{search_query}%'),
-                Contact.phone.ilike(f'%{search_query}%'),
-                Contact.email.ilike(f'%{search_query}%'),
-                # Search in recent message content
-                Conversation.id.in_(
-                    db.session.query(Activity.conversation_id).filter(
-                        Activity.body.ilike(f'%{search_query}%')
-                    ).subquery()
-                )
-            )
-        )
-    
-    # Apply type filters
-    if filter_type == 'unread':
-        # Conversations with incoming messages newer than last outgoing
-        query = query.filter(
-            Conversation.id.in_(
-                db.session.query(Activity.conversation_id).filter(
-                    Activity.direction == 'incoming',
-                    Activity.created_at > func.coalesce(
-                        db.session.query(func.max(Activity.created_at)).filter(
-                            Activity.conversation_id == Conversation.id,
-                            Activity.direction == 'outgoing'
-                        ).scalar_subquery(),
-                        datetime(2020, 1, 1)
-                    )
-                ).subquery()
-            )
-        )
-    elif filter_type == 'has_attachments':
-        query = query.filter(
-            Conversation.id.in_(
-                db.session.query(Activity.conversation_id).filter(
-                    Activity.media_urls.isnot(None)
-                ).subquery()
-            )
-        )
-    elif filter_type == 'office_numbers':
-        # Conversations with contacts flagged as office numbers
-        office_contact_ids = db.session.query(ContactFlag.contact_id).filter(
-            ContactFlag.flag_type == 'office_number'
-        ).subquery()
-        query = query.filter(Contact.id.in_(office_contact_ids))
-    
-    # Apply date filters
-    if date_filter == 'today':
-        today = datetime.now().date()
-        query = query.filter(func.date(Conversation.last_activity_at) == today)
-    elif date_filter == 'week':
-        week_ago = datetime.now() - timedelta(days=7)
-        query = query.filter(Conversation.last_activity_at >= week_ago)
-    elif date_filter == 'month':
-        month_ago = datetime.now() - timedelta(days=30)
-        query = query.filter(Conversation.last_activity_at >= month_ago)
-    
-    # Order by most recent activity
-    query = query.order_by(Conversation.last_activity_at.desc())
-    
-    # Paginate results
-    total_conversations = query.count()
-    conversations = query.offset((page - 1) * per_page).limit(per_page).all()
-    
-    # Get all contact IDs for flag lookup
-    contact_ids = [conv.contact_id for conv in conversations]
-    
-    # Batch query for office flags
-    office_flags = set()
-    if contact_ids:
-        office_flag_results = db.session.query(ContactFlag.contact_id).filter(
-            ContactFlag.contact_id.in_(contact_ids),
-            ContactFlag.flag_type == 'office_number'
-        ).all()
-        office_flags = {flag.contact_id for flag in office_flag_results}
-    
-    # Enhance conversations with metadata using pre-loaded data
-    enhanced_conversations = []
-    for conv in conversations:
-        # Process pre-loaded activities
-        activities = conv.activities  # Already loaded via selectinload
-        
-        # Get latest activity from pre-loaded activities
-        latest_activity = max(activities, key=lambda a: a.created_at) if activities else None
-        
-        # Check for unread status using pre-loaded activities
-        incoming_activities = [a for a in activities if a.direction == 'incoming']
-        outgoing_activities = [a for a in activities if a.direction == 'outgoing']
-        
-        latest_incoming = max(incoming_activities, key=lambda a: a.created_at) if incoming_activities else None
-        latest_outgoing = max(outgoing_activities, key=lambda a: a.created_at) if outgoing_activities else None
-        
-        is_unread = (latest_incoming and 
-                    (not latest_outgoing or latest_incoming.created_at > latest_outgoing.created_at))
-        
-        # Check for attachments and AI content in pre-loaded activities
-        has_attachments = any(a.media_urls for a in activities)
-        has_ai_summary = any(a.ai_summary for a in activities)
-        
-        # Check if office number using pre-fetched flags
-        is_office_number = conv.contact_id in office_flags
-        
-        # Message count from pre-loaded activities
-        message_count = len(activities)
-        
-        enhanced_conversations.append({
-            'conversation': conv,
-            'latest_activity': latest_activity,
-            'is_unread': is_unread,
-            'has_attachments': has_attachments,
-            'has_ai_summary': has_ai_summary,
-            'is_office_number': is_office_number,
-            'message_count': message_count
-        })
-    
-    # Calculate pagination
-    total_pages = (total_conversations + per_page - 1) // per_page
-    has_prev = page > 1
-    has_next = page < total_pages
-    
     # Get available campaigns for bulk actions
-    from crm_database import Campaign
-    available_campaigns = Campaign.query.filter(Campaign.status.in_(['draft', 'running'])).all()
+    available_campaigns = conversation_service.get_available_campaigns()
     
     return render_template('conversation_list.html', 
-                         conversations=enhanced_conversations,
+                         conversations=result['conversations'],
                          search_query=search_query,
                          filter_type=filter_type,
                          date_filter=date_filter,
-                         page=page,
-                         total_pages=total_pages,
-                         has_prev=has_prev,
-                         has_next=has_next,
-                         total_conversations=total_conversations,
+                         page=result['page'],
+                         total_pages=result['total_pages'],
+                         has_prev=result['has_prev'],
+                         has_next=result['has_next'],
+                         total_conversations=result['total_count'],
                          available_campaigns=available_campaigns)
 
 @contact_bp.route('/conversations/bulk-action', methods=['POST'])
 @login_required
 def bulk_conversation_action():
     """Handle bulk actions on conversations"""
+    conversation_service = ConversationService()
+    
     action = request.form.get('action')
-    conversation_ids = request.form.getlist('conversation_ids')
+    conversation_ids = [int(id) for id in request.form.getlist('conversation_ids')]
     
     if not conversation_ids:
         flash('No conversations selected', 'warning')
