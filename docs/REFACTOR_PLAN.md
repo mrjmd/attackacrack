@@ -10,20 +10,76 @@ Focus on three high-impact areas that directly support campaign launch:
 **Goal**: Move ALL business logic from routes to services
 
 ### Priority Routes to Refactor:
-1. **routes/main_routes.py** - Heavy business logic in dashboard
-   - [ ] Move all dashboard calculations to `dashboard_service.py`
-   - [ ] Move import logic to respective services
-   - [ ] Routes should only: validate input → call service → return response
 
-2. **routes/campaigns.py** - Campaign management logic
-   - [ ] Move campaign creation logic to service
-   - [ ] Move recipient filtering to service
-   - [ ] Move A/B test logic to service
+#### ✅ COMPLETED:
+1. **routes/main_routes.py** - Dashboard refactored to DashboardService
+2. **routes/campaigns.py** - Campaign logic moved to CampaignService
 
-3. **routes/contact_routes.py** - Mixed logic
-   - [ ] Move search/filter logic to service
+#### 🔧 HIGH PRIORITY (Heavy business logic):
+1. **routes/todo_routes.py** - Most DB operations in routes
+   - [ ] Create `TodoService` with all CRUD operations
+   - [ ] Move dashboard todo logic with priority sorting
+   - [ ] Standardize API responses
+
+2. **routes/api_routes.py** - Complex diagnostic logic
+   - [ ] Create `DiagnosticsService` for health checks
+   - [ ] Create `TaskService` for Celery task management
+   - [ ] Move message fetching logic to MessageService
+
+3. **routes/settings_routes.py** - Sync orchestration logic
+   - [ ] Create `SyncService` for sync health monitoring
+   - [ ] Move Celery task queuing logic to service
+   - [ ] Expand QuickBooksSyncService for manual sync
+
+#### 📝 MEDIUM PRIORITY (Moderate refactoring needed):
+4. **routes/contact_routes.py** - Mixed logic
+   - [ ] Move search/filter logic to ContactService
+   - [ ] Move bulk operations to service
    - [ ] Move export logic to service
-   - [ ] Standardize error handling
+
+5. **routes/property_routes.py** - Search/pagination
+   - [ ] Expand PropertyService with search methods
+   - [ ] Move pagination logic to service
+
+#### ✅ LOW PRIORITY (Already well-structured):
+6. **routes/auth.py** & **routes/auth_routes.py** - Minor updates
+   - [ ] Expand AuthService with profile management
+   - [ ] Add QuickBooks disconnect to service
+
+#### ✅ NO REFACTORING NEEDED:
+- **routes/job_routes.py** - Excellent service usage
+- **routes/appointment_routes.py** - Properly using services
+- **routes/invoice_routes.py** - Good service delegation
+- **routes/quote_routes.py** - Minor DB query, mostly good
+- **routes/growth_routes.py** - Placeholder routes only
+
+### New Services to Create:
+
+1. **TodoService** (`services/todo_service.py`)
+   - `get_user_todos(user_id, include_completed=True)`
+   - `get_dashboard_todos(user_id, limit=5)`
+   - `create_todo(user_id, todo_data)`
+   - `update_todo(todo_id, user_id, updates)`
+   - `toggle_todo_completion(todo_id, user_id)`
+   - `delete_todo(todo_id, user_id)`
+
+2. **DiagnosticsService** (`services/diagnostics_service.py`)
+   - `get_health_status()`
+   - `get_redis_diagnostics()`
+   - `test_database_connection()`
+   - `get_system_metrics()`
+
+3. **SyncService** (`services/sync_service.py`)
+   - `get_sync_health_status()`
+   - `get_openphone_sync_stats()`
+   - `queue_openphone_sync(sync_type, options)`
+   - `monitor_active_tasks()`
+
+4. **TaskService** (`services/task_service.py`)
+   - `get_task_status(task_id)`
+   - `queue_task(task_name, args, kwargs)`
+   - `cancel_task(task_id)`
+   - `get_active_tasks()`
 
 ### Refactoring Pattern:
 ```python

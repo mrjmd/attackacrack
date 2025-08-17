@@ -106,9 +106,13 @@ docker-compose restart celery celery-beat
 ### 🚧 In Progress - Week of August 18, 2025
 **TOP PRIORITY: Launch production text campaign by end of week**
 
-1. **Dashboard Activity Sorting** - Critical UX fix
-   - Currently sorts by import time (wrong!)
-   - MUST sort by most recent actual activity (text/call/voicemail)
+1. **Service Layer Refactoring** ✅ Dashboard/Campaigns DONE, 4 routes remain
+   - ✅ Dashboard refactored to DashboardService
+   - ✅ Campaigns refactored to CampaignService  
+   - 🔧 Create TodoService for routes/todo_routes.py
+   - 🔧 Create DiagnosticsService & TaskService for routes/api_routes.py
+   - 🔧 Create SyncService for routes/settings_routes.py
+   - 🔧 Expand ContactService with search/pagination/bulk operations
    
 2. **Contacts Page Overhaul** - Foundation for campaigns
    - Fix broken filters
@@ -120,9 +124,7 @@ docker-compose restart celery celery-beat
    - Test campaign workflow end-to-end
    - Launch first automated SMS campaign via OpenPhone API
    
-4. **OpenPhone Webhooks** - Enable real-time updates
-   - Configure webhooks in production
-   - Verify signature validation working
+4. **OpenPhone Webhooks** ✅ COMPLETE - Working in production!
    - Test response tracking
 
 ### 📋 Priority Roadmap
@@ -434,7 +436,10 @@ The system automatically detects and imports from these CSV formats:
 
 ## Recent Victories 🎉
 
-### January 2025 - Universal CSV Import & Bounce Tracking
+### January 2025 - Service Layer Refactoring & Universal CSV Import
+- **Completed major service layer refactoring** for dashboard and campaign routes
+- **Created DashboardService** to handle all dashboard business logic 
+- **Enhanced CampaignService** with comprehensive campaign management methods
 - **Implemented universal CSV import** with automatic format detection for 10+ formats
 - **Added SMS bounce tracking** using OpenPhone webhook data (FREE, no external APIs)
 - **Fixed duplicate key constraints** in production CSV imports
