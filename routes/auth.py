@@ -3,7 +3,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user, logout_user
 from services.auth_service import AuthService
-from crm_database import db, User, InviteToken
 from functools import wraps
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -132,10 +131,10 @@ def profile():
         
         if action == 'update_profile':
             # Update profile information
-            current_user.first_name = request.form.get('first_name', current_user.first_name).strip()
-            current_user.last_name = request.form.get('last_name', current_user.last_name).strip()
-            db.session.commit()
-            flash('Profile updated successfully', 'success')
+            first_name = request.form.get('first_name', current_user.first_name)
+            last_name = request.form.get('last_name', current_user.last_name)
+            success, message = AuthService.update_user_profile(current_user, first_name, last_name)
+            flash(message, 'success' if success else 'error')
             
         elif action == 'change_password':
             # Change password
@@ -156,8 +155,9 @@ def profile():
 @admin_required
 def manage_users():
     """User management page (admin only)"""
-    users = User.query.order_by(User.created_at.desc()).all()
-    invites = InviteToken.query.filter_by(used=False).order_by(InviteToken.created_at.desc()).all()
+    auth_service = current_app.services.get('auth')
+    users = auth_service.get_all_users()
+    invites = auth_service.get_pending_invites()
     return render_template('auth/manage_users.html', users=users, invites=invites)
 
 

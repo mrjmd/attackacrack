@@ -75,6 +75,8 @@ def create_app(config_name=None, test_config=None):
     from services.sync_health_service import SyncHealthService
     from services.todo_service import TodoService
     from services.csv_import_service import CSVImportService
+    from services.appointment_service import AppointmentService
+    from services.auth_service import AuthService
     
     # Create and populate service registry
     registry = ServiceRegistry()
@@ -92,6 +94,8 @@ def create_app(config_name=None, test_config=None):
     registry.register('sync_health', SyncHealthService())
     registry.register('todo', TodoService())
     registry.register('campaign_list', CampaignListService())
+    registry.register('appointment', AppointmentService())
+    registry.register('auth', AuthService())
     
     # Services with dependencies
     registry.register('campaign', CampaignService(

@@ -1,19 +1,11 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app
 from flask_login import login_required
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
 
-from services.contact_service import ContactService
-from services.property_service import PropertyService
-from services.job_service import JobService
-from services.quote_service import QuoteService
-from services.appointment_service import AppointmentService
-from services.message_service import MessageService
-from services.csv_import_service import CSVImportService
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
-from extensions import db
-from crm_database import Setting, Activity, Conversation, Todo, CampaignMembership
+from crm_database import Setting, db
 
 main_bp = Blueprint('main', __name__)
 
@@ -32,15 +24,14 @@ def dashboard():
     from datetime import datetime, timedelta
     from sqlalchemy import func
     from sqlalchemy.orm import selectinload, joinedload
-    from services.dashboard_service import DashboardService
-    from services.campaign_service import CampaignService
+    from flask import current_app
+    from flask_login import current_user
     
-    # Initialize services
-    dashboard_service = DashboardService()
-    contact_service = ContactService()
-    appointment_service = AppointmentService()
-    message_service = MessageService()
-    campaign_service = CampaignService()
+    # Get services from registry
+    dashboard_service = current_app.services.get('dashboard')
+    appointment_service = current_app.services.get('appointment')
+    campaign_service = current_app.services.get('campaign')
+    todo_service = current_app.services.get('todo')
     
     # Get all dashboard statistics from service
     stats = dashboard_service.get_dashboard_stats()
@@ -100,25 +91,10 @@ def dashboard():
     # Data quality score (percentage of contacts with complete info)
     data_quality_score = dashboard_service.get_data_quality_score()
     
-    # Get todos for the current user
-    from flask_login import current_user
-    todos = Todo.query.filter_by(
-        user_id=current_user.id,
-        is_completed=False
-    ).order_by(
-        db.case(
-            (Todo.priority == 'high', 1),
-            (Todo.priority == 'medium', 2),
-            (Todo.priority == 'low', 3),
-            else_=4
-        ),
-        Todo.created_at.desc()
-    ).limit(5).all()
-    
-    pending_tasks_count = Todo.query.filter_by(
-        user_id=current_user.id,
-        is_completed=False
-    ).count()
+    # Get todos for the current user using TodoService
+    todo_data = todo_service.get_dashboard_todos(user_id=current_user.id, limit=5)
+    todos = todo_data['todos']
+    pending_tasks_count = todo_data['pending_count']
     
     return render_template(
         'dashboard.html', 
@@ -182,8 +158,8 @@ def automation_settings():
 @login_required
 def import_csv():
     """Import contacts from CSV using smart format detection"""
-    contact_service = ContactService()
-    csv_service = CSVImportService(contact_service)
+    contact_service = current_app.services.get('contact')
+    csv_service = current_app.services.get('csv_import')
     
     if request.method == 'POST':
         file = request.files.get('file')
@@ -224,8 +200,8 @@ def import_csv():
 @login_required
 def import_property_radar():
     """Import PropertyRadar data using smart format detection"""
-    contact_service = ContactService()
-    csv_service = CSVImportService(contact_service)
+    contact_service = current_app.services.get('contact')
+    csv_service = current_app.services.get('csv_import')
     
     if request.method == 'POST':
         file = request.files.get('file')

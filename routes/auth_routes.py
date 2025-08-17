@@ -76,13 +76,14 @@ def quickbooks_callback():
 def quickbooks_disconnect():
     """Disconnect from QuickBooks"""
     try:
-        from crm_database import db, QuickBooksAuth
+        from flask import current_app
+        auth_service = current_app.services.get('auth')
         
-        # Delete all auth records
-        QuickBooksAuth.query.delete()
-        db.session.commit()
-        
-        flash('Disconnected from QuickBooks', 'info')
+        success, message = auth_service.clear_quickbooks_auth()
+        if success:
+            flash('Disconnected from QuickBooks', 'info')
+        else:
+            flash(f'Error: {message}', 'error')
     except Exception as e:
         flash(f'Error disconnecting: {str(e)}', 'error')
     

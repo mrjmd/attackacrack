@@ -259,3 +259,29 @@ class AuthService:
         
         status = "activated" if user.is_active else "deactivated"
         return True, f"User {status} successfully"
+    
+    @staticmethod
+    def get_all_users():
+        """Get all users ordered by creation date"""
+        return User.query.order_by(User.created_at.desc()).all()
+    
+    @staticmethod
+    def get_pending_invites():
+        """Get all unused invite tokens"""
+        return InviteToken.query.filter_by(used=False).order_by(InviteToken.created_at.desc()).all()
+    
+    @staticmethod
+    def clear_quickbooks_auth():
+        """Clear all QuickBooks authentication data"""
+        from crm_database import QuickBooksAuth
+        QuickBooksAuth.query.delete()
+        db.session.commit()
+        return True, "QuickBooks authentication cleared"
+    
+    @staticmethod
+    def update_user_profile(user, first_name, last_name):
+        """Update user's profile information"""
+        user.first_name = first_name.strip()
+        user.last_name = last_name.strip()
+        db.session.commit()
+        return True, "Profile updated successfully"
