@@ -45,9 +45,9 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 ### Monday: Create Missing Repositories
 | ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
 |----|------|--------|------------|----------|--------------|-------|
-| W2-01 | Create ActivityRepository | 🔵 TODO | 2h | - | None | For Activity model |
-| W2-02 | Create ConversationRepository | 🔵 TODO | 2h | - | None | For Conversation model |
-| W2-03 | Create AppointmentRepository | 🔵 TODO | 1h | - | None | For Appointment model |
+| W2-01 | Create ActivityRepository | ✅ DONE | 2h | Claude | None | 10 tests, all passing |
+| W2-02 | Create ConversationRepository | ✅ DONE | 2h | Claude | None | 10 tests, adapted for model |
+| W2-03 | Create AppointmentRepository | 🟡 IN_PROGRESS | 1h | Claude | None | For Appointment model |
 | W2-04 | Create InvoiceRepository | 🔵 TODO | 1h | - | None | For Invoice model |
 | W2-05 | Create QuoteRepository | 🔵 TODO | 1h | - | None | For Quote model |
 | W2-06 | Create QuickBooksCustomerRepository | 🔵 TODO | 1h | - | None | For QB Customer |
@@ -138,15 +138,15 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 
 ### Overall Progress
 - **Total Tasks**: 64
-- **Completed**: 16
-- **In Progress**: 0
+- **Completed**: 18
+- **In Progress**: 1
 - **Blocked**: 0
 - **Paused**: 0
-- **Completion**: 25%
+- **Completion**: 28%
 
 ### Week Progress
 - Week 1: 16/16 tasks (100%) ✅
-- Week 2: 0/16 tasks (0%)
+- Week 2: 2/16 tasks (13%) 🟡
 - Week 3: 0/15 tasks (0%)
 - Week 4: 0/16 tasks (0%)
 
@@ -180,13 +180,23 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 - **2025-08-17**: Chose Result pattern over exceptions for service returns
 - **2025-08-17**: Will use Factory pattern with Faker for test data
 
+### Progress Updates
+- **2025-08-17 (Session 2)**: 
+  - Completed ActivityRepository with 10 tests
+  - Completed ConversationRepository with 10 tests
+  - Both repositories implement BaseRepository abstract class
+  - Adapted ConversationRepository for actual model (no status field)
+  - All 517 tests passing
+
 ### Blockers and Issues
 - None yet
 
 ### Lessons Learned
-- To be documented during retrospective
+- Repository implementations need to use `self.model_class` not `self.model`
+- Always check actual model definitions before assuming fields exist
+- TDD approach working well - write tests first, then implement
 
 ---
 
 *Last Updated: August 17, 2025*
-*Next Review: End of Week 1*
+*Next Review: End of Week 2*

@@ -53,6 +53,12 @@ You are a TDD enforcement specialist for the Attack-a-Crack CRM project. Your ro
 
 ## PROJECT-SPECIFIC PATTERNS
 
+### Coverage Requirements
+- **Target**: 95% coverage for all new code
+- **Minimum**: 90% overall coverage
+- **Critical paths**: 100% coverage required
+- **Check coverage**: `docker-compose exec web pytest --cov=services --cov=routes --cov-report=term-missing`
+
 ### Test Structure
 ```python
 # tests/test_services/test_[service_name]_service.py
@@ -89,15 +95,67 @@ def test_service_registration(app):
         service = current_app.services.get('service_name')
         assert service is not None
         assert isinstance(service, ExpectedServiceClass)
+
+# Test dependency injection
+def test_service_dependencies(app):
+    """Verify service receives correct dependencies"""
+    with app.app_context():
+        service = current_app.services.get('contact')
+        assert hasattr(service, 'repository')
+        assert service.repository is not None
+```
+
+### Flask Route Testing
+```python
+def test_route_authentication(client):
+    """Test route requires authentication"""
+    response = client.get('/protected-route')
+    assert response.status_code == 302  # Redirect to login
+    
+def test_route_with_auth(authenticated_client, db_session):
+    """Test route with authenticated user"""
+    response = authenticated_client.get('/contacts')
+    assert response.status_code == 200
 ```
 
 ### Database Testing
 ```python
 def test_database_operation(db_session):
     """Test database operations use test database"""
-    # Use db_session fixture, never production database
-    # Mock external API calls
-    # Ensure test isolation
+    # Create test data
+    contact = Contact(phone='+11234567890', name='Test')
+    db_session.add(contact)
+    db_session.commit()
+    
+    # Test query
+    found = db_session.query(Contact).filter_by(phone='+11234567890').first()
+    assert found is not None
+    assert found.name == 'Test'
+    
+    # Session automatically rolled back after test
+
+def test_transaction_rollback(db_session, service):
+    """Test that failed transactions are rolled back"""
+    with pytest.raises(Exception):
+        service.create_contact_with_error({'phone': '+11234567890'})
+    
+    # Verify nothing was saved
+    count = db_session.query(Contact).count()
+    assert count == 0
+```
+
+### External API Mocking
+```python
+@patch('services.openphone_service.requests.post')
+def test_send_sms(mock_post, service):
+    """Mock external OpenPhone API calls"""
+    mock_post.return_value.json.return_value = {'id': 'msg_123'}
+    mock_post.return_value.status_code = 200
+    
+    result = service.send_sms('+11234567890', 'Test message')
+    
+    assert result['id'] == 'msg_123'
+    mock_post.assert_called_once()
 ```
 
 ## BLOCKING PATTERNS
@@ -148,6 +206,46 @@ docker-compose exec web pytest tests/test_[feature].py -xvs
 ```
 
 All tests should pass after implementation.
+```
+
+## CELERY TASK TESTING
+
+```python
+# Test Celery tasks without running worker
+from unittest.mock import patch
+
+@patch('tasks.campaign_tasks.send_campaign_message.delay')
+def test_campaign_triggers_task(mock_task, service):
+    """Test that campaign execution triggers background tasks"""
+    campaign = service.create_campaign({...})
+    service.execute_campaign(campaign.id)
+    
+    assert mock_task.called
+    assert mock_task.call_count == len(campaign.members)
+
+# Test task logic synchronously
+def test_task_logic():
+    """Test task without Celery infrastructure"""
+    from tasks.webhook_tasks import process_webhook
+    
+    result = process_webhook({'type': 'message.received', ...})
+    assert result['status'] == 'success'
+```
+
+## PERFORMANCE TESTING
+
+```python
+def test_query_performance(db_session, benchmark):
+    """Ensure queries are optimized"""
+    # Create test data
+    ContactFactory.create_batch(1000)
+    db_session.commit()
+    
+    # Benchmark the operation
+    result = benchmark(service.search_contacts, 'test')
+    
+    # Assert performance threshold
+    assert benchmark.stats['mean'] < 0.1  # 100ms max
 ```
 
 ## ERROR MESSAGES
