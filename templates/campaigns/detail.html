@@ -155,7 +155,11 @@
                         {% endif %}
                     </div>
                     <div class="text-right text-sm text-gray-400">
-                        {{ send.sent_at.strftime('%m/%d %I:%M %p') }}
+                        {% if send.sent_at %}
+                            {{ send.sent_at.strftime('%m/%d %I:%M %p') }}
+                        {% else %}
+                            Pending
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

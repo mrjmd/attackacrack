@@ -21,9 +21,14 @@ def mock_openphone_service(campaign_service):
 
 
 @pytest.fixture
-def campaign_service():
-    """Fixture providing campaign service instance"""
-    return CampaignService()
+def campaign_service(list_service):
+    """Fixture providing campaign service instance with dependencies"""
+    from services.openphone_service import OpenPhoneService
+    openphone_service = OpenPhoneService()
+    return CampaignService(
+        openphone_service=openphone_service,
+        list_service=list_service
+    )
 
 
 @pytest.fixture

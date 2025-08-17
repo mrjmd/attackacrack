@@ -220,11 +220,11 @@ class TestCampaignRoutesIntegration:
     def test_campaign_lists_page(self, authenticated_client, db_session):
         """Test campaign lists management page"""
         # Create test lists
-        list1 = CampaignList(name="Static List", list_type="static")
+        list1 = CampaignList(name="Static List", is_dynamic=False)
         list2 = CampaignList(
             name="Dynamic List",
-            list_type="dynamic",
-            criteria={"has_phone": True}
+            is_dynamic=True,
+            filter_criteria={"has_phone": True}
         )
         db_session.add_all([list1, list2])
         db_session.commit()
@@ -239,19 +239,22 @@ class TestCampaignRoutesIntegration:
     
     def test_create_campaign_list(self, authenticated_client, db_session):
         """Test creating a new campaign list"""
+        import time
+        unique_id = str(int(time.time() * 1000000))[-6:]
+        
         # Submit list creation form
         response = authenticated_client.post('/campaigns/lists/new', data={
-            'name': 'New Test List',
+            'name': f'New Test List {unique_id}',
             'description': 'Test list description',
-            'list_type': 'static'
+            'is_dynamic': ''
         }, follow_redirects=True)
         
         # Assert
         assert response.status_code == 200
-        new_list = CampaignList.query.filter_by(name='New Test List').first()
+        new_list = CampaignList.query.filter_by(name=f'New Test List {unique_id}').first()
         assert new_list is not None
         assert new_list.description == 'Test list description'
-        assert new_list.list_type == 'static'
+        assert new_list.is_dynamic == False
     
     def test_refresh_dynamic_list(self, authenticated_client, db_session):
         """Test refreshing a dynamic campaign list"""
@@ -261,8 +264,8 @@ class TestCampaignRoutesIntegration:
         # Create dynamic list
         dynamic_list = CampaignList(
             name=f"Dynamic Test {unique_id}",
-            list_type="dynamic",
-            criteria={"has_phone": True}
+            is_dynamic=True,
+            filter_criteria={"has_phone": True}
         )
         db_session.add(dynamic_list)
         db_session.commit()
