@@ -7,6 +7,8 @@
 *.pyc
 __pycache__/
 flask_session/
+celerybeat-schedule
+celerybeat-schedule.db
 crm.db
 client_secret.json
 token.pickle
