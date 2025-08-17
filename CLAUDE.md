@@ -218,22 +218,43 @@ docker-compose restart celery celery-beat
 
 ## Development Guidelines
 
+### CRITICAL: Test-Driven Development (TDD) is MANDATORY
+Starting immediately, all new features and refactoring MUST follow TDD:
+1. **Write the test FIRST** - it should fail initially (Red)
+2. **Write minimal code** to make the test pass (Green)  
+3. **Refactor** to improve code quality while keeping tests green (Refactor)
+4. **No code without tests** - if there's no test, the code doesn't get merged
+
+See `/docs/ARCHITECTURE.md` for detailed testing strategy and patterns.
+
 ### CRITICAL: Research vs Implementation
 - **RESEARCH TASKS**: When asked to research, investigate, or explore options - ONLY provide findings and recommendations. DO NOT implement without explicit approval.
 - **NEVER** start implementation that involves costs (API subscriptions, paid services) without explicit user approval
 - **ALWAYS** document findings comprehensively and let the user make implementation decisions
 - Research deliverables should include: findings, options, costs, recommendations, and wait for user direction
 
+### Architecture Principles
+- **Dependency Injection**: Services receive dependencies via constructor, never create them
+- **Service Registry Pattern**: All services managed centrally in app.py
+- **Separation of Concerns**: Routes handle HTTP, services handle business logic, models handle data
+- **No Direct DB Queries in Routes**: All database access through service methods
+- **No External API Calls Outside Services**: API calls isolated in dedicated service classes
+
 ### Code Style
 - Use Flask blueprints for routes
-- Business logic in service modules
+- Business logic in service modules  
 - No comments unless requested
 - Follow existing patterns in codebase
 - Use SQLAlchemy for all database operations
+- Type hints for all function parameters and returns
 
 ### Testing Requirements
-- All new features require tests
-- Aim for >90% code coverage
+- **TDD is mandatory** - write tests before implementation
+- **Test Pyramid**: 70% unit tests, 25% integration tests, 5% E2E tests
+- **Coverage Target**: >90% for all new code
+- **Unit Tests**: Mock all dependencies, test business logic only
+- **Integration Tests**: Use real test database, mock only external APIs
+- **Test Isolation**: Each test must be independent, no shared state
 - Use pytest fixtures for test data
 - Test both success and error cases
 

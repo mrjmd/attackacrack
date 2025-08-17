@@ -13,14 +13,23 @@ from sqlalchemy import and_, or_, func
 
 from extensions import db
 from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity
-from services.openphone_service import OpenPhoneService
 
 
 class CampaignService:
     """Service for managing text campaigns with A/B testing and compliance"""
     
-    def __init__(self):
-        self.openphone_service = OpenPhoneService()
+    def __init__(self, 
+                 openphone_service=None,
+                 list_service=None):
+        """Initialize with injected dependencies
+        
+        Args:
+            openphone_service: OpenPhoneService instance for SMS sending
+            list_service: CampaignListService instance for list management
+        """
+        # Accept injected dependencies
+        self.openphone_service = openphone_service
+        self.list_service = list_service
         
         # Business hours: weekdays 9am-6pm ET
         self.business_hours_start = time(9, 0)
@@ -89,11 +98,12 @@ class CampaignService:
     
     def add_recipients_from_list(self, campaign_id: int, list_id: int) -> int:
         """Add recipients from a campaign list"""
-        from services.campaign_list_service import CampaignListService
-        list_service = CampaignListService()
+        # Use injected list_service instead of creating new instance
+        if not self.list_service:
+            raise ValueError("CampaignListService not provided")
         
         # Get all active contacts from the list
-        contacts = list_service.get_list_contacts(list_id)
+        contacts = self.list_service.get_list_contacts(list_id)
         
         added = 0
         for contact in contacts:
@@ -216,6 +226,7 @@ class CampaignService:
     def process_campaign_queue(self) -> Dict:
         """Process pending campaign sends (called by Celery task)"""
         stats = {
+            'campaigns_processed': 0,
             'messages_sent': 0,
             'messages_skipped': 0,
             'daily_limits_reached': [],
@@ -237,6 +248,7 @@ class CampaignService:
                 campaign_stats = self._process_campaign_sends(campaign)
                 stats['messages_sent'] += campaign_stats['sent']
                 stats['messages_skipped'] += campaign_stats['skipped']
+                stats['campaigns_processed'] += 1
                 
             except Exception as e:
                 stats['errors'].append(f"Campaign {campaign.name}: {str(e)}")
@@ -585,6 +597,181 @@ class CampaignService:
             return True
         
         return False
+    
+    def personalize_message(self, template: str, contact: Contact) -> str:
+        """Public method for message personalization"""
+        return self._personalize_message(template, contact)
+    
+    def is_business_hours(self) -> bool:
+        """Check if current time is within business hours"""
+        now = datetime.now()
+        current_time = now.time()
+        current_day = now.weekday()
+        
+        # Check if it's a business day
+        if current_day not in self.business_days:
+            return False
+        
+        # Check if within business hours
+        return self.business_hours_start <= current_time <= self.business_hours_end
+    
+    def select_variant_for_recipient(self, campaign: Campaign) -> str:
+        """Select A or B variant for A/B test based on current split"""
+        if campaign.campaign_type != 'ab_test':
+            return 'A'
+        
+        ab_config = campaign.ab_config or {}
+        
+        # If winner declared, use winner variant
+        if ab_config.get('winner_declared'):
+            return ab_config.get('winner_variant', 'A')
+        
+        # Use current split percentage
+        current_split = ab_config.get('current_split', 50)
+        
+        # Random selection based on split
+        import random
+        return 'A' if random.randint(1, 100) <= current_split else 'B'
+    
+    def calculate_significance(self, stats_a: Dict, stats_b: Dict) -> Dict:
+        """Calculate statistical significance between two variants"""
+        try:
+            sent_a = stats_a.get('sent', 0)
+            sent_b = stats_b.get('sent', 0)
+            responses_a = stats_a.get('responses', 0)
+            responses_b = stats_b.get('responses', 0)
+            
+            if sent_a == 0 or sent_b == 0:
+                return {
+                    'p_value': 1.0,
+                    'is_significant': False,
+                    'confidence': 0.0
+                }
+            
+            # Calculate response rates
+            rate_a = responses_a / sent_a
+            rate_b = responses_b / sent_b
+            
+            # Perform chi-square test
+            no_response_a = sent_a - responses_a
+            no_response_b = sent_b - responses_b
+            
+            contingency_table = [
+                [responses_a, no_response_a],
+                [responses_b, no_response_b]
+            ]
+            
+            chi2, p_value, _, _ = stats.chi2_contingency(contingency_table)
+            
+            confidence = 1 - p_value
+            is_significant = p_value < 0.05  # 95% confidence threshold
+            
+            return {
+                'p_value': p_value,
+                'is_significant': is_significant,
+                'confidence': confidence,
+                'rate_a': rate_a,
+                'rate_b': rate_b
+            }
+        except Exception as e:
+            return {
+                'p_value': 1.0,
+                'is_significant': False,
+                'confidence': 0.0,
+                'error': str(e)
+            }
+    
+    def check_and_declare_ab_winner(self, campaign: Campaign) -> Dict:
+        """Check if A/B test has reached significance and declare winner"""
+        if campaign.campaign_type != 'ab_test':
+            return {'winner_declared': False, 'reason': 'Not an A/B test'}
+        
+        ab_config = campaign.ab_config or {}
+        
+        # Already has winner
+        if ab_config.get('winner_declared'):
+            return {
+                'winner_declared': True,
+                'winner': ab_config.get('winner_variant')
+            }
+        
+        # Get analytics for both variants
+        analytics = self.get_campaign_analytics(campaign.id)
+        
+        stats_a = analytics.get('variant_a', {})
+        stats_b = analytics.get('variant_b', {})
+        
+        # Check minimum sample size
+        min_sample = ab_config.get('min_sample_size', 100)
+        if stats_a.get('sent', 0) < min_sample or stats_b.get('sent', 0) < min_sample:
+            return {
+                'winner_declared': False,
+                'reason': 'Insufficient sample size'
+            }
+        
+        # Calculate significance
+        significance = self.calculate_significance(stats_a, stats_b)
+        
+        if significance['is_significant']:
+            # Determine winner
+            winner = 'A' if stats_a.get('response_rate', 0) > stats_b.get('response_rate', 0) else 'B'
+            
+            # Update campaign
+            ab_config['winner_declared'] = True
+            ab_config['winner_variant'] = winner
+            ab_config['final_p_value'] = significance['p_value']
+            ab_config['confidence'] = significance['confidence']
+            campaign.ab_config = ab_config
+            
+            db.session.commit()
+            
+            return {
+                'winner_declared': True,
+                'winner': winner,
+                'confidence': significance['confidence'],
+                'p_value': significance['p_value']
+            }
+        
+        return {
+            'winner_declared': False,
+            'reason': 'Not yet statistically significant',
+            'current_p_value': significance['p_value']
+        }
+    
+    def is_opt_out_message(self, message: str) -> bool:
+        """Check if message is an opt-out request"""
+        if not message:
+            return False
+        
+        opt_out_keywords = [
+            'stop', 'unsubscribe', 'optout', 'opt-out', 
+            'remove', 'cancel', 'quit', 'end'
+        ]
+        
+        message_lower = message.lower().strip()
+        return any(keyword in message_lower for keyword in opt_out_keywords)
+    
+    def should_send_to_contact(self, contact: Contact) -> bool:
+        """Check if we should send messages to this contact"""
+        # Check for opt-out flag
+        opted_out = ContactFlag.query.filter_by(
+            contact_id=contact.id,
+            flag_type='opted_out'
+        ).first()
+        
+        if opted_out:
+            return False
+        
+        # Check for office number flag
+        office_flag = ContactFlag.query.filter_by(
+            contact_id=contact.id,
+            flag_type='office_number'
+        ).first()
+        
+        if office_flag:
+            return False
+        
+        return True
     
     def _get_contact_flags(self, contact: Contact) -> List[str]:
         """Get list of flags for a contact"""
