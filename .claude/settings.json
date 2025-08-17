@@ -1,0 +1,78 @@
+{
+  "project": {
+    "name": "Attack-a-Crack CRM",
+    "type": "flask-application",
+    "python_version": "3.11"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/enforce-tdd.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '✅ File modified. Remember to run tests: docker-compose exec web pytest tests/ -v'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '🤖 Processing request. TDD enforcement active. Tests must be written before implementation.'"
+          }
+        ]
+      }
+    ]
+  },
+  "agents": {
+    "auto_invoke": [
+      {
+        "pattern": "implement|create|add|build|develop",
+        "agent": "tdd-enforcer",
+        "message": "Invoking TDD enforcer to ensure test-first development"
+      },
+      {
+        "pattern": "repository|clean architecture|database abstraction",
+        "agent": "repository-architect",
+        "message": "Invoking repository architect for clean architecture patterns"
+      },
+      {
+        "pattern": "test|coverage|pytest|mock",
+        "agent": "flask-test-specialist",
+        "message": "Invoking Flask test specialist for comprehensive testing"
+      }
+    ]
+  },
+  "reminders": {
+    "on_session_start": [
+      "📋 TDD is MANDATORY - Write tests before implementation",
+      "🔧 Use service registry: current_app.services.get('service_name')",
+      "🧪 Target: 95% test coverage for new code",
+      "📝 Update CHANGELOG.md for all changes"
+    ],
+    "on_file_edit": [
+      "Run tests after changes: docker-compose exec web pytest tests/ -v",
+      "Check coverage: docker-compose exec web pytest --cov --cov-report=term-missing"
+    ]
+  },
+  "development": {
+    "test_command": "docker-compose exec web pytest",
+    "coverage_command": "docker-compose exec web pytest --cov --cov-report=term-missing",
+    "lint_command": "docker-compose exec web black . && docker-compose exec web isort .",
+    "type_check_command": "docker-compose exec web mypy ."
+  }
+}

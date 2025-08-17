@@ -1,144 +1,92 @@
 """
-ContactService - Refactored with Repository Pattern
-Business logic layer for contact management, now using ContactRepository for data access
+ContactService - Refactored with Result Pattern and Repository
+Handles contact management operations using Result pattern for consistent error handling
 """
 
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timedelta
 import csv
 import io
-from sqlalchemy.orm import Session
-from repositories.contact_repository import ContactRepository
-from repositories.base_repository import PaginationParams, SortOrder
-from crm_database import Contact, ContactFlag, Conversation, Activity, CampaignMembership, Campaign, Property, Job, db
-from sqlalchemy.exc import IntegrityError
 import logging
+from typing import List, Dict, Optional, Any
+from datetime import datetime
+from sqlalchemy import or_, and_, func
+from sqlalchemy.orm import Session, joinedload
+
+from crm_database import Contact, ContactFlag, Campaign, CampaignMembership, Conversation, Activity, db
+from services.common.result import Result, PagedResult
+from repositories.contact_repository import ContactRepository
 
 logger = logging.getLogger(__name__)
 
 
 class ContactService:
-    """Service for contact business logic with repository pattern"""
+    """Service for managing contacts using Result pattern and Repository"""
     
-    def __init__(self, repository: Optional[ContactRepository] = None, session: Optional[Session] = None):
+    def __init__(self, contact_repository: Optional[ContactRepository] = None, 
+                 session: Optional[Session] = None):
         """
-        Initialize with injected repository.
+        Initialize with optional repository and session.
         
         Args:
-            repository: ContactRepository instance for data access
-            session: Database session (will create repository if not provided)
+            contact_repository: ContactRepository for data access
+            session: Database session
         """
         self.session = session or db.session
-        self.repository = repository or ContactRepository(self.session, Contact)
+        self.contact_repository = contact_repository or ContactRepository(self.session, Contact)
     
-    def get_contacts_page(
-        self,
-        search_query: str = '',
-        filter_type: str = 'all',
-        sort_by: str = 'name',
-        page: int = 1,
-        per_page: int = 50
-    ) -> Dict[str, Any]:
+    def add_contact(self, first_name: str, last_name: str, 
+                   email: Optional[str] = None, 
+                   phone: Optional[str] = None,
+                   **kwargs) -> Result[Contact]:
         """
-        Get paginated contacts with filters and search.
+        Add a new contact.
         
         Args:
-            search_query: Search text
-            filter_type: Filter to apply
-            sort_by: Sort field
-            page: Page number
-            per_page: Items per page
+            first_name: Contact's first name
+            last_name: Contact's last name
+            email: Optional email address
+            phone: Optional phone number
+            **kwargs: Additional contact fields
             
         Returns:
-            Dictionary with contacts and pagination info
+            Result[Contact]: Success with contact or failure with error
         """
-        # Use repository for data access
-        pagination = PaginationParams(page=page, per_page=per_page)
-        sort_order = SortOrder.DESC if sort_by == 'recent_activity' else SortOrder.ASC
-        
-        result = self.repository.get_contacts_with_filter(
-            filter_type=filter_type,
-            search_query=search_query,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            pagination=pagination
-        )
-        
-        # Enhance contacts with metadata
-        enhanced_contacts = self._enhance_contacts(result.items)
-        
-        return {
-            'contacts': enhanced_contacts,
-            'total_count': result.total,
-            'page': result.page,
-            'per_page': result.per_page,
-            'total_pages': result.pages,
-            'has_prev': result.has_prev,
-            'has_next': result.has_next
-        }
+        try:
+            # Check for duplicates
+            if phone:
+                existing = self.contact_repository.find_by_phone(phone)
+                if existing:
+                    return Result.failure(
+                        f"Contact with phone {phone} already exists",
+                        code="DUPLICATE_PHONE"
+                    )
+            
+            if email:
+                existing = self.contact_repository.find_by_email(email)
+                if existing:
+                    return Result.failure(
+                        f"Contact with email {email} already exists",
+                        code="DUPLICATE_EMAIL"
+                    )
+            
+            # Create contact
+            contact_data = {
+                'first_name': first_name,
+                'last_name': last_name,
+                'email': email,
+                'phone': phone,
+                **kwargs
+            }
+            
+            contact = self.contact_repository.create(contact_data)
+            logger.info(f"Created contact: {contact.id} - {contact.full_name}")
+            
+            return Result.success(contact, metadata={"created_at": datetime.utcnow()})
+            
+        except Exception as e:
+            logger.error(f"Failed to create contact: {str(e)}")
+            return Result.failure(f"Failed to create contact: {str(e)}", code="CREATE_ERROR")
     
-    def _enhance_contacts(self, contacts: List[Contact]) -> List[Dict[str, Any]]:
-        """
-        Add metadata to contacts for display.
-        
-        Args:
-            contacts: List of Contact objects
-            
-        Returns:
-            List of enhanced contact dictionaries
-        """
-        if not contacts:
-            return []
-        
-        contact_ids = [c.id for c in contacts]
-        
-        # Get conversation counts
-        conversation_counts = {}
-        if contact_ids:
-            from sqlalchemy import func
-            counts = self.session.query(
-                Conversation.contact_id,
-                func.count(Conversation.id)
-            ).filter(
-                Conversation.contact_id.in_(contact_ids)
-            ).group_by(Conversation.contact_id).all()
-            
-            conversation_counts = {contact_id: count for contact_id, count in counts}
-        
-        # Get last activity dates
-        last_activities = {}
-        if contact_ids:
-            activities = self.session.query(
-                Conversation.contact_id,
-                func.max(Conversation.last_activity_at)
-            ).filter(
-                Conversation.contact_id.in_(contact_ids)
-            ).group_by(Conversation.contact_id).all()
-            
-            last_activities = {contact_id: last_activity for contact_id, last_activity in activities}
-        
-        # Get opt-out status
-        opted_out_ids = set()
-        if contact_ids:
-            flags = self.session.query(ContactFlag.contact_id).filter(
-                ContactFlag.contact_id.in_(contact_ids),
-                ContactFlag.flag_type == 'opted_out'
-            ).all()
-            opted_out_ids = {flag[0] for flag in flags}
-        
-        # Build enhanced contact list
-        enhanced = []
-        for contact in contacts:
-            enhanced.append({
-                'contact': contact,
-                'conversation_count': conversation_counts.get(contact.id, 0),
-                'last_activity': last_activities.get(contact.id),
-                'is_opted_out': contact.id in opted_out_ids
-            })
-        
-        return enhanced
-    
-    def get_contact_by_id(self, contact_id: int) -> Optional[Contact]:
+    def get_contact_by_id(self, contact_id: int) -> Result[Contact]:
         """
         Get contact by ID.
         
@@ -146,65 +94,120 @@ class ContactService:
             contact_id: Contact ID
             
         Returns:
-            Contact or None
+            Result[Contact]: Success with contact or failure
         """
-        return self.repository.get_by_id(contact_id)
+        contact = self.contact_repository.find_by_id(contact_id)
+        if contact:
+            return Result.success(contact)
+        return Result.failure(f"Contact not found: {contact_id}", code="NOT_FOUND")
     
-    def create_contact(self, **contact_data) -> Tuple[bool, Optional[Contact], Optional[str]]:
+    def get_contact_by_phone(self, phone_number: str) -> Result[Contact]:
         """
-        Create a new contact.
+        Get contact by phone number.
         
         Args:
-            **contact_data: Contact fields
+            phone_number: Phone number to search
             
         Returns:
-            Tuple of (success, contact, error_message)
+            Result[Contact]: Success with contact or failure
+        """
+        contact = self.contact_repository.find_by_phone(phone_number)
+        if contact:
+            return Result.success(contact)
+        return Result.failure(f"Contact not found with phone: {phone_number}", code="NOT_FOUND")
+    
+    def get_all_contacts(self, page: int = 1, per_page: int = 100) -> PagedResult[List[Contact]]:
+        """
+        Get all contacts with pagination.
+        
+        Args:
+            page: Page number
+            per_page: Items per page
+            
+        Returns:
+            PagedResult[List[Contact]]: Paginated contacts
         """
         try:
-            contact = self.repository.create(**contact_data)
-            self.repository.commit()
-            logger.info(f"Created contact: {contact.id}")
-            return True, contact, None
-        except IntegrityError as e:
-            self.repository.rollback()
-            if 'unique constraint' in str(e).lower():
-                return False, None, "A contact with this phone number or email already exists"
-            return False, None, "Database error creating contact"
+            pagination_params = {"page": page, "per_page": per_page}
+            result = self.contact_repository.find_all(pagination_params)
+            
+            return PagedResult.paginated(
+                data=result['items'],
+                total=result['total'],
+                page=page,
+                per_page=per_page
+            )
         except Exception as e:
-            self.repository.rollback()
-            logger.error(f"Error creating contact: {e}")
-            return False, None, str(e)
+            logger.error(f"Failed to get contacts: {str(e)}")
+            return PagedResult.failure(f"Failed to get contacts: {str(e)}", code="FETCH_ERROR")
     
-    def update_contact(self, contact_id: int, **updates) -> Tuple[bool, Optional[Contact], Optional[str]]:
+    def search_contacts(self, query: str, limit: int = 20) -> Result[List[Contact]]:
         """
-        Update a contact.
+        Search contacts by name, email, or phone.
+        
+        Args:
+            query: Search query
+            limit: Maximum results
+            
+        Returns:
+            Result[List[Contact]]: Success with contacts or failure
+        """
+        try:
+            if not query:
+                return Result.success([])
+            
+            # Search in multiple fields
+            search_filter = or_(
+                Contact.first_name.ilike(f'%{query}%'),
+                Contact.last_name.ilike(f'%{query}%'),
+                Contact.email.ilike(f'%{query}%'),
+                Contact.phone.ilike(f'%{query}%'),
+                Contact.company.ilike(f'%{query}%')
+            )
+            
+            contacts = self.session.query(Contact).filter(
+                search_filter
+            ).limit(limit).all()
+            
+            return Result.success(contacts)
+            
+        except Exception as e:
+            logger.error(f"Search failed: {str(e)}")
+            return Result.failure(f"Search failed: {str(e)}", code="SEARCH_ERROR")
+    
+    def update_contact(self, contact_id: int, **kwargs) -> Result[Contact]:
+        """
+        Update contact attributes.
         
         Args:
             contact_id: Contact ID
-            **updates: Fields to update
+            **kwargs: Fields to update
             
         Returns:
-            Tuple of (success, contact, error_message)
+            Result[Contact]: Success with updated contact or failure
         """
         try:
-            contact = self.repository.update_by_id(contact_id, **updates)
-            if contact:
-                self.repository.commit()
-                logger.info(f"Updated contact: {contact_id}")
-                return True, contact, None
-            else:
-                return False, None, "Contact not found"
-        except IntegrityError as e:
-            self.repository.rollback()
-            if 'unique constraint' in str(e).lower():
-                return False, None, "A contact with this phone number or email already exists"
-            return False, None, "Database error updating contact"
+            contact = self.contact_repository.find_by_id(contact_id)
+            if not contact:
+                return Result.failure(f"Contact not found: {contact_id}", code="NOT_FOUND")
+            
+            # Update fields
+            for key, value in kwargs.items():
+                if hasattr(contact, key):
+                    setattr(contact, key, value)
+            
+            contact.updated_at = datetime.utcnow()
+            self.session.commit()
+            
+            logger.info(f"Updated contact: {contact_id}")
+            return Result.success(contact)
+            
         except Exception as e:
-            self.repository.rollback()
-            logger.error(f"Error updating contact {contact_id}: {e}")
-            return False, None, str(e)
+            self.session.rollback()
+            logger.error(f"Failed to update contact: {str(e)}")
+            return Result.failure(f"Failed to update contact: {str(e)}", code="UPDATE_ERROR")
     
-    def delete_contact(self, contact_id: int) -> Tuple[bool, Optional[str]]:
+    def delete_contact(self, contact_id: int) -> Result[bool]:
         """
         Delete a contact.
         
@@ -212,279 +215,253 @@ class ContactService:
             contact_id: Contact ID
             
         Returns:
-            Tuple of (success, error_message)
+            Result[bool]: Success or failure
         """
         try:
-            success = self.repository.delete_by_id(contact_id)
-            if success:
-                self.repository.commit()
-                logger.info(f"Deleted contact: {contact_id}")
-                return True, None
-            else:
-                return False, "Contact not found"
+            contact = self.contact_repository.find_by_id(contact_id)
+            if not contact:
+                return Result.failure(f"Contact not found: {contact_id}", code="NOT_FOUND")
+            
+            self.contact_repository.delete(contact_id)
+            logger.info(f"Deleted contact: {contact_id}")
+            return Result.success(True)
+            
         except Exception as e:
-            self.repository.rollback()
-            logger.error(f"Error deleting contact {contact_id}: {e}")
-            return False, str(e)
+            logger.error(f"Failed to delete contact: {str(e)}")
+            return Result.failure(f"Failed to delete contact: {str(e)}", code="DELETE_ERROR")
     
-    def search_contacts(self, query: str) -> List[Contact]:
+    def bulk_action(self, action: str, contact_ids: List[int], **kwargs) -> Result[Dict[str, Any]]:
         """
-        Search contacts by query.
+        Perform bulk action on multiple contacts.
         
         Args:
-            query: Search query
+            action: Action to perform (delete, tag, update, etc.)
+            contact_ids: List of contact IDs
+            **kwargs: Action-specific parameters
             
         Returns:
-            List of matching contacts
+            Result[Dict]: Success with results or failure
         """
-        return self.repository.search(query)
-    
-    def find_or_create_contact(self, phone: str, **additional_data) -> Contact:
-        """
-        Find existing contact by phone or create new one.
+        if not contact_ids:
+            return Result.failure("No contact IDs provided", code="NO_CONTACTS")
         
-        Args:
-            phone: Phone number
-            **additional_data: Additional contact fields
+        results = {
+            "successful": 0,
+            "failed": 0,
+            "errors": []
+        }
+        
+        try:
+            if action == "delete":
+                for contact_id in contact_ids:
+                    result = self.delete_contact(contact_id)
+                    if result.is_success:
+                        results["successful"] += 1
+                    else:
+                        results["failed"] += 1
+                        results["errors"].append(f"Contact {contact_id}: {result.error}")
             
-        Returns:
-            Contact instance
-        """
-        # Try to find existing contact
-        contact = self.repository.find_by_phone(phone)
-        
-        if not contact:
-            # Create new contact
-            contact_data = {'phone': phone}
-            contact_data.update(additional_data)
-            contact = self.repository.create(**contact_data)
-            self.repository.commit()
-            logger.info(f"Created new contact with phone: {phone}")
-        else:
-            # Update existing contact with any new data
-            if additional_data:
-                # Only update fields that are currently empty
-                updates = {}
-                for key, value in additional_data.items():
-                    if value and not getattr(contact, key, None):
-                        updates[key] = value
+            elif action == "tag":
+                tag = kwargs.get("tag")
+                if not tag:
+                    return Result.failure("Tag not provided", code="MISSING_PARAMETER")
                 
-                if updates:
-                    self.repository.update(contact, **updates)
-                    self.repository.commit()
-                    logger.info(f"Updated existing contact {contact.id} with new data")
-        
-        return contact
+                for contact_id in contact_ids:
+                    contact = self.contact_repository.find_by_id(contact_id)
+                    if contact:
+                        current_tags = contact.tags or []
+                        if tag not in current_tags:
+                            current_tags.append(tag)
+                            contact.tags = current_tags
+                            self.session.commit()
+                        results["successful"] += 1
+                    else:
+                        results["failed"] += 1
+                        results["errors"].append(f"Contact {contact_id} not found")
+            
+            elif action == "update":
+                update_fields = {k: v for k, v in kwargs.items() if k != "action"}
+                for contact_id in contact_ids:
+                    result = self.update_contact(contact_id, **update_fields)
+                    if result.is_success:
+                        results["successful"] += 1
+                    else:
+                        results["failed"] += 1
+                        results["errors"].append(result.error)
+            
+            else:
+                return Result.failure(f"Unknown action: {action}", code="INVALID_ACTION")
+            
+            return Result.success(results, metadata={"action": action, "total": len(contact_ids)})
+            
+        except Exception as e:
+            logger.error(f"Bulk action failed: {str(e)}")
+            return Result.failure(f"Bulk action failed: {str(e)}", code="BULK_ACTION_ERROR")
     
-    def bulk_update_tags(self, contact_ids: List[int], tags: List[str], operation: str = 'add') -> int:
+    def add_to_campaign(self, contact_id: int, campaign_id: int) -> Result[CampaignMembership]:
         """
-        Bulk update tags for multiple contacts.
+        Add contact to a campaign.
+        
+        Args:
+            contact_id: Contact ID
+            campaign_id: Campaign ID
+            
+        Returns:
+            Result[CampaignMembership]: Success with membership or failure
+        """
+        try:
+            # Verify contact exists
+            contact = self.contact_repository.find_by_id(contact_id)
+            if not contact:
+                return Result.failure(f"Contact not found: {contact_id}", code="CONTACT_NOT_FOUND")
+            
+            # Verify campaign exists
+            campaign = Campaign.query.get(campaign_id)
+            if not campaign:
+                return Result.failure(f"Campaign not found: {campaign_id}", code="CAMPAIGN_NOT_FOUND")
+            
+            # Check for existing membership
+            existing = CampaignMembership.query.filter_by(
+                contact_id=contact_id,
+                campaign_id=campaign_id
+            ).first()
+            
+            if existing:
+                return Result.failure(
+                    "Contact already in campaign",
+                    code="ALREADY_MEMBER",
+                    metadata={"membership_id": existing.id}
+                )
+            
+            # Create membership
+            membership = CampaignMembership(
+                contact_id=contact_id,
+                campaign_id=campaign_id,
+                status='pending'
+            )
+            
+            self.session.add(membership)
+            self.session.commit()
+            
+            logger.info(f"Added contact {contact_id} to campaign {campaign_id}")
+            return Result.success(membership)
+            
+        except Exception as e:
+            self.session.rollback()
+            logger.error(f"Failed to add to campaign: {str(e)}")
+            return Result.failure(f"Failed to add to campaign: {str(e)}", code="CAMPAIGN_ERROR")
+    
+    def bulk_add_to_campaign(self, contact_ids: List[int], campaign_id: int) -> Result[Dict[str, Any]]:
+        """
+        Add multiple contacts to a campaign.
         
         Args:
             contact_ids: List of contact IDs
-            tags: Tags to add/remove/replace
-            operation: 'add', 'remove', or 'replace'
+            campaign_id: Campaign ID
             
         Returns:
-            Number of contacts updated
+            Result[Dict]: Success with results or failure
         """
-        count = self.repository.bulk_update_tags(contact_ids, tags, operation)
-        self.repository.commit()
-        logger.info(f"Updated tags for {count} contacts")
-        return count
-    
-    def merge_duplicate_contacts(self, primary_id: int, duplicate_id: int) -> Tuple[bool, Optional[Contact], Optional[str]]:
-        """
-        Merge duplicate contact into primary contact.
+        if not contact_ids:
+            return Result.failure("No contact IDs provided", code="NO_CONTACTS")
         
-        Args:
-            primary_id: ID of contact to keep
-            duplicate_id: ID of contact to merge and delete
-            
-        Returns:
-            Tuple of (success, merged_contact, error_message)
-        """
-        try:
-            merged = self.repository.merge_contacts(primary_id, duplicate_id)
-            if merged:
-                self.repository.commit()
-                logger.info(f"Merged contact {duplicate_id} into {primary_id}")
-                return True, merged, None
+        # Verify campaign exists
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign:
+            return Result.failure(f"Campaign not found: {campaign_id}", code="CAMPAIGN_NOT_FOUND")
+        
+        results = {
+            "added": 0,
+            "skipped": 0,
+            "errors": []
+        }
+        
+        for contact_id in contact_ids:
+            result = self.add_to_campaign(contact_id, campaign_id)
+            if result.is_success:
+                results["added"] += 1
+            elif result.error_code == "ALREADY_MEMBER":
+                results["skipped"] += 1
             else:
-                return False, None, "One or both contacts not found"
-        except Exception as e:
-            self.repository.rollback()
-            logger.error(f"Error merging contacts: {e}")
-            return False, None, str(e)
-    
-    def find_duplicates(self, field: str = 'phone') -> List[Tuple[str, int]]:
-        """
-        Find duplicate contacts by field.
+                results["errors"].append(f"Contact {contact_id}: {result.error}")
         
-        Args:
-            field: Field to check for duplicates
-            
-        Returns:
-            List of (field_value, count) tuples
-        """
-        return self.repository.find_duplicates(field)
+        return Result.success(results, metadata={
+            "campaign_id": campaign_id,
+            "total_contacts": len(contact_ids)
+        })
     
-    def get_contact_stats(self) -> Dict[str, int]:
-        """
-        Get statistics about contacts.
-        
-        Returns:
-            Dictionary with contact statistics
-        """
-        return self.repository.get_contact_stats()
-    
-    def export_contacts_to_csv(self, contact_ids: Optional[List[int]] = None) -> str:
+    def export_contacts(self, contact_ids: List[int]) -> Result[str]:
         """
         Export contacts to CSV format.
         
         Args:
-            contact_ids: Optional list of specific contact IDs to export
+            contact_ids: List of contact IDs to export
             
         Returns:
-            CSV string
+            Result[str]: Success with CSV data or failure
         """
-        if contact_ids:
-            contacts = [self.repository.get_by_id(cid) for cid in contact_ids]
-            contacts = [c for c in contacts if c]  # Filter out None values
-        else:
-            contacts = self.repository.get_all(order_by='last_name')
+        if not contact_ids:
+            return Result.failure("No contact IDs provided", code="NO_CONTACTS")
         
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=[
-            'id', 'first_name', 'last_name', 'phone', 'email', 
-            'company', 'address', 'city', 'state', 'zip_code',
-            'tags', 'created_at', 'updated_at'
-        ])
-        
-        writer.writeheader()
-        for contact in contacts:
-            writer.writerow({
-                'id': contact.id,
-                'first_name': contact.first_name or '',
-                'last_name': contact.last_name or '',
-                'phone': contact.phone or '',
-                'email': contact.email or '',
-                'company': contact.company or '',
-                'address': contact.address or '',
-                'city': contact.city or '',
-                'state': contact.state or '',
-                'zip_code': contact.zip_code or '',
-                'tags': ','.join(contact.tags) if contact.tags else '',
-                'created_at': contact.created_at.isoformat() if contact.created_at else '',
-                'updated_at': contact.updated_at.isoformat() if contact.updated_at else ''
-            })
-        
-        return output.getvalue()
-    
-    def import_contacts_from_csv(self, csv_content: str) -> Tuple[int, int, List[str]]:
-        """
-        Import contacts from CSV content.
-        
-        Args:
-            csv_content: CSV string content
-            
-        Returns:
-            Tuple of (created_count, updated_count, errors)
-        """
-        created = 0
-        updated = 0
-        errors = []
-        
-        reader = csv.DictReader(io.StringIO(csv_content))
-        
-        for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
-            try:
-                # Clean and validate phone number
-                phone = row.get('phone', '').strip()
-                if not phone:
-                    errors.append(f"Row {row_num}: Missing phone number")
-                    continue
-                
-                # Check if contact exists
-                existing = self.repository.find_by_phone(phone)
-                
-                contact_data = {
-                    'first_name': row.get('first_name', '').strip(),
-                    'last_name': row.get('last_name', '').strip(),
-                    'email': row.get('email', '').strip() or None,
-                    'company': row.get('company', '').strip() or None,
-                    'address': row.get('address', '').strip() or None,
-                    'city': row.get('city', '').strip() or None,
-                    'state': row.get('state', '').strip() or None,
-                    'zip_code': row.get('zip_code', '').strip() or None
-                }
-                
-                # Handle tags
-                tags_str = row.get('tags', '').strip()
-                if tags_str:
-                    contact_data['tags'] = [t.strip() for t in tags_str.split(',')]
-                
-                if existing:
-                    # Update existing contact
-                    self.repository.update(existing, **contact_data)
-                    updated += 1
-                else:
-                    # Create new contact
-                    contact_data['phone'] = phone
-                    self.repository.create(**contact_data)
-                    created += 1
-                
-            except Exception as e:
-                errors.append(f"Row {row_num}: {str(e)}")
-        
-        # Commit all changes
-        if created > 0 or updated > 0:
-            self.repository.commit()
-        
-        return created, updated, errors
-    
-    def get_contacts_for_campaign(self, filters: Dict[str, Any]) -> List[Contact]:
-        """
-        Get contacts for a campaign based on filters.
-        
-        Args:
-            filters: Dictionary of filters to apply
-            
-        Returns:
-            List of eligible contacts
-        """
-        # Start with all contacts
-        if filters.get('list_id'):
-            # Get contacts from a specific list
-            from crm_database import CampaignList, CampaignListMember
-            list_members = self.session.query(CampaignListMember.contact_id).filter(
-                CampaignListMember.list_id == filters['list_id'],
-                CampaignListMember.status == 'active'
-            ).subquery()
-            
+        try:
             contacts = self.session.query(Contact).filter(
-                Contact.id.in_(list_members)
+                Contact.id.in_(contact_ids)
             ).all()
-        else:
-            contacts = self.repository.get_all()
+            
+            if not contacts:
+                return Result.failure("No contacts found", code="NO_CONTACTS_FOUND")
+            
+            # Create CSV
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=[
+                'id', 'first_name', 'last_name', 'email', 'phone',
+                'company', 'address', 'city', 'state', 'zip_code',
+                'tags', 'created_at'
+            ])
+            
+            writer.writeheader()
+            for contact in contacts:
+                writer.writerow({
+                    'id': contact.id,
+                    'first_name': contact.first_name,
+                    'last_name': contact.last_name,
+                    'email': contact.email,
+                    'phone': contact.phone,
+                    'company': contact.company,
+                    'address': contact.address,
+                    'city': contact.city,
+                    'state': contact.state,
+                    'zip_code': contact.zip_code,
+                    'tags': ','.join(contact.tags) if contact.tags else '',
+                    'created_at': contact.created_at.isoformat() if contact.created_at else ''
+                })
+            
+            csv_data = output.getvalue()
+            return Result.success(csv_data, metadata={"count": len(contacts)})
+            
+        except Exception as e:
+            logger.error(f"Export failed: {str(e)}")
+            return Result.failure(f"Export failed: {str(e)}", code="EXPORT_ERROR")
+    
+    def get_contact_statistics(self) -> Result[Dict[str, int]]:
+        """
+        Get overall contact statistics.
         
-        # Apply additional filters
-        if filters.get('has_phone'):
-            contacts = [c for c in contacts if c.phone]
-        
-        if filters.get('exclude_opted_out'):
-            opted_out = self.repository.get_opted_out_contacts()
-            opted_out_ids = {c.id for c in opted_out}
-            contacts = [c for c in contacts if c.id not in opted_out_ids]
-        
-        if filters.get('has_conversation'):
-            contacts_with_conv = self.repository.get_contacts_with_conversations()
-            conv_ids = {c.id for c in contacts_with_conv}
-            contacts = [c for c in contacts if c.id in conv_ids]
-        
-        if filters.get('no_conversation'):
-            contacts_without_conv = self.repository.get_contacts_without_conversations()
-            no_conv_ids = {c.id for c in contacts_without_conv}
-            contacts = [c for c in contacts if c.id in no_conv_ids]
-        
-        return contacts
+        Returns:
+            Result[Dict]: Success with statistics or failure
+        """
+        try:
+            stats = {
+                'total_contacts': self.session.query(Contact).count(),
+                'with_phone': self.session.query(Contact).filter(Contact.phone.isnot(None)).count(),
+                'with_email': self.session.query(Contact).filter(Contact.email.isnot(None)).count(),
+                'with_conversations': self.session.query(Contact).join(Conversation).distinct().count(),
+                'opted_out': ContactFlag.query.filter_by(flag_type='opted_out').distinct(ContactFlag.contact_id).count(),
+                'invalid_phone': ContactFlag.query.filter_by(flag_type='invalid_phone').distinct(ContactFlag.contact_id).count()
+            }
+            
+            return Result.success(stats)
+            
+        except Exception as e:
+            logger.error(f"Failed to get statistics: {str(e)}")
+            return Result.failure(f"Failed to get statistics: {str(e)}", code="STATS_ERROR")
