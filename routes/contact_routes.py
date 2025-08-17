@@ -344,7 +344,7 @@ def edit_contact(contact_id):
         return redirect(url_for('contact.contact_detail', contact_id=contact.id))
     return render_template('add_edit_contact_form.html', contact=contact)
 
-@contact_bp.route('/contacts/bulk-action', methods=['POST'])
+@contact_bp.route('/bulk-action', methods=['POST'])
 @login_required
 def bulk_contact_action():
     """Handle bulk actions on contacts"""
