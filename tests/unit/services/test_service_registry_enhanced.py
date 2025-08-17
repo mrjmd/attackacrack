@@ -27,7 +27,7 @@ class TestServiceRegistryEnhanced:
         """Test registry initialization"""
         assert registry._descriptors == {}
         assert registry._scoped_instances == {}
-        assert registry._initialization_stack == []
+        assert hasattr(registry, '_thread_local')
         assert registry.list_services() == []
     
     def test_register_service_instance(self, registry):
@@ -323,7 +323,7 @@ class TestServiceRegistryEnhanced:
         factory_calls = []
         
         def make_factory(name):
-            def factory():
+            def factory(**kwargs):  # Accept kwargs for dependencies
                 factory_calls.append(name)
                 return Mock()
             return factory

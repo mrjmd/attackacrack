@@ -260,11 +260,14 @@ See `/docs/ARCHITECTURE.md` for detailed testing strategy and patterns.
 - Type hints for all function parameters and returns
 
 ### Testing Requirements
+- **ALWAYS run tests before committing/pushing code**
 - **TDD is mandatory** - write tests before implementation
 - **Test Pyramid**: 70% unit tests, 25% integration tests, 5% E2E tests
 - **Coverage Target**: >90% for all new code
 - **Unit Tests**: Mock all dependencies, test business logic only
 - **Integration Tests**: Use real test database, mock only external APIs
+- **Run tests locally first**: `docker-compose exec web pytest tests/ -v`
+- **Fix any failures before pushing** to avoid failed CI/CD pipeline
 - **Test Isolation**: Each test must be independent, no shared state
 - Use pytest fixtures for test data
 - Test both success and error cases

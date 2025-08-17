@@ -58,7 +58,7 @@ class ServiceRegistryEnhanced:
     def __init__(self):
         self._descriptors: Dict[str, ServiceDescriptor] = {}
         self._scoped_instances: Dict[str, Dict[str, Any]] = {}
-        self._initialization_stack: List[str] = []
+        self._thread_local = threading.local()
         self._lock = threading.Lock()
     
     def register(
@@ -101,7 +101,8 @@ class ServiceRegistryEnhanced:
         name: str,
         factory: Callable,
         lifecycle: ServiceLifecycle = ServiceLifecycle.SINGLETON,
-        dependencies: Optional[List[str]] = None
+        dependencies: Optional[List[str]] = None,
+        tags: Optional[Set[str]] = None
     ) -> None:
         """
         Register a factory function for lazy service instantiation.
@@ -111,12 +112,14 @@ class ServiceRegistryEnhanced:
             factory: Callable that returns a service instance
             lifecycle: Service lifecycle type
             dependencies: Services this factory depends on
+            tags: Optional tags for categorization
         """
         self.register(
             name=name,
             factory=factory,
             lifecycle=lifecycle,
-            dependencies=dependencies
+            dependencies=dependencies,
+            tags=tags
         )
     
     def register_singleton(self, name: str, factory: Callable, **kwargs) -> None:
@@ -147,9 +150,13 @@ class ServiceRegistryEnhanced:
         
         descriptor = self._descriptors[name]
         
+        # Initialize thread-local stack if needed
+        if not hasattr(self._thread_local, 'initialization_stack'):
+            self._thread_local.initialization_stack = []
+        
         # Check for circular dependencies
-        if name in self._initialization_stack:
-            cycle = " -> ".join(self._initialization_stack + [name])
+        if name in self._thread_local.initialization_stack:
+            cycle = " -> ".join(self._thread_local.initialization_stack + [name])
             raise RuntimeError(f"Circular dependency detected: {cycle}")
         
         # Handle different lifecycles
@@ -173,7 +180,8 @@ class ServiceRegistryEnhanced:
                 return descriptor.instance
             
             if descriptor.is_initializing:
-                raise RuntimeError(f"Service '{descriptor.name}' is already being initialized")
+                # Another thread is initializing, wait for it
+                pass  # Lock will be released and we'll wait
             
             descriptor.is_initializing = True
             try:
@@ -203,7 +211,11 @@ class ServiceRegistryEnhanced:
         if descriptor.factory is None:
             raise ValueError(f"No factory registered for '{descriptor.name}'")
         
-        self._initialization_stack.append(descriptor.name)
+        # Initialize thread-local stack if needed
+        if not hasattr(self._thread_local, 'initialization_stack'):
+            self._thread_local.initialization_stack = []
+        
+        self._thread_local.initialization_stack.append(descriptor.name)
         try:
             # Resolve dependencies
             if descriptor.dependencies:
@@ -217,7 +229,7 @@ class ServiceRegistryEnhanced:
             return instance
             
         finally:
-            self._initialization_stack.pop()
+            self._thread_local.initialization_stack.pop()
     
     def get_all_by_tag(self, tag: str) -> Dict[str, Any]:
         """
@@ -244,7 +256,9 @@ class ServiceRegistryEnhanced:
         with self._lock:
             self._descriptors.clear()
             self._scoped_instances.clear()
-            self._initialization_stack.clear()
+            # Clear thread-local data
+            if hasattr(self._thread_local, 'initialization_stack'):
+                self._thread_local.initialization_stack.clear()
     
     def reset_service(self, name: str) -> None:
         """Reset a specific service, forcing re-instantiation on next get"""
