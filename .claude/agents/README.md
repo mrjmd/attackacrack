@@ -24,6 +24,24 @@ This directory contains world-class specialized sub-agents designed to provide d
 - **Expertise**: pytest-flask, fixtures, mocking strategies, coverage improvement
 - **Use When**: Writing tests, improving coverage, debugging test failures
 
+#### **python-flask-stack-expert** (Enhanced)
+- **Purpose**: Deep Flask architecture with Attack-a-Crack patterns
+- **Triggers**: "flask", "sqlalchemy", "blueprint", "service registry"
+- **Expertise**: Service registry, SQLAlchemy, Celery, project-specific patterns
+- **Use When**: Building Flask features, architectural decisions
+
+#### **devops-pipeline-architect** (Enhanced)
+- **Purpose**: DigitalOcean deployment and CI/CD expertise
+- **Triggers**: "deploy", "docker", "github actions", "digitalocean"
+- **Expertise**: DigitalOcean App Platform, GitHub Actions, Docker optimization
+- **Use When**: Deployment issues, infrastructure changes, CI/CD setup
+
+#### **general-purpose** (Enhanced)
+- **Purpose**: Comprehensive system knowledge and analysis
+- **Triggers**: "research", "analyze", "explore", "architecture decision"
+- **Expertise**: Full system understanding, multi-component analysis
+- **Use When**: Complex problems, architecture decisions, system-wide analysis
+
 ### API Integration Agents
 
 #### **openphone-api-specialist**
@@ -195,5 +213,5 @@ For new developers, use agents in this order:
 ---
 
 *Last Updated: August 17, 2025*
-*Total Agents: 10*
+*Total Agents: 13*
 *Combined Expertise: Complete coverage of Attack-a-Crack CRM system*

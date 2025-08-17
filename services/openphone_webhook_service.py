@@ -16,7 +16,7 @@ from typing import Dict, Any, Optional
 
 from extensions import db
 from crm_database import Activity, Contact, Conversation, WebhookEvent
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 from services.sms_metrics_service import SMSMetricsService
 
 logger = logging.getLogger(__name__)

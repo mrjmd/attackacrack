@@ -76,7 +76,7 @@
       },
       {
         "pattern": "repository|clean architecture|database abstraction",
-        "agent": "repository-architect",
+        "agent": "repository-architect", 
         "message": "🏗️ Invoking repository architect for clean architecture patterns"
       },
       {
@@ -113,6 +113,36 @@
         "pattern": "claude code|sub-agent|hooks|memory",
         "agent": "claude-code-architect",
         "message": "🤖 Invoking Claude Code architect for workflow optimization"
+      },
+      {
+        "pattern": "flask|sqlalchemy|blueprint|service registry",
+        "agent": "python-flask-stack-expert",
+        "message": "🐍 Invoking enhanced Flask specialist for application architecture"
+      },
+      {
+        "pattern": "deploy|docker|github actions|digitalocean",
+        "agent": "devops-pipeline-architect",
+        "message": "🚀 Invoking enhanced DevOps specialist for deployment and infrastructure"
+      },
+      {
+        "pattern": "property radar|real estate|property data|lead generation",
+        "agent": "property-radar-specialist",
+        "message": "🏠 Invoking Property Radar specialist for real estate data integration"
+      },
+      {
+        "pattern": "google calendar|gmail|google drive|google oauth",
+        "agent": "google-services-specialist",
+        "message": "📅 Invoking Google Services specialist for Workspace integration"
+      },
+      {
+        "pattern": "gemini|ai analysis|conversation analysis|address extraction",
+        "agent": "gemini-ai-specialist",
+        "message": "🤖 Invoking Gemini AI specialist for intelligent automation"
+      },
+      {
+        "pattern": "research|analyze|explore|architecture decision|complex problem",
+        "agent": "general-purpose",
+        "message": "🔍 Invoking enhanced general-purpose agent for comprehensive analysis"
       }
     ]
   },

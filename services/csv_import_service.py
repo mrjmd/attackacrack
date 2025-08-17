@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from werkzeug.datastructures import FileStorage
 from crm_database import db, Contact, CSVImport, CampaignList, CampaignListMember, ContactCSVImport
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 
 
 class CSVImportService:

@@ -77,7 +77,7 @@ class ContactService:
                 **kwargs
             }
             
-            contact = self.contact_repository.create(contact_data)
+            contact = self.contact_repository.create(**contact_data)
             logger.info(f"Created contact: {contact.id} - {contact.full_name}")
             
             return Result.success(contact, metadata={"created_at": datetime.utcnow()})
@@ -96,7 +96,7 @@ class ContactService:
         Returns:
             Result[Contact]: Success with contact or failure
         """
-        contact = self.contact_repository.find_by_id(contact_id)
+        contact = self.contact_repository.get_by_id(contact_id)
         if contact:
             return Result.success(contact)
         return Result.failure(f"Contact not found: {contact_id}", code="NOT_FOUND")
@@ -128,12 +128,13 @@ class ContactService:
             PagedResult[List[Contact]]: Paginated contacts
         """
         try:
-            pagination_params = {"page": page, "per_page": per_page}
-            result = self.contact_repository.find_all(pagination_params)
+            from repositories.base_repository import PaginationParams
+            pagination_params = PaginationParams(page=page, per_page=per_page)
+            result = self.contact_repository.get_paginated(pagination_params)
             
             return PagedResult.paginated(
-                data=result['items'],
-                total=result['total'],
+                data=result.items,
+                total=result.total,
                 page=page,
                 per_page=per_page
             )
@@ -187,7 +188,7 @@ class ContactService:
             Result[Contact]: Success with updated contact or failure
         """
         try:
-            contact = self.contact_repository.find_by_id(contact_id)
+            contact = self.contact_repository.get_by_id(contact_id)
             if not contact:
                 return Result.failure(f"Contact not found: {contact_id}", code="NOT_FOUND")
             
@@ -218,7 +219,7 @@ class ContactService:
             Result[bool]: Success or failure
         """
         try:
-            contact = self.contact_repository.find_by_id(contact_id)
+            contact = self.contact_repository.get_by_id(contact_id)
             if not contact:
                 return Result.failure(f"Contact not found: {contact_id}", code="NOT_FOUND")
             
@@ -267,7 +268,7 @@ class ContactService:
                     return Result.failure("Tag not provided", code="MISSING_PARAMETER")
                 
                 for contact_id in contact_ids:
-                    contact = self.contact_repository.find_by_id(contact_id)
+                    contact = self.contact_repository.get_by_id(contact_id)
                     if contact:
                         current_tags = contact.tags or []
                         if tag not in current_tags:
@@ -311,7 +312,7 @@ class ContactService:
         """
         try:
             # Verify contact exists
-            contact = self.contact_repository.find_by_id(contact_id)
+            contact = self.contact_repository.get_by_id(contact_id)
             if not contact:
                 return Result.failure(f"Contact not found: {contact_id}", code="CONTACT_NOT_FOUND")
             

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 from flask_login import login_required
 from services.property_service import PropertyService
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 from crm_database import Property
 from extensions import db
 

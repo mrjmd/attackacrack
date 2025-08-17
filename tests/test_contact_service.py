@@ -5,7 +5,7 @@ Improved comprehensive tests for ContactService following enterprise standards.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 from crm_database import Contact
 import time
 

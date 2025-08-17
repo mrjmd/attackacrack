@@ -160,8 +160,10 @@ class AppointmentService:
         Returns:
             List of email addresses
         """
-        # TODO: Make default attendee configurable
-        attendees = ['mike.harrington.email@example.com']
+        # Get default attendee from environment or config
+        import os
+        default_attendee = os.environ.get('DEFAULT_APPOINTMENT_ATTENDEE', 'mike.harrington.email@example.com')
+        attendees = [default_attendee]
         
         # Add contact's email if available
         if appointment.contact and appointment.contact.email:

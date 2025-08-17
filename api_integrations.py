@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import requests
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 

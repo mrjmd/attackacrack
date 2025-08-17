@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 from flask_login import login_required
-from services.appointment_service import AppointmentService
-from services.contact_service import ContactService
+from services.appointment_service_refactored import AppointmentService
+from services.contact_service_refactored import ContactService
 from services.message_service import MessageService
 from services.ai_service import AIService
 from datetime import datetime

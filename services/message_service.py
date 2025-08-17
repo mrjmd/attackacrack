@@ -1,6 +1,6 @@
 from extensions import db
 from crm_database import Activity, Contact, Property, Conversation
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 from services.property_service import PropertyService
 from services.openphone_service import OpenPhoneService
 from services.ai_service import AIService

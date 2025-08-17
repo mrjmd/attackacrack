@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, jsonify, flash, make_response
 from flask_login import login_required, current_user
 from datetime import datetime
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 from services.message_service import MessageService
 from services.conversation_service import ConversationService 
 

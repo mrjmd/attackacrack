@@ -6,7 +6,7 @@ Addresses TODO items from original test file with comprehensive coverage.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from services.appointment_service import AppointmentService
+from services.appointment_service_refactored import AppointmentService
 from crm_database import Appointment, Contact, Property
 from datetime import date, time
 import time as time_module

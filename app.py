@@ -60,63 +60,146 @@ def create_app(config_name=None, test_config=None):
     db.init_app(app)
     migrate = Migrate(app, db)
     
-    # Initialize Service Registry
-    from services.registry import ServiceRegistry
-    from services.contact_service import ContactService
-    from services.openphone_service import OpenPhoneService
-    from services.campaign_service import CampaignService
-    from services.campaign_list_service import CampaignListService
-    from services.message_service import MessageService
-    from services.dashboard_service import DashboardService
-    from services.conversation_service import ConversationService
-    from services.task_service import TaskService
-    from services.diagnostics_service import DiagnosticsService
-    from services.openphone_sync_service import OpenPhoneSyncService
-    from services.sync_health_service import SyncHealthService
-    from services.todo_service import TodoService
-    from services.csv_import_service import CSVImportService
-    from services.appointment_service import AppointmentService
-    from services.auth_service import AuthService
-    from services.ai_service import AIService
-    from services.quickbooks_service import QuickBooksService
-    from services.quickbooks_sync_service import QuickBooksSyncService
-    from services.quote_service import QuoteService
-    from services.job_service import JobService
-    from services.invoice_service import InvoiceService
+    # Initialize Enhanced Service Registry with Lazy Loading
+    from services.service_registry_enhanced import create_enhanced_registry, ServiceLifecycle
+    registry = create_enhanced_registry()
     
-    # Create and populate service registry
-    registry = ServiceRegistry()
+    # Register base services (no dependencies)
+    registry.register('db_session', service=db.session)
     
-    # Register services with dependency injection
-    # Basic services (no dependencies)
-    registry.register('contact', ContactService())
-    registry.register('openphone', OpenPhoneService())
-    registry.register('message', MessageService())
-    registry.register('dashboard', DashboardService())
-    registry.register('conversation', ConversationService())
-    registry.register('task', TaskService())
-    registry.register('diagnostics', DiagnosticsService())
-    registry.register('openphone_sync', OpenPhoneSyncService())
-    registry.register('sync_health', SyncHealthService())
-    registry.register('todo', TodoService())
-    registry.register('campaign_list', CampaignListService())
-    registry.register('appointment', AppointmentService())
-    registry.register('auth', AuthService())
-    registry.register('ai', AIService())
-    registry.register('quickbooks', QuickBooksService())
-    registry.register('quickbooks_sync', QuickBooksSyncService())
-    registry.register('quote', QuoteService())
-    registry.register('job', JobService())
-    registry.register('invoice', InvoiceService())
+    # Register services with lazy loading factories
+    # These won't be instantiated until first use
     
-    # Services with dependencies
-    registry.register('campaign', CampaignService(
-        openphone_service=registry.get('openphone'),
-        list_service=registry.get('campaign_list')
-    ))
-    registry.register('csv_import', CSVImportService(
-        contact_service=registry.get('contact')
-    ))
+    # Basic services without dependencies
+    registry.register_singleton('contact', lambda: _create_contact_service())
+    registry.register_singleton('message', lambda: _create_message_service())
+    registry.register_singleton('todo', lambda: _create_todo_service())
+    registry.register_singleton('auth', lambda: _create_auth_service())
+    registry.register_singleton('job', lambda: _create_job_service())
+    registry.register_singleton('quote', lambda: _create_quote_service())
+    registry.register_singleton('invoice', lambda: _create_invoice_service())
+    
+    # External API services (expensive to initialize)
+    registry.register_singleton(
+        'openphone',
+        lambda: _create_openphone_service(),
+        tags={'external', 'api', 'sms'}
+    )
+    
+    registry.register_singleton(
+        'google_calendar',
+        lambda: _create_google_calendar_service(),
+        tags={'external', 'api', 'calendar'}
+    )
+    
+    registry.register_singleton(
+        'email',
+        lambda: _create_email_service(),
+        tags={'external', 'smtp'}
+    )
+    
+    registry.register_singleton(
+        'ai',
+        lambda: _create_ai_service(),
+        tags={'external', 'api', 'ai'}
+    )
+    
+    registry.register_singleton(
+        'quickbooks',
+        lambda: _create_quickbooks_service(),
+        tags={'external', 'api', 'accounting'}
+    )
+    
+    # Services with single dependencies
+    registry.register_factory(
+        'campaign_list',
+        lambda db_session: _create_campaign_list_service(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'dashboard',
+        lambda db_session: _create_dashboard_service(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'conversation',
+        lambda db_session: _create_conversation_service(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'task',
+        lambda db_session: _create_task_service(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'diagnostics',
+        lambda db_session: _create_diagnostics_service(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'sync_health',
+        lambda db_session: _create_sync_health_service(db_session),
+        dependencies=['db_session']
+    )
+    
+    # Services with multiple dependencies
+    registry.register_factory(
+        'campaign',
+        lambda openphone, campaign_list: _create_campaign_service(openphone, campaign_list),
+        dependencies=['openphone', 'campaign_list']
+    )
+    
+    registry.register_factory(
+        'csv_import',
+        lambda contact: _create_csv_import_service(contact),
+        dependencies=['contact']
+    )
+    
+    registry.register_factory(
+        'openphone_sync',
+        lambda openphone, db_session: _create_openphone_sync_service(openphone, db_session),
+        dependencies=['openphone', 'db_session']
+    )
+    
+    registry.register_factory(
+        'quickbooks_sync',
+        lambda quickbooks, db_session: _create_quickbooks_sync_service(quickbooks, db_session),
+        dependencies=['quickbooks', 'db_session']
+    )
+    
+    registry.register_factory(
+        'appointment',
+        lambda google_calendar, db_session: _create_appointment_service(google_calendar, db_session),
+        dependencies=['google_calendar', 'db_session']
+    )
+    
+    # Validate all dependencies are registered
+    errors = registry.validate_dependencies()
+    if errors:
+        for error in errors:
+            logger.error(f"Service dependency error: {error}")
+        if app.config.get('FLASK_ENV') == 'production':
+            raise RuntimeError(f"Service dependency errors: {errors}")
+    
+    # Log initialization order for debugging
+    if app.debug:
+        try:
+            order = registry.get_initialization_order()
+            logger.debug(f"Service initialization order: {order}")
+        except RuntimeError as e:
+            logger.error(f"Circular dependency detected: {e}")
+            raise
+    
+    # Warmup critical services in production
+    if app.config.get('FLASK_ENV') == 'production':
+        critical_services = ['db_session', 'openphone', 'auth']
+        logger.info(f"Warming up critical services: {critical_services}")
+        registry.warmup(critical_services)
     
     # Attach registry to app
     app.services = registry
@@ -241,6 +324,175 @@ def create_app(config_name=None, test_config=None):
     commands.init_app(app)
     
     return app
+
+
+# Service Factory Functions
+# These are only called when the service is first requested
+
+def _create_contact_service():
+    """Create ContactService instance"""
+    from services.contact_service_refactored import ContactService
+    logger.info("Initializing ContactService")
+    return ContactService()
+
+def _create_message_service():
+    """Create MessageService instance"""
+    from services.message_service import MessageService
+    logger.info("Initializing MessageService")
+    return MessageService()
+
+def _create_todo_service():
+    """Create TodoService instance"""
+    from services.todo_service import TodoService
+    logger.info("Initializing TodoService")
+    return TodoService()
+
+def _create_auth_service():
+    """Create AuthService instance"""
+    from services.auth_service import AuthService
+    logger.info("Initializing AuthService")
+    return AuthService()
+
+def _create_job_service():
+    """Create JobService instance"""
+    from services.job_service import JobService
+    logger.info("Initializing JobService")
+    return JobService()
+
+def _create_quote_service():
+    """Create QuoteService instance"""
+    from services.quote_service import QuoteService
+    logger.info("Initializing QuoteService")
+    return QuoteService()
+
+def _create_invoice_service():
+    """Create InvoiceService instance"""
+    from services.invoice_service import InvoiceService
+    logger.info("Initializing InvoiceService")
+    return InvoiceService()
+
+def _create_openphone_service():
+    """Create OpenPhoneService instance - expensive due to API validation"""
+    from services.openphone_service import OpenPhoneService
+    logger.info("Initializing OpenPhoneService")
+    api_key = os.environ.get('OPENPHONE_API_KEY')
+    phone_number = os.environ.get('OPENPHONE_PHONE_NUMBER')
+    if not api_key:
+        logger.warning("OpenPhone API key not configured")
+        return None
+    return OpenPhoneService()  # Uses env vars internally
+
+def _create_google_calendar_service():
+    """Create GoogleCalendarService instance - expensive due to OAuth"""
+    from services.google_calendar_service import GoogleCalendarService
+    from api_integrations import get_google_credentials
+    logger.info("Initializing GoogleCalendarService")
+    try:
+        credentials = get_google_credentials()
+        return GoogleCalendarService(credentials=credentials)
+    except Exception as e:
+        logger.warning(f"Google Calendar service unavailable: {e}")
+        return None
+
+def _create_email_service():
+    """Create EmailService instance - may require SMTP connection"""
+    from services.email_service import EmailService, EmailConfig
+    logger.info("Initializing EmailService")
+    config = EmailConfig(
+        server=os.environ.get('SMTP_SERVER', 'localhost'),
+        port=int(os.environ.get('SMTP_PORT', '587')),
+        use_tls=os.environ.get('SMTP_USE_TLS', 'true').lower() == 'true',
+        username=os.environ.get('SMTP_USERNAME'),
+        password=os.environ.get('SMTP_PASSWORD'),
+        default_sender=os.environ.get('DEFAULT_EMAIL_SENDER', 'noreply@example.com')
+    )
+    mail = None  # Would get from Flask-Mail if needed
+    return EmailService(mail=mail, config=config)
+
+def _create_ai_service():
+    """Create AIService instance"""
+    from services.ai_service import AIService
+    logger.info("Initializing AIService")
+    return AIService()
+
+def _create_quickbooks_service():
+    """Create QuickBooksService instance"""
+    from services.quickbooks_service import QuickBooksService
+    logger.info("Initializing QuickBooksService")
+    if not os.environ.get('QUICKBOOKS_CLIENT_ID'):
+        logger.warning("QuickBooks not configured")
+        return None
+    return QuickBooksService()
+
+def _create_campaign_list_service(db_session):
+    """Create CampaignListService with dependencies"""
+    from services.campaign_list_service import CampaignListService
+    logger.info("Initializing CampaignListService")
+    return CampaignListService()
+
+def _create_dashboard_service(db_session):
+    """Create DashboardService with dependencies"""
+    from services.dashboard_service import DashboardService
+    logger.info("Initializing DashboardService")
+    return DashboardService()
+
+def _create_conversation_service(db_session):
+    """Create ConversationService with dependencies"""
+    from services.conversation_service import ConversationService
+    logger.info("Initializing ConversationService")
+    return ConversationService()
+
+def _create_task_service(db_session):
+    """Create TaskService with dependencies"""
+    from services.task_service import TaskService
+    logger.info("Initializing TaskService")
+    return TaskService()
+
+def _create_diagnostics_service(db_session):
+    """Create DiagnosticsService with dependencies"""
+    from services.diagnostics_service import DiagnosticsService
+    logger.info("Initializing DiagnosticsService")
+    return DiagnosticsService()
+
+def _create_sync_health_service(db_session):
+    """Create SyncHealthService with dependencies"""
+    from services.sync_health_service import SyncHealthService
+    logger.info("Initializing SyncHealthService")
+    return SyncHealthService()
+
+def _create_campaign_service(openphone, campaign_list):
+    """Create CampaignService with dependencies"""
+    from services.campaign_service import CampaignService
+    logger.info("Initializing CampaignService")
+    return CampaignService(
+        openphone_service=openphone,
+        list_service=campaign_list
+    )
+
+def _create_csv_import_service(contact):
+    """Create CSVImportService with dependencies"""
+    from services.csv_import_service import CSVImportService
+    logger.info("Initializing CSVImportService")
+    return CSVImportService(contact_service=contact)
+
+def _create_openphone_sync_service(openphone, db_session):
+    """Create OpenPhoneSyncService with dependencies"""
+    from services.openphone_sync_service import OpenPhoneSyncService
+    logger.info("Initializing OpenPhoneSyncService")
+    return OpenPhoneSyncService()
+
+def _create_quickbooks_sync_service(quickbooks, db_session):
+    """Create QuickBooksSyncService with dependencies"""
+    from services.quickbooks_sync_service import QuickBooksSyncService
+    logger.info("Initializing QuickBooksSyncService")
+    return QuickBooksSyncService()
+
+def _create_appointment_service(google_calendar, db_session):
+    """Create AppointmentService with dependencies"""
+    from services.appointment_service_refactored import AppointmentService
+    logger.info("Initializing AppointmentService")
+    return AppointmentService(calendar_service=google_calendar, session=db_session)
+
 
 if __name__ == '__main__':
     app = create_app()
