@@ -72,17 +72,47 @@
       {
         "pattern": "implement|create|add|build|develop",
         "agent": "tdd-enforcer",
-        "message": "Invoking TDD enforcer to ensure test-first development"
+        "message": "🧪 Invoking TDD enforcer to ensure test-first development"
       },
       {
         "pattern": "repository|clean architecture|database abstraction",
         "agent": "repository-architect",
-        "message": "Invoking repository architect for clean architecture patterns"
+        "message": "🏗️ Invoking repository architect for clean architecture patterns"
       },
       {
         "pattern": "test|coverage|pytest|mock",
         "agent": "flask-test-specialist",
-        "message": "Invoking Flask test specialist for comprehensive testing"
+        "message": "🔬 Invoking Flask test specialist for comprehensive testing"
+      },
+      {
+        "pattern": "openphone|sms|webhook|phone|messaging",
+        "agent": "openphone-api-specialist",
+        "message": "📱 Invoking OpenPhone API specialist for communication features"
+      },
+      {
+        "pattern": "quickbooks|invoice|customer sync|oauth",
+        "agent": "quickbooks-integration-specialist",
+        "message": "💰 Invoking QuickBooks specialist for financial integration"
+      },
+      {
+        "pattern": "celery|background task|async|queue",
+        "agent": "celery-tasks-specialist",
+        "message": "⚙️ Invoking Celery specialist for background processing"
+      },
+      {
+        "pattern": "migration|alembic|schema change|database",
+        "agent": "database-migration-specialist",
+        "message": "🗄️ Invoking database migration specialist for schema management"
+      },
+      {
+        "pattern": "campaign|a/b test|sms marketing|bulk message",
+        "agent": "campaign-system-specialist",
+        "message": "📊 Invoking campaign specialist for marketing automation"
+      },
+      {
+        "pattern": "claude code|sub-agent|hooks|memory",
+        "agent": "claude-code-architect",
+        "message": "🤖 Invoking Claude Code architect for workflow optimization"
       }
     ]
   },
