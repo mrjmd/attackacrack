@@ -8,8 +8,9 @@ from flask_login import login_required
 from services.contact_service import ContactService
 from services.message_service import MessageService
 from services.ai_service import AIService
+from services.diagnostics_service import DiagnosticsService
+from services.task_service import TaskService
 from crm_database import Activity # Import Activity
-from celery.result import AsyncResult
 
 api_bp = Blueprint('api', __name__)
 
@@ -33,143 +34,17 @@ def debug_session():
 @api_bp.route('/health')
 def health_check():
     """Health check endpoint for monitoring."""
-    health_status = {
-        'status': 'healthy',
-        'service': 'attackacrack-crm',
-        'database': 'unknown',
-        'redis': 'unknown'
-    }
-    
-    try:
-        # Check database connection
-        from extensions import db
-        db.session.execute('SELECT 1')
-        health_status['database'] = 'connected'
-    except Exception as e:
-        health_status['database'] = f'error: {str(e)}'
-        health_status['status'] = 'degraded'
-    
-    try:
-        # Check Redis connection (optional)
-        import os
-        if os.environ.get('REDIS_URL'):
-            try:
-                from celery_worker import celery
-                celery.backend.get('health_check_test')
-                health_status['redis'] = 'connected'
-            except ImportError:
-                # Celery worker might not be available in all contexts
-                health_status['redis'] = 'celery not available'
-        else:
-            health_status['redis'] = 'not configured'
-    except Exception as e:
-        health_status['redis'] = f'error: {str(e)}'
-        # Don't fail health check for Redis issues
-    
-    # Return 200 if database is connected (minimum requirement)
-    if health_status['database'] == 'connected':
-        return jsonify(health_status), 200
-    else:
-        return jsonify(health_status), 503
+    diagnostics_service = DiagnosticsService()
+    health_status, status_code = diagnostics_service.get_health_status()
+    return jsonify(health_status), status_code
 
 
 @api_bp.route('/health/redis')
 @login_required
 def redis_health():
     """Redis connectivity diagnostic endpoint"""
-    import socket
-    from urllib.parse import urlparse
-    
-    diagnostics = {
-        'redis_url_configured': False,
-        'redis_url_scheme': None,
-        'network_reachable': False,
-        'redis_ping': False,
-        'celery_configured': False,
-        'errors': []
-    }
-    
-    redis_url = os.environ.get('REDIS_URL', '')
-    
-    if redis_url:
-        diagnostics['redis_url_configured'] = True
-        parsed = urlparse(redis_url)
-        diagnostics['redis_url_scheme'] = parsed.scheme
-        diagnostics['redis_host'] = parsed.hostname
-        diagnostics['redis_port'] = parsed.port or 6379
-        
-        # Test network connectivity
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(5)
-            result = sock.connect_ex((parsed.hostname, parsed.port or 6379))
-            sock.close()
-            diagnostics['network_reachable'] = (result == 0)
-            if result != 0:
-                diagnostics['errors'].append(f"Network connection failed with error code: {result}")
-        except Exception as e:
-            diagnostics['errors'].append(f"Network test error: {str(e)}")
-        
-        # Test Redis connection
-        if diagnostics['network_reachable']:
-            try:
-                import redis
-                import ssl
-                
-                if redis_url.startswith('rediss://'):
-                    # SSL connection
-                    if 'ssl_cert_reqs' not in redis_url:
-                        separator = '&' if '?' in redis_url else '?'
-                        redis_url_test = redis_url + f"{separator}ssl_cert_reqs=CERT_NONE"
-                    else:
-                        redis_url_test = redis_url
-                    
-                    r = redis.from_url(
-                        redis_url_test,
-                        socket_connect_timeout=5,
-                        socket_timeout=5,
-                        ssl_cert_reqs=ssl.CERT_NONE,
-                        ssl_check_hostname=False
-                    )
-                else:
-                    r = redis.from_url(
-                        redis_url,
-                        socket_connect_timeout=5,
-                        socket_timeout=5
-                    )
-                
-                # Test ping
-                r.ping()
-                diagnostics['redis_ping'] = True
-                
-                # Get Redis info
-                info = r.info('server')
-                diagnostics['redis_version'] = info.get('redis_version', 'Unknown')
-                
-            except Exception as e:
-                diagnostics['errors'].append(f"Redis connection error: {type(e).__name__}: {str(e)}")
-    else:
-        diagnostics['errors'].append("REDIS_URL environment variable not set")
-    
-    # Test Celery configuration
-    try:
-        from celery_config import create_celery_app
-        celery = create_celery_app('diagnostic')
-        diagnostics['celery_configured'] = True
-    except Exception as e:
-        diagnostics['errors'].append(f"Celery configuration error: {str(e)}")
-    
-    # Determine overall status
-    if diagnostics['redis_ping']:
-        status_code = 200
-        diagnostics['status'] = 'healthy'
-    elif diagnostics['network_reachable']:
-        status_code = 503
-        diagnostics['status'] = 'redis_connection_failed'
-    else:
-        status_code = 503
-        diagnostics['status'] = 'network_unreachable'
-    
+    diagnostics_service = DiagnosticsService()
+    diagnostics, status_code = diagnostics_service.get_redis_diagnostics()
     return jsonify(diagnostics), status_code
 
 
@@ -295,55 +170,16 @@ def generate_appointment_summary(contact_id):
 @login_required
 def task_status(task_id):
     """Get the status of a Celery task"""
+    task_service = TaskService()
+    
     try:
-        # Import celery here to avoid circular import
-        import os
-        redis_url = os.environ.get('REDIS_URL', '')
-        if redis_url.startswith('rediss://'):
-            # For production SSL Redis, we need to configure Celery properly
-            from celery_config import create_celery_app
-            celery = create_celery_app('attackacrack')
-        else:
-            # For local non-SSL Redis, use the regular approach
-            from celery_worker import celery
-        
-        result = AsyncResult(task_id, app=celery)
-        
-        response = {
-            'task_id': task_id,
-            'state': result.state,
-            'ready': result.ready()
-        }
-        
-        if result.state == 'PENDING':
-            # Task hasn't started yet
-            response['meta'] = {'status': 'Task is waiting to be processed...'}
-        elif result.state == 'PROGRESS':
-            # Task is running with progress updates
-            response['meta'] = result.info
-        elif result.state == 'SUCCESS':
-            # Task completed successfully
-            response['result'] = result.result
-            response['meta'] = result.info if hasattr(result, 'info') else None
-        elif result.state == 'FAILURE':
-            # Task failed
-            response['error'] = str(result.info)
-            response['meta'] = {
-                'exc_type': result.info.get('exc_type', 'Unknown') if isinstance(result.info, dict) else 'Unknown',
-                'exc_message': result.info.get('exc_message', str(result.info)) if isinstance(result.info, dict) else str(result.info),
-                'status': 'Task failed'
-            }
-        else:
-            # Some other state
-            response['meta'] = result.info
-            
+        response = task_service.get_task_status(task_id)
         return jsonify(response)
-        
     except Exception as e:
         return jsonify({
             'task_id': task_id,
             'state': 'ERROR',
-            'error': f'Could not fetch task status: {str(e)}'
+            'error': str(e)
         }), 500
 
 @api_bp.route('/webhooks/openphone', methods=['POST'])
