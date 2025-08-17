@@ -167,6 +167,12 @@ def create_app(config_name=None, test_config=None):
     )
     
     registry.register_factory(
+        'openphone_webhook',
+        lambda contact, sms_metrics: _create_openphone_webhook_service(contact, sms_metrics),
+        dependencies=['contact', 'sms_metrics']
+    )
+    
+    registry.register_factory(
         'quickbooks_sync',
         lambda quickbooks, db_session: _create_quickbooks_sync_service(quickbooks, db_session),
         dependencies=['quickbooks', 'db_session']
@@ -480,6 +486,12 @@ def _create_openphone_sync_service(openphone, db_session):
     from services.openphone_sync_service import OpenPhoneSyncService
     logger.info("Initializing OpenPhoneSyncService")
     return OpenPhoneSyncService()
+
+def _create_openphone_webhook_service(contact, sms_metrics):
+    """Create OpenPhoneWebhookService with dependencies"""
+    from services.openphone_webhook_service import OpenPhoneWebhookService
+    logger.info("Initializing OpenPhoneWebhookService")
+    return OpenPhoneWebhookService(contact_service=contact, metrics_service=sms_metrics)
 
 def _create_quickbooks_sync_service(quickbooks, db_session):
     """Create QuickBooksSyncService with dependencies"""

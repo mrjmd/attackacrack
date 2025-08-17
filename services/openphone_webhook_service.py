@@ -24,9 +24,17 @@ logger = logging.getLogger(__name__)
 class OpenPhoneWebhookService:
     """Handles all OpenPhone webhook events"""
     
-    def __init__(self):
-        self.contact_service = ContactService()
-        self.metrics_service = SMSMetricsService()
+    def __init__(self, contact_service: Optional[ContactService] = None, 
+                 metrics_service: Optional[SMSMetricsService] = None):
+        # Use provided services or create defaults with proper dependencies
+        if contact_service:
+            self.contact_service = contact_service
+        else:
+            # Fallback: try to create ContactService with default repository
+            from repositories.contact_repository import ContactRepository
+            self.contact_service = ContactService(ContactRepository(db.session))
+        
+        self.metrics_service = metrics_service or SMSMetricsService()
         
     def process_webhook(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -180,9 +180,14 @@ def task_status(task_id):
 @api_bp.route('/webhooks/openphone', methods=['POST'])
 @verify_openphone_signature
 def openphone_webhook():
-    from services.openphone_webhook_service import OpenPhoneWebhookService
+    # Use service registry to get the webhook service
+    webhook_service = current_app.services.get('openphone_webhook')
+    if not webhook_service:
+        # Fallback: create service with proper dependencies from registry
+        from services.openphone_webhook_service import OpenPhoneWebhookService
+        contact_service = current_app.services.get('contact')
+        webhook_service = OpenPhoneWebhookService(contact_service=contact_service)
     
-    webhook_service = OpenPhoneWebhookService()
     data = request.json
     current_app.logger.info(f"Received valid webhook: {data}")
     
