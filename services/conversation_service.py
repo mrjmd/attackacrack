@@ -227,6 +227,58 @@ class ConversationService:
             Campaign.status.in_(['draft', 'running'])
         ).all()
     
+    def mark_conversations_read(self, conversation_ids: List[int]) -> Tuple[bool, str]:
+        """Mark conversations as read by updating last activity"""
+        if not conversation_ids:
+            return False, "No conversations selected"
+        
+        try:
+            for conv_id in conversation_ids:
+                conv = Conversation.query.get(conv_id)
+                if conv:
+                    conv.last_activity_at = datetime.utcnow()
+            db.session.commit()
+            return True, f'Marked {len(conversation_ids)} conversations as read'
+        except Exception as e:
+            db.session.rollback()
+            return False, f'Error marking conversations: {str(e)}'
+    
+    def get_contact_ids_from_conversations(self, conversation_ids: List[int]) -> List[int]:
+        """Get unique contact IDs from conversation IDs"""
+        conversations = Conversation.query.filter(
+            Conversation.id.in_(conversation_ids)
+        ).all()
+        return list(set(conv.contact_id for conv in conversations if conv.contact_id))
+    
+    def export_conversations_with_contacts(self, conversation_ids: List[int]) -> str:
+        """Export conversations with contact info to CSV"""
+        import csv
+        import io
+        
+        conversations = Conversation.query.filter(
+            Conversation.id.in_(conversation_ids)
+        ).options(joinedload(Conversation.contact)).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        writer.writerow(['Contact Name', 'Phone', 'Email', 'Last Activity', 'Message Count'])
+        
+        # Write data
+        for conv in conversations:
+            message_count = Activity.query.filter_by(conversation_id=conv.id).count()
+            writer.writerow([
+                f"{conv.contact.first_name} {conv.contact.last_name}" if conv.contact else "",
+                conv.contact.phone if conv.contact else "",
+                conv.contact.email if conv.contact else "",
+                conv.last_activity_at.strftime('%Y-%m-%d %H:%M:%S') if conv.last_activity_at else '',
+                message_count
+            ])
+        
+        output.seek(0)
+        return output.getvalue()
+    
     def bulk_action(self, action: str, conversation_ids: List[int], **kwargs) -> Tuple[bool, str]:
         """
         Perform bulk action on conversations
@@ -244,46 +296,10 @@ class ConversationService:
         
         try:
             if action == 'mark_read':
-                # Mark conversations as read by adding a dummy outgoing activity
-                for conv_id in conversation_ids:
-                    # This would need to be implemented based on your read/unread logic
-                    pass
-                return True, f"Marked {len(conversation_ids)} conversations as read"
-                
-            elif action == 'add_to_campaign':
-                campaign_id = kwargs.get('campaign_id')
-                if not campaign_id:
-                    return False, "No campaign selected"
-                # Implementation would add contacts to campaign
-                return True, f"Added {len(conversation_ids)} contacts to campaign"
-                
-            elif action == 'flag_office':
-                # Flag contacts as office numbers
-                conversations = Conversation.query.filter(
-                    Conversation.id.in_(conversation_ids)
-                ).all()
-                
-                for conv in conversations:
-                    existing_flag = ContactFlag.query.filter_by(
-                        contact_id=conv.contact_id,
-                        flag_type='office_number'
-                    ).first()
-                    
-                    if not existing_flag:
-                        flag = ContactFlag(
-                            contact_id=conv.contact_id,
-                            flag_type='office_number',
-                            flagged_at=datetime.now()
-                        )
-                        db.session.add(flag)
-                
-                db.session.commit()
-                return True, f"Flagged {len(conversation_ids)} contacts as office numbers"
-                
+                return self.mark_conversations_read(conversation_ids)
             elif action == 'export':
-                # Export would generate CSV
-                return True, "Export functionality not yet implemented"
-                
+                csv_data = self.export_conversations_with_contacts(conversation_ids)
+                return True, csv_data
             else:
                 return False, f"Unknown action: {action}"
                 

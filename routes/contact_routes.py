@@ -1,13 +1,9 @@
-from flask import Blueprint, render_template, request, redirect, url_for, current_app, jsonify, flash
-from flask_login import login_required
-from datetime import datetime, timedelta
-from sqlalchemy import or_, and_, func
-from sqlalchemy.orm import joinedload, selectinload
+from flask import Blueprint, render_template, request, redirect, url_for, current_app, jsonify, flash, make_response
+from flask_login import login_required, current_user
+from datetime import datetime
 from services.contact_service import ContactService
 from services.message_service import MessageService
 from services.conversation_service import ConversationService 
-from extensions import db
-from crm_database import Activity, Conversation, Contact, ContactFlag
 
 contact_bp = Blueprint('contact', __name__)
 
@@ -15,7 +11,7 @@ contact_bp = Blueprint('contact', __name__)
 @login_required
 def list_all():
     """Display paginated list of contacts with filters"""
-    contact_service = ContactService()
+    contact_service = current_app.services.get('contact')
     
     # Get parameters
     page = request.args.get('page', 1, type=int)
@@ -48,7 +44,7 @@ def list_all():
 @login_required
 def conversation_list():
     """Display paginated list of conversations with filters"""
-    conversation_service = ConversationService()
+    conversation_service = current_app.services.get('conversation')
     
     # Get search and filter parameters
     search_query = request.args.get('search', '').strip()
@@ -84,7 +80,8 @@ def conversation_list():
 @login_required
 def bulk_conversation_action():
     """Handle bulk actions on conversations"""
-    conversation_service = ConversationService()
+    contact_service = current_app.services.get('contact')
+    conversation_service = current_app.services.get('conversation')
     
     action = request.form.get('action')
     conversation_ids = [int(id) for id in request.form.getlist('conversation_ids')]
@@ -95,15 +92,9 @@ def bulk_conversation_action():
     
     try:
         if action == 'mark_read':
-            # Mark conversations as read by creating outgoing activities
-            for conv_id in conversation_ids:
-                conv = Conversation.query.get(conv_id)
-                if conv:
-                    # Update last activity to indicate read status
-                    conv.last_activity_at = datetime.utcnow()
-            
-            db.session.commit()
-            flash(f'Marked {len(conversation_ids)} conversations as read', 'success')
+            # Use conversation service to mark as read
+            success, message = conversation_service.mark_conversations_read(conversation_ids)
+            flash(message, 'success' if success else 'error')
             
         elif action == 'add_to_campaign':
             campaign_id = request.form.get('campaign_id')
@@ -111,85 +102,33 @@ def bulk_conversation_action():
                 flash('No campaign selected', 'warning')
                 return redirect(url_for('contact.conversation_list'))
             
-            # Add contacts to campaign
-            from crm_database import Campaign, CampaignMembership
-            campaign = Campaign.query.get(campaign_id)
-            if not campaign:
-                flash('Campaign not found', 'error')
-                return redirect(url_for('contact.conversation_list'))
+            # Get contact IDs from conversations
+            contact_ids = conversation_service.get_contact_ids_from_conversations(conversation_ids)
             
-            added_count = 0
-            for conv_id in conversation_ids:
-                conv = Conversation.query.get(conv_id)
-                if conv:
-                    # Check if already in campaign
-                    existing = CampaignMembership.query.filter_by(
-                        campaign_id=campaign_id,
-                        contact_id=conv.contact_id
-                    ).first()
-                    
-                    if not existing:
-                        membership = CampaignMembership(
-                            campaign_id=campaign_id,
-                            contact_id=conv.contact_id,
-                            status='pending'
-                        )
-                        db.session.add(membership)
-                        added_count += 1
-            
-            db.session.commit()
-            flash(f'Added {added_count} contacts to campaign "{campaign.name}"', 'success')
+            # Use ContactService to bulk add to campaign
+            added_count, message = contact_service.bulk_add_to_campaign(contact_ids, int(campaign_id))
+            flash(message, 'success' if added_count > 0 else 'warning')
             
         elif action == 'flag_office':
-            # Flag selected contacts as office numbers
-            for conv_id in conversation_ids:
-                conv = Conversation.query.get(conv_id)
-                if conv:
-                    # Check if already flagged
-                    existing_flag = ContactFlag.query.filter_by(
-                        contact_id=conv.contact_id,
-                        flag_type='office_number'
-                    ).first()
-                    
-                    if not existing_flag:
-                        flag = ContactFlag(
-                            contact_id=conv.contact_id,
-                            flag_type='office_number',
-                            flag_reason='Bulk flagged as office number',
-                            applies_to='both',
-                            created_by='bulk_action'
-                        )
-                        db.session.add(flag)
+            # Get contact IDs from conversations
+            contact_ids = conversation_service.get_contact_ids_from_conversations(conversation_ids)
             
-            db.session.commit()
-            flash(f'Flagged {len(conversation_ids)} contacts as office numbers', 'success')
+            # Flag contacts as office numbers
+            flagged = 0
+            for contact_id in contact_ids:
+                if contact_service.add_contact_flag(contact_id, 'office_number', 'Bulk flagged as office number', 'bulk_action'):
+                    flagged += 1
+            
+            flash(f'Flagged {flagged} contacts as office numbers', 'success')
             
         elif action == 'export':
+            # Get contact IDs from conversations
+            contact_ids = conversation_service.get_contact_ids_from_conversations(conversation_ids)
+            
             # Export conversation data
-            conversations = Conversation.query.filter(Conversation.id.in_(conversation_ids)).all()
+            csv_data = conversation_service.export_conversations_with_contacts(conversation_ids)
             
-            import csv
-            import io
-            from flask import make_response
-            
-            output = io.StringIO()
-            writer = csv.writer(output)
-            
-            # Write headers
-            writer.writerow(['Contact Name', 'Phone', 'Email', 'Last Activity', 'Message Count'])
-            
-            # Write data
-            for conv in conversations:
-                writer.writerow([
-                    f"{conv.contact.first_name} {conv.contact.last_name}",
-                    conv.contact.phone,
-                    conv.contact.email or '',
-                    conv.last_activity_at.strftime('%Y-%m-%d %H:%M:%S') if conv.last_activity_at else '',
-                    Activity.query.filter_by(conversation_id=conv.id).count()
-                ])
-            
-            output.seek(0)
-            response = make_response(output.getvalue())
+            response = make_response(csv_data)
             response.headers['Content-Disposition'] = 'attachment; filename=conversations_export.csv'
             response.headers['Content-Type'] = 'text/csv'
             return response
@@ -199,21 +138,28 @@ def bulk_conversation_action():
             
     except Exception as e:
         flash(f'Error performing bulk action: {str(e)}', 'error')
-        db.session.rollback()
     
     return redirect(url_for('contact.conversation_list'))
 
 @contact_bp.route('/<int:contact_id>')
 @login_required
 def contact_detail(contact_id):
-    contact_service = ContactService()
-    message_service = MessageService()
+    """Display contact details"""
+    contact_service = current_app.services.get('contact')
+    message_service = current_app.services.get('message')
+    
     contact = contact_service.get_contact_by_id(contact_id)
+    if not contact:
+        flash('Contact not found', 'error')
+        return redirect(url_for('contact.list_all'))
     
     activities = message_service.get_activities_for_contact(contact_id)
     
-    from api_integrations import get_emails_for_contact
-    recent_emails = get_emails_for_contact(contact.email)
+    # Get emails if contact has email
+    recent_emails = []
+    if contact.email:
+        from api_integrations import get_emails_for_contact
+        recent_emails = get_emails_for_contact(contact.email)
 
     return render_template(
         'contact_detail.html', 
@@ -225,16 +171,12 @@ def contact_detail(contact_id):
 @contact_bp.route('/<int:contact_id>/conversation')
 @login_required
 def conversation(contact_id):
-    contact_service = ContactService()
-    message_service = MessageService()
+    """Display contact conversation with enhanced details"""
+    contact_service = current_app.services.get('contact')
+    message_service = current_app.services.get('message')
     
-    # Additional data for enhanced view
-    from crm_database import Job, ContactFlag, CampaignMembership, Campaign, Property
-    
-    # Get contact with eager loading for properties and their jobs
-    contact = Contact.query.options(
-        selectinload(Contact.properties).selectinload(Property.jobs)
-    ).filter_by(id=contact_id).first()
+    # Get contact with eager loading for properties and jobs
+    contact = contact_service.get_contact_with_relations(contact_id)
     
     if not contact:
         flash('Contact not found', 'error')
@@ -246,33 +188,22 @@ def conversation(contact_id):
     recent_jobs = []
     if contact.properties:
         for prop in contact.properties:
-            recent_jobs.extend(prop.jobs)  # Jobs are already loaded
+            recent_jobs.extend(prop.jobs)
     recent_jobs = sorted(recent_jobs, key=lambda x: x.completed_at if x.completed_at else datetime.min, reverse=True)[:3]
     
-    # Check for flags
-    has_office_flag = ContactFlag.query.filter_by(
-        contact_id=contact_id,
-        flag_type='office_number'
-    ).first() is not None
+    # Get contact flags
+    flags = contact_service.get_contact_flags(contact_id)
+    has_office_flag = flags['has_office_flag']
+    has_opted_out = flags['has_opted_out']
     
-    has_opted_out = ContactFlag.query.filter_by(
-        contact_id=contact_id,
-        flag_type='opted_out'
-    ).first() is not None
-    
-    # Get campaign memberships with eager loading
-    campaign_memberships = CampaignMembership.query.options(
-        joinedload(CampaignMembership.campaign)
-    ).filter_by(
-        contact_id=contact_id
-    ).order_by(CampaignMembership.sent_at.desc()).limit(3).all()
+    # Get campaign memberships
+    campaign_memberships = contact_service.get_campaign_memberships(contact_id, limit=3)
     
     # Calculate statistics
     call_count = sum(1 for a in activities if a.activity_type == 'call')
     last_activity = max(activities, key=lambda a: a.created_at) if activities else None
     last_activity_date = last_activity.created_at.strftime('%b %d, %Y') if last_activity else None
     
-    # Use the new enhanced template
     return render_template('conversation_detail_enhanced.html', 
                          contact=contact, 
                          activities=activities,
@@ -287,9 +218,9 @@ def conversation(contact_id):
 @login_required
 def send_message(contact_id):
     """Send a message to a contact via OpenPhone"""
-    from services.openphone_service import OpenPhoneService
+    contact_service = current_app.services.get('contact')
+    openphone_service = current_app.services.get('openphone')
     
-    contact_service = ContactService()
     contact = contact_service.get_contact_by_id(contact_id)
     
     if not contact:
@@ -297,77 +228,156 @@ def send_message(contact_id):
         return redirect(url_for('contact.conversation_list'))
     
     message_body = request.form.get('body', '').strip()
+    
     if not message_body:
-        flash('Message cannot be empty', 'error')
+        flash('Message cannot be empty', 'warning')
         return redirect(url_for('contact.conversation', contact_id=contact_id))
     
+    if not contact.phone:
+        flash('Contact has no phone number', 'error')
+        return redirect(url_for('contact.conversation', contact_id=contact_id))
+    
+    # Send message via OpenPhone
     try:
-        openphone_service = OpenPhoneService()
-        result = openphone_service.send_message(contact.phone, message_body)
+        result = openphone_service.send_message(
+            to_number=contact.phone,
+            body=message_body
+        )
         
         if result.get('success'):
             flash('Message sent successfully!', 'success')
         else:
-            flash('Failed to send message', 'error')
+            flash(f'Failed to send message: {result.get("error", "Unknown error")}', 'error')
     except Exception as e:
         flash(f'Error sending message: {str(e)}', 'error')
     
     return redirect(url_for('contact.conversation', contact_id=contact_id))
 
-@contact_bp.route('/add', methods=['GET', 'POST'])
+@contact_bp.route('/<int:contact_id>/flag', methods=['POST'])
 @login_required
-def add_contact():
-    contact_service = ContactService()
-    if request.method == 'POST':
-        contact_service.add_contact(
-            first_name=request.form['first_name'],
-            last_name=request.form['last_name'],
-            email=request.form['email'],
-            phone=request.form['phone']
-        )
-        return redirect(url_for('contact.list_all'))
-    return render_template('add_edit_contact_form.html')
+def flag_contact(contact_id):
+    """Add a flag to a contact"""
+    contact_service = current_app.services.get('contact')
+    
+    flag_type = request.form.get('flag_type')
+    reason = request.form.get('reason', '')
+    
+    if not flag_type:
+        flash('Flag type is required', 'error')
+        return redirect(url_for('contact.conversation', contact_id=contact_id))
+    
+    success = contact_service.add_contact_flag(
+        contact_id=contact_id,
+        flag_type=flag_type,
+        reason=reason,
+        created_by=str(current_user.id) if current_user.is_authenticated else 'system'
+    )
+    
+    if success:
+        flash(f'Contact flagged as {flag_type}', 'success')
+    else:
+        flash('Flag already exists or error occurred', 'warning')
+    
+    return redirect(url_for('contact.conversation', contact_id=contact_id))
 
-@contact_bp.route('/<int:contact_id>/edit', methods=['GET', 'POST'])
+@contact_bp.route('/<int:contact_id>/unflag', methods=['POST'])
 @login_required
-def edit_contact(contact_id):
-    contact_service = ContactService()
-    contact = contact_service.get_contact_by_id(contact_id)
-    if request.method == 'POST':
-        contact_service.update_contact(
-            contact,
-            first_name=request.form['first_name'],
-            last_name=request.form['last_name'],
-            email=request.form['email'],
-            phone=request.form['phone']
-        )
-        return redirect(url_for('contact.contact_detail', contact_id=contact.id))
-    return render_template('add_edit_contact_form.html', contact=contact)
+def unflag_contact(contact_id):
+    """Remove a flag from a contact"""
+    contact_service = current_app.services.get('contact')
+    
+    flag_type = request.form.get('flag_type')
+    
+    if not flag_type:
+        flash('Flag type is required', 'error')
+        return redirect(url_for('contact.conversation', contact_id=contact_id))
+    
+    success = contact_service.remove_contact_flag(contact_id, flag_type)
+    
+    if success:
+        flash(f'Removed {flag_type} flag', 'success')
+    else:
+        flash('Error removing flag', 'error')
+    
+    return redirect(url_for('contact.conversation', contact_id=contact_id))
 
 @contact_bp.route('/bulk-action', methods=['POST'])
 @login_required
 def bulk_contact_action():
     """Handle bulk actions on contacts"""
-    contact_service = ContactService()
+    contact_service = current_app.services.get('contact')
+    
     action = request.form.get('action')
     contact_ids = [int(id) for id in request.form.getlist('contact_ids')]
     
-    if action in ['flag_opted_out', 'unflag_opted_out']:
-        flag_type = 'opted_out'
-        if action == 'flag_opted_out':
-            success, message = contact_service.bulk_action('flag', contact_ids, flag_type=flag_type)
-        else:
-            success, message = contact_service.bulk_action('unflag', contact_ids, flag_type=flag_type)
-    else:
-        success, message = contact_service.bulk_action(action, contact_ids)
+    if not contact_ids:
+        flash('No contacts selected', 'warning')
+        return redirect(url_for('contact.list_all'))
     
-    flash(message, 'success' if success else 'error')
+    if action == 'export':
+        # Export contacts to CSV
+        csv_data = contact_service.export_contacts(contact_ids)
+        
+        response = make_response(csv_data)
+        response.headers['Content-Disposition'] = 'attachment; filename=contacts_export.csv'
+        response.headers['Content-Type'] = 'text/csv'
+        return response
+    else:
+        # Use bulk_action for other operations
+        success, message = contact_service.bulk_action(
+            action=action,
+            contact_ids=contact_ids,
+            **request.form.to_dict()
+        )
+        
+        flash(message, 'success' if success else 'error')
+    
     return redirect(url_for('contact.list_all'))
 
-@contact_bp.route('/<int:contact_id>/delete', methods=['POST'])
+@contact_bp.route('/add', methods=['GET', 'POST'])
 @login_required
-def delete_contact(contact_id):
-    contact_service = ContactService()
+def add_contact():
+    """Add a new contact"""
+    contact_service = current_app.services.get('contact')
+    
+    if request.method == 'POST':
+        contact = contact_service.add_contact(
+            first_name=request.form['first_name'],
+            last_name=request.form['last_name'],
+            email=request.form.get('email'),
+            phone=request.form.get('phone')
+        )
+        if contact:
+            flash('Contact added successfully', 'success')
+        else:
+            flash('Error adding contact (possible duplicate)', 'error')
+        return redirect(url_for('contact.list_all'))
+    
+    return render_template('add_edit_contact_form.html')
+
+@contact_bp.route('/<int:contact_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_contact(contact_id):
+    """Edit an existing contact"""
+    contact_service = current_app.services.get('contact')
+    
     contact = contact_service.get_contact_by_id(contact_id)
-    contact_service.delete_contact(contact)
-    return redirect(url_for('contact.list_all'))
+    if not contact:
+        flash('Contact not found', 'error')
+        return redirect(url_for('contact.list_all'))
+    
+    if request.method == 'POST':
+        updated = contact_service.update_contact(
+            contact,
+            first_name=request.form['first_name'],
+            last_name=request.form['last_name'],
+            email=request.form.get('email'),
+            phone=request.form.get('phone')
+        )
+        if updated:
+            flash('Contact updated successfully', 'success')
+        else:
+            flash('Error updating contact', 'error')
+        return redirect(url_for('contact.contact_detail', contact_id=contact_id))
+    
+    return render_template('add_edit_contact_form.html', contact=contact)
