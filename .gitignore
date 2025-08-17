@@ -1,10 +1,12 @@
 # Environment variables
 .env
 .env.save
+.env.local
 
 # Other ignores...
 *.pyc
 __pycache__/
+flask_session/
 crm.db
 client_secret.json
 token.pickle
