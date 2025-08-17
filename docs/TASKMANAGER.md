@@ -172,24 +172,115 @@
 
 ### 4.4 OpenPhone Webhooks Production Setup
 **Goal**: Enable real-time message tracking and responses
+**Status**: Previously working on local with ngrok
 
-#### Tasks:
-- [ ] **Configure Webhook Endpoint**
-  - [ ] Verify webhook URL in production: `https://attackacrack-prod-5ce6f.ondigitalocean.app/api/webhooks/openphone`
-  - [ ] Register webhook with OpenPhone API
-  - [ ] Test webhook signature validation
+#### Pre-Setup Verification:
+- [ ] **Check Environment Variables**
+  - [ ] Verify `OPENPHONE_WEBHOOK_SIGNING_KEY` is set in production
+  - [ ] Confirm `OPENPHONE_API_KEY` is available
+  - [ ] Ensure `OPENPHONE_PHONE_NUMBER_ID` is configured
+  - [ ] Set `WEBHOOK_BASE_URL` to `https://attackacrack-prod-5ce6f.ondigitalocean.app`
+
+- [ ] **Code Deployment Status**
+  - [ ] Confirm webhook endpoint exists at `/api/webhooks/openphone`
+  - [ ] Verify signature verification decorator is in place
+  - [ ] Check OpenPhoneWebhookService is deployed
+  - [ ] Ensure webhook_events table exists in production DB
+
+#### Step 1: List Existing Webhooks
+```bash
+python scripts/dev_tools/webhooks/manage_webhooks.py list
+```
+- [ ] Document any existing webhooks (may need cleanup)
+- [ ] Note webhook IDs for potential deletion
+
+#### Step 2: Clean Up Old Webhooks (if needed)
+```bash
+python scripts/dev_tools/webhooks/manage_webhooks.py delete
+```
+- [ ] Remove any test/ngrok webhooks
+- [ ] Verify cleanup with list command
+
+#### Step 3: Register Production Webhooks
+```bash
+python scripts/dev_tools/webhooks/manage_webhooks.py create
+```
+This will register webhooks for all 6 event types:
+- [ ] `message.received` - Incoming messages
+- [ ] `message.delivered` - Delivery confirmations
+- [ ] `call.completed` - Call records
+- [ ] `call.recording.completed` - Recording URLs
+- [ ] `call.summary.completed` - AI summaries
+- [ ] `call.transcript.completed` - AI transcripts
+
+#### Step 4: Test Webhook Connectivity
+- [ ] **Basic Connectivity Test**
+  ```bash
+  python scripts/dev_tools/webhooks/manage_webhooks.py test
+  ```
   
-- [ ] **Test Event Processing**
-  - [ ] Send test message and verify `message.received` webhook
-  - [ ] Check `message.delivered` status updates
-  - [ ] Verify response tracking for campaigns
-  - [ ] Test error handling and retry logic
+- [ ] **Manual Message Test**
+  - [ ] Send a test SMS to the OpenPhone number
+  - [ ] Check webhook_events table for new entry
+  - [ ] Verify Activity record created
+  - [ ] Confirm conversation updated
+
+- [ ] **Signature Verification Test**
+  ```bash
+  python scripts/dev_tools/webhooks/test_webhook_handler.py signature
+  ```
+
+#### Step 5: Production Validation
+- [ ] **Message Flow Testing**
+  - [ ] Send inbound SMS → Verify webhook received
+  - [ ] Send outbound SMS → Check delivery webhook
+  - [ ] Make test call → Confirm call.completed webhook
   
-- [ ] **Monitor and Debug**
-  - [ ] Check `webhook_events` table for incoming events
-  - [ ] Verify events are processed correctly
-  - [ ] Set up alerts for webhook failures
-  - [ ] Document webhook troubleshooting steps
+- [ ] **Database Verification**
+  ```sql
+  -- Check recent webhook events
+  SELECT * FROM webhook_events 
+  ORDER BY created_at DESC 
+  LIMIT 10;
+  
+  -- Verify processing status
+  SELECT event_type, processed, COUNT(*) 
+  FROM webhook_events 
+  GROUP BY event_type, processed;
+  ```
+
+- [ ] **Campaign Integration Test**
+  - [ ] Send campaign message
+  - [ ] Wait for delivery webhook
+  - [ ] Verify campaign membership status updated
+  - [ ] Check response tracking works
+
+#### Step 6: Monitoring Setup
+- [ ] **Create Health Check Script**
+  ```python
+  # Check webhook processing health
+  - Last webhook received timestamp
+  - Processing success rate
+  - Average processing time
+  - Failed webhook count
+  ```
+
+- [ ] **Set Up Alerts**
+  - [ ] No webhooks received in 1 hour (during business hours)
+  - [ ] Webhook processing errors > 5%
+  - [ ] Signature validation failures
+  
+- [ ] **Documentation**
+  - [ ] Update production runbook with webhook troubleshooting
+  - [ ] Document webhook event flow
+  - [ ] Create debugging checklist
+
+#### Common Issues & Solutions:
+1. **403 Forbidden** → Check OPENPHONE_WEBHOOK_SIGNING_KEY
+2. **404 Not Found** → Verify endpoint URL and deployment
+3. **500 Server Error** → Check logs, database connection
+4. **No webhooks received** → Verify OpenPhone subscription active
+5. **Signature mismatch** → Ensure signing key matches OpenPhone config
 
 ### 4.5 Send First Production Campaign
 **Goal**: Successfully launch first automated SMS campaign
