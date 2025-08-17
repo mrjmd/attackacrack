@@ -22,16 +22,7 @@ csv_service = CSVImportService(ContactService())
 @login_required
 def campaign_list():
     """List all campaigns with basic stats"""
-    campaigns = Campaign.query.order_by(Campaign.created_at.desc()).all()
-    
-    campaign_data = []
-    for campaign in campaigns:
-        analytics = campaign_service.get_campaign_analytics(campaign.id)
-        campaign_data.append({
-            'campaign': campaign,
-            'analytics': analytics
-        })
-    
+    campaign_data = campaign_service.get_all_campaigns_with_analytics()
     return render_template('campaigns/list.html', campaigns=campaign_data)
 
 
@@ -39,31 +30,8 @@ def campaign_list():
 @login_required
 def new_campaign():
     """Show campaign creation form"""
-    # Get contact counts for audience sizing
-    total_contacts = Contact.query.count()
-    
-    # Contacts with real names (not phone numbers)
-    named_contacts = Contact.query.filter(~Contact.first_name.like('%+1%')).count()
-    
-    # Contacts with emails
-    email_contacts = Contact.query.filter(
-        Contact.email.isnot(None),
-        Contact.email != ''
-    ).count()
-    
-    # Opted out contacts
-    opted_out_count = db.session.query(Contact.id).join(ContactFlag).filter(
-        ContactFlag.flag_type == 'opted_out',
-        ContactFlag.applies_to.in_(['sms', 'both'])
-    ).count()
-    
-    audience_stats = {
-        'total_contacts': total_contacts,
-        'named_contacts': named_contacts,
-        'email_contacts': email_contacts,
-        'opted_out_count': opted_out_count,
-        'available_contacts': total_contacts - opted_out_count
-    }
+    # Get audience statistics from service
+    audience_stats = campaign_service.get_audience_stats()
     
     # Get available campaign lists with stats
     campaign_lists = []
@@ -137,10 +105,7 @@ def campaign_detail(campaign_id):
     bounce_metrics = metrics_service.get_campaign_metrics(campaign_id)
     
     # Get recent sends for activity feed
-    recent_sends = CampaignMembership.query.filter_by(
-        campaign_id=campaign_id,
-        status='sent'
-    ).order_by(CampaignMembership.sent_at.desc()).limit(10).all()
+    recent_sends = campaign_service.get_recent_sends(campaign_id, limit=10)
     
     return render_template('campaigns/detail.html', 
                          campaign=campaign,
@@ -169,14 +134,12 @@ def start_campaign(campaign_id):
 @login_required
 def pause_campaign(campaign_id):
     """Pause a running campaign"""
-    campaign = Campaign.query.get_or_404(campaign_id)
+    success = campaign_service.pause_campaign(campaign_id)
     
-    if campaign.status == 'running':
-        campaign.status = 'paused'
-        db.session.commit()
+    if success:
         flash('Campaign paused', 'info')
     else:
-        flash('Campaign is not running', 'warning')
+        flash('Campaign is not running or not found', 'warning')
     
     return redirect(url_for('campaigns.campaign_detail', campaign_id=campaign_id))
 
@@ -232,44 +195,12 @@ def api_preview_audience():
     """Preview campaign audience size based on filters"""
     try:
         data = request.json
-        
-        # Build contact query based on filters
-        query = Contact.query
-        
-        if data.get('has_name_only'):
-            query = query.filter(~Contact.first_name.like('%+1%'))
-        
-        if data.get('has_email'):
-            query = query.filter(Contact.email.isnot(None))
-            query = query.filter(Contact.email != '')
-        
-        if data.get('exclude_office_numbers'):
-            office_contact_ids = db.session.query(ContactFlag.contact_id).filter(
-                ContactFlag.flag_type == 'office_number'
-            ).subquery()
-            query = query.filter(~Contact.id.in_(office_contact_ids))
-        
-        # Always exclude opted out
-        opted_out_ids = db.session.query(ContactFlag.contact_id).filter(
-            ContactFlag.flag_type == 'opted_out',
-            ContactFlag.applies_to.in_(['sms', 'both'])
-        ).subquery()
-        query = query.filter(~Contact.id.in_(opted_out_ids))
-        
-        if data.get('min_days_since_contact'):
-            from datetime import timedelta
-            days_ago = datetime.utcnow() - timedelta(days=data['min_days_since_contact'])
-            recent_contact_ids = db.session.query(ContactFlag.contact_id).filter(
-                ContactFlag.flag_type == 'recently_texted',
-                ContactFlag.created_at > days_ago
-            ).subquery()
-            query = query.filter(~Contact.id.in_(recent_contact_ids))
-        
-        audience_size = query.count()
+        preview = campaign_service.preview_audience(data)
         
         return jsonify({
             'success': True,
-            'audience_size': audience_size
+            'audience_size': preview['total_count'],
+            'sample_contacts': preview['sample_contacts']
         })
         
     except Exception as e:

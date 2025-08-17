@@ -627,6 +627,138 @@ class CampaignService:
         
         return count
     
+    def get_all_campaigns_with_analytics(self) -> List[Dict]:
+        """Get all campaigns with their analytics"""
+        campaigns = Campaign.query.order_by(Campaign.created_at.desc()).all()
+        
+        campaign_data = []
+        for campaign in campaigns:
+            analytics = self.get_campaign_analytics(campaign.id)
+            campaign_data.append({
+                'campaign': campaign,
+                'analytics': analytics
+            })
+        
+        return campaign_data
+    
+    def get_audience_stats(self) -> Dict:
+        """Get statistics about available audience for campaigns"""
+        total_contacts = Contact.query.count()
+        
+        # Contacts with real names (not phone numbers)
+        named_contacts = Contact.query.filter(~Contact.first_name.like('%+1%')).count()
+        
+        # Contacts with emails
+        email_contacts = Contact.query.filter(
+            Contact.email.isnot(None),
+            Contact.email != ''
+        ).count()
+        
+        # Opted out contacts
+        opted_out_count = db.session.query(Contact.id).join(ContactFlag).filter(
+            ContactFlag.flag_type == 'opted_out',
+            ContactFlag.applies_to.in_(['sms', 'both'])
+        ).count()
+        
+        return {
+            'total_contacts': total_contacts,
+            'named_contacts': named_contacts,
+            'email_contacts': email_contacts,
+            'opted_out_count': opted_out_count,
+            'available_contacts': total_contacts - opted_out_count
+        }
+    
+    def pause_campaign(self, campaign_id: int) -> bool:
+        """Pause a running campaign"""
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign:
+            return False
+        
+        if campaign.status == 'running':
+            campaign.status = 'paused'
+            db.session.commit()
+            return True
+        return False
+    
+    def get_campaign_recipients(self, campaign_id: int, status_filter: str = 'all', 
+                               variant_filter: str = 'all', page: int = 1, 
+                               per_page: int = 50) -> Dict:
+        """Get paginated campaign recipients with filtering"""
+        query = CampaignMembership.query.filter_by(campaign_id=campaign_id)
+        
+        if status_filter != 'all':
+            query = query.filter_by(status=status_filter)
+        
+        if variant_filter != 'all':
+            query = query.filter_by(variant=variant_filter)
+        
+        # Add joins to get contact info
+        query = query.join(Contact)
+        
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return {
+            'recipients': pagination.items,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'current_page': page
+        }
+    
+    def get_recent_sends(self, campaign_id: int, limit: int = 10) -> List[CampaignMembership]:
+        """Get recent message sends for a campaign"""
+        return CampaignMembership.query.filter_by(
+            campaign_id=campaign_id,
+            status='sent'
+        ).order_by(CampaignMembership.sent_at.desc()).limit(limit).all()
+    
+    def preview_audience(self, filters: Dict) -> Dict:
+        """Preview campaign audience size based on filters"""
+        # Build contact query based on filters
+        query = Contact.query
+        
+        if filters.get('has_name_only'):
+            query = query.filter(~Contact.first_name.like('%+1%'))
+        
+        if filters.get('has_email'):
+            query = query.filter(Contact.email.isnot(None))
+            query = query.filter(Contact.email != '')
+        
+        if filters.get('exclude_office_numbers'):
+            office_contact_ids = db.session.query(ContactFlag.contact_id).filter(
+                ContactFlag.flag_type == 'office_number'
+            ).subquery()
+            query = query.filter(~Contact.id.in_(office_contact_ids))
+        
+        # Always exclude opted out
+        opted_out_ids = db.session.query(ContactFlag.contact_id).filter(
+            ContactFlag.flag_type == 'opted_out',
+            ContactFlag.applies_to.in_(['sms', 'both'])
+        ).subquery()
+        query = query.filter(~Contact.id.in_(opted_out_ids))
+        
+        if filters.get('min_days_since_contact'):
+            days_ago = datetime.utcnow() - timedelta(days=filters['min_days_since_contact'])
+            recent_contact_ids = db.session.query(ContactFlag.contact_id).filter(
+                ContactFlag.flag_type == 'recently_texted',
+                ContactFlag.created_at > days_ago
+            ).subquery()
+            query = query.filter(~Contact.id.in_(recent_contact_ids))
+        
+        # Get count and sample
+        total_count = query.count()
+        sample_contacts = query.limit(5).all()
+        
+        return {
+            'total_count': total_count,
+            'sample_contacts': [{
+                'id': c.id,
+                'name': c.first_name or c.phone,
+                'phone': c.phone,
+                'email': c.email
+            } for c in sample_contacts]
+        }
+    
     def get_campaign_analytics(self, campaign_id: int) -> Dict:
         """Get comprehensive analytics for a campaign"""
         campaign = Campaign.query.get_or_404(campaign_id)
