@@ -1,565 +1,432 @@
-# CLAUDE.md - Attack-a-Crack CRM Development Guide
+# CLAUDE_ENHANCED.md - Attack-a-Crack CRM Development Guide with Advanced Sub-Agent System
 
-## Project Overview
+## 🎉 PHASE 2 FOUNDATION COMPLETE - August 17, 2025
+**MAJOR MILESTONE: 30/64 tasks completed (47% of Phase 2)**
 
-Attack-a-Crack CRM is a comprehensive Flask-based CRM system integrated with OpenPhone for SMS/communication management. It features automated workflows, AI-powered insights, multi-source contact enrichment, and is designed to manage every aspect of the business from lead generation to final payment.
+### ✅ Enhanced Dependency Injection & Repository Pattern System
+- **ServiceRegistryEnhanced**: State-of-the-art dependency injection with lazy loading
+  - **24 services registered** with sophisticated factory pattern and lifecycle management
+  - **Thread-safe initialization** with circular dependency detection and validation
+  - **Service tagging** by type (external, api, sms, accounting, etc.)
+  - **Production optimization** with critical service warmup capabilities
+  - **Zero dependency validation errors** - complete dependency graph resolution
 
-**Tech Stack:**
-- Backend: Flask + SQLAlchemy + PostgreSQL
-- Background Tasks: Celery + Redis/Valkey
-- SMS/Calls: OpenPhone API + Webhooks
-- AI: Google Gemini API
-- Deployment: DigitalOcean App Platform (Docker containers)
-- Testing: pytest
-- Version Control: GitHub with Actions CI/CD
+- **Repository Pattern Implementation**: Complete data abstraction layer
+  - **8 repositories created**: Contact, Activity, Conversation, Appointment, Invoice, Quote, WebhookEvent, Todo, QuickBooksSync
+  - **BaseRepository interface** with standardized CRUD operations and advanced querying
+  - **77 comprehensive repository tests** with 100% coverage
+  - **Complete database abstraction** - no direct SQLAlchemy queries in services
+  - **Result pattern integration** for standardized error handling
 
-## Project Structure
+- **Clean Architecture Achieved**: Perfect separation of concerns
+  - **Routes**: Handle HTTP requests/responses only, use `current_app.services.get()`
+  - **Services**: Business logic with dependency injection, use repository pattern
+  - **Repositories**: Data access layer with standardized interfaces
+  - **Database**: SQLAlchemy models accessed only through repositories
 
+### 🚧 Next Phase - Week 2 Test Infrastructure (W2-15 to W2-20)
+**CURRENT PRIORITY: Test Coverage Expansion & Campaign Launch**
+
+1. **Test Infrastructure Overhaul** (W2-15 to W2-20)
+   - Restructure test directories (unit/integration/e2e)
+   - Implement factory pattern for test data generation
+   - CSV Import Service comprehensive test suite
+   - Campaign Service unit tests with repository mocking
+   - Webhook Service comprehensive testing
+   - Route layer integration tests
+
+2. **Campaign System Production Ready**
+   - Fix dashboard activity sorting (sort by recent activity, not import time)
+   - Overhaul contacts page (filters, pagination, intuitive UX)
+   - Vet campaign list generation and templating
+   - Launch first automated SMS campaign via OpenPhone API
+
+## 🚨 CRITICAL: Test-Driven Development is MANDATORY
+
+**ENFORCEMENT RULES:**
+1. **ALWAYS** write tests BEFORE implementation - NO EXCEPTIONS
+2. Tests MUST fail initially (Red phase) with meaningful error messages
+3. Write MINIMAL code to make tests pass (Green phase)
+4. Refactor only after tests are green (Refactor phase)
+5. **NEVER** modify tests to match implementation - fix the implementation instead
+
+**TDD WORKFLOW:**
+```bash
+# 1. Write the test
+docker-compose exec web pytest tests/test_new_feature.py -xvs  # Should FAIL
+
+# 2. Implement minimal code
+# ... only write enough to pass the test ...
+
+# 3. Verify test passes
+docker-compose exec web pytest tests/test_new_feature.py -xvs  # Should PASS
+
+# 4. Refactor if needed (tests stay green)
+docker-compose exec web pytest tests/  # All tests should PASS
 ```
-├── app.py                  # Flask application entry point
-├── config.py              # Application configuration
-├── crm_database.py        # SQLAlchemy database models
-├── routes/                # Flask route handlers (blueprints)
-├── services/              # Business logic layer
-├── templates/             # Jinja2 HTML templates
-├── tests/                 # Test suite
-├── tasks/                 # Celery background tasks
-├── migrations/            # Alembic database migrations
-├── scripts/               # Administrative and data management scripts
-├── docs/                  # Project documentation
-└── .do/                   # DigitalOcean deployment configs
+
+## 🤖 Sub-Agent Usage Guidelines
+
+### PROACTIVE AGENT INVOCATION
+Use these agents IMMEDIATELY when starting these tasks:
+
+1. **python-flask-stack-expert**: For ANY Flask/SQLAlchemy/Celery implementation
+2. **devops-pipeline-architect**: For deployment, CI/CD, or infrastructure changes
+3. **deep-research-analyst**: When exploring new integrations or architectural decisions
+4. **Task tool with 'tdd-enforcer'**: BEFORE writing any new feature code
+
+### AGENT CHAINING PATTERNS
+
+**Feature Implementation Chain:**
+```
+1. deep-research-analyst → Analyze requirements and existing code
+2. tdd-enforcer → Write comprehensive tests first
+3. python-flask-stack-expert → Implement with Flask best practices
+4. code-reviewer → Verify implementation quality
 ```
 
-## Key Development Commands
+**Refactoring Chain (Phase 2):**
+```
+1. repository-architect → Design repository interfaces
+2. tdd-enforcer → Write repository tests
+3. python-flask-stack-expert → Implement repositories
+4. migration-specialist → Update existing code
+```
 
-### Testing
+## 📁 Project Structure & Context Preservation
+
+### Critical Files for Context
+When starting ANY task, read these files first:
+- `app.py` - Service Registry and application setup
+- `config.py` - Configuration management
+- `crm_database.py` - All database models
+- `services/__init__.py` - Service initialization patterns
+- Current route file being modified
+- Related test files
+
+### Service Registry Pattern (MUST FOLLOW)
+```python
+# CORRECT - Using service registry
+def some_route():
+    contact_service = current_app.services.get('contact')
+    result = contact_service.get_all_contacts()
+    
+# WRONG - Direct instantiation
+def some_route():
+    contact_service = ContactService(db.session)  # NEVER DO THIS
+```
+
+### Repository Pattern (Phase 2 Implementation)
+```python
+# Future state - ALL database access through repositories
+class ContactRepository(BaseRepository):
+    def find_by_phone(self, phone: str) -> Optional[Contact]:
+        return self.query(Contact).filter_by(phone=phone).first()
+
+class ContactService:
+    def __init__(self, repository: ContactRepository):
+        self.repository = repository  # Injected, not created
+```
+
+## 🧪 Testing Standards
+
+### Coverage Requirements
+- **Target**: 95% coverage for all new code
+- **Minimum**: 90% overall coverage
+- **Critical paths**: 100% coverage required
+
+### Test Organization
+```python
+# tests/test_services/test_contact_service.py
+class TestContactService:
+    def test_create_contact(self, contact_service, db_session):
+        """Test contact creation with valid data"""
+        # Arrange
+        data = {"phone": "+11234567890", "name": "Test User"}
+        
+        # Act
+        contact = contact_service.create_contact(data)
+        
+        # Assert
+        assert contact.phone == "+11234567890"
+        assert contact.name == "Test User"
+        
+    def test_create_contact_duplicate_phone(self, contact_service):
+        """Test that duplicate phone numbers are handled correctly"""
+        # Test the error case
+```
+
+### Testing Commands
 ```bash
 # Run all tests with coverage
-docker-compose exec web pytest --cov --cov-report=term-missing --ignore=migrations/ --ignore=venv/
+docker-compose exec web pytest --cov --cov-report=term-missing
 
 # Run specific test file
 docker-compose exec web pytest tests/test_contact_service.py -xvs
 
-# Run critical coverage tests
-docker-compose exec web pytest tests/test_critical_coverage.py -v
+# Run tests matching pattern
+docker-compose exec web pytest -k "test_create" -xvs
+
+# Generate HTML coverage report
+docker-compose exec web pytest --cov --cov-report=html
 ```
 
-### Database Management
+## 🔄 Git Workflow with Context Preservation
+
+### Commit Strategy for Continuity
 ```bash
-# Run migrations
-docker-compose exec web flask db upgrade
+# After completing a feature/fix
+git add .
+git commit -m "Complete: [Feature description]
 
-# Create new migration
-docker-compose exec web flask db migrate -m "description"
-
-# Check database stats
-docker-compose exec web python -c "
-from app import create_app
-from crm_database import Contact, Conversation, Activity
-app = create_app()
-with app.app_context():
-    print(f'Contacts: {Contact.query.count()}')
-    print(f'Conversations: {Conversation.query.count()}')
-    print(f'Activities: {Activity.query.count()}')
-"
-```
-
-### Data Import
-```bash
-# Run large scale import (production)
-docker-compose exec web python large_scale_import.py
-
-# Run with resume capability
-docker-compose exec web python large_scale_import.py --resume
-
-# Run interactive import manager
-docker-compose exec web python scripts/data_management/imports/import_manager.py
-```
-
-### Background Tasks
-```bash
-# Check Celery worker status
-docker-compose exec celery celery -A celery_worker.celery inspect active
-
-# Restart Celery workers
-docker-compose restart celery celery-beat
-```
-
-## Current Project Status
-
-### ✅ Completed Features
-- **Production-ready deployment on DigitalOcean App Platform** ✨
-- **Large scale OpenPhone import (7000+ conversations successfully imported!)** 🎉
-- **Environment variables properly managed and preserved during deployments**
-- **Universal CSV import system with smart format detection (10+ formats!)** 📊
-- **SMS bounce tracking integrated with OpenPhone webhooks** 📈
-- Enhanced database models for all OpenPhone data types
-- Contact enrichment from multiple CSV sources with automatic merging
-- Webhook handling with signature verification
-- Background task processing with Celery + Valkey (Redis)
-- User authentication and authorization system
-- SMS campaign system with A/B testing
-- Flask-Session with Redis backend for multi-worker support
-- GitHub Actions CI/CD pipeline with proper env var preservation
-- Valkey attached as managed database resource
-
-### ✅ COMPLETED - Week of August 17, 2025
-**MAJOR MILESTONE: Enhanced Dependency Injection System Complete!**
-
-1. **Phase 1: Service Layer Refactoring** ✅ COMPLETE - ALL ROUTES REFACTORED!
-   - ✅ **Service Registry with Dependency Injection** fully implemented across application
-   - ✅ **ALL route files refactored**: main, auth, api, settings, campaigns, quote routes
-   - ✅ **21 services registered**: Contact, OpenPhone, Message, Dashboard, Conversation, Task, Diagnostics, OpenPhoneSync, SyncHealth, Todo, CampaignList, Campaign, CSVImport, Appointment, Auth, AI, QuickBooks, QuickBooksSync, Quote, Job, Invoice
-   - ✅ **Zero direct database queries in routes** - Complete separation of concerns achieved
-   - ✅ **All 350 tests passing** - No regressions during refactoring
-   - ✅ **Clean Architecture implemented** - Routes handle HTTP only, services handle business logic
-   - ✅ Enhanced ContactService with 12+ methods for complete contact management
-   - ✅ All services using `current_app.services.get()` dependency injection pattern
-
-2. **Phase 2: Advanced Dependency Injection & Repositories** ✅ COMPLETE!
-   - ✅ **Repository Pattern**: 8 repositories created (Contact, Activity, Conversation, Appointment, Invoice, Quote, WebhookEvent, Todo, QuickBooksSync)
-   - ✅ **Enhanced Service Registry**: Sophisticated dependency injection with lazy loading, lifecycle management, and validation
-   - ✅ **24 Services Registered**: Complete service ecosystem with proper dependency resolution
-   - ✅ **Service Factory Pattern**: Lazy instantiation with lambda factories and dependency injection
-   - ✅ **Thread-Safe Initialization**: Circular dependency detection and validation
-   - ✅ **Service Tagging**: Organized services by type (external, api, sms, etc.)
-   - ✅ **Production Warmup**: Critical service pre-initialization for performance
-
-### 🚧 In Progress - Week of August 18, 2025  
-**NEXT PRIORITY: Campaign System Production Ready**
-   
-3. **Contacts Page Overhaul** - Foundation for campaigns
-   - Fix broken filters
-   - Implement proper pagination
-   - Complete UX improvement pass
-   
-3. **Campaign System Production Ready**
-   - Vet list generation and templating
-   - Test campaign workflow end-to-end
-   - Launch first automated SMS campaign via OpenPhone API
-   
-4. **OpenPhone Webhooks** ✅ COMPLETE - Working in production!
-   - Test response tracking
-
-### 📋 Priority Roadmap
-1. **THIS WEEK - Campaign Launch Prerequisites**
-   - Fix dashboard activity sorting (sort by recent activity, not import time)
-   - Overhaul contacts page (filters, pagination, intuitive UX)
-   - Ensure OpenPhone webhooks working in production
-   - Vet campaign list generation and templating
-   - Send first automated text messages
-
-2. **NEXT WEEK - Campaign Operations**
-   - Monitor first campaign performance
-   - Implement response tracking and analytics
-   - Build automated follow-up sequences
-   - A/B testing refinements
-   - Daily limit compliance (125 texts/day for cold outreach)
-
-3. **HIGH PRIORITY - Contact Enrichment** ✅ Ready to Use!
-   - **Universal CSV import with smart detection at:**
-     - `/campaigns/import-csv` - For campaign list creation
-     - `/settings/imports` → CSV & PropertyRadar imports
-   - Automatically detects 10+ CSV formats (OpenPhone, Realtor, PropertyRadar, etc.)
-   - Phone number normalization to +1XXXXXXXXXX format
-   - Smart enrichment: Only fills missing data, preserves existing
-   - See `/docs/CSV_IMPORT_FIELD_MAPPING.md` for complete documentation
-
-4. **UPCOMING - QuickBooks Integration**
-   - Complete OAuth authentication flow
-   - Customer sync and enrichment
-   - Products/services import
-   - Quote/invoice bidirectional sync
-   - Payment tracking and reconciliation
-
-5. **FUTURE - Advanced Features**
-   - Financial dashboards and reporting
-   - SmartLead email integration (Q2 2025)
-   - Multi-channel campaigns (SMS + Email)
-   - AI-powered response suggestions
-   - Customer portal for self-service
-
-## Core Database Models
-
-### Contact
-- Primary entity for customer/lead management
-- Enriched from multiple sources (OpenPhone, CSV, QuickBooks)
-- Fields: phone, email, name, company, addresses, tags, financial data
-- Relationships: properties, conversations, activities, campaigns
-
-### Activity
-- Unified model for all communications (messages, calls, voicemails)
-- Stores media URLs, recording URLs, AI summaries/transcripts
-- Linked to conversations and contacts
-
-### Conversation
-- Groups activities by contact
-- Tracks last activity and participant information
-
-### Campaign & CampaignMembership
-- SMS campaign management with A/B testing
-- Compliance tracking (opt-outs, daily limits)
-- Response sentiment analysis
-
-### WebhookEvent
-- Stores all OpenPhone webhook payloads
-- Ensures idempotent processing
-- Error tracking and retry capability
-
-## External Integrations
-
-### OpenPhone API
-- **Base URL**: https://api.openphone.com/v1
-- **Authentication**: API key in Authorization header
-- **Key Endpoints**:
-  - /conversations - Get conversation threads
-  - /messages - Get/send SMS messages
-  - /calls - Get call history
-  - /call-recordings/{callId} - Get call recordings
-- **Webhooks**: message.received, message.delivered, call.completed, call.recording.completed, call.summary.completed, call.transcript.completed
-- **Limitations**: No media in messages API (but available in webhooks), no voicemail API
-
-### QuickBooks Online (In Development)
-- OAuth 2.0 authentication flow
-- Customer sync and enrichment
-- Products/services import
-- Quote/invoice bidirectional sync
-
-### Google APIs
-- Gemini AI for conversation analysis
-- Calendar integration for appointments
-- OAuth for authentication
-
-## Development Guidelines
-
-### CRITICAL: Test-Driven Development (TDD) is MANDATORY
-Starting immediately, all new features and refactoring MUST follow TDD:
-1. **Write the test FIRST** - it should fail initially (Red)
-2. **Write minimal code** to make the test pass (Green)  
-3. **Refactor** to improve code quality while keeping tests green (Refactor)
-4. **No code without tests** - if there's no test, the code doesn't get merged
-
-See `/docs/ARCHITECTURE.md` for detailed testing strategy and patterns.
-
-### CRITICAL: Research vs Implementation
-- **RESEARCH TASKS**: When asked to research, investigate, or explore options - ONLY provide findings and recommendations. DO NOT implement without explicit approval.
-- **NEVER** start implementation that involves costs (API subscriptions, paid services) without explicit user approval
-- **ALWAYS** document findings comprehensively and let the user make implementation decisions
-- Research deliverables should include: findings, options, costs, recommendations, and wait for user direction
-
-### Architecture Principles
-- **Enhanced Service Registry Pattern**: All services managed centrally via ServiceRegistryEnhanced with lazy loading
-- **Advanced Dependency Injection**: True dependency injection with factory pattern, lifecycle management, and validation
-- **Service Factory Pattern**: Lambda factories for lazy instantiation with automatic dependency resolution
-- **Thread-Safe Initialization**: Circular dependency detection, proper service lifecycle management
-- **Repository Pattern**: Data access layer completely abstracted through repository interfaces
-- **Access Pattern**: Routes use `current_app.services.get('service_name')` to access services
-- **Separation of Concerns**: Routes handle HTTP, services handle business logic, repositories handle data access
-- **No Direct DB Queries in Routes/Services**: All database access through repository pattern
-- **Service Tagging & Organization**: Services categorized by type (external, api, sms, etc.)
-- **Production Optimization**: Service warmup capabilities and validation for production environments
-
-### Code Style
-- Use Flask blueprints for routes
-- Business logic in service modules  
-- No comments unless requested
-- Follow existing patterns in codebase
-- Use SQLAlchemy for all database operations
-- Type hints for all function parameters and returns
-
-### Testing Requirements
-- **ALWAYS run tests before committing/pushing code**
-- **TDD is mandatory** - write tests before implementation
-- **Test Pyramid**: 70% unit tests, 25% integration tests, 5% E2E tests
-- **Coverage Target**: >90% for all new code
-- **Unit Tests**: Mock all dependencies, test business logic only
-- **Integration Tests**: Use real test database, mock only external APIs
-- **Run tests locally first**: `docker-compose exec web pytest tests/ -v`
-- **Fix any failures before pushing** to avoid failed CI/CD pipeline
-- **Test Isolation**: Each test must be independent, no shared state
-- Use pytest fixtures for test data
-- Test both success and error cases
-
-### Security Best Practices
-- Never commit secrets (use environment variables)
-- Validate all user input
-- Use HMAC signature verification for webhooks
-- Implement proper authentication on all routes
-- Encrypt sensitive data in database
-
-### Git Workflow
-```bash
-# When committing changes
-git status  # Check untracked files
-git diff    # Review changes
-git add .   # Stage changes
-git commit -m "Description
+Context for next session:
+- Tests written: [list test files]
+- Services modified: [list services]
+- Next steps: [what should be done next]
 
 🤖 Generated with Claude Code
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-## Environment Variables
-
-Critical environment variables (must be set):
+### Branch Naming for Context
 ```bash
-# Database
-DATABASE_URL=postgresql://user:pass@db:5432/dbname
+# Feature branches
+git checkout -b feature/W2-01-repository-pattern-base
 
-# OpenPhone
-OPENPHONE_API_KEY=your_api_key
-OPENPHONE_PHONE_NUMBER=your_phone
-OPENPHONE_PHONE_NUMBER_ID=your_id
-OPENPHONE_WEBHOOK_SIGNING_KEY=your_signing_key
+# Bugfix branches  
+git checkout -b fix/contact-filter-pagination
 
-# Redis/Celery
-REDIS_URL=redis://redis:6379/0
-CELERY_BROKER_URL=redis://redis:6379/0
-
-# Security
-SECRET_KEY=your_secret_key
-ENCRYPTION_KEY=your_encryption_key
-
-# AI Services
-GEMINI_API_KEY=your_gemini_key
-
-# Optional Integrations
-QUICKBOOKS_CLIENT_ID=your_qb_id
-QUICKBOOKS_CLIENT_SECRET=your_qb_secret
-SMARTLEAD_API_KEY=your_smartlead_key
+# Refactor branches
+git checkout -b refactor/W2-02-contact-repository
 ```
 
-## Deployment (DigitalOcean)
+## 📊 Dashboard & Activity Tracking
 
-### Configuration
-- Main config: `.do/app.yaml` (template only - no secrets)
-- Services: web (Flask), worker (Celery)
-- Database: PostgreSQL 13
-- Valkey (Redis): Managed instance for sessions and Celery
-- Region: nyc3
+### Real-time Documentation Requirements
+When implementing ANY feature:
+1. Update relevant service docstrings
+2. Add inline comments for complex logic
+3. Update CHANGELOG.md with feature/fix
+4. Ensure README reflects new capabilities
 
-### GitHub Actions CI/CD
-- **AUTOMATIC DEPLOYMENT**: Pushing to main automatically triggers deployment
-- **DO NOT MANUALLY DEPLOY**: The CI/CD pipeline handles everything
-- **IMPORTANT**: Never run manual deployments after git push
-- Environment variables are now stored as encrypted values in app.yaml
-- The deployment workflow simply updates the app with the spec
+### Progress Tracking
 
-### Environment Variables Management  
-**SOLVED**: Environment variables are now stored as ENCRYPTED values in app.yaml
-- Encrypted values (EV[1:...]) are SAFE to commit to Git
-- DigitalOcean automatically encrypts sensitive values when set
-- These encrypted values are app-specific and cannot be used elsewhere
-- To update values: Set them once, export spec, commit encrypted values
-- Emergency restoration script available: `scripts/fix_env_vars.sh`
+#### Automatic Todo Persistence with Archive System
+**Intelligent todo management that prevents bloat while preserving history:**
 
-### Production Commands
-```bash
-# Deploy via GitHub Actions (preserves env vars)
-# Push to main branch triggers CI/CD
-
-# Manual deployment (use with caution)
-doctl apps spec get <app-id> > temp-spec.yaml
-# Edit temp-spec.yaml as needed
-doctl apps update <app-id> --spec temp-spec.yaml
-
-# Check deployment status
-doctl apps list-deployments <app-id>
-
-# View logs
-doctl apps logs <app-id> <component-name> --tail=100
+##### Archive-Based System
+```
+.claude/todos/
+├── current.md          # Symlink to active session
+├── archive/           # Historical sessions by month
+│   └── 2025-08/      # Monthly organization
+│       ├── session-2025-08-17-0930.md
+│       └── session-2025-08-17-1445.md
+└── summary.md         # Cumulative completed tasks
 ```
 
-## Troubleshooting
+##### Three-Tier Todo System
 
-### Common Issues
+1. **`.claude/todos/current.md`** (Active Session)
+   - Auto-created at session start
+   - Updated after EVERY TodoWrite
+   - Includes full context for recovery
+   - Symlink to actual session file in archive
 
-1. **Import Failures**
-   - Check OpenPhone API key
-   - Verify rate limits not exceeded
-   - Use resume capability: `python large_scale_import.py --resume`
+2. **`.claude/todos/archive/`** (Historical Record)
+   - Each session preserved separately
+   - Organized by month (YYYY-MM)
+   - Auto-cleanup after 3 months
+   - Searchable history of all work
 
-2. **Webhook Issues**
-   - Verify signing key matches
-   - Check webhook URL configuration
-   - Review webhook_events table for errors
+3. **`TODO.md`** (Project Roadmap)
+   - Weekly priorities and sprints
+   - Long-term goals
+   - Manually updated milestones
 
-3. **Celery Task Failures**
-   - Check Redis connection
-   - Monitor worker logs: `docker-compose logs -f celery`
-   - Restart workers if needed
+##### Benefits
+- **No Bloat**: Each session is a separate file
+- **Full History**: Can review any past session
+- **Auto-Cleanup**: Old sessions removed after 3 months
+- **Easy Recovery**: current.md always has active session
+- **Searchable**: grep through archive for past work
 
-4. **Database Connection Issues**
-   - Verify DATABASE_URL format
-   - Check connection pool settings
-   - Monitor active connections
+#### Recovery After Interruption
+```bash
+# If session is interrupted or context squashed:
+1. Read .claude/session-todos.md
+2. Check "🔍 Context for Recovery" section
+3. Resume from "Working On" status
+4. Continue with "In Progress" items
+5. Run commands from "Commands to Resume"
+```
 
-### Debug Mode
+#### Todo Workflow
+```bash
+# Starting a task
+1. TodoWrite creates in-memory todos
+2. Automatically saved to .claude/session-todos.md
+3. File includes timestamp and context
+
+# During work
+- Each status change triggers auto-save
+- Session notes capture decisions
+- Modified files are tracked
+
+# After interruption
+- New session reads .claude/session-todos.md
+- Continues exactly where left off
+- No manual tracking needed
+```
+
+## 🚀 Phase 2 Refactoring Guidelines
+
+### Week-by-Week Implementation
+**Week 1: Repository Foundation**
+- BaseRepository interface
+- ContactRepository implementation
+- CampaignRepository implementation
+- Complete test coverage
+
+**Week 2: Service Layer Enhancement**
+- Dependency injection for all services
+- Remove all direct DB queries
+- Factory pattern for object creation
+- Integration test suite
+
+**Week 3: Advanced Patterns**
+- Unit of Work implementation
+- Domain events
+- CQRS for complex queries
+- Performance optimization
+
+## 🛡️ Security & Best Practices
+
+### Environment Variables
 ```python
-# Enable detailed logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
+# ALWAYS use environment variables for secrets
+api_key = os.environ.get('OPENPHONE_API_KEY')
+if not api_key:
+    raise ValueError("OPENPHONE_API_KEY not set")
+
+# NEVER hardcode secrets
+api_key = "sk-abc123..."  # NEVER DO THIS
 ```
 
-## Performance Optimization
+### Input Validation
+```python
+# ALWAYS validate user input
+def create_contact(self, data: dict) -> Contact:
+    # Validate required fields
+    if not data.get('phone'):
+        raise ValueError("Phone number is required")
+    
+    # Normalize phone number
+    phone = self.normalize_phone(data['phone'])
+    
+    # Validate phone format
+    if not self.is_valid_phone(phone):
+        raise ValueError(f"Invalid phone number: {phone}")
+```
 
-### Database
-- Use eager loading to prevent N+1 queries
-- Implement server-side pagination (100 records default)
-- Add indexes for frequently queried fields
-- Use database connection pooling
+## 🔍 Debugging & Troubleshooting
 
-### Celery
-- Limit concurrency based on instance size
-- Use task timeouts to prevent hanging
-- Implement retry logic with exponential backoff
+### Standard Debug Process
+1. Check logs: `docker-compose logs -f web`
+2. Run specific test: `docker-compose exec web pytest tests/test_failing.py -xvs`
+3. Interactive debugging: `import ipdb; ipdb.set_trace()`
+4. Check database state: `docker-compose exec web flask shell`
 
-### API Rate Limiting
-- OpenPhone: Respect rate limits with throttling
-- Implement request queuing for bulk operations
-- Use batch operations where available
+### Common Issues & Solutions
+```python
+# Issue: Session not available in Celery task
+# Solution: Create new session in task
+@celery.task
+def process_webhook(data):
+    from app import create_app
+    app = create_app()
+    with app.app_context():
+        # Now you have database access
+        
+# Issue: Circular imports
+# Solution: Use string references or late imports
+def get_service(name: str):
+    from app import current_app
+    return current_app.services.get(name)
+```
 
-## UI/UX Standards
+## 📈 Performance Monitoring
 
-### Dark Theme Design
-- Background: `bg-gray-900` (sidebar), `bg-gray-800` (main)
-- Text: `text-white` (primary), `text-gray-400` (secondary)
-- Buttons: `bg-blue-600 hover:bg-blue-700`
-- Success/Error: `text-green-400` / `text-red-500`
+### Query Optimization Checklist
+- [ ] Use eager loading for relationships
+- [ ] Implement pagination (100 records default)
+- [ ] Add database indexes for frequent queries
+- [ ] Use bulk operations for batch updates
+- [ ] Profile slow queries with EXPLAIN ANALYZE
 
-### Component Patterns
-- Use Tailwind CSS utility classes
-- Maintain consistent spacing (p-8 for pages, p-6 for cards)
-- All forms need proper validation and feedback
-- Loading states for async operations
+### Celery Task Monitoring
+```bash
+# Check active tasks
+docker-compose exec celery celery -A celery_worker.celery inspect active
 
-## Key Files Reference
+# Monitor task queue
+docker-compose exec celery celery -A celery_worker.celery events
 
-### Core Application
-- `app.py:create_app()` - Application factory
-- `config.py` - Configuration management
-- `crm_database.py` - All database models
-- `celery_worker.py` - Background task configuration
+# Purge all tasks (emergency)
+docker-compose exec celery celery -A celery_worker.celery purge -f
+```
 
-### Services (Business Logic)
-- `services/openphone_service.py` - OpenPhone API client
-- `services/openphone_webhook_service.py` - Webhook processing
-- `services/openphone_sync_service.py` - OpenPhone sync operations and task management
-- `services/contact_service.py` - Contact management
-- `services/campaign_service.py` - Campaign operations
-- `services/dashboard_service.py` - Dashboard statistics and metrics
-- `services/todo_service.py` - Todo task management
-- `services/diagnostics_service.py` - System health checks and diagnostics
-- `services/task_service.py` - Celery task status and management
-- `services/sync_health_service.py` - Sync health monitoring across integrations
-- `services/ai_service.py` - Gemini AI integration
-- `services/csv_import_service.py` - Universal CSV import with smart detection
-- `services/sms_metrics_service.py` - SMS bounce tracking and analytics
+## 🎯 Current Sprint Focus (Week of August 18, 2025)
 
-### Routes (Controllers)
-- `routes/dashboard_routes.py` - Main dashboard (uses DashboardService)
-- `routes/contact_routes.py` - Contact CRUD
-- `routes/conversation_routes.py` - Messaging interface
-- `routes/campaign_routes.py` - Campaign management (uses CampaignService)
-- `routes/api_routes.py` - API endpoints and webhooks (uses DiagnosticsService, TaskService)
-- `routes/settings_routes.py` - Settings and sync management (uses OpenPhoneSyncService, SyncHealthService)
-- `routes/todo_routes.py` - Todo management (uses TodoService)
+### PRIORITY 1: Campaign System Launch
+- [ ] Fix contact page filters and pagination
+- [ ] Test campaign list generation
+- [ ] Verify OpenPhone webhook integration
+- [ ] Launch first text campaign (125 texts/day limit)
 
-### Import Scripts
-- `large_scale_import.py` - Production data import
-- `scripts/data_management/imports/enhanced_openphone_import.py` - Core import logic
-- `scripts/data_management/universal_csv_enrichment.py` - Universal CSV enrichment
-- `scripts/data_management/csv_importer.py` - Legacy CSV contact import
+### PRIORITY 2: Begin Phase 2 Refactoring
+- [ ] Create BaseRepository interface
+- [ ] Implement ContactRepository with tests
+- [ ] Start CampaignRepository implementation
 
-### Supported CSV Formats (Auto-Detected)
-The system automatically detects and imports from these CSV formats:
-- **OpenPhone** - Contact exports with phone, name, email, address
-- **Realtor.com** - Agent listings with contact info
-- **Sotheby's International Realty** - Agent directory exports
-- **Vicente Realty** - Agent contact lists
-- **Exit Realty (Cape & Premier)** - Agent rosters
-- **Jack Conway & Company** - Agent directories
-- **Lamacchia Realty** - Contact exports
-- **William Raveis** - Agent listings
-- **PropertyRadar** - Property and owner data with dual contacts
-- **Standard formats** - Any CSV with recognizable phone/name/email columns
+### Success Metrics
+- All tests passing (350/350) ✅
+- 90%+ code coverage
+- Zero direct DB queries in routes
+- Campaign system operational
 
-## Recent Victories 🎉
+## 📝 Documentation to Maintain
 
-### August 2025 - Enhanced Dependency Injection & Repository Pattern 🚀 ✨
-- **ENHANCED DEPENDENCY INJECTION SYSTEM COMPLETE** - State-of-the-art dependency management!
-- **ServiceRegistryEnhanced** with sophisticated lazy loading and lifecycle management:
-  - **24 services registered** with true dependency injection and factory pattern
-  - **Thread-safe initialization** with circular dependency detection and validation
-  - **Service tagging and organization** by type (external, api, sms, accounting, etc.)
-  - **Production optimization** with service warmup and validation capabilities
-  - **Zero dependency validation errors** - complete dependency graph resolution
+### Always Update These Files
+1. `CHANGELOG.md` - Every feature/fix
+2. `docs/API.md` - New endpoints
+3. `docs/ARCHITECTURE.md` - Design decisions
+4. Service docstrings - Method documentation
+5. Test docstrings - What's being tested
 
-- **REPOSITORY PATTERN IMPLEMENTATION** completed:
-  - ✅ **8 repositories created**: Contact, Activity, Conversation, Appointment, Invoice, Quote, WebhookEvent, Todo, QuickBooksSync
-  - ✅ **BaseRepository with full CRUD operations** and advanced querying
-  - ✅ **71 comprehensive repository tests** added with 100% coverage
-  - ✅ **Data access layer completely abstracted** from business logic
-  - ✅ **Result pattern integration** for standardized error handling
+### Session Handoff Template
+```markdown
+## Session Summary - [Date]
 
-- **SERVICE FACTORY PATTERN** with lambda factories:
-  - Services instantiated lazily only when first requested
-  - Automatic dependency resolution with parameter injection
-  - External API services (OpenPhone, QuickBooks, Google Calendar) properly isolated
-  - Service lifecycle management (singleton, transient, scoped)
+### Completed
+- [List completed tasks]
 
-- **COMPLETE REFACTORING ACHIEVEMENTS**:
-  - All route files use enhanced dependency injection pattern
-  - Services use repository pattern for all data access
-  - Clean separation: Routes → Services → Repositories → Database
-  - **578 tests passing** throughout entire refactoring process!
+### In Progress  
+- [Current task and status]
+- [Files currently being modified]
 
-### January 2025 - Service Layer Foundation
-- **Service Registry with Dependency Injection** foundation established
-- **21 services registered** in basic service registry pattern
-- **ALL route files refactored** to use dependency injection
-- **Zero direct database queries in routes** achieved
+### Next Steps
+- [Immediate next task]
+- [Any blockers or dependencies]
 
-### January 2025 - Universal CSV Import & SMS Tracking
-- **Implemented universal CSV import** with automatic format detection for 10+ formats
-- **Added SMS bounce tracking** using OpenPhone webhook data (FREE, no external APIs)
-- **Fixed duplicate key constraints** in production CSV imports
-- **Enhanced Settings import pages** with smart column detection and enrichment
-- **Achieved 100% contact enrichment** capability without creating duplicates
-
-### January 2025 - Production Deployment Success
-- **Successfully imported 7000+ OpenPhone conversations** to production database
-- **Fixed persistent environment variable issues** that were clearing on every deployment
-- **Resolved Flask-Session multi-worker authentication** problems (1-in-4 success rate → 100%)
-- **Established stable CI/CD pipeline** with proper secret management
-- **Celery + Valkey integration** working flawlessly for background tasks
-
-### Key Lessons Learned
-1. **Environment Variables**: DigitalOcean's `doctl apps update --spec` replaces the entire spec. Solution: Fetch current spec first, modify, then deploy.
-2. **Session Management**: Flask's default in-memory sessions don't work with multiple gunicorn workers. Solution: Flask-Session with Redis backend.
-3. **Secret Management**: Never store secrets in app.yaml. Use DigitalOcean's environment variable management at the app level.
-4. **Background Tasks**: Celery requires careful configuration with SSL for managed Redis/Valkey services.
-
-## Notes for Future Development
-
-1. **Contact Enrichment**: ✅ COMPLETE - Universal CSV import now available in production
-2. **Media Handling**: OpenPhone API doesn't provide media URLs in messages endpoint, but webhooks do
-3. **Campaign Limits**: 125 texts/day for cold outreach per phone number
-4. **A/B Testing**: Requires minimum 100 contacts per variant for statistical significance
-5. **QuickBooks Integration**: OAuth tokens need encryption and refresh handling
-6. **Email Integration**: SmartLead API planned for Q2 2025
-7. **Performance**: Database currently handles 7000+ conversations well
-8. **Security**: All routes except webhooks require authentication
-
-## Support Resources
-
-- OpenPhone API Docs: https://www.openphone.com/docs/
-- DigitalOcean App Platform: https://docs.digitalocean.com/products/app-platform/
-- QuickBooks API: https://developer.intuit.com/app/developer/qbo/docs/
-- Project Repository: (GitHub URL)
-- Issue Tracking: GitHub Issues
+### Context for Next Session
+- [Key decisions made]
+- [Important code locations]
+- [Any pending questions]
+```
 
 ---
 
-*This document should be updated as the project evolves. Last updated: August 17, 2025*
+*Last Updated: August 17, 2025*
+*Version: 2.0 - Enhanced with Sub-Agent Integration*

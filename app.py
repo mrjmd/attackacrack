@@ -385,10 +385,10 @@ def _create_openphone_service():
 def _create_google_calendar_service():
     """Create GoogleCalendarService instance - expensive due to OAuth"""
     from services.google_calendar_service import GoogleCalendarService
-    from api_integrations import get_google_credentials
+    from api_integrations import get_google_creds
     logger.info("Initializing GoogleCalendarService")
     try:
-        credentials = get_google_credentials()
+        credentials = get_google_creds()
         return GoogleCalendarService(credentials=credentials)
     except Exception as e:
         logger.warning(f"Google Calendar service unavailable: {e}")

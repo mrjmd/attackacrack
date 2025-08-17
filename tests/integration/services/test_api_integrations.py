@@ -16,7 +16,7 @@ import googleapiclient.discovery
 import requests # For patching requests.get/post
 
 # Import ContactService for type hinting in mocks
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 
 # Fixture to provide a Flask app context for tests that need current_app
 @pytest.fixture

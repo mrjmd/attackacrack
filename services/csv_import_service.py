@@ -119,28 +119,29 @@ class CSVImportService:
     def detect_format(self, headers: List[str], filename: str) -> Optional[str]:
         """Detect CSV format based on headers and filename"""
         
-        # Check filename patterns first
-        filename_lower = filename.lower()
-        if 'openphone' in filename_lower:
-            return 'openphone'
-        elif 'realtor' in filename_lower:
-            return 'realtor'
-        elif 'sotheby' in filename_lower:
-            return 'sothebys'
-        elif 'vicente' in filename_lower:
-            return 'vicente'
-        elif 'exitcape' in filename_lower:
-            return 'exit_cape'
-        elif 'exitpremier' in filename_lower:
-            return 'exit_premier'
-        elif 'jackconway' in filename_lower:
-            return 'jackconway'
-        elif 'lamacchia' in filename_lower:
-            return 'lamacchia'
-        elif 'raveis' in filename_lower:
-            return 'raveis'
-        elif 'cleaned_data_phone' in filename_lower or 'propertyradar' in filename_lower:
-            return 'propertyradar'
+        # Check filename patterns first (if filename provided)
+        if filename:
+            filename_lower = filename.lower()
+            if 'openphone' in filename_lower:
+                return 'openphone'
+            elif 'realtor' in filename_lower:
+                return 'realtor'
+            elif 'sotheby' in filename_lower:
+                return 'sothebys'
+            elif 'vicente' in filename_lower:
+                return 'vicente'
+            elif 'exitcape' in filename_lower:
+                return 'exit_cape'
+            elif 'exitpremier' in filename_lower:
+                return 'exit_premier'
+            elif 'jackconway' in filename_lower:
+                return 'jackconway'
+            elif 'lamacchia' in filename_lower:
+                return 'lamacchia'
+            elif 'raveis' in filename_lower:
+                return 'raveis'
+            elif 'cleaned_data_phone' in filename_lower or 'propertyradar' in filename_lower:
+                return 'propertyradar'
         
         # Check by header patterns
         if 'First name' in headers and 'Phone number' in headers:
@@ -177,6 +178,15 @@ class CSVImportService:
         
         # Remove all non-digit characters
         digits = re.sub(r'\D', '', str(phone))
+        
+        # Validate meaningful digits in the original phone number part
+        if len(digits) >= 10:
+            # Check the main 10-digit phone number part (excluding country code)
+            phone_part = digits[-10:] if len(digits) == 11 else digits
+            if phone_part == '0' * 10:  # Reject all zeros
+                return None
+            if len(set(phone_part)) <= 1:  # Reject all same digit
+                return None
         
         # Handle different lengths
         if len(digits) == 10:

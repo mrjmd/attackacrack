@@ -142,6 +142,47 @@ class ContactService:
             logger.error(f"Failed to get contacts: {str(e)}")
             return PagedResult.failure(f"Failed to get contacts: {str(e)}", code="FETCH_ERROR")
     
+    def get_contacts_page(
+        self,
+        search_query: str = '',
+        filter_type: str = 'all',
+        sort_by: str = 'name',
+        page: int = 1,
+        per_page: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Get paginated contacts with search and filtering for route layer.
+        
+        Args:
+            search_query: Search query string
+            filter_type: Filter type to apply ('all', 'has_email', 'has_phone', etc.)
+            sort_by: Field to sort by ('name', 'created', 'recent_activity')
+            page: Page number (1-based)
+            per_page: Items per page
+            
+        Returns:
+            Dictionary with pagination metadata and contacts
+        """
+        try:
+            return self.contact_repository.get_paginated_contacts(
+                search_query=search_query,
+                filter_type=filter_type,
+                sort_by=sort_by,
+                page=page,
+                per_page=per_page
+            )
+        except Exception as e:
+            logger.error(f"Failed to get contacts page: {str(e)}")
+            # Return empty result on error
+            return {
+                'contacts': [],
+                'total_count': 0,
+                'page': page,
+                'total_pages': 0,
+                'has_prev': False,
+                'has_next': False
+            }
+    
     def search_contacts(self, query: str, limit: int = 20) -> Result[List[Contact]]:
         """
         Search contacts by name, email, or phone.

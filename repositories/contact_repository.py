@@ -31,7 +31,7 @@ class ContactRepository(BaseRepository[Contact]):
         if not query:
             return []
         
-        search_fields = fields or ['first_name', 'last_name', 'phone', 'email', 'company']
+        search_fields = fields or ['first_name', 'last_name', 'phone', 'email']
         
         conditions = []
         for field in search_fields:
@@ -142,8 +142,7 @@ class ContactRepository(BaseRepository[Contact]):
                 Contact.first_name.ilike(f'%{search_query}%'),
                 Contact.last_name.ilike(f'%{search_query}%'),
                 Contact.phone.ilike(f'%{search_query}%'),
-                Contact.email.ilike(f'%{search_query}%'),
-                Contact.company.ilike(f'%{search_query}%')
+                Contact.email.ilike(f'%{search_query}%')
             )
         )
     
@@ -227,8 +226,7 @@ class ContactRepository(BaseRepository[Contact]):
                 else func.max(Conversation.last_activity_at).asc().nullsfirst()
             )
         
-        elif sort_by == 'company':
-            return query.order_by(order_func(Contact.company))
+        # Note: company field not available in Contact model
         
         elif sort_by == 'email':
             return query.order_by(order_func(Contact.email))
@@ -291,6 +289,46 @@ class ContactRepository(BaseRepository[Contact]):
         return self.session.query(Contact).join(Conversation).filter(
             Conversation.last_activity_at >= cutoff_date
         ).distinct().all()
+    
+    def get_paginated_contacts(
+        self,
+        search_query: str = '',
+        filter_type: str = 'all',
+        sort_by: str = 'name',
+        page: int = 1,
+        per_page: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Get paginated contacts with search and filtering.
+        
+        Args:
+            search_query: Search query string
+            filter_type: Filter type to apply
+            sort_by: Field to sort by
+            page: Page number (1-based)
+            per_page: Items per page
+            
+        Returns:
+            Dictionary with pagination metadata and contacts
+        """
+        pagination_params = PaginationParams(page=page, per_page=per_page)
+        result = self.get_contacts_with_filter(
+            filter_type=filter_type,
+            search_query=search_query,
+            sort_by=sort_by,
+            sort_order=SortOrder.ASC,
+            pagination=pagination_params
+        )
+        
+        # Convert PaginatedResult to dict format expected by service
+        return {
+            'contacts': result.items,
+            'total_count': result.total,
+            'page': result.page,
+            'total_pages': result.pages,
+            'has_prev': result.has_prev,
+            'has_next': result.has_next
+        }
     
     def get_contacts_by_tag(self, tag: str) -> List[Contact]:
         """

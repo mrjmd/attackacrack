@@ -4,7 +4,7 @@ Extended tests for new ContactService methods following TDD principles
 
 import pytest
 from unittest.mock import MagicMock, patch, Mock
-from services.contact_service import ContactService
+from services.contact_service_refactored import ContactService
 from crm_database import Contact, ContactFlag, CampaignMembership, Campaign, Property, Job, db
 from datetime import datetime
 import time
