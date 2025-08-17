@@ -77,6 +77,9 @@ def create_app(config_name=None, test_config=None):
     from services.csv_import_service import CSVImportService
     from services.appointment_service import AppointmentService
     from services.auth_service import AuthService
+    from services.ai_service import AIService
+    from services.quickbooks_service import QuickBooksService
+    from services.quickbooks_sync_service import QuickBooksSyncService
     
     # Create and populate service registry
     registry = ServiceRegistry()
@@ -96,6 +99,9 @@ def create_app(config_name=None, test_config=None):
     registry.register('campaign_list', CampaignListService())
     registry.register('appointment', AppointmentService())
     registry.register('auth', AuthService())
+    registry.register('ai', AIService())
+    registry.register('quickbooks', QuickBooksService())
+    registry.register('quickbooks_sync', QuickBooksSyncService())
     
     # Services with dependencies
     registry.register('campaign', CampaignService(

@@ -2,12 +2,8 @@
 Settings routes for system configuration and data management
 """
 
-from flask import Blueprint, render_template, request, flash, redirect, url_for
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
 from flask_login import login_required
-from services.quickbooks_service import QuickBooksService
-from services.quickbooks_sync_service import QuickBooksSyncService
-from services.openphone_sync_service import OpenPhoneSyncService
-from services.sync_health_service import SyncHealthService
 from crm_database import db, QuickBooksAuth
 from datetime import datetime, timedelta
 import uuid
@@ -34,7 +30,7 @@ def automation():
 @login_required
 def sync_health():
     """Sync health monitoring - webhook status, reconciliation, etc."""
-    sync_health_service = SyncHealthService()
+    sync_health_service = current_app.services.get('sync_health')
     health_data = sync_health_service.get_sync_health_status()
     
     return render_template('settings/sync_health.html',
@@ -48,7 +44,7 @@ def sync_health():
 @login_required
 def openphone():
     """OpenPhone sync management"""
-    openphone_sync_service = OpenPhoneSyncService()
+    openphone_sync_service = current_app.services.get('openphone_sync')
     sync_stats = openphone_sync_service.get_sync_statistics()
     
     return render_template('settings/openphone.html',
@@ -61,7 +57,7 @@ def openphone():
 @login_required
 def openphone_sync():
     """Run manual OpenPhone sync"""
-    openphone_sync_service = OpenPhoneSyncService()
+    openphone_sync_service = current_app.services.get('openphone_sync')
     
     # Get parameters from form
     sync_type = request.form.get('sync_type', 'recent')
@@ -88,7 +84,7 @@ def openphone_sync():
 @login_required
 def quickbooks():
     """QuickBooks integration settings"""
-    qb_service = QuickBooksService()
+    qb_service = current_app.services.get('quickbooks')
     
     # Check if authenticated
     is_authenticated = qb_service.is_authenticated()
@@ -110,7 +106,7 @@ def quickbooks():
 def quickbooks_sync():
     """Manually trigger QuickBooks sync"""
     try:
-        sync_service = QuickBooksSyncService()
+        sync_service = current_app.services.get('quickbooks_sync')
         
         # Get sync type from form
         sync_type = request.form.get('sync_type', 'all')

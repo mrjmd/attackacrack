@@ -5,12 +5,6 @@ import os
 from functools import wraps
 from flask import Blueprint, jsonify, request, current_app, abort
 from flask_login import login_required
-from services.contact_service import ContactService
-from services.message_service import MessageService
-from services.ai_service import AIService
-from services.diagnostics_service import DiagnosticsService
-from services.task_service import TaskService
-from crm_database import Activity # Import Activity
 
 api_bp = Blueprint('api', __name__)
 
@@ -34,7 +28,7 @@ def debug_session():
 @api_bp.route('/health')
 def health_check():
     """Health check endpoint for monitoring."""
-    diagnostics_service = DiagnosticsService()
+    diagnostics_service = current_app.services.get('diagnostics')
     health_status, status_code = diagnostics_service.get_health_status()
     return jsonify(health_status), status_code
 
@@ -43,7 +37,7 @@ def health_check():
 @login_required
 def redis_health():
     """Redis connectivity diagnostic endpoint"""
-    diagnostics_service = DiagnosticsService()
+    diagnostics_service = current_app.services.get('diagnostics')
     diagnostics, status_code = diagnostics_service.get_redis_diagnostics()
     return jsonify(diagnostics), status_code
 
@@ -110,7 +104,7 @@ def verify_openphone_signature(f):
 @api_bp.route('/contacts')
 @login_required
 def get_contacts():
-    contact_service = ContactService()
+    contact_service = current_app.services.get('contact')
     contacts = contact_service.get_all_contacts()
     contact_list = [{'id': c.id, 'first_name': c.first_name, 'last_name': c.last_name, 'email': c.email, 'phone': c.phone} for c in contacts]
     return jsonify(contact_list)
@@ -118,9 +112,10 @@ def get_contacts():
 @api_bp.route('/messages/latest_conversations')
 @login_required
 def get_latest_conversations():
-    message_service = MessageService()
+    message_service = current_app.services.get('message')
     # Refresh session to get latest data from webhooks
-    message_service.session.expire_all()
+    from extensions import db
+    db.session.expire_all()
     latest_conversations = message_service.get_latest_conversations_from_db(limit=10)
     conversations_json = []
     for conv in latest_conversations:
@@ -140,7 +135,7 @@ def get_contact_messages(contact_id):
     """
     Provides a JSON list of all activities for a specific contact.
     """
-    message_service = MessageService()
+    message_service = current_app.services.get('message')
     # Use the new, correct service method
     activities = message_service.get_activities_for_contact(contact_id)
     # Format the data into the JSON structure the frontend expects
@@ -158,8 +153,8 @@ def get_contact_messages(contact_id):
 @api_bp.route('/appointments/generate_summary/<int:contact_id>')
 @login_required
 def generate_appointment_summary(contact_id):
-    message_service = MessageService()
-    ai_service = AIService()
+    message_service = current_app.services.get('message')
+    ai_service = current_app.services.get('ai')
     
     activities = message_service.get_activities_for_contact(contact_id)
     summary = ai_service.summarize_conversation_for_appointment(activities)
@@ -170,7 +165,7 @@ def generate_appointment_summary(contact_id):
 @login_required
 def task_status(task_id):
     """Get the status of a Celery task"""
-    task_service = TaskService()
+    task_service = current_app.services.get('task')
     
     try:
         response = task_service.get_task_status(task_id)
