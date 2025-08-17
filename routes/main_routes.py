@@ -13,7 +13,7 @@ from services.message_service import MessageService
 from services.csv_import_service import CSVImportService
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
 from extensions import db
-from crm_database import Setting, Activity, Conversation, Todo
+from crm_database import Setting, Activity, Conversation, Todo, CampaignMembership
 
 main_bp = Blueprint('main', __name__)
 
@@ -32,145 +32,27 @@ def dashboard():
     from datetime import datetime, timedelta
     from sqlalchemy import func
     from sqlalchemy.orm import selectinload, joinedload
-    from crm_database import Contact, Campaign, CampaignMembership, Activity, Conversation
+    from services.dashboard_service import DashboardService
     from services.campaign_service import CampaignService
     
+    # Initialize services
+    dashboard_service = DashboardService()
     contact_service = ContactService()
     appointment_service = AppointmentService()
     message_service = MessageService()
     campaign_service = CampaignService()
     
-    # Enhanced Statistics for Dashboard Cards
-    total_contacts = Contact.query.count()
+    # Get all dashboard statistics from service
+    stats = dashboard_service.get_dashboard_stats()
     
-    # Contacts added this week (using Activity records as proxy since Contact doesn't have created_at)
-    week_ago = datetime.utcnow() - timedelta(days=7)
-    contacts_added_this_week = Activity.query.filter(
-        Activity.created_at >= week_ago,
-        Activity.contact_id.isnot(None)
-    ).distinct(Activity.contact_id).count()
-    
-    # Active campaigns
-    active_campaigns = Campaign.query.filter_by(status='running').count()
-    
-    # Campaign response rate (average across all campaigns)
-    # Use eager loading to get campaigns with their memberships
-    all_campaigns = Campaign.query.options(
-        selectinload(Campaign.memberships)
-    ).all()
-    
-    response_rates = []
-    try:
-        for campaign in all_campaigns:
-            # Calculate response rate using pre-loaded memberships
-            sent_count = sum(1 for m in campaign.memberships if m.status in ['sent', 'replied_positive', 'replied_negative'])
-            if sent_count > 0:
-                replied_count = sum(1 for m in campaign.memberships if m.status in ['replied_positive', 'replied_negative'])
-                response_rate = (replied_count / sent_count) * 100
-                response_rates.append(response_rate)
-    except Exception as e:
-        # Handle case where campaign service fails
-        pass
-    
-    avg_response_rate = round(sum(response_rates) / len(response_rates), 1) if response_rates else 0
-    
-    # Monthly revenue (placeholder - can be enhanced with actual revenue tracking)
-    monthly_revenue = 12500  # Placeholder
-    revenue_growth = 8.5  # Placeholder percentage
-    
-    # Messages sent today
-    today = datetime.utcnow().date()
-    messages_today = Activity.query.filter(
-        Activity.activity_type == 'message',
-        Activity.direction == 'outgoing',
-        func.date(Activity.created_at) == today
-    ).count()
-    
-    # Overall response rate (incoming messages vs outgoing)
-    total_outgoing = Activity.query.filter(
-        Activity.activity_type == 'message',
-        Activity.direction == 'outgoing'
-    ).count()
-    
-    total_incoming = Activity.query.filter(
-        Activity.activity_type == 'message',
-        Activity.direction == 'incoming'
-    ).count()
-    
-    overall_response_rate = round((total_incoming / total_outgoing * 100), 1) if total_outgoing > 0 else 0
-    
-    # Get SMS bounce metrics for dashboard
-    from services.sms_metrics_service import SMSMetricsService
-    metrics_service = SMSMetricsService()
-    sms_metrics = metrics_service.get_global_metrics(days=30)
-    
-    stats = {
-        'contact_count': total_contacts,
-        'contacts_added_this_week': contacts_added_this_week,
-        'active_campaigns': active_campaigns,
-        'campaign_response_rate': avg_response_rate,
-        'monthly_revenue': monthly_revenue,
-        'revenue_growth': revenue_growth,
-        'overall_response_rate': overall_response_rate,
-        'messages_today': messages_today,
-        'bounce_rate': sms_metrics.get('bounce_rate', 0),
-        'delivery_rate': sms_metrics.get('delivery_rate', 0),
-        'total_messages_30d': sms_metrics.get('total_sent', 0),
-        'bounced_messages_30d': sms_metrics.get('bounced', 0)
-    }
-    
-    # Activity Timeline Data (get more conversations and sort by most recent activity)
-    # Use eager loading for conversations with their contacts and activities
-    # Filter out conversations without activity timestamps (these are likely import artifacts)
-    # Also ensure we only get conversations that actually have activities
-    from sqlalchemy import exists
-    
-    latest_conversations = Conversation.query.options(
-        joinedload(Conversation.contact),
-        selectinload(Conversation.activities)
-    ).filter(
-        Conversation.last_activity_at.isnot(None),
-        exists().where(Activity.conversation_id == Conversation.id)  # Must have at least one activity
-    ).order_by(Conversation.last_activity_at.desc()).limit(20).all()
-    
-    openphone_texts = []
-    for conv in latest_conversations:
-        # Get the most recent activity from pre-loaded activities
-        last_activity = max(conv.activities, key=lambda act: act.created_at) if conv.activities else None
-        if last_activity:
-            # Determine content based on activity type
-            if last_activity.activity_type == 'call':
-                if last_activity.direction == 'incoming':
-                    content = "📞 Incoming call"
-                else:
-                    content = "📞 Outgoing call"
-                if last_activity.duration_seconds:
-                    duration_min = last_activity.duration_seconds // 60
-                    content += f" ({duration_min}m)"
-            elif last_activity.activity_type == 'voicemail':
-                content = "🎤 Voicemail received"
-            else:
-                # Message type
-                content = last_activity.body or "📱 Message (no content)"
-            
-            openphone_texts.append({
-                'contact_id': conv.contact.id,
-                'contact_name': conv.contact.first_name or conv.contact.phone,
-                'contact_number': conv.contact.phone,
-                'latest_message_body': content,
-                'timestamp': last_activity.created_at.strftime('%H:%M') if last_activity.created_at else 'Just now',
-                'activity_timestamp': last_activity.created_at,  # For sorting
-                'activity_type': last_activity.activity_type
-            })
-    
-    # Sort by most recent activity timestamp descending
-    openphone_texts.sort(key=lambda x: x['activity_timestamp'], reverse=True)
+    # Get activity timeline from service
+    timeline_items = dashboard_service.get_activity_timeline(limit=20)
     
     # Take only the top 5 for dashboard display
-    openphone_texts = openphone_texts[:5]
+    openphone_texts = timeline_items[:5]
     
-    # Campaign Events for Timeline
-    recent_campaigns = Campaign.query.order_by(Campaign.created_at.desc()).limit(3).all()
+    # Get recent campaigns for timeline
+    recent_campaigns = dashboard_service.get_recent_campaigns(limit=3)
     campaign_events = []
     try:
         for campaign in recent_campaigns:
@@ -190,14 +72,7 @@ def dashboard():
             })
     
     # Message Volume Data (Last 7 Days)
-    message_volume_data = []
-    for i in range(7):
-        day = datetime.utcnow().date() - timedelta(days=6-i)
-        count = Activity.query.filter(
-            Activity.activity_type == 'message',
-            func.date(Activity.created_at) == day
-        ).count()
-        message_volume_data.append({'date': day, 'count': count})
+    message_volume_data = dashboard_service.get_message_volume_data(days=7)
     
     # Recent Campaigns with Performance
     recent_campaigns_with_perf = []
@@ -220,12 +95,10 @@ def dashboard():
     appointments = appointment_service.get_all_appointments()[:4]  # Limit to 4
     
     # System Health Data
-    campaign_queue_size = CampaignMembership.query.filter_by(status='pending').count()
+    campaign_queue_size = dashboard_service.get_campaign_queue_size()
     
     # Data quality score (percentage of contacts with complete info)
-    contacts_with_names = Contact.query.filter(~Contact.first_name.like('%+1%')).count()
-    contacts_with_emails = Contact.query.filter(Contact.email.isnot(None), Contact.email != '').count()
-    data_quality_score = round(((contacts_with_names + contacts_with_emails) / (total_contacts * 2)) * 100) if total_contacts > 0 else 0
+    data_quality_score = dashboard_service.get_data_quality_score()
     
     # Get todos for the current user
     from flask_login import current_user
