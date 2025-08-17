@@ -122,11 +122,15 @@ def dashboard():
     # Activity Timeline Data (get more conversations and sort by most recent activity)
     # Use eager loading for conversations with their contacts and activities
     # Filter out conversations without activity timestamps (these are likely import artifacts)
+    # Also ensure we only get conversations that actually have activities
+    from sqlalchemy import exists
+    
     latest_conversations = Conversation.query.options(
         joinedload(Conversation.contact),
         selectinload(Conversation.activities)
     ).filter(
-        Conversation.last_activity_at.isnot(None)
+        Conversation.last_activity_at.isnot(None),
+        exists().where(Activity.conversation_id == Conversation.id)  # Must have at least one activity
     ).order_by(Conversation.last_activity_at.desc()).limit(20).all()
     
     openphone_texts = []
