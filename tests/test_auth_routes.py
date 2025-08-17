@@ -165,7 +165,7 @@ class TestLoginLogout:
             
             assert response.status_code == 200
             # Should be on contacts page now
-            assert b'<h2 class="text-3xl font-bold">Contacts</h2>' in response.data
+            assert b'<h1 class="text-3xl font-bold text-white">Contacts</h1>' in response.data
     
     def test_logout(self, admin_client):
         """Test logout functionality"""

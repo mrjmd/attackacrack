@@ -3,17 +3,268 @@
 {% block title %}Contacts{% endblock %}
 
 {% block content %}
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-3xl font-bold">Contacts</h2>
-        <a href="{{ url_for('contact.add_contact') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Add New Contact</a>
+<div class="space-y-6">
+    <!-- Header with Search and Actions -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Contacts</h1>
+            <p class="text-gray-400 mt-1">{{ total_count }} total contacts</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('contact.add_contact') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                <span>➕</span> Add Contact
+            </a>
+            <button id="bulk-actions-btn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg disabled:opacity-50" disabled>
+                Bulk Actions
+            </button>
+        </div>
     </div>
-    <div class="bg-gray-900 rounded-lg shadow p-6">
-        <ul>
-            {% for contact in contacts %}
-                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('contact.contact_detail', contact_id=contact.id) }}" class="hover:text-blue-400">{{ contact.first_name }} {{ contact.last_name }}</a></li>
-            {% else %}
-                <li>No contacts found.</li>
-            {% endfor %}
-        </ul>
+
+    <!-- Search and Filters -->
+    <div class="bg-gray-700 rounded-lg p-4">
+        <form method="GET" class="flex flex-wrap gap-4 items-end">
+            <!-- Search Box -->
+            <div class="flex-1 min-w-64">
+                <label class="block text-sm font-medium text-gray-300 mb-1">Search</label>
+                <input type="text" name="search" value="{{ search_query }}" 
+                       placeholder="Search by name, phone, email, or company..."
+                       class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            <!-- Filter Type -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Filter</label>
+                <select name="filter" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500">
+                    <option value="all" {{ 'selected' if filter_type == 'all' }}>All Contacts</option>
+                    <option value="has_phone" {{ 'selected' if filter_type == 'has_phone' }}>Has Phone</option>
+                    <option value="has_email" {{ 'selected' if filter_type == 'has_email' }}>Has Email</option>
+                    <option value="has_conversation" {{ 'selected' if filter_type == 'has_conversation' }}>Has Messages</option>
+                    <option value="no_conversation" {{ 'selected' if filter_type == 'no_conversation' }}>No Messages</option>
+                    <option value="opted_out" {{ 'selected' if filter_type == 'opted_out' }}>Opted Out</option>
+                    <option value="recent_activity" {{ 'selected' if filter_type == 'recent_activity' }}>Recent Activity</option>
+                </select>
+            </div>
+            
+            <!-- Sort By -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Sort</label>
+                <select name="sort" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500">
+                    <option value="name" {{ 'selected' if sort_by == 'name' }}>Name</option>
+                    <option value="created" {{ 'selected' if sort_by == 'created' }}>Recently Added</option>
+                    <option value="recent_activity" {{ 'selected' if sort_by == 'recent_activity' }}>Recent Activity</option>
+                </select>
+            </div>
+            
+            <!-- Submit Button -->
+            <div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                    Filter
+                </button>
+            </div>
+            
+            <!-- Clear Filters -->
+            {% if search_query or filter_type != 'all' or sort_by != 'name' %}
+            <div>
+                <a href="{{ url_for('contact.list_all') }}" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">
+                    Clear
+                </a>
+            </div>
+            {% endif %}
+        </form>
     </div>
+
+    <!-- Bulk Actions Form -->
+    <form id="bulk-actions-form" method="POST" action="{{ url_for('contact.bulk_contact_action') }}" style="display: none;">
+        <div class="bg-gray-700 rounded-lg p-4 border-2 border-purple-500">
+            <div class="flex items-center gap-4">
+                <select name="action" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white">
+                    <option value="">Select Action...</option>
+                    <option value="flag_opted_out">Flag as Opted Out</option>
+                    <option value="unflag_opted_out">Remove Opted Out Flag</option>
+                    <option value="export">Export to CSV</option>
+                    <option value="delete">Delete Selected</option>
+                </select>
+                
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">
+                    Execute
+                </button>
+                
+                <button type="button" id="cancel-bulk" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">
+                    Cancel
+                </button>
+                
+                <span id="selected-count" class="text-gray-300">0 selected</span>
+            </div>
+        </div>
+    </form>
+
+    <!-- Contacts List -->
+    <div class="bg-gray-700 rounded-lg">
+        {% if contacts %}
+            <!-- Select All Header -->
+            <div class="px-4 py-3 border-b border-gray-600 flex items-center gap-3">
+                <input type="checkbox" id="select-all" class="rounded border-gray-500">
+                <label for="select-all" class="text-gray-300 text-sm">Select All</label>
+                <span class="text-gray-400 text-sm">{{ contacts|length }} contacts shown</span>
+            </div>
+            
+            <!-- Contact Items -->
+            <div class="divide-y divide-gray-600">
+                {% for item in contacts %}
+                {% set contact = item.contact %}
+                <div class="p-4 hover:bg-gray-600 transition-colors contact-item">
+                    <div class="flex items-center gap-3">
+                        <!-- Checkbox -->
+                        <input type="checkbox" name="contact_ids" value="{{ contact.id }}" 
+                               class="rounded border-gray-500 contact-checkbox">
+                        
+                        <!-- Contact Info -->
+                        <div class="flex-1">
+                            <a href="{{ url_for('contact.contact_detail', contact_id=contact.id) }}" 
+                               class="block hover:text-blue-400 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h3 class="font-semibold text-white">
+                                            {{ contact.first_name }} {{ contact.last_name }}
+                                        </h3>
+                                        <div class="flex items-center gap-4 mt-1">
+                                            {% if contact.phone %}
+                                            <span class="text-gray-400 text-sm">📱 {{ contact.phone }}</span>
+                                            {% endif %}
+                                            {% if contact.email %}
+                                            <span class="text-gray-400 text-sm">✉️ {{ contact.email }}</span>
+                                            {% endif %}
+                                            {% if contact.company %}
+                                            <span class="text-gray-500 text-sm">🏢 {{ contact.company }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="text-right">
+                                        {% if item.last_activity %}
+                                        <div class="text-xs text-gray-400">
+                                            Last activity: {{ item.last_activity.strftime('%b %d, %Y') }}
+                                        </div>
+                                        {% endif %}
+                                        {% if item.message_count > 0 %}
+                                        <div class="text-xs text-gray-500">
+                                            {{ item.message_count }} messages
+                                        </div>
+                                        {% endif %}
+                                        {% if 'opted_out' in item.flags %}
+                                        <span class="inline-block px-2 py-1 text-xs bg-red-900 text-red-300 rounded mt-1">
+                                            Opted Out
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <!-- Quick Actions -->
+                        <div class="flex gap-2">
+                            {% if item.has_conversation %}
+                            <a href="{{ url_for('contact.conversation', contact_id=contact.id) }}" 
+                               class="text-gray-400 hover:text-white p-1" title="View conversation">
+                                💬
+                            </a>
+                            {% endif %}
+                            <a href="{{ url_for('contact.edit_contact', contact_id=contact.id) }}" 
+                               class="text-gray-400 hover:text-white p-1" title="Edit contact">
+                                ✏️
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="p-8 text-center">
+                <div class="text-gray-400 text-lg mb-2">No contacts found</div>
+                <p class="text-gray-500">Try adjusting your search or filter criteria</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="flex justify-center items-center gap-2">
+        {% if has_prev %}
+        <a href="{{ url_for('contact.list_all', page=page-1, search=search_query, filter=filter_type, sort=sort_by) }}" 
+           class="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Previous</a>
+        {% endif %}
+        
+        <span class="px-3 py-2 text-gray-300">
+            Page {{ page }} of {{ total_pages }}
+        </span>
+        
+        {% if has_next %}
+        <a href="{{ url_for('contact.list_all', page=page+1, search=search_query, filter=filter_type, sort=sort_by) }}" 
+           class="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Bulk selection functionality
+const selectAllCheckbox = document.getElementById('select-all');
+const contactCheckboxes = document.querySelectorAll('.contact-checkbox');
+const bulkActionsBtn = document.getElementById('bulk-actions-btn');
+const bulkActionsForm = document.getElementById('bulk-actions-form');
+const selectedCountSpan = document.getElementById('selected-count');
+const cancelBulkBtn = document.getElementById('cancel-bulk');
+
+function updateBulkActions() {
+    const checkedBoxes = document.querySelectorAll('.contact-checkbox:checked');
+    const count = checkedBoxes.length;
+    
+    selectedCountSpan.textContent = `${count} selected`;
+    bulkActionsBtn.disabled = count === 0;
+    
+    if (bulkActionsForm.style.display !== 'none') {
+        // Update hidden inputs for selected IDs
+        const existingInputs = bulkActionsForm.querySelectorAll('input[name="contact_ids"]');
+        existingInputs.forEach(input => input.remove());
+        
+        checkedBoxes.forEach(checkbox => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'contact_ids';
+            input.value = checkbox.value;
+            bulkActionsForm.appendChild(input);
+        });
+    }
+}
+
+selectAllCheckbox?.addEventListener('change', function() {
+    contactCheckboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+    });
+    updateBulkActions();
+});
+
+contactCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', updateBulkActions);
+});
+
+bulkActionsBtn?.addEventListener('click', function() {
+    bulkActionsForm.style.display = 'block';
+    updateBulkActions();
+});
+
+cancelBulkBtn?.addEventListener('click', function() {
+    bulkActionsForm.style.display = 'none';
+});
+
+// Action-specific handling
+const actionSelect = bulkActionsForm?.querySelector('select[name="action"]');
+actionSelect?.addEventListener('change', function() {
+    if (this.value === 'delete') {
+        if (!confirm('Are you sure you want to delete the selected contacts? This cannot be undone.')) {
+            this.value = '';
+        }
+    }
+});
+</script>
 {% endblock %}

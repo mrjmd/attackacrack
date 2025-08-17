@@ -8,7 +8,7 @@ def test_contact_list_page(authenticated_client):
     """
     response = authenticated_client.get('/contacts/')
     assert response.status_code == 200
-    assert b'<h2 class="text-3xl font-bold">Contacts</h2>' in response.data
+    assert b'<h1 class="text-3xl font-bold text-white">Contacts</h1>' in response.data
     # Check for the seeded contact from conftest.py
     assert b"Test User" in response.data
 
@@ -29,5 +29,5 @@ def test_add_contact_route(authenticated_client):
     assert response.status_code == 200
     
     # Check that the new contact's name is now on the contact list page
-    assert b"Jane Doe" in response.data
-    assert b'<h2 class="text-3xl font-bold">Contacts</h2>' in response.data
+    assert b"Jane" in response.data and b"Doe" in response.data
+    assert b'<h1 class="text-3xl font-bold text-white">Contacts</h1>' in response.data

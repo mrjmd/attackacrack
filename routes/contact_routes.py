@@ -14,34 +14,35 @@ contact_bp = Blueprint('contact', __name__)
 @contact_bp.route('/')
 @login_required
 def list_all():
+    """Display paginated list of contacts with filters"""
     contact_service = ContactService()
     
-    # Get pagination parameters
+    # Get parameters
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 100, type=int)
-    search = request.args.get('search', '').strip()
+    per_page = request.args.get('per_page', 50, type=int)
+    search_query = request.args.get('search', '').strip()
+    filter_type = request.args.get('filter', 'all')
+    sort_by = request.args.get('sort', 'name')
     
     # Get paginated contacts
-    if search:
-        contacts_paginated = Contact.query.filter(
-            db.or_(
-                Contact.first_name.ilike(f'%{search}%'),
-                Contact.last_name.ilike(f'%{search}%'),
-                Contact.phone.ilike(f'%{search}%'),
-                Contact.email.ilike(f'%{search}%')
-            )
-        ).order_by(Contact.last_name, Contact.first_name).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-    else:
-        contacts_paginated = Contact.query.order_by(
-            Contact.last_name, Contact.first_name
-        ).paginate(page=page, per_page=per_page, error_out=False)
+    result = contact_service.get_contacts_page(
+        search_query=search_query,
+        filter_type=filter_type,
+        sort_by=sort_by,
+        page=page,
+        per_page=per_page
+    )
     
     return render_template('contact_list.html', 
-                         contacts=contacts_paginated.items,
-                         pagination=contacts_paginated,
-                         search=search)
+                         contacts=result['contacts'],
+                         total_count=result['total_count'],
+                         page=result['page'],
+                         total_pages=result['total_pages'],
+                         has_prev=result['has_prev'],
+                         has_next=result['has_next'],
+                         search_query=search_query,
+                         filter_type=filter_type,
+                         sort_by=sort_by)
 
 @contact_bp.route('/conversations')
 @login_required
@@ -342,6 +343,26 @@ def edit_contact(contact_id):
         )
         return redirect(url_for('contact.contact_detail', contact_id=contact.id))
     return render_template('add_edit_contact_form.html', contact=contact)
+
+@contact_bp.route('/contacts/bulk-action', methods=['POST'])
+@login_required
+def bulk_contact_action():
+    """Handle bulk actions on contacts"""
+    contact_service = ContactService()
+    action = request.form.get('action')
+    contact_ids = [int(id) for id in request.form.getlist('contact_ids')]
+    
+    if action in ['flag_opted_out', 'unflag_opted_out']:
+        flag_type = 'opted_out'
+        if action == 'flag_opted_out':
+            success, message = contact_service.bulk_action('flag', contact_ids, flag_type=flag_type)
+        else:
+            success, message = contact_service.bulk_action('unflag', contact_ids, flag_type=flag_type)
+    else:
+        success, message = contact_service.bulk_action(action, contact_ids)
+    
+    flash(message, 'success' if success else 'error')
+    return redirect(url_for('contact.list_all'))
 
 @contact_bp.route('/<int:contact_id>/delete', methods=['POST'])
 @login_required
