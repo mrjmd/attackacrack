@@ -15,12 +15,12 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 ### Monday-Tuesday: Complete Dependency Injection
 | ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
 |----|------|--------|------------|----------|--------------|-------|
-| W1-01 | Audit all services for internal dependencies | 🔵 TODO | 2h | - | None | Create spreadsheet of service dependencies |
-| W1-02 | Create GoogleCalendarService | 🔵 TODO | 3h | - | W1-01 | Extract from api_integrations.py |
-| W1-03 | Create EmailService abstraction | 🔵 TODO | 2h | - | W1-01 | Wrap Flask-Mail functionality |
-| W1-04 | Refactor AppointmentService to accept GoogleCalendarService | 🔵 TODO | 2h | - | W1-02 | Remove direct imports |
-| W1-05 | Implement lazy loading in ServiceRegistry | 🔵 TODO | 3h | - | None | Add factory pattern support |
-| W1-06 | Update app.py with proper service initialization order | 🔵 TODO | 4h | - | W1-01 to W1-05 | Document dependency graph |
+| W1-01 | Audit all services for internal dependencies | ✅ DONE | 2h | Claude | None | Created SERVICE_DEPENDENCY_AUDIT.md |
+| W1-02 | Create GoogleCalendarService | ✅ DONE | 3h | Claude | W1-01 | Extracted with 8 methods, 18 tests |
+| W1-03 | Create EmailService abstraction | ✅ DONE | 2h | Claude | W1-01 | Created with 11 methods, 24 tests |
+| W1-04 | Refactor AppointmentService to accept GoogleCalendarService | ✅ DONE | 2h | Claude | W1-02 | Expanded to 19 methods, 24 tests |
+| W1-05 | Implement lazy loading in ServiceRegistry | ✅ DONE | 3h | Claude | None | Enhanced registry with 25 tests |
+| W1-06 | Update app.py with proper service initialization order | ✅ DONE | 4h | Claude | W1-01 to W1-05 | Created app_enhanced.py |
 
 ### Wednesday-Thursday: Repository Pattern Implementation
 | ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
