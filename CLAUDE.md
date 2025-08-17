@@ -106,7 +106,7 @@ docker-compose restart celery celery-beat
 ### 🚧 In Progress - Week of August 18, 2025
 **TOP PRIORITY: Launch production text campaign by end of week**
 
-1. **Service Layer Refactoring** ✅ COMPLETE - ALL ROUTES REFACTORED!
+1. **Phase 1: Service Layer Refactoring** ✅ COMPLETE - ALL ROUTES REFACTORED!
    - ✅ **Service Registry with Dependency Injection** fully implemented across application
    - ✅ **ALL route files refactored**: main, auth, api, settings, campaigns, quote routes
    - ✅ **21 services registered**: Contact, OpenPhone, Message, Dashboard, Conversation, Task, Diagnostics, OpenPhoneSync, SyncHealth, Todo, CampaignList, Campaign, CSVImport, Appointment, Auth, AI, QuickBooks, QuickBooksSync, Quote, Job, Invoice
@@ -115,8 +115,15 @@ docker-compose restart celery celery-beat
    - ✅ **Clean Architecture implemented** - Routes handle HTTP only, services handle business logic
    - ✅ Enhanced ContactService with 12+ methods for complete contact management
    - ✅ All services using `current_app.services.get()` dependency injection pattern
+
+2. **Phase 2: Codebase Hardening & TDD** 🚀 NEXT UP!
+   - See `/docs/REFACTOR_PLAN_PHASE2.md` for complete implementation plan
+   - Repository pattern to isolate database access
+   - Complete dependency injection for all external services
+   - Comprehensive test suite with 95% coverage target
+   - Factory pattern for test data generation
    
-2. **Contacts Page Overhaul** - Foundation for campaigns
+3. **Contacts Page Overhaul** - Foundation for campaigns
    - Fix broken filters
    - Implement proper pagination
    - Complete UX improvement pass
