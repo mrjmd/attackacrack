@@ -23,6 +23,9 @@ uploads/
 csvs/
 
 # Claude Code session files
+.claude/todos/current.md
+.claude/todos/archive/
+.claude/todos/summary.md
 .claude/session-todos.md
 .claude/session-todos.md.backup
 .claude/last-update.txt

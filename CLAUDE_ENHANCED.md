@@ -171,30 +171,45 @@ When implementing ANY feature:
 
 ### Progress Tracking
 
-#### Automatic Todo Persistence
-**ALL todos are automatically saved to `.claude/session-todos.md`:**
-- Updates after EVERY task status change
-- Preserves context if session is interrupted
-- Includes recovery information
-- Never lose progress due to context squashing
+#### Automatic Todo Persistence with Archive System
+**Intelligent todo management that prevents bloat while preserving history:**
 
-#### Three-Tier Todo System
+##### Archive-Based System
+```
+.claude/todos/
+├── current.md          # Symlink to active session
+├── archive/           # Historical sessions by month
+│   └── 2025-08/      # Monthly organization
+│       ├── session-2025-08-17-0930.md
+│       └── session-2025-08-17-1445.md
+└── summary.md         # Cumulative completed tasks
+```
 
-1. **`.claude/session-todos.md`** (Auto-Updated)
-   - Updated immediately after each TodoWrite
-   - Contains current session progress
-   - Includes context for recovery
-   - Modified files and next steps
+##### Three-Tier Todo System
 
-2. **`TODO.md`** (Project-Wide)
+1. **`.claude/todos/current.md`** (Active Session)
+   - Auto-created at session start
+   - Updated after EVERY TodoWrite
+   - Includes full context for recovery
+   - Symlink to actual session file in archive
+
+2. **`.claude/todos/archive/`** (Historical Record)
+   - Each session preserved separately
+   - Organized by month (YYYY-MM)
+   - Auto-cleanup after 3 months
+   - Searchable history of all work
+
+3. **`TODO.md`** (Project Roadmap)
    - Weekly priorities and sprints
-   - Long-term roadmap
-   - Manually updated for major milestones
+   - Long-term goals
+   - Manually updated milestones
 
-3. **In-Memory TodoWrite** (Real-Time)
-   - Tracks immediate progress
-   - Triggers auto-save to session-todos.md
-   - Shows in Claude's responses
+##### Benefits
+- **No Bloat**: Each session is a separate file
+- **Full History**: Can review any past session
+- **Auto-Cleanup**: Old sessions removed after 3 months
+- **Easy Recovery**: current.md always has active session
+- **Searchable**: grep through archive for past work
 
 #### Recovery After Interruption
 ```bash

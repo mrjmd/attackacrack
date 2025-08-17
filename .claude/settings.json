@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/persist-todos.sh TodoWrite"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-manager.sh update"
           }
         ]
       }
@@ -42,6 +42,26 @@
           {
             "type": "command",
             "command": "echo '🤖 Processing request. TDD enforcement active. Tests must be written before implementation.'"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-manager.sh start"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-manager.sh close"
           }
         ]
       }
