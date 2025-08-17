@@ -14,8 +14,17 @@ from scipy import stats
 
 @pytest.fixture
 def campaign_service():
-    """Fixture providing campaign service instance"""
-    return CampaignService()
+    """Fixture providing campaign service instance with dependencies"""
+    from services.openphone_service import OpenPhoneService
+    from services.campaign_list_service import CampaignListService
+    
+    openphone_service = OpenPhoneService()
+    list_service = CampaignListService()
+    
+    return CampaignService(
+        openphone_service=openphone_service,
+        list_service=list_service
+    )
 
 
 @pytest.fixture

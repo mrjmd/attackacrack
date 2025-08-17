@@ -60,6 +60,51 @@ def create_app(config_name=None, test_config=None):
     db.init_app(app)
     migrate = Migrate(app, db)
     
+    # Initialize Service Registry
+    from services.registry import ServiceRegistry
+    from services.contact_service import ContactService
+    from services.openphone_service import OpenPhoneService
+    from services.campaign_service import CampaignService
+    from services.campaign_list_service import CampaignListService
+    from services.message_service import MessageService
+    from services.dashboard_service import DashboardService
+    from services.conversation_service import ConversationService
+    from services.task_service import TaskService
+    from services.diagnostics_service import DiagnosticsService
+    from services.openphone_sync_service import OpenPhoneSyncService
+    from services.sync_health_service import SyncHealthService
+    from services.todo_service import TodoService
+    from services.csv_import_service import CSVImportService
+    
+    # Create and populate service registry
+    registry = ServiceRegistry()
+    
+    # Register services with dependency injection
+    # Basic services (no dependencies)
+    registry.register('contact', ContactService())
+    registry.register('openphone', OpenPhoneService())
+    registry.register('message', MessageService())
+    registry.register('dashboard', DashboardService())
+    registry.register('conversation', ConversationService())
+    registry.register('task', TaskService())
+    registry.register('diagnostics', DiagnosticsService())
+    registry.register('openphone_sync', OpenPhoneSyncService())
+    registry.register('sync_health', SyncHealthService())
+    registry.register('todo', TodoService())
+    registry.register('campaign_list', CampaignListService())
+    
+    # Services with dependencies
+    registry.register('campaign', CampaignService(
+        openphone_service=registry.get('openphone'),
+        list_service=registry.get('campaign_list')
+    ))
+    registry.register('csv_import', CSVImportService(
+        contact_service=registry.get('contact')
+    ))
+    
+    # Attach registry to app
+    app.services = registry
+    
     # Initialize authentication
     bcrypt.init_app(app)
     login_manager.init_app(app)
