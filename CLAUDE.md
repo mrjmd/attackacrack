@@ -106,9 +106,13 @@ docker-compose restart celery celery-beat
 ### 🚧 In Progress - Week of August 18, 2025
 **TOP PRIORITY: Launch production text campaign by end of week**
 
-1. **Service Layer Refactoring** ✅ COMPLETE - All major routes refactored!
-   - ✅ Dashboard refactored to DashboardService
-   - ✅ Campaigns refactored to CampaignService  
+1. **Service Layer Refactoring** ✅ COMPLETE WITH SERVICE REGISTRY PATTERN!
+   - ✅ **Service Registry with Dependency Injection** implemented in app.py
+   - ✅ Dashboard refactored to DashboardService with DI
+   - ✅ Campaigns refactored to CampaignService with DI
+   - ✅ CampaignListService properly injected as dependency
+   - ✅ All services using `current_app.services.get()` pattern
+   - ✅ **100% test coverage maintained** (335/335 tests passing)
    - ✅ Todo routes already using TodoService
    - ✅ Created DiagnosticsService & TaskService for routes/api_routes.py
    - ✅ Created OpenPhoneSyncService & SyncHealthService for routes/settings_routes.py
@@ -234,11 +238,13 @@ See `/docs/ARCHITECTURE.md` for detailed testing strategy and patterns.
 - Research deliverables should include: findings, options, costs, recommendations, and wait for user direction
 
 ### Architecture Principles
+- **Service Registry Pattern**: All services managed centrally in app.py via ServiceRegistry class
 - **Dependency Injection**: Services receive dependencies via constructor, never create them
-- **Service Registry Pattern**: All services managed centrally in app.py
+- **Access Pattern**: Routes use `current_app.services.get('service_name')` to access services
 - **Separation of Concerns**: Routes handle HTTP, services handle business logic, models handle data
 - **No Direct DB Queries in Routes**: All database access through service methods
 - **No External API Calls Outside Services**: API calls isolated in dedicated service classes
+- **Service Dependencies**: Services can depend on other services, injected at registration time
 
 ### Code Style
 - Use Flask blueprints for routes
@@ -465,25 +471,32 @@ The system automatically detects and imports from these CSV formats:
 
 ## Recent Victories 🎉
 
+### January 2025 - Service Registry Pattern Implementation 🚀
+- **Implemented Service Registry with Dependency Injection**:
+  - Created centralized ServiceRegistry class to manage all services
+  - Services receive dependencies via constructor injection
+  - Routes access services via `current_app.services.get()`
+  - All inter-service dependencies properly managed
+  - **335/335 tests passing** after complete refactoring!
+
 ### January 2025 - Complete Service Layer Refactoring
 - **Completed FULL service layer refactoring** for all major routes!
 - **Created 7 new service classes**:
-  - DashboardService - Dashboard business logic
+  - DashboardService - Dashboard business logic with DI
   - TodoService - Todo management
   - DiagnosticsService - System health checks
   - TaskService - Celery task management
   - OpenPhoneSyncService - OpenPhone sync operations
   - SyncHealthService - Sync health monitoring
-  - Enhanced CampaignService - Campaign management
+  - Enhanced CampaignService - Campaign management with DI
 - **Refactored all primary routes** to use service layer pattern:
   - api_routes.py (-175 lines of business logic)
   - settings_routes.py (-110 lines of business logic)
-  - dashboard_routes.py (previously completed)
-  - campaign_routes.py (previously completed)
+  - dashboard_routes.py (uses service registry)
+  - campaign_routes.py (uses service registry)
   - todo_routes.py (already using TodoService)
 - **Removed 285+ lines of business logic** from route handlers
 - **Improved code organization** with proper separation of concerns
-- **All tests passing** with no breaking changes
 
 ### January 2025 - Universal CSV Import & SMS Tracking
 - **Implemented universal CSV import** with automatic format detection for 10+ formats
@@ -526,4 +539,4 @@ The system automatically detects and imports from these CSV formats:
 
 ---
 
-*This document should be updated as the project evolves. Last updated: January 17, 2025*
+*This document should be updated as the project evolves. Last updated: January 18, 2025*

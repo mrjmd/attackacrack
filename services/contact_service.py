@@ -1,8 +1,11 @@
-from crm_database import Contact, ContactFlag, Conversation, Activity, db
+from crm_database import Contact, ContactFlag, Conversation, Activity, CampaignMembership, Campaign, Property, Job, db
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, and_, func, exists
+from sqlalchemy.orm import joinedload, selectinload
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
+import csv
+import io
 
 class ContactService:
     def __init__(self):
@@ -160,8 +163,8 @@ class ContactService:
                     if not existing:
                         flag = ContactFlag(
                             contact_id=contact_id,
-                            flag_type=flag_type,
-                            flagged_at=datetime.now()
+                            flag_type=flag_type
+                            # created_at is auto-set by model default
                         )
                         db.session.add(flag)
                 db.session.commit()
@@ -244,3 +247,162 @@ class ContactService:
         self.session.delete(contact)
         self.session.commit()
         return True
+    
+    def get_contact_with_relations(self, contact_id: int) -> Optional[Contact]:
+        """Get contact with eager loading of properties and jobs"""
+        return Contact.query.options(
+            selectinload(Contact.properties).selectinload(Property.jobs)
+        ).filter_by(id=contact_id).first()
+    
+    def get_contact_flags(self, contact_id: int) -> Dict[str, bool]:
+        """Get all flags for a contact"""
+        flags = ContactFlag.query.filter_by(contact_id=contact_id).all()
+        return {
+            'has_office_flag': any(f.flag_type == 'office_number' for f in flags),
+            'has_opted_out': any(f.flag_type == 'opted_out' for f in flags),
+            'flags': [f.flag_type for f in flags]
+        }
+    
+    def add_contact_flag(self, contact_id: int, flag_type: str, reason: str = None, created_by: str = 'system') -> bool:
+        """Add a flag to a contact"""
+        try:
+            # Check if flag already exists
+            existing = ContactFlag.query.filter_by(
+                contact_id=contact_id,
+                flag_type=flag_type
+            ).first()
+            
+            if not existing:
+                flag = ContactFlag(
+                    contact_id=contact_id,
+                    flag_type=flag_type,
+                    flag_reason=reason or f'Flagged as {flag_type}',
+                    applies_to='both',
+                    created_by=created_by
+                    # created_at is auto-set by model default
+                )
+                db.session.add(flag)
+                db.session.commit()
+                return True
+            return False
+        except Exception as e:
+            db.session.rollback()
+            raise e
+    
+    def remove_contact_flag(self, contact_id: int, flag_type: str) -> bool:
+        """Remove a flag from a contact"""
+        try:
+            ContactFlag.query.filter_by(
+                contact_id=contact_id,
+                flag_type=flag_type
+            ).delete()
+            db.session.commit()
+            return True
+        except Exception as e:
+            db.session.rollback()
+            raise e
+    
+    def get_campaign_memberships(self, contact_id: int, limit: int = 3) -> List[CampaignMembership]:
+        """Get campaign memberships for a contact"""
+        return CampaignMembership.query.options(
+            joinedload(CampaignMembership.campaign)
+        ).filter_by(
+            contact_id=contact_id
+        ).order_by(CampaignMembership.sent_at.desc()).limit(limit).all()
+    
+    def add_to_campaign(self, contact_id: int, campaign_id: int) -> Tuple[bool, str]:
+        """Add a contact to a campaign"""
+        try:
+            # Check if campaign exists
+            campaign = Campaign.query.get(campaign_id)
+            if not campaign:
+                return False, 'Campaign not found'
+            
+            # Check if already in campaign
+            existing = CampaignMembership.query.filter_by(
+                campaign_id=campaign_id,
+                contact_id=contact_id
+            ).first()
+            
+            if existing:
+                return False, 'Contact already in campaign'
+            
+            membership = CampaignMembership(
+                campaign_id=campaign_id,
+                contact_id=contact_id,
+                status='pending'
+            )
+            db.session.add(membership)
+            db.session.commit()
+            return True, 'Contact added to campaign'
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, f'Error: {str(e)}'
+    
+    def bulk_add_to_campaign(self, contact_ids: List[int], campaign_id: int) -> Tuple[int, str]:
+        """Add multiple contacts to a campaign"""
+        try:
+            # Check if campaign exists
+            campaign = Campaign.query.get(campaign_id)
+            if not campaign:
+                return 0, 'Campaign not found'
+            
+            added_count = 0
+            for contact_id in contact_ids:
+                # Check if already in campaign
+                existing = CampaignMembership.query.filter_by(
+                    campaign_id=campaign_id,
+                    contact_id=contact_id
+                ).first()
+                
+                if not existing:
+                    membership = CampaignMembership(
+                        campaign_id=campaign_id,
+                        contact_id=contact_id,
+                        status='pending'
+                    )
+                    db.session.add(membership)
+                    added_count += 1
+            
+            db.session.commit()
+            return added_count, f'Added {added_count} contacts to campaign "{campaign.name}"'
+            
+        except Exception as e:
+            db.session.rollback()
+            return 0, f'Error: {str(e)}'
+    
+    def export_contacts(self, contact_ids: List[int]) -> str:
+        """Export contacts to CSV format"""
+        contacts = Contact.query.filter(Contact.id.in_(contact_ids)).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers based on actual Contact model fields
+        writer.writerow(['First Name', 'Last Name', 'Phone', 'Email', 'Import Source', 'Customer Type', 'Lead Source'])
+        
+        # Write data
+        for contact in contacts:
+            writer.writerow([
+                contact.first_name,
+                contact.last_name,
+                contact.phone or '',
+                contact.email or '',
+                contact.import_source or '',
+                contact.customer_type or '',
+                contact.lead_source or ''
+            ])
+        
+        output.seek(0)
+        return output.getvalue()
+    
+    def get_contact_statistics(self) -> Dict[str, int]:
+        """Get overall contact statistics"""
+        return {
+            'total_contacts': Contact.query.count(),
+            'with_phone': Contact.query.filter(Contact.phone.isnot(None)).count(),
+            'with_email': Contact.query.filter(Contact.email.isnot(None)).count(),
+            'opted_out': ContactFlag.query.filter_by(flag_type='opted_out').distinct(ContactFlag.contact_id).count(),
+            'office_numbers': ContactFlag.query.filter_by(flag_type='office_number').distinct(ContactFlag.contact_id).count()
+        }
