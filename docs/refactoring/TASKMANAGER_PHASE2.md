@@ -116,9 +116,9 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 ### Monday-Tuesday: Test Discovery & Import Fixes
 | ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
 |----|------|--------|------------|----------|--------------|-------|
-| W4-01 | Run full test suite and document failures | 🔵 TODO | 2h | - | None | Identify all 12 files with collection errors |
-| W4-02 | Fix all import errors from deleted services | 🔵 TODO | 4h | - | W4-01 | 11 tests importing old service names |
-| W4-03 | Update tests to use _refactored service names | 🔵 TODO | 4h | - | W4-02 | Systematic update of all service imports |
+| W4-01 | Run full test suite and document failures | ✅ DONE | 2h | - | None | Found 5 files with collection errors (not 12) |
+| W4-02 | Fix all import errors from deleted services | ✅ DONE | 4h | - | W4-01 | Fixed imports in 5 test files |
+| W4-03 | Update tests to use _refactored service names | ✅ DONE | 4h | - | W4-02 | Updated all service names and parameters |
 | W4-04 | Create comprehensive test fixtures for service registry | 🔵 TODO | 3h | - | W4-03 | Shared fixtures for all tests |
 | W4-05 | Create repository mock factory | 🔵 TODO | 3h | - | W4-04 | Standardized mocking patterns |
 
@@ -180,11 +180,11 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 - Week 1: 16/16 tasks (100%) ✅
 - Week 2: 20/20 tasks (100%) ✅ **FOUNDATION & TESTING COMPLETE**
 - Week 3: 13/15 tasks (87%) ✅ **REPOSITORY PATTERN COMPLETE**
-- Week 4: 0/11 tasks (0%) 🚨 **TEST RECOVERY - CRITICAL PATH**
+- Week 4: 3/11 tasks (27%) 🚨 **TEST RECOVERY - IN PROGRESS**
 - Week 5: 0/16 tasks (0%)
 
 ### Test Coverage Progress
-- Current: Unknown (tests not running due to import errors)
+- Current: Tests running! 1,100 passing, 224 failing, 350 errors
 - Intermediate Target: 80% (Week 4)
 - Final Target: 95% (Week 5)
 - Progress: Blocked by test suite failures
