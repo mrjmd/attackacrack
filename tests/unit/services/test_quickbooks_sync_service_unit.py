@@ -631,19 +631,25 @@ class TestQuickBooksSyncServiceFinancialSummary:
         """Test update_contact_financial_summary uses InvoiceRepository instead of Invoice.query.join()"""
         # Arrange
         contact = Mock(id=1)
+        # Create more complete mock invoices to avoid calculation errors
         mock_invoices = [
             Mock(total_amount=Decimal('1000.00'), balance_due=Decimal('500.00'), payment_status='partial'),
-            Mock(total_amount=Decimal('2000.00'), balance_due=Decimal('0.00'), payment_status='paid'),
+            Mock(total_amount=Decimal('2000.00'), balance_due=Decimal('0.00'), payment_status='paid', 
+                 paid_date=None),  # No paid_date, so it won't be included in average calculation
             Mock(total_amount=Decimal('1500.00'), balance_due=Decimal('1500.00'), payment_status='unpaid')
         ]
         
         mock_repositories['invoice_repository'].find_by_contact_id.return_value = mock_invoices
+        mock_repositories['contact_repository'].update.return_value = contact
         
         # Act
         service.update_contact_financial_summary(contact)
         
         # Assert - This will fail until we replace Invoice.query.join(Job).join(Property).filter()
         mock_repositories['invoice_repository'].find_by_contact_id.assert_called_once_with(1)
+        
+        # Also verify the contact was updated with financial summary
+        mock_repositories['contact_repository'].update.assert_called_once()
 
 
 class TestQuickBooksSyncServiceTransactionManagement:

@@ -25,6 +25,21 @@ class QuickBooksSyncRepository(BaseRepository):
             .filter_by(entity_type=entity_type)\
             .all()
     
+    def find_by_entity(self, entity_type: str, entity_id: str) -> Optional:
+        """
+        Find sync record by entity type and QuickBooks entity ID.
+        
+        Args:
+            entity_type: Type of entity (customer, item, invoice, estimate)
+            entity_id: QuickBooks entity ID
+            
+        Returns:
+            QuickBooksSync object or None if not found
+        """
+        return self.session.query(self.model_class)\
+            .filter_by(entity_type=entity_type, entity_id=entity_id)\
+            .first()
+    
     def find_by_entity_id(self, entity_id: str) -> Optional:
         """
         Find sync record by QuickBooks entity ID.

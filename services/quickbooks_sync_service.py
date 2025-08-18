@@ -510,8 +510,8 @@ class QuickBooksSyncService:
     def _record_sync(self, entity_type: str, entity_id: str, 
                     local_id: int, local_table: str, sync_version: str):
         """Record a sync operation"""
-        # First try to find by entity_id (primary lookup)
-        sync = self.quickbooks_sync_repository.find_by_entity_id(entity_id)
+        # First try to find by entity type and entity_id
+        sync = self.quickbooks_sync_repository.find_by_entity(entity_type, entity_id)
         
         # Build sync data
         sync_data = {

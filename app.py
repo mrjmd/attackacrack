@@ -653,10 +653,43 @@ def _create_openphone_webhook_service(contact, sms_metrics):
     return OpenPhoneWebhookService(contact_service=contact, metrics_service=sms_metrics)
 
 def _create_quickbooks_sync_service(quickbooks, db_session):
-    """Create QuickBooksSyncService with dependencies"""
+    """Create QuickBooksSyncService with repository dependencies"""
     from services.quickbooks_sync_service import QuickBooksSyncService
-    logger.info("Initializing QuickBooksSyncService")
-    return QuickBooksSyncService()
+    from repositories.contact_repository import ContactRepository
+    from repositories.product_repository import ProductRepository
+    from repositories.quote_repository import QuoteRepository
+    from repositories.invoice_repository import InvoiceRepository
+    from repositories.job_repository import JobRepository
+    from repositories.property_repository import PropertyRepository
+    from repositories.quickbooks_sync_repository import QuickBooksSyncRepository
+    from repositories.quote_line_item_repository import QuoteLineItemRepository
+    from repositories.invoice_line_item_repository import InvoiceLineItemRepository
+    from crm_database import Contact, Product, Quote, Invoice, Job, Property, QuickBooksSync, QuoteLineItem, InvoiceLineItem
+    
+    logger.info("Initializing QuickBooksSyncService with repositories")
+    
+    # Create repository instances
+    contact_repo = ContactRepository(session=db_session, model_class=Contact)
+    product_repo = ProductRepository(session=db_session, model_class=Product)
+    quote_repo = QuoteRepository(session=db_session, model_class=Quote)
+    invoice_repo = InvoiceRepository(session=db_session, model_class=Invoice)
+    job_repo = JobRepository(session=db_session, model_class=Job)
+    property_repo = PropertyRepository(session=db_session, model_class=Property)
+    quickbooks_sync_repo = QuickBooksSyncRepository(session=db_session, model_class=QuickBooksSync)
+    quote_line_item_repo = QuoteLineItemRepository(session=db_session, model_class=QuoteLineItem)
+    invoice_line_item_repo = InvoiceLineItemRepository(session=db_session, model_class=InvoiceLineItem)
+    
+    return QuickBooksSyncService(
+        contact_repository=contact_repo,
+        product_repository=product_repo,
+        quote_repository=quote_repo,
+        invoice_repository=invoice_repo,
+        job_repository=job_repo,
+        property_repository=property_repo,
+        quickbooks_sync_repository=quickbooks_sync_repo,
+        quote_line_item_repository=quote_line_item_repo,
+        invoice_line_item_repository=invoice_line_item_repo
+    )
 
 def _create_appointment_service(google_calendar, db_session):
     """Create AppointmentService with dependencies"""

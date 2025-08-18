@@ -6,7 +6,7 @@ from typing import List, Optional
 from datetime import date, datetime
 from sqlalchemy import desc, asc, or_, and_
 from repositories.base_repository import BaseRepository, PaginatedResult
-from crm_database import Invoice, Job
+from crm_database import Invoice, Job, Property
 
 
 class InvoiceRepository(BaseRepository):
@@ -24,6 +24,22 @@ class InvoiceRepository(BaseRepository):
         """
         return self.session.query(self.model_class)\
             .filter_by(job_id=job_id)\
+            .all()
+    
+    def find_by_contact_id(self, contact_id: int) -> List:
+        """
+        Find all invoices for a contact.
+        
+        Args:
+            contact_id: ID of the contact
+            
+        Returns:
+            List of Invoice objects for the contact
+        """
+        return self.session.query(self.model_class)\
+            .join(Job)\
+            .join(Property)\
+            .filter(Property.contact_id == contact_id)\
             .all()
     
     def find_by_status(self, status: str) -> List:
