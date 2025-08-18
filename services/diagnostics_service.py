@@ -1,15 +1,28 @@
 """
 DiagnosticsService - Handles system health checks and diagnostics
+
+Refactored to use Repository Pattern - NO direct database access allowed.
+All database operations go through DiagnosticsRepository.
 """
 import os
 import socket
 from typing import Dict, Any, Tuple
 from urllib.parse import urlparse
-from extensions import db
+
+from repositories.diagnostics_repository import DiagnosticsRepository
 
 
 class DiagnosticsService:
-    """Service for system health checks and diagnostics"""
+    """Service for system health checks and diagnostics with repository pattern"""
+    
+    def __init__(self, repository: DiagnosticsRepository):
+        """
+        Initialize service with repository dependency injection.
+        
+        Args:
+            repository: DiagnosticsRepository instance for database operations
+        """
+        self.repository = repository
     
     def get_health_status(self) -> Tuple[Dict[str, Any], int]:
         """
@@ -42,15 +55,17 @@ class DiagnosticsService:
     
     def test_database_connection(self) -> str:
         """
-        Test database connectivity
+        Test database connectivity through repository.
         
         Returns:
             Status string: 'connected' or error message
         """
         try:
-            from sqlalchemy import text
-            db.session.execute(text('SELECT 1'))
-            return 'connected'
+            if self.repository.check_database_connection():
+                return 'connected'
+            else:
+                error = self.repository.get_connection_error_details()
+                return f'error: {error}' if error else 'error: Unknown connection error'
         except Exception as e:
             return f'error: {str(e)}'
     
@@ -224,24 +239,16 @@ class DiagnosticsService:
     
     def get_system_metrics(self) -> Dict[str, Any]:
         """
-        Get system metrics and statistics
+        Get system metrics and statistics through repository.
         
         Returns:
             Dictionary of system metrics
         """
-        from crm_database import Contact, Conversation, Activity, Campaign, Todo
-        
         metrics = {}
         
         try:
-            # Database statistics
-            metrics['database'] = {
-                'contacts': Contact.query.count(),
-                'conversations': Conversation.query.count(),
-                'activities': Activity.query.count(),
-                'campaigns': Campaign.query.count(),
-                'todos': Todo.query.count()
-            }
+            # Database statistics through repository (NO direct model access)
+            metrics['database'] = self.repository.get_all_model_counts()
         except Exception as e:
             metrics['database'] = {'error': str(e)}
         

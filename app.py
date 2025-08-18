@@ -574,10 +574,16 @@ def _create_task_service(db_session):
     return TaskService()
 
 def _create_diagnostics_service(db_session):
-    """Create DiagnosticsService with dependencies"""
+    """Create DiagnosticsService with repository pattern"""
     from services.diagnostics_service import DiagnosticsService
-    logger.info("Initializing DiagnosticsService")
-    return DiagnosticsService()
+    from repositories.diagnostics_repository import DiagnosticsRepository
+    
+    # Create repository with database session
+    diagnostics_repository = DiagnosticsRepository(session=db_session)
+    
+    # Create service with repository dependency injection
+    logger.info("Initializing DiagnosticsService with repository pattern")
+    return DiagnosticsService(repository=diagnostics_repository)
 
 def _create_sync_health_service(db_session):
     """Create SyncHealthService with dependencies"""
