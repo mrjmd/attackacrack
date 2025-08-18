@@ -4,10 +4,11 @@ Manages appointments with proper separation of concerns
 """
 
 from typing import Optional, List, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from extensions import db
 from crm_database import Appointment, Contact
 from services.google_calendar_service import GoogleCalendarService
+from repositories.appointment_repository import AppointmentRepository
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -18,16 +19,30 @@ class AppointmentService:
     
     def __init__(self, 
                  calendar_service: Optional[GoogleCalendarService] = None,
+                 repository: Optional[AppointmentRepository] = None,
                  session=None):
         """
         Initialize AppointmentService with dependencies
         
         Args:
             calendar_service: GoogleCalendarService instance for calendar integration
-            session: Database session (defaults to db.session)
+            repository: AppointmentRepository for data access (preferred over session)
+            session: Database session (deprecated, use repository instead)
         """
         self.calendar_service = calendar_service
-        self.session = session or db.session
+        
+        # Use repository if provided, otherwise fall back to session
+        if repository:
+            self.repository = repository
+            # Don't store session when using repository pattern
+        elif session:
+            # Legacy: create repository on the fly from session
+            self.session = session
+            self.repository = AppointmentRepository(session, Appointment)
+        else:
+            # Default: use db.session
+            self.session = db.session
+            self.repository = AppointmentRepository(db.session, Appointment)
     
     def add_appointment(self, **kwargs) -> Appointment:
         """
@@ -45,25 +60,25 @@ class AppointmentService:
         Returns:
             Created Appointment instance
         """
-        # Create the appointment in local database first
-        new_appointment = Appointment(
-            title=kwargs.get('title'),
-            description=kwargs.get('description'),
-            date=kwargs.get('date'),
-            time=kwargs.get('time'),
-            contact_id=kwargs.get('contact_id')
-        )
-        self.session.add(new_appointment)
+        # Create the appointment using repository
+        appointment_data = {
+            'title': kwargs.get('title'),
+            'description': kwargs.get('description'),
+            'date': kwargs.get('date'),
+            'time': kwargs.get('time'),
+            'contact_id': kwargs.get('contact_id')
+        }
+        new_appointment = self.repository.create(**appointment_data)
         # Commit to get ID before calendar sync
-        self.session.commit()
+        self.repository.commit()
         
         # Sync to Google Calendar if service available and not disabled
         sync_to_calendar = kwargs.get('sync_to_calendar', True)
         if self.calendar_service and sync_to_calendar:
             calendar_event_id = self._sync_to_google_calendar(new_appointment, kwargs)
             if calendar_event_id:
-                new_appointment.google_calendar_event_id = calendar_event_id
-                self.session.commit()
+                self.repository.update(new_appointment, google_calendar_event_id=calendar_event_id)
+                self.repository.commit()
         elif not self.calendar_service and sync_to_calendar:
             logger.warning(
                 "Google Calendar sync requested but calendar service not available",
@@ -220,7 +235,7 @@ class AppointmentService:
         Returns:
             List of all Appointment instances
         """
-        return self.session.query(Appointment).all()
+        return self.repository.get_all()
     
     def get_appointment_by_id(self, appointment_id: int) -> Optional[Appointment]:
         """
@@ -232,7 +247,7 @@ class AppointmentService:
         Returns:
             Appointment instance or None
         """
-        return self.session.get(Appointment, appointment_id)
+        return self.repository.get_by_id(appointment_id)
     
     def get_appointments_for_contact(self, contact_id: int) -> List[Appointment]:
         """
@@ -244,7 +259,7 @@ class AppointmentService:
         Returns:
             List of Appointment instances for the contact
         """
-        return self.session.query(Appointment).filter_by(contact_id=contact_id).all()
+        return self.repository.find_by_contact_id(contact_id)
     
     def get_upcoming_appointments(self, days: int = 7) -> List[Appointment]:
         """
@@ -256,14 +271,10 @@ class AppointmentService:
         Returns:
             List of upcoming Appointment instances
         """
-        from datetime import date
         today = date.today()
         end_date = today + timedelta(days=days)
         
-        return self.session.query(Appointment).filter(
-            Appointment.date >= today,
-            Appointment.date <= end_date
-        ).order_by(Appointment.date, Appointment.time).all()
+        return self.repository.find_by_date_range(today, end_date)
     
     def update_appointment(self, appointment: Appointment, **kwargs) -> Appointment:
         """
@@ -280,13 +291,15 @@ class AppointmentService:
         calendar_fields_changed = False
         calendar_fields = {'title', 'description', 'date', 'time'}
         
-        for key, value in kwargs.items():
-            if hasattr(appointment, key):
-                setattr(appointment, key, value)
-                if key in calendar_fields:
-                    calendar_fields_changed = True
+        # Check which fields are changing
+        for key in kwargs:
+            if key in calendar_fields:
+                calendar_fields_changed = True
+                break
         
-        self.session.commit()
+        # Update using repository
+        appointment = self.repository.update(appointment, **kwargs)
+        self.repository.commit()
         
         # Update Google Calendar if needed
         if (self.calendar_service and 
@@ -377,12 +390,12 @@ class AppointmentService:
                         event_id=appointment.google_calendar_event_id
                     )
             
-            # Delete from local database
-            self.session.delete(appointment)
-            self.session.commit()
-            
-            logger.info("Successfully deleted appointment", appointment_id=appointment.id)
-            return True
+            # Delete from local database using repository
+            result = self.repository.delete(appointment)
+            if result:
+                self.repository.commit()
+                logger.info("Successfully deleted appointment", appointment_id=appointment.id)
+            return result
             
         except Exception as e:
             logger.error(
@@ -390,7 +403,7 @@ class AppointmentService:
                 appointment_id=appointment.id,
                 error=str(e)
             )
-            self.session.rollback()
+            self.repository.rollback()
             return False
     
     def reschedule_appointment(self, 
@@ -425,14 +438,14 @@ class AppointmentService:
             Updated Appointment instance
         """
         # Add a status field to track cancellation
-        appointment.is_cancelled = True
-        self.session.commit()
+        appointment = self.repository.update(appointment, is_cancelled=True)
+        self.repository.commit()
         
         # Remove from Google Calendar if synced
         if self.calendar_service and appointment.google_calendar_event_id:
             self.calendar_service.delete_event(appointment.google_calendar_event_id)
-            appointment.google_calendar_event_id = None
-            self.session.commit()
+            appointment = self.repository.update(appointment, google_calendar_event_id=None)
+            self.repository.commit()
         
         logger.info("Appointment cancelled", appointment_id=appointment.id)
         return appointment

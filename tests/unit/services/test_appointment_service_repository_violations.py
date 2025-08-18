@@ -289,48 +289,41 @@ class TestAppointmentServiceLegacyPatternDetection:
     These tests specifically check for anti-patterns
     """
     
-    def test_specific_method_violations(self):
+    def test_specific_method_violations_are_fixed(self):
         """
-        TEST SPECIFIC: Test the exact method violations mentioned
-        MUST FAIL: Lines 238, 262, 278 have direct session.query() calls
+        TEST SPECIFIC: Verify the exact method violations have been FIXED
+        SHOULD PASS: Lines 238, 262, 278 no longer have direct session.query() calls
         """
         service = AppointmentService()
         
-        # Create a mock session to track calls
-        with patch.object(service, 'session') as mock_session:
-            mock_query = Mock()
-            mock_session.query.return_value = mock_query
-            mock_query.all.return_value = []
-            mock_query.filter_by.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.order_by.return_value = mock_query
+        # Verify service now uses repository pattern
+        assert hasattr(service, 'repository'), "Service should have repository after fix"
+        
+        # Create a mock session to verify it's NOT called
+        with patch.object(service, 'repository') as mock_repository:
+            mock_repository.get_all.return_value = []
+            mock_repository.find_by_contact_id.return_value = []
+            mock_repository.find_by_date_range.return_value = []
             
-            # Test get_all_appointments (line ~238)
+            # Test get_all_appointments - should use repository.get_all()
             service.get_all_appointments()
-            
-            # VIOLATION: Should NOT call session.query directly
-            mock_session.query.assert_called_with(Appointment)
+            mock_repository.get_all.assert_called_once()
             
             # Reset mock for next test
-            mock_session.reset_mock()
+            mock_repository.reset_mock()
             
-            # Test get_appointments_for_contact (line ~262)
+            # Test get_appointments_for_contact - should use repository.find_by_contact_id()
             service.get_appointments_for_contact(1)
-            
-            # VIOLATION: Should NOT call session.query directly
-            mock_session.query.assert_called_with(Appointment)
+            mock_repository.find_by_contact_id.assert_called_once_with(1)
             
             # Reset mock for next test
-            mock_session.reset_mock()
+            mock_repository.reset_mock()
             
-            # Test get_upcoming_appointments (line ~278)
+            # Test get_upcoming_appointments - should use repository.find_by_date_range()
             service.get_upcoming_appointments(7)
+            mock_repository.find_by_date_range.assert_called_once()
             
-            # VIOLATION: Should NOT call session.query directly
-            mock_session.query.assert_called_with(Appointment)
-            
-            # All these calls prove the service violates repository pattern
-            # When fixed, service should use repository instead
+            # SUCCESS: All methods now use repository pattern instead of direct queries
     
     def test_repository_pattern_enforcement_fails(self):
         """

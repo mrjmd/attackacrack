@@ -8,6 +8,7 @@ from unittest.mock import Mock, MagicMock, patch
 from datetime import date, time, datetime, timedelta
 from services.appointment_service_refactored import AppointmentService
 from services.google_calendar_service import GoogleCalendarService
+from repositories.appointment_repository import AppointmentRepository
 from crm_database import Appointment, Contact, Property
 
 
@@ -34,6 +35,24 @@ class TestAppointmentServiceRefactored:
         session.query = MagicMock()
         session.get = MagicMock()
         return session
+    
+    @pytest.fixture
+    def mock_repository(self, mock_session):
+        """Mock AppointmentRepository"""
+        repository = Mock(spec=AppointmentRepository)
+        repository.session = mock_session
+        repository.model_class = Appointment
+        repository.create = Mock()
+        repository.get_by_id = Mock()
+        repository.get_all = Mock()
+        repository.find_by_contact_id = Mock()
+        repository.find_by_date_range = Mock()
+        repository.find_upcoming_appointments = Mock()
+        repository.update = Mock()
+        repository.delete = Mock()
+        repository.commit = Mock()
+        repository.rollback = Mock()
+        return repository
     
     @pytest.fixture
     def mock_contact(self):
@@ -71,6 +90,14 @@ class TestAppointmentServiceRefactored:
         return AppointmentService(
             calendar_service=mock_calendar_service,
             session=mock_session
+        )
+    
+    @pytest.fixture
+    def service_with_repository(self, mock_calendar_service, mock_repository):
+        """Create AppointmentService with repository pattern"""
+        return AppointmentService(
+            calendar_service=mock_calendar_service,
+            repository=mock_repository
         )
     
     def test_init_without_dependencies(self):
@@ -378,3 +405,198 @@ class TestAppointmentServiceRefactored:
         service.calendar_service.delete_event.assert_called_once_with('google_123')
         assert mock_appointment.google_calendar_event_id is None
         assert mock_session.commit.call_count >= 1
+
+
+class TestAppointmentServiceWithRepository:
+    """Test suite for AppointmentService using Repository pattern"""
+    
+    @pytest.fixture
+    def mock_calendar_service(self):
+        """Mock GoogleCalendarService"""
+        mock = Mock(spec=GoogleCalendarService)
+        mock.create_event = Mock(return_value={'id': 'google_event_123'})
+        mock.update_event = Mock(return_value={'id': 'google_event_123'})
+        mock.delete_event = Mock(return_value=True)
+        return mock
+    
+    @pytest.fixture
+    def mock_repository(self):
+        """Mock AppointmentRepository"""
+        repository = Mock(spec=AppointmentRepository)
+        repository.create = Mock()
+        repository.get_by_id = Mock()
+        repository.get_all = Mock()
+        repository.find_by_contact_id = Mock()
+        repository.find_by_date_range = Mock()
+        repository.update = Mock()
+        repository.delete = Mock()
+        repository.commit = Mock()
+        repository.rollback = Mock()
+        return repository
+    
+    @pytest.fixture
+    def mock_contact(self):
+        """Mock contact with property"""
+        contact = Mock(spec=Contact)
+        contact.id = 1
+        contact.first_name = "John"
+        contact.last_name = "Doe"
+        contact.email = "john@example.com"
+        contact.phone = "+15551234567"
+        
+        property_obj = Mock(spec=Property)
+        property_obj.address = "123 Main St"
+        contact.properties = [property_obj]
+        
+        return contact
+    
+    @pytest.fixture
+    def mock_appointment(self, mock_contact):
+        """Mock appointment"""
+        appointment = Mock(spec=Appointment)
+        appointment.id = 1
+        appointment.title = "Test Appointment"
+        appointment.description = "Test Description"
+        appointment.date = date(2025, 8, 20)
+        appointment.time = time(10, 0)
+        appointment.contact_id = 1
+        appointment.contact = mock_contact
+        appointment.google_calendar_event_id = None
+        return appointment
+    
+    @pytest.fixture
+    def service(self, mock_calendar_service, mock_repository):
+        """Create AppointmentService with repository"""
+        return AppointmentService(
+            calendar_service=mock_calendar_service,
+            repository=mock_repository
+        )
+    
+    def test_init_with_repository(self, mock_calendar_service, mock_repository):
+        """Test initialization with repository pattern"""
+        service = AppointmentService(
+            calendar_service=mock_calendar_service,
+            repository=mock_repository
+        )
+        assert service.calendar_service == mock_calendar_service
+        assert service.repository == mock_repository
+        assert hasattr(service, 'session') is False  # Should not have session when using repository
+    
+    def test_get_all_appointments_with_repository(self, service, mock_repository):
+        """Test getting all appointments using repository"""
+        mock_appointments = [Mock(), Mock()]
+        mock_repository.get_all.return_value = mock_appointments
+        
+        result = service.get_all_appointments()
+        
+        assert result == mock_appointments
+        mock_repository.get_all.assert_called_once()
+    
+    def test_get_appointment_by_id_with_repository(self, service, mock_repository, mock_appointment):
+        """Test getting appointment by ID using repository"""
+        mock_repository.get_by_id.return_value = mock_appointment
+        
+        result = service.get_appointment_by_id(1)
+        
+        assert result == mock_appointment
+        mock_repository.get_by_id.assert_called_once_with(1)
+    
+    def test_get_appointments_for_contact_with_repository(self, service, mock_repository):
+        """Test getting appointments for contact using repository"""
+        mock_appointments = [Mock(), Mock()]
+        mock_repository.find_by_contact_id.return_value = mock_appointments
+        
+        result = service.get_appointments_for_contact(1)
+        
+        assert result == mock_appointments
+        mock_repository.find_by_contact_id.assert_called_once_with(1)
+    
+    def test_get_upcoming_appointments_with_repository(self, service, mock_repository):
+        """Test getting upcoming appointments using repository"""
+        mock_appointments = [Mock(), Mock()]
+        today = date.today()
+        end_date = today + timedelta(days=7)
+        mock_repository.find_by_date_range.return_value = mock_appointments
+        
+        result = service.get_upcoming_appointments(days=7)
+        
+        assert result == mock_appointments
+        mock_repository.find_by_date_range.assert_called_once_with(today, end_date)
+    
+    def test_add_appointment_with_repository(self, service, mock_repository, mock_contact):
+        """Test adding appointment using repository"""
+        mock_appointment = Mock(spec=Appointment)
+        mock_appointment.id = 1
+        mock_appointment.contact = mock_contact
+        mock_appointment.date = date(2025, 8, 20)
+        mock_appointment.time = time(10, 0)
+        mock_appointment.title = "Test Meeting"
+        mock_appointment.description = "Test Description"
+        mock_appointment.google_calendar_event_id = None
+        
+        mock_repository.create.return_value = mock_appointment
+        
+        result = service.add_appointment(
+            title="Test Meeting",
+            description="Test Description",
+            date=date(2025, 8, 20),
+            time=time(10, 0),
+            contact_id=1
+        )
+        
+        assert result == mock_appointment
+        mock_repository.create.assert_called_once()
+        mock_repository.commit.assert_called()
+        # Should also sync to calendar
+        service.calendar_service.create_event.assert_called_once()
+    
+    def test_update_appointment_with_repository(self, service, mock_repository, mock_appointment):
+        """Test updating appointment using repository"""
+        mock_appointment.google_calendar_event_id = 'google_123'
+        mock_repository.update.return_value = mock_appointment
+        
+        result = service.update_appointment(
+            mock_appointment,
+            title="Updated Title",
+            description="Updated Description"
+        )
+        
+        assert result == mock_appointment
+        mock_repository.update.assert_called_once_with(
+            mock_appointment,
+            title="Updated Title",
+            description="Updated Description"
+        )
+        mock_repository.commit.assert_called_once()
+        # Calendar should be updated since fields changed
+        service.calendar_service.update_event.assert_called_once()
+    
+    def test_delete_appointment_with_repository(self, service, mock_repository, mock_appointment):
+        """Test deleting appointment using repository"""
+        mock_appointment.google_calendar_event_id = 'google_123'
+        mock_repository.delete.return_value = True
+        
+        result = service.delete_appointment(mock_appointment)
+        
+        assert result is True
+        service.calendar_service.delete_event.assert_called_once_with('google_123')
+        mock_repository.delete.assert_called_once_with(mock_appointment)
+        mock_repository.commit.assert_called_once()
+    
+    def test_repository_priority_over_session(self, mock_calendar_service, mock_repository):
+        """Test that repository is used when both repository and session are provided"""
+        mock_session = MagicMock()
+        service = AppointmentService(
+            calendar_service=mock_calendar_service,
+            repository=mock_repository,
+            session=mock_session  # Both provided
+        )
+        
+        # Should use repository, not session
+        assert service.repository == mock_repository
+        assert not hasattr(service, 'session')  # Session should not be stored when repository is provided
+        
+        # Verify repository is used for operations
+        service.get_all_appointments()
+        mock_repository.get_all.assert_called_once()
+        mock_session.query.assert_not_called()
