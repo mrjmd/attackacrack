@@ -8,15 +8,15 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from flask import current_app
 
-from services.sms_metrics_service import SMSMetricsService
-
 
 class DashboardService:
     """Service for dashboard data and statistics using Repository Pattern"""
     
     def __init__(self, contact_repository=None, campaign_repository=None, 
-                 activity_repository=None, conversation_repository=None):
-        self.metrics_service = SMSMetricsService()
+                 activity_repository=None, conversation_repository=None,
+                 sms_metrics_service=None):
+        # Service dependencies (injected or retrieved from service registry)
+        self.sms_metrics_service = sms_metrics_service
         
         # Repository dependencies (injected or retrieved from service registry)
         self.contact_repository = contact_repository
@@ -48,6 +48,12 @@ class DashboardService:
             self.conversation_repository = current_app.services.get('conversation_repository')
         return self.conversation_repository
     
+    def _get_sms_metrics_service(self):
+        """Get SMS metrics service (lazy load from service registry if not injected)"""
+        if self.sms_metrics_service is None:
+            self.sms_metrics_service = current_app.services.get('sms_metrics')
+        return self.sms_metrics_service
+    
     def get_dashboard_stats(self) -> Dict[str, Any]:
         """
         Get all dashboard statistics using repositories
@@ -77,7 +83,8 @@ class DashboardService:
         stats['overall_response_rate'] = activity_repo.calculate_overall_response_rate()
         
         # SMS bounce metrics (30 day)
-        sms_metrics = self.metrics_service.get_global_metrics(days=30)
+        metrics_service = self._get_sms_metrics_service()
+        sms_metrics = metrics_service.get_global_metrics(days=30)
         stats['bounce_rate'] = sms_metrics.get('bounce_rate', 0)
         stats['delivery_rate'] = sms_metrics.get('delivery_rate', 0)
         stats['total_messages_30d'] = sms_metrics.get('total_sent', 0)

@@ -245,16 +245,22 @@ class AuthService:
         user = user_result.data
         
         # Update allowed fields
-        allowed_fields = ['name', 'email', 'role', 'is_active']
+        allowed_fields = ['first_name', 'last_name', 'email', 'role', 'is_active']
+        update_data = {}
         for field, value in kwargs.items():
             if field in allowed_fields:
-                setattr(user, field, value)
+                update_data[field] = value
+        
+        if not update_data:
+            return Result.failure("No valid fields to update", code="NO_UPDATES")
         
         try:
-            self.session.commit()
-            return Result.success(user)
+            # Use repository to update user
+            updated_user = self.user_repository.update(user_id, **update_data)
+            self.user_repository.commit()
+            return Result.success(updated_user)
         except Exception as e:
-            self.session.rollback()
+            self.user_repository.rollback()
             return Result.failure(f"Failed to update user: {str(e)}", code="UPDATE_FAILED")
     
     def change_password(self, user_id: int, old_password: str, new_password: str) -> Result[bool]:
@@ -284,14 +290,15 @@ class AuthService:
         if password_result.is_failure:
             return Result.failure(password_result.error, code=password_result.error_code)
         
-        # Update password
-        user.password_hash = generate_password_hash(new_password)
+        # Update password using repository
+        new_password_hash = generate_password_hash(new_password)
         
         try:
-            self.session.commit()
+            self.user_repository.update(user_id, password_hash=new_password_hash)
+            self.user_repository.commit()
             return Result.success(True)
         except Exception as e:
-            self.session.rollback()
+            self.user_repository.rollback()
             return Result.failure(f"Failed to change password: {str(e)}", code="UPDATE_FAILED")
     
     def create_invite(self, email: str, role: str = 'marketer', 
@@ -443,14 +450,16 @@ class AuthService:
             return user_result
         
         user = user_result.data
-        user.is_active = not user.is_active
+        new_status = not user.is_active
         
         try:
-            self.session.commit()
-            logger.info(f"Toggled user status for {user.email}: is_active={user.is_active}")
-            return Result.success(user, metadata={"is_active": user.is_active})
+            # Use repository to update status
+            updated_user = self.user_repository.update(user_id, is_active=new_status)
+            self.user_repository.commit()
+            logger.info(f"Toggled user status for {user.email}: is_active={new_status}")
+            return Result.success(updated_user, metadata={"is_active": new_status})
         except Exception as e:
-            self.session.rollback()
+            self.user_repository.rollback()
             return Result.failure(f"Failed to toggle user status: {str(e)}", code="UPDATE_FAILED")
     
     def delete_user(self, user_id: int) -> Result[bool]:
@@ -470,11 +479,40 @@ class AuthService:
         user = user_result.data
         
         try:
-            self.session.delete(user)
-            self.session.commit()
+            # Use repository to delete user
+            self.user_repository.delete(user_id)
+            self.user_repository.commit()
             logger.info(f"Deleted user: {user.email}")
             return Result.success(True)
         except Exception as e:
-            self.session.rollback()
+            self.user_repository.rollback()
             logger.error(f"Failed to delete user: {str(e)}")
             return Result.failure(f"Failed to delete user: {str(e)}", code="DELETE_FAILED")
+    
+    def get_pending_invites(self, page: int = 1, per_page: int = 50) -> PagedResult[List[Dict[str, Any]]]:
+        """
+        Get all pending invites with pagination.
+        
+        Args:
+            page: Page number
+            per_page: Items per page
+            
+        Returns:
+            PagedResult[List[Dict[str, Any]]]: Paginated pending invites
+        """
+        try:
+            # Get invites that are not used and not expired
+            current_time = datetime.utcnow()
+            pagination_params = PaginationParams(page=page, per_page=per_page)
+            
+            # Use repository to get pending invites
+            paginated = self.invite_repository.get_pending_invites(pagination_params, current_time)
+            
+            return PagedResult.paginated(
+                data=paginated.items,
+                total=paginated.total,
+                page=page,
+                per_page=per_page
+            )
+        except Exception as e:
+            return PagedResult.failure(f"Failed to get pending invites: {str(e)}", code="DATABASE_ERROR")

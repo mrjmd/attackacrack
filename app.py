@@ -112,7 +112,7 @@ def create_app(config_name=None, test_config=None):
     )
     registry.register_singleton('message', lambda: _create_message_service())
     registry.register_singleton('todo', lambda: _create_todo_service())
-    registry.register_singleton('auth', lambda: _create_auth_service())
+    registry.register_singleton('auth', lambda: _create_auth_service(db.session))
     registry.register_factory(
         'product', 
         lambda db_session: _create_product_service(db_session),
@@ -429,11 +429,26 @@ def _create_todo_service():
     logger.info("Initializing TodoService")
     return TodoService()
 
-def _create_auth_service():
-    """Create AuthService instance"""
+def _create_auth_service(db_session):
+    """Create AuthService instance with required repositories"""
     from services.auth_service_refactored import AuthService
-    logger.info("Initializing AuthService")
-    return AuthService()
+    from repositories.user_repository import UserRepository
+    from repositories.invite_token_repository import InviteTokenRepository
+    from crm_database import User, InviteToken
+    
+    logger.info("Initializing AuthService with repositories")
+    
+    # Create repositories with model classes
+    user_repository = UserRepository(db_session, User)
+    invite_repository = InviteTokenRepository(db_session, InviteToken)
+    
+    # Create auth service with injected repositories
+    # Note: email_service will be None for now, can be added later if needed
+    return AuthService(
+        email_service=None,
+        user_repository=user_repository,
+        invite_repository=invite_repository
+    )
 
 def _create_product_service(db_session):
     """Create ProductService with ProductRepository"""
@@ -609,13 +624,13 @@ def _create_dashboard_service(db_session):
 def _create_dashboard_service_with_repositories(contact_repository, campaign_repository, activity_repository, conversation_repository, sms_metrics_service):
     """Create DashboardService with repository and service dependencies"""
     from services.dashboard_service import DashboardService
-    logger.info("Initializing DashboardService with repository pattern and SMS metrics")
+    logger.info("Initializing DashboardService with repository pattern")
     return DashboardService(
-        sms_metrics_service=sms_metrics_service,
         contact_repository=contact_repository,
         campaign_repository=campaign_repository,
         activity_repository=activity_repository,
-        conversation_repository=conversation_repository
+        conversation_repository=conversation_repository,
+        sms_metrics_service=sms_metrics_service
     )
 
 # Repository creation functions
@@ -804,8 +819,12 @@ def _create_quickbooks_sync_service(quickbooks, db_session):
 def _create_appointment_service(google_calendar, db_session):
     """Create AppointmentService with dependencies"""
     from services.appointment_service_refactored import AppointmentService
-    logger.info("Initializing AppointmentService")
-    return AppointmentService(calendar_service=google_calendar, session=db_session)
+    from repositories.appointment_repository import AppointmentRepository
+    logger.info("Initializing AppointmentService with repository")
+    return AppointmentService(
+        calendar_service=google_calendar, 
+        repository=AppointmentRepository(db_session)
+    )
 
 
 def _create_scheduler_service(openphone, invoice, db_session):

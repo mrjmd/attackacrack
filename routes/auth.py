@@ -2,7 +2,6 @@
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user, logout_user
-from services.auth_service_refactored import AuthService
 from functools import wraps
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -31,16 +30,26 @@ def login():
         password = request.form.get('password', '')
         remember = request.form.get('remember', False)
         
-        user, message = AuthService.authenticate_user(email, password)
+        # Get auth service from registry
+        auth_service = current_app.services.get('auth')
         
-        if user:
-            AuthService.login_user_session(user, remember=remember)
-            next_page = request.args.get('next')
-            if next_page:
-                return redirect(next_page)
-            return redirect(url_for('main.dashboard'))
+        # Authenticate user and handle Result
+        auth_result = auth_service.authenticate_user(email, password)
+        
+        if auth_result.success:
+            user = auth_result.data
+            # Login user with Flask-Login
+            login_result = auth_service.login_user(user, remember=remember)
+            
+            if login_result.success:
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+                return redirect(url_for('main.dashboard'))
+            else:
+                flash(login_result.error or 'Failed to log in', 'error')
         else:
-            flash(message, 'error')
+            flash(auth_result.error or 'Invalid credentials', 'error')
     
     return render_template('auth/login.html')
 
@@ -49,7 +58,9 @@ def login():
 @login_required
 def logout():
     """Logout current user"""
-    AuthService.logout_user_session()
+    # Get auth service from registry
+    auth_service = current_app.services.get('auth')
+    auth_service.logout_user()
     flash('You have been logged out', 'success')
     return redirect(url_for('auth.login'))
 
@@ -66,21 +77,25 @@ def invite_user():
             flash('Invalid role selected', 'error')
             return render_template('auth/invite.html')
         
-        # Create invite
-        invite, message = AuthService.create_invite(email, role, current_user)
+        # Get auth service from registry
+        auth_service = current_app.services.get('auth')
         
-        if invite:
+        # Create invite
+        invite_result = auth_service.create_invite(email, role, invited_by_id=current_user.id)
+        
+        if invite_result.success:
+            invite = invite_result.data
             # Send invite email
             base_url = request.url_root.rstrip('/')
-            success, email_message = AuthService.send_invite_email(invite, base_url)
+            email_result = auth_service.send_invite_email(invite, base_url)
             
-            if success:
+            if email_result.success:
                 flash(f'Invitation sent to {email}', 'success')
             else:
-                flash(f'Invitation created but email failed: {email_message}', 'warning')
+                flash(f'Invitation created but email failed: {email_result.error}', 'warning')
                 flash(f'Share this link: {base_url}/auth/accept-invite/{invite.token}', 'info')
         else:
-            flash(message, 'error')
+            flash(invite_result.error or 'Failed to create invite', 'error')
     
     return render_template('auth/invite.html')
 
@@ -91,12 +106,17 @@ def accept_invite(token):
     if current_user.is_authenticated:
         logout_user()
     
-    # Validate token
-    invite, message = AuthService.validate_invite_token(token)
+    # Get auth service from registry
+    auth_service = current_app.services.get('auth')
     
-    if not invite:
-        flash(message, 'error')
+    # Validate token
+    invite_result = auth_service.validate_invite(token)
+    
+    if not invite_result.success:
+        flash(invite_result.error or 'Invalid or expired invite', 'error')
         return redirect(url_for('auth.login'))
+    
+    invite = invite_result.data
     
     if request.method == 'POST':
         password = request.form.get('password', '')
@@ -111,13 +131,13 @@ def accept_invite(token):
             flash('Passwords do not match', 'error')
         else:
             # Create user
-            user, message = AuthService.use_invite_token(token, password, first_name, last_name)
+            user_result = auth_service.use_invite(token, password, first_name, last_name)
             
-            if user:
+            if user_result.success:
                 flash('Account created successfully! Please log in.', 'success')
                 return redirect(url_for('auth.login'))
             else:
-                flash(message, 'error')
+                flash(user_result.error or 'Failed to create account', 'error')
     
     return render_template('auth/accept_invite.html', invite=invite)
 
@@ -129,12 +149,23 @@ def profile():
     if request.method == 'POST':
         action = request.form.get('action')
         
+        # Get auth service from registry
+        auth_service = current_app.services.get('auth')
+        
         if action == 'update_profile':
             # Update profile information
             first_name = request.form.get('first_name', current_user.first_name)
             last_name = request.form.get('last_name', current_user.last_name)
-            success, message = AuthService.update_user_profile(current_user, first_name, last_name)
-            flash(message, 'success' if success else 'error')
+            
+            # Use the generic update_user method
+            update_result = auth_service.update_user(current_user.id, 
+                                                   first_name=first_name, 
+                                                   last_name=last_name)
+            
+            if update_result.success:
+                flash('Profile updated successfully', 'success')
+            else:
+                flash(update_result.error or 'Failed to update profile', 'error')
             
         elif action == 'change_password':
             # Change password
@@ -145,8 +176,12 @@ def profile():
             if new_password != confirm_password:
                 flash('New passwords do not match', 'error')
             else:
-                success, message = AuthService.change_password(current_user, current_password, new_password)
-                flash(message, 'success' if success else 'error')
+                password_result = auth_service.change_password(current_user.id, current_password, new_password)
+                
+                if password_result.success:
+                    flash('Password changed successfully', 'success')
+                else:
+                    flash(password_result.error or 'Failed to change password', 'error')
     
     return render_template('auth/profile.html', user=current_user)
 
@@ -156,9 +191,32 @@ def profile():
 def manage_users():
     """User management page (admin only)"""
     auth_service = current_app.services.get('auth')
-    users = auth_service.get_all_users()
-    invites = auth_service.get_pending_invites()
-    return render_template('auth/manage_users.html', users=users, invites=invites)
+    
+    # Get page from query params
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    # Get users with pagination
+    users_result = auth_service.get_all_users(page=page, per_page=per_page)
+    
+    if users_result.success:
+        users = users_result.data
+    else:
+        users = []
+        flash('Failed to load users', 'error')
+    
+    # Get pending invites
+    invites_result = auth_service.get_pending_invites()
+    
+    if invites_result.success:
+        invites = invites_result.data
+    else:
+        invites = []
+    
+    return render_template('auth/manage_users.html', 
+                         users=users, 
+                         invites=invites,
+                         pagination=users_result.pagination if users_result.success else None)
 
 
 @auth_bp.route('/users/<int:user_id>/toggle-status', methods=['POST'])
@@ -168,7 +226,14 @@ def toggle_user_status(user_id):
     if user_id == current_user.id:
         flash('You cannot deactivate your own account', 'error')
     else:
-        success, message = AuthService.toggle_user_status(user_id)
-        flash(message, 'success' if success else 'error')
+        # Get auth service from registry
+        auth_service = current_app.services.get('auth')
+        
+        toggle_result = auth_service.toggle_user_status(user_id)
+        
+        if toggle_result.success:
+            flash('User status updated successfully', 'success')
+        else:
+            flash(toggle_result.error or 'Failed to update user status', 'error')
     
     return redirect(url_for('auth.manage_users'))

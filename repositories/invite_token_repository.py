@@ -203,6 +203,52 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             self.session.rollback()
             return None
     
+    def get_pending_invites(self, pagination_params: PaginationParams, 
+                           current_time: Optional[datetime] = None) -> PaginatedResult[InviteToken]:
+        """
+        Get paginated list of pending (unused and unexpired) invite tokens.
+        
+        Args:
+            pagination_params: Pagination parameters
+            current_time: Current time for expiry check (defaults to utcnow)
+            
+        Returns:
+            Paginated result of pending invites
+        """
+        try:
+            now = current_time or datetime.utcnow()
+            
+            # Build query for pending invites
+            query = (self.session.query(InviteToken)
+                    .filter(
+                        and_(
+                            InviteToken.used == False,
+                            InviteToken.expires_at > now
+                        )
+                    )
+                    .order_by(desc(InviteToken.created_at)))
+            
+            # Get total count
+            total = query.count()
+            
+            # Get paginated items
+            items = query.offset(pagination_params.offset).limit(pagination_params.limit).all()
+            
+            return PaginatedResult(
+                items=items,
+                total=total,
+                page=pagination_params.page,
+                per_page=pagination_params.per_page
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting pending invites: {e}")
+            return PaginatedResult(
+                items=[],
+                total=0,
+                page=pagination_params.page,
+                per_page=pagination_params.per_page
+            )
+    
     def cleanup_expired_invites(self) -> int:
         """
         Delete all expired invite tokens.

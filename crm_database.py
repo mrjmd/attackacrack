@@ -7,7 +7,7 @@ from datetime import datetime, time, date
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)  # Increased size for modern hash algorithms
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='marketer')  # 'admin' or 'marketer'
