@@ -2,15 +2,25 @@
 ConversationService - Handles conversation listing, filtering, and management
 """
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timedelta
-from sqlalchemy import or_, func, and_, exists, select
-from sqlalchemy.orm import joinedload, selectinload
-from extensions import db
-from crm_database import Conversation, Contact, Activity, ContactFlag, Campaign
+from datetime import datetime
+from crm_database import Conversation, Activity
+from repositories.conversation_repository import ConversationRepository
+from repositories.campaign_repository import CampaignRepository
 
 
 class ConversationService:
     """Service for managing conversations and message threads"""
+    
+    def __init__(self, conversation_repository: ConversationRepository, campaign_repository: CampaignRepository):
+        """
+        Initialize ConversationService with repository dependencies.
+        
+        Args:
+            conversation_repository: Repository for conversation data access
+            campaign_repository: Repository for campaign data access
+        """
+        self.conversation_repository = conversation_repository
+        self.campaign_repository = campaign_repository
     
     def get_conversations_page(
         self,
@@ -33,32 +43,17 @@ class ConversationService:
         Returns:
             Dictionary containing conversations and pagination info
         """
-        # Start with base query - only conversations with activities
-        query = db.session.query(Conversation).options(
-            joinedload(Conversation.contact),
-            selectinload(Conversation.activities)
-        ).join(Contact).filter(
-            exists().where(Activity.conversation_id == Conversation.id)
+        # Use repository to get filtered conversations
+        repo_result = self.conversation_repository.find_conversations_with_filters(
+            search_query=search_query,
+            filter_type=filter_type,
+            date_filter=date_filter,
+            page=page,
+            per_page=per_page
         )
         
-        # Apply search filters
-        if search_query:
-            query = self._apply_search_filter(query, search_query)
-        
-        # Apply type filters
-        query = self._apply_type_filter(query, filter_type)
-        
-        # Apply date filters
-        query = self._apply_date_filter(query, date_filter)
-        
-        # Order by most recent activity
-        query = query.order_by(Conversation.last_activity_at.desc())
-        
-        # Get total count before pagination
-        total_count = query.count()
-        
-        # Paginate results
-        conversations = query.offset((page - 1) * per_page).limit(per_page).all()
+        conversations = repo_result['conversations']
+        total_count = repo_result['total_count']
         
         # Enhance conversations with metadata
         enhanced_conversations = self._enhance_conversations(conversations)
@@ -76,69 +71,7 @@ class ConversationService:
             'has_next': page < total_pages
         }
     
-    def _apply_search_filter(self, query, search_query: str):
-        """Apply search filter to query"""
-        return query.filter(
-            or_(
-                Contact.first_name.ilike(f'%{search_query}%'),
-                Contact.last_name.ilike(f'%{search_query}%'),
-                Contact.phone.ilike(f'%{search_query}%'),
-                Contact.email.ilike(f'%{search_query}%'),
-                # Search in message content
-                exists().where(
-                    and_(
-                        Activity.conversation_id == Conversation.id,
-                        Activity.body.ilike(f'%{search_query}%')
-                    )
-                )
-            )
-        )
-    
-    def _apply_type_filter(self, query, filter_type: str):
-        """Apply type filter to query"""
-        if filter_type == 'unread':
-            # Fixed unread filter - conversations with incoming messages that have no later outgoing
-            # This avoids the aggregate function error
-            subquery = select(Activity.conversation_id).where(
-                Activity.direction == 'incoming'
-            ).group_by(Activity.conversation_id).subquery()
-            
-            query = query.filter(Conversation.id.in_(subquery))
-            
-        elif filter_type == 'has_attachments':
-            # Filter for conversations with actual media URLs (not empty JSON arrays)
-            query = query.filter(
-                exists().where(
-                    and_(
-                        Activity.conversation_id == Conversation.id,
-                        Activity.media_urls.isnot(None),
-                        func.jsonb_array_length(Activity.media_urls) > 0
-                    )
-                )
-            )
-            
-        elif filter_type == 'office_numbers':
-            # Conversations with contacts flagged as office numbers
-            office_contact_ids = db.session.query(ContactFlag.contact_id).filter(
-                ContactFlag.flag_type == 'office_number'
-            ).subquery()
-            query = query.filter(Contact.id.in_(office_contact_ids))
-        
-        return query
-    
-    def _apply_date_filter(self, query, date_filter: str):
-        """Apply date filter to query"""
-        if date_filter == 'today':
-            today = datetime.now().date()
-            query = query.filter(func.date(Conversation.last_activity_at) == today)
-        elif date_filter == 'week':
-            week_ago = datetime.now() - timedelta(days=7)
-            query = query.filter(Conversation.last_activity_at >= week_ago)
-        elif date_filter == 'month':
-            month_ago = datetime.now() - timedelta(days=30)
-            query = query.filter(Conversation.last_activity_at >= month_ago)
-        
-        return query
+    # Removed _apply_search_filter, _apply_type_filter, _apply_date_filter - moved to repository
     
     def _enhance_conversations(self, conversations: List[Conversation]) -> List[Dict[str, Any]]:
         """
@@ -153,14 +86,8 @@ class ConversationService:
         # Get all contact IDs for batch flag lookup
         contact_ids = [conv.contact_id for conv in conversations]
         
-        # Batch query for office flags
-        office_flags = set()
-        if contact_ids:
-            office_flag_results = db.session.query(ContactFlag.contact_id).filter(
-                ContactFlag.contact_id.in_(contact_ids),
-                ContactFlag.flag_type == 'office_number'
-            ).all()
-            office_flags = {flag.contact_id for flag in office_flag_results}
+        # Use repository for batch office flag lookup
+        office_flags = self.conversation_repository.get_office_flags_batch(contact_ids)
         
         # Enhance each conversation
         enhanced = []
@@ -221,33 +148,27 @@ class ConversationService:
         
         return enhanced
     
-    def get_available_campaigns(self) -> List[Campaign]:
+    def get_available_campaigns(self):
         """Get campaigns available for bulk actions"""
-        return Campaign.query.filter(
-            Campaign.status.in_(['draft', 'running'])
-        ).all()
+        return self.campaign_repository.find_by_statuses(['draft', 'running'])
     
     def mark_conversations_read(self, conversation_ids: List[int]) -> Tuple[bool, str]:
         """Mark conversations as read by updating last activity"""
         if not conversation_ids:
             return False, "No conversations selected"
         
-        try:
-            for conv_id in conversation_ids:
-                conv = Conversation.query.get(conv_id)
-                if conv:
-                    conv.last_activity_at = datetime.utcnow()
-            db.session.commit()
+        success = self.conversation_repository.bulk_update_last_activity(
+            conversation_ids, datetime.utcnow()
+        )
+        
+        if success:
             return True, f'Marked {len(conversation_ids)} conversations as read'
-        except Exception as e:
-            db.session.rollback()
-            return False, f'Error marking conversations: {str(e)}'
+        else:
+            return False, 'Error marking conversations'
     
     def get_contact_ids_from_conversations(self, conversation_ids: List[int]) -> List[int]:
         """Get unique contact IDs from conversation IDs"""
-        conversations = Conversation.query.filter(
-            Conversation.id.in_(conversation_ids)
-        ).all()
+        conversations = self.conversation_repository.find_conversations_by_ids_with_contact_info(conversation_ids)
         return list(set(conv.contact_id for conv in conversations if conv.contact_id))
     
     def export_conversations_with_contacts(self, conversation_ids: List[int]) -> str:
@@ -255,9 +176,9 @@ class ConversationService:
         import csv
         import io
         
-        conversations = Conversation.query.filter(
-            Conversation.id.in_(conversation_ids)
-        ).options(joinedload(Conversation.contact)).all()
+        # Use repository methods for data access
+        conversations = self.conversation_repository.find_conversations_by_ids_with_contact_info(conversation_ids)
+        activity_counts = self.conversation_repository.get_activity_counts_for_conversations(conversation_ids)
         
         output = io.StringIO()
         writer = csv.writer(output)
@@ -267,7 +188,7 @@ class ConversationService:
         
         # Write data
         for conv in conversations:
-            message_count = Activity.query.filter_by(conversation_id=conv.id).count()
+            message_count = activity_counts.get(conv.id, 0)
             writer.writerow([
                 f"{conv.contact.first_name} {conv.contact.last_name}" if conv.contact else "",
                 conv.contact.phone if conv.contact else "",
@@ -304,5 +225,4 @@ class ConversationService:
                 return False, f"Unknown action: {action}"
                 
         except Exception as e:
-            db.session.rollback()
             return False, f"Error performing bulk action: {str(e)}"

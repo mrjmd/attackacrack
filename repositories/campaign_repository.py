@@ -549,3 +549,17 @@ class CampaignRepository(BaseRepository[Campaign]):
         self.session.flush()
         
         return cloned
+    
+    def find_by_statuses(self, statuses: List[str]) -> List[Campaign]:
+        """
+        Find campaigns by list of statuses.
+        
+        Args:
+            statuses: List of status values to match
+            
+        Returns:
+            List of campaigns matching any of the statuses
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.status.in_(statuses)
+        ).all()

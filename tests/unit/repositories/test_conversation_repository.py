@@ -42,7 +42,7 @@ class TestConversationRepository:
     def test_find_by_openphone_id(self, repository, mock_session):
         """Test finding conversation by OpenPhone ID"""
         # Arrange
-        mock_conversation = Mock(id=1, openphone_conversation_id="op_conv_123")
+        mock_conversation = Mock(id=1, openphone_id="op_conv_123")
         mock_query = Mock()
         mock_query.filter_by.return_value.first.return_value = mock_conversation
         mock_session.query.return_value = mock_query
@@ -52,7 +52,7 @@ class TestConversationRepository:
         
         # Assert
         assert result == mock_conversation
-        mock_query.filter_by.assert_called_once_with(openphone_conversation_id="op_conv_123")
+        mock_query.filter_by.assert_called_once_with(openphone_id="op_conv_123")
     
     def test_find_recent_conversations(self, repository, mock_session):
         """Test finding recent conversations"""
