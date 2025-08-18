@@ -4,7 +4,7 @@ Handles syncing data between QuickBooks and CRM
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from decimal import Decimal
 from sqlalchemy import and_
 from flask import current_app
@@ -14,10 +14,41 @@ from crm_database import (
 )
 from services.quickbooks_service import QuickBooksService
 
+if TYPE_CHECKING:
+    from repositories.contact_repository import ContactRepository
+    from repositories.product_repository import ProductRepository
+    from repositories.quote_repository import QuoteRepository
+    from repositories.invoice_repository import InvoiceRepository
+    from repositories.job_repository import JobRepository
+    from repositories.property_repository import PropertyRepository
+    from repositories.quickbooks_sync_repository import QuickBooksSyncRepository
+    from repositories.quote_line_item_repository import QuoteLineItemRepository
+    from repositories.invoice_line_item_repository import InvoiceLineItemRepository
+
 
 class QuickBooksSyncService:
-    def __init__(self):
+    def __init__(self, 
+                 contact_repository: 'ContactRepository' = None,
+                 product_repository: 'ProductRepository' = None,
+                 quote_repository: 'QuoteRepository' = None,
+                 invoice_repository: 'InvoiceRepository' = None,
+                 job_repository: 'JobRepository' = None,
+                 property_repository: 'PropertyRepository' = None,
+                 quickbooks_sync_repository: 'QuickBooksSyncRepository' = None,
+                 quote_line_item_repository: 'QuoteLineItemRepository' = None,
+                 invoice_line_item_repository: 'InvoiceLineItemRepository' = None):
         self.qb_service = QuickBooksService()
+        
+        # Repository dependencies
+        self.contact_repository = contact_repository
+        self.product_repository = product_repository
+        self.quote_repository = quote_repository
+        self.invoice_repository = invoice_repository
+        self.job_repository = job_repository
+        self.property_repository = property_repository
+        self.quickbooks_sync_repository = quickbooks_sync_repository
+        self.quote_line_item_repository = quote_line_item_repository
+        self.invoice_line_item_repository = invoice_line_item_repository
     
     def sync_all(self) -> Dict[str, Any]:
         """Run full sync of all QuickBooks data"""
@@ -44,11 +75,10 @@ class QuickBooksSyncService:
                     current_app.logger.error(f"Error syncing customer {qb_customer.get('Id')}: {str(e)}")
                     results['errors'] += 1
             
-            db.session.commit()
+            # Transaction management handled by repositories
             
         except Exception as e:
             current_app.logger.error(f"Error fetching customers: {str(e)}")
-            db.session.rollback()
         
         return results
     
@@ -69,11 +99,10 @@ class QuickBooksSyncService:
                     current_app.logger.error(f"Error syncing item {qb_item.get('Id')}: {str(e)}")
                     results['errors'] += 1
             
-            db.session.commit()
+            # Transaction management handled by repositories
             
         except Exception as e:
             current_app.logger.error(f"Error fetching items: {str(e)}")
-            db.session.rollback()
         
         return results
     
@@ -94,11 +123,10 @@ class QuickBooksSyncService:
                     current_app.logger.error(f"Error syncing estimate {qb_estimate.get('Id')}: {str(e)}")
                     results['errors'] += 1
             
-            db.session.commit()
+            # Transaction management handled by repositories
             
         except Exception as e:
             current_app.logger.error(f"Error fetching estimates: {str(e)}")
-            db.session.rollback()
         
         return results
     
@@ -119,11 +147,10 @@ class QuickBooksSyncService:
                     current_app.logger.error(f"Error syncing invoice {qb_invoice.get('Id')}: {str(e)}")
                     results['errors'] += 1
             
-            db.session.commit()
+            # Transaction management handled by repositories
             
         except Exception as e:
             current_app.logger.error(f"Error fetching invoices: {str(e)}")
-            db.session.rollback()
         
         return results
     
@@ -132,7 +159,7 @@ class QuickBooksSyncService:
         qb_id = qb_customer['Id']
         
         # Try to find by QuickBooks ID first
-        contact = Contact.query.filter_by(quickbooks_customer_id=qb_id).first()
+        contact = self.contact_repository.find_by_quickbooks_customer_id(qb_id)
         
         # If not found, try to match by phone or email
         if not contact:
@@ -146,55 +173,54 @@ class QuickBooksSyncService:
             # Try to find by phone
             for phone in phones:
                 if phone:
-                    contact = Contact.query.filter_by(phone=phone).first()
+                    contact = self.contact_repository.find_by_phone(phone)
                     if contact:
                         break
             
             # Try to find by email
             if not contact and qb_customer.get('PrimaryEmailAddr'):
                 email = qb_customer['PrimaryEmailAddr']['Address']
-                contact = Contact.query.filter_by(email=email).first()
+                contact = self.contact_repository.find_by_email(email)
         
-        # Create new contact if not found
-        if not contact:
-            contact = Contact()
-            db.session.add(contact)
-            
-            # Set phone (prefer mobile)
-            if qb_customer.get('Mobile'):
-                contact.phone = self._normalize_phone(qb_customer['Mobile']['FreeFormNumber'])
-            elif qb_customer.get('PrimaryPhone'):
-                contact.phone = self._normalize_phone(qb_customer['PrimaryPhone']['FreeFormNumber'])
+        # Build contact data
+        contact_data = {
+            'quickbooks_customer_id': qb_id,
+            'quickbooks_sync_token': qb_customer.get('SyncToken'),
+            'customer_type': 'customer',
+            'tax_exempt': qb_customer.get('Taxable', True) == False
+        }
         
-        # Update contact fields
-        contact.quickbooks_customer_id = qb_id
-        contact.quickbooks_sync_token = qb_customer.get('SyncToken')
+        # Set phone (prefer mobile)
+        if qb_customer.get('Mobile'):
+            contact_data['phone'] = self._normalize_phone(qb_customer['Mobile']['FreeFormNumber'])
+        elif qb_customer.get('PrimaryPhone'):
+            contact_data['phone'] = self._normalize_phone(qb_customer['PrimaryPhone']['FreeFormNumber'])
         
         # Parse name
         if qb_customer.get('GivenName'):
-            contact.first_name = qb_customer['GivenName']
+            contact_data['first_name'] = qb_customer['GivenName']
         if qb_customer.get('FamilyName'):
-            contact.last_name = qb_customer['FamilyName']
-        elif qb_customer.get('DisplayName') and not contact.first_name:
+            contact_data['last_name'] = qb_customer['FamilyName']
+        elif qb_customer.get('DisplayName'):
             # Try to split display name
             parts = qb_customer['DisplayName'].split(' ', 1)
-            contact.first_name = parts[0]
+            contact_data['first_name'] = parts[0]
             if len(parts) > 1:
-                contact.last_name = parts[1]
+                contact_data['last_name'] = parts[1]
         
         # Email
-        if qb_customer.get('PrimaryEmailAddr') and not contact.email:
-            contact.email = qb_customer['PrimaryEmailAddr']['Address']
-        
-        # Mark as customer
-        contact.customer_type = 'customer'
+        if qb_customer.get('PrimaryEmailAddr'):
+            contact_data['email'] = qb_customer['PrimaryEmailAddr']['Address']
         
         # Financial info
         if qb_customer.get('Balance'):
-            contact.outstanding_balance = Decimal(str(qb_customer['Balance']))
+            contact_data['outstanding_balance'] = Decimal(str(qb_customer['Balance']))
         
-        # Tax exempt
-        contact.tax_exempt = qb_customer.get('Taxable', True) == False
+        # Create or update contact using repository
+        if not contact:
+            contact = self.contact_repository.create(contact_data)
+        else:
+            contact = self.contact_repository.update(contact, contact_data)
         
         # Record sync
         self._record_sync('customer', qb_id, contact.id, 'contact', qb_customer.get('SyncToken'))
@@ -205,34 +231,38 @@ class QuickBooksSyncService:
         """Sync a single item to product. Returns True if created, False if updated"""
         qb_id = qb_item['Id']
         
-        # Find or create product
-        product = Product.query.filter_by(quickbooks_item_id=qb_id).first()
+        # Find existing product
+        product = self.product_repository.find_by_quickbooks_item_id(qb_id)
         is_new = product is None
         
-        if not product:
-            product = Product()
-            db.session.add(product)
-        
-        # Update fields
-        product.quickbooks_item_id = qb_id
-        product.quickbooks_sync_token = qb_item.get('SyncToken')
-        product.name = qb_item['Name']
-        product.description = qb_item.get('Description')
-        product.item_type = qb_item['Type'].lower()
-        product.active = qb_item.get('Active', True)
-        product.taxable = qb_item.get('Taxable', True)
+        # Build product data
+        product_data = {
+            'quickbooks_item_id': qb_id,
+            'quickbooks_sync_token': qb_item.get('SyncToken'),
+            'name': qb_item['Name'],
+            'description': qb_item.get('Description'),
+            'item_type': qb_item['Type'].lower(),
+            'active': qb_item.get('Active', True),
+            'taxable': qb_item.get('Taxable', True)
+        }
         
         # Pricing
         if qb_item.get('UnitPrice'):
-            product.unit_price = Decimal(str(qb_item['UnitPrice']))
+            product_data['unit_price'] = Decimal(str(qb_item['UnitPrice']))
         
         # For inventory items
         if qb_item['Type'] == 'Inventory' and qb_item.get('QtyOnHand'):
-            product.quantity_on_hand = int(qb_item['QtyOnHand'])
+            product_data['quantity_on_hand'] = int(qb_item['QtyOnHand'])
         
         # Income account
         if qb_item.get('IncomeAccountRef'):
-            product.income_account = qb_item['IncomeAccountRef'].get('name')
+            product_data['income_account'] = qb_item['IncomeAccountRef'].get('name')
+        
+        # Create or update product using repository
+        if not product:
+            product = self.product_repository.create(product_data)
+        else:
+            product = self.product_repository.update(product, product_data)
         
         # Record sync
         self._record_sync('item', qb_id, product.id, 'product', qb_item.get('SyncToken'))
@@ -470,23 +500,25 @@ class QuickBooksSyncService:
     def _record_sync(self, entity_type: str, entity_id: str, 
                     local_id: int, local_table: str, sync_version: str):
         """Record a sync operation"""
-        sync = QuickBooksSync.query.filter_by(
-            entity_type=entity_type,
-            entity_id=entity_id
-        ).first()
+        # First try to find by entity_id (primary lookup)
+        sync = self.quickbooks_sync_repository.find_by_entity_id(entity_id)
         
+        # Build sync data
+        sync_data = {
+            'entity_type': entity_type,
+            'entity_id': entity_id,
+            'local_id': local_id,
+            'local_table': local_table,
+            'sync_version': sync_version,
+            'last_synced': datetime.utcnow(),
+            'sync_status': 'synced'
+        }
+        
+        # Create or update sync record using repository
         if not sync:
-            sync = QuickBooksSync(
-                entity_type=entity_type,
-                entity_id=entity_id
-            )
-            db.session.add(sync)
-        
-        sync.local_id = local_id
-        sync.local_table = local_table
-        sync.sync_version = sync_version
-        sync.last_synced = datetime.utcnow()
-        sync.sync_status = 'synced'
+            sync = self.quickbooks_sync_repository.create(sync_data)
+        else:
+            sync = self.quickbooks_sync_repository.update(sync, sync_data)
     
     def update_contact_financial_summary(self, contact: Contact):
         """Update contact's financial summary from invoices"""

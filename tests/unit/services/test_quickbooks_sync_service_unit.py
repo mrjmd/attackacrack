@@ -113,20 +113,22 @@ class TestQuickBooksSyncServiceCustomerSync:
     def service(self, mock_repositories):
         return QuickBooksSyncService(**mock_repositories)
     
-    def test_sync_customer_uses_contact_repository_to_find_by_quickbooks_id(self, service, mock_repositories):
-        """Test _sync_customer uses ContactRepository.find_by_quickbooks_id instead of Contact.query.filter_by"""
+    def test_sync_customer_uses_contact_repository_to_find_by_quickbooks_customer_id(self, service, mock_repositories):
+        """Test _sync_customer uses ContactRepository.find_by_quickbooks_customer_id instead of Contact.query.filter_by"""
         # Arrange
         qb_customer = {'Id': '123', 'DisplayName': 'Test Customer', 'SyncToken': '0'}
         existing_contact = Mock(spec=Contact)
         
-        mock_repositories['contact_repository'].find_by_quickbooks_id.return_value = existing_contact
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = existing_contact
+        mock_repositories['contact_repository'].update.return_value = existing_contact
+        mock_repositories['quickbooks_sync_repository'].find_by_entity_id.return_value = Mock()
+        mock_repositories['quickbooks_sync_repository'].update.return_value = Mock()
         
         # Act
         result = service._sync_customer(qb_customer)
         
         # Assert - This will fail until we replace Contact.query.filter_by(quickbooks_customer_id=qb_id).first()
-        mock_repositories['contact_repository'].find_by_quickbooks_id.assert_called_once_with('123')
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.assert_called_once_with('123')
         assert result == existing_contact
     
     def test_sync_customer_uses_contact_repository_to_find_by_phone(self, service, mock_repositories):
@@ -140,9 +142,9 @@ class TestQuickBooksSyncServiceCustomerSync:
         }
         existing_contact = Mock(spec=Contact)
         
-        mock_repositories['contact_repository'].find_by_quickbooks_id.return_value = None
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = None
         mock_repositories['contact_repository'].find_by_phone.return_value = existing_contact
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        # Don't need to mock _record_sync for this test
         
         # Act
         result = service._sync_customer(qb_customer)
@@ -162,10 +164,10 @@ class TestQuickBooksSyncServiceCustomerSync:
         }
         existing_contact = Mock(spec=Contact)
         
-        mock_repositories['contact_repository'].find_by_quickbooks_id.return_value = None
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = None
         mock_repositories['contact_repository'].find_by_phone.return_value = None
         mock_repositories['contact_repository'].find_by_email.return_value = existing_contact
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        # Don't need to mock _record_sync for this test
         
         # Act
         result = service._sync_customer(qb_customer)
@@ -189,11 +191,11 @@ class TestQuickBooksSyncServiceCustomerSync:
         }
         new_contact = Mock(spec=Contact, id=1)
         
-        mock_repositories['contact_repository'].find_by_quickbooks_id.return_value = None
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = None
         mock_repositories['contact_repository'].find_by_phone.return_value = None
         mock_repositories['contact_repository'].find_by_email.return_value = None
         mock_repositories['contact_repository'].create.return_value = new_contact
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        # Don't need to mock _record_sync for this test
         
         # Act
         result = service._sync_customer(qb_customer)
@@ -236,19 +238,19 @@ class TestQuickBooksSyncServiceProductSync:
         return QuickBooksSyncService(**mock_repositories)
     
     def test_sync_item_uses_product_repository_to_find(self, service, mock_repositories):
-        """Test _sync_item uses ProductRepository.find_by_quickbooks_id instead of Product.query.filter_by"""
+        """Test _sync_item uses ProductRepository.find_by_quickbooks_customer_id instead of Product.query.filter_by"""
         # Arrange
         qb_item = {'Id': '123', 'Name': 'Test Product', 'Type': 'Service', 'SyncToken': '0'}
         existing_product = Mock(spec=Product)
         
-        mock_repositories['product_repository'].find_by_quickbooks_id.return_value = existing_product
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        mock_repositories['product_repository'].find_by_quickbooks_item_id.return_value = existing_product
+        # Don't need to mock _record_sync for this test
         
         # Act
         is_new = service._sync_item(qb_item)
         
         # Assert - This will fail until we replace Product.query.filter_by(quickbooks_item_id=qb_id).first()
-        mock_repositories['product_repository'].find_by_quickbooks_id.assert_called_once_with('123')
+        mock_repositories['product_repository'].find_by_quickbooks_item_id.assert_called_once_with('123')
         assert is_new is False
     
     def test_sync_item_uses_product_repository_to_create(self, service, mock_repositories):
@@ -267,9 +269,9 @@ class TestQuickBooksSyncServiceProductSync:
         }
         new_product = Mock(spec=Product)
         
-        mock_repositories['product_repository'].find_by_quickbooks_id.return_value = None
+        mock_repositories['product_repository'].find_by_quickbooks_item_id.return_value = None
         mock_repositories['product_repository'].create.return_value = new_product
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        # Don't need to mock _record_sync for this test
         
         # Act
         is_new = service._sync_item(qb_item)
@@ -312,7 +314,7 @@ class TestQuickBooksSyncServiceQuoteSync:
         return QuickBooksSyncService(**mock_repositories)
     
     def test_sync_estimate_uses_quote_repository_to_find(self, service, mock_repositories):
-        """Test _sync_estimate uses QuoteRepository.find_by_quickbooks_id instead of Quote.query.filter_by"""
+        """Test _sync_estimate uses QuoteRepository.find_by_quickbooks_customer_id instead of Quote.query.filter_by"""
         # Arrange
         qb_estimate = {
             'Id': '123',
@@ -325,7 +327,7 @@ class TestQuickBooksSyncServiceQuoteSync:
         existing_quote = Mock(spec=Quote)
         
         mock_repositories['quote_repository'].find_by_quickbooks_id.return_value = existing_quote
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        # Don't need to mock _record_sync for this test
         
         # Act
         is_new = service._sync_estimate(qb_estimate)
@@ -353,7 +355,7 @@ class TestQuickBooksSyncServiceQuoteSync:
         ]
         
         mock_product = Mock(id=1)
-        mock_repositories['product_repository'].find_by_quickbooks_id.return_value = mock_product
+        mock_repositories['product_repository'].find_by_quickbooks_item_id.return_value = mock_product
         mock_repositories['quote_line_item_repository'].create.return_value = Mock()
         
         # Act
@@ -363,7 +365,7 @@ class TestQuickBooksSyncServiceQuoteSync:
         mock_repositories['quote_line_item_repository'].delete_by_quote_id.assert_called_once_with(1)
         
         # Assert - This will fail until we replace Product.query.filter_by(quickbooks_item_id=item_qb_id).first()
-        mock_repositories['product_repository'].find_by_quickbooks_id.assert_called_once_with('123')
+        mock_repositories['product_repository'].find_by_quickbooks_item_id.assert_called_once_with('123')
         
         # Assert - This will fail until we replace db.session.add(line_item)
         mock_repositories['quote_line_item_repository'].create.assert_called_once()
@@ -391,7 +393,7 @@ class TestQuickBooksSyncServiceInvoiceSync:
         return QuickBooksSyncService(**mock_repositories)
     
     def test_sync_invoice_uses_invoice_repository_to_find(self, service, mock_repositories):
-        """Test _sync_invoice uses InvoiceRepository.find_by_quickbooks_id instead of Invoice.query.filter_by"""
+        """Test _sync_invoice uses InvoiceRepository.find_by_quickbooks_customer_id instead of Invoice.query.filter_by"""
         # Arrange
         qb_invoice = {
             'Id': '123',
@@ -406,7 +408,7 @@ class TestQuickBooksSyncServiceInvoiceSync:
         existing_invoice = Mock(spec=Invoice)
         
         mock_repositories['invoice_repository'].find_by_quickbooks_id.return_value = existing_invoice
-        mock_repositories['quickbooks_sync_repository'].create_or_update.return_value = Mock()
+        # Don't need to mock _record_sync for this test
         
         # Act
         is_new = service._sync_invoice(qb_invoice)
@@ -434,7 +436,7 @@ class TestQuickBooksSyncServiceInvoiceSync:
         ]
         
         mock_product = Mock(id=2)
-        mock_repositories['product_repository'].find_by_quickbooks_id.return_value = mock_product
+        mock_repositories['product_repository'].find_by_quickbooks_item_id.return_value = mock_product
         mock_repositories['invoice_line_item_repository'].create.return_value = Mock()
         
         # Act
@@ -444,7 +446,7 @@ class TestQuickBooksSyncServiceInvoiceSync:
         mock_repositories['invoice_line_item_repository'].delete_by_invoice_id.assert_called_once_with(1)
         
         # Assert - This will fail until we replace Product.query.filter_by(quickbooks_item_id=item_qb_id).first()
-        mock_repositories['product_repository'].find_by_quickbooks_id.assert_called_once_with('456')
+        mock_repositories['product_repository'].find_by_quickbooks_item_id.assert_called_once_with('456')
         
         # Assert - This will fail until we replace db.session.add(line_item)
         mock_repositories['invoice_line_item_repository'].create.assert_called_once()
@@ -484,7 +486,7 @@ class TestQuickBooksSyncServiceJobPropertyCreation:
         mock_property = Mock(id=1)
         mock_job = Mock(id=1)
         
-        mock_repositories['contact_repository'].find_by_quickbooks_id.return_value = mock_contact
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = mock_contact
         mock_repositories['property_repository'].find_by_contact_id.return_value = mock_property
         mock_repositories['job_repository'].create.return_value = mock_job
         
@@ -492,7 +494,7 @@ class TestQuickBooksSyncServiceJobPropertyCreation:
         result = service._find_or_create_job_for_qb_transaction(qb_transaction)
         
         # Assert - This will fail until we replace Contact.query.filter_by(quickbooks_customer_id=customer_qb_id).first()
-        mock_repositories['contact_repository'].find_by_quickbooks_id.assert_called_once_with('123')
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.assert_called_once_with('123')
         assert result == mock_job
     
     def test_find_or_create_job_uses_property_repository(self, service, mock_repositories):
@@ -508,7 +510,7 @@ class TestQuickBooksSyncServiceJobPropertyCreation:
         mock_property = Mock(id=2)
         mock_job = Mock(id=2)
         
-        mock_repositories['contact_repository'].find_by_quickbooks_id.return_value = mock_contact
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = mock_contact
         mock_repositories['property_repository'].find_by_contact_id.return_value = mock_property
         mock_repositories['job_repository'].create.return_value = mock_job
         
@@ -532,7 +534,7 @@ class TestQuickBooksSyncServiceJobPropertyCreation:
         mock_property = Mock(id=3)
         mock_job = Mock(id=3)
         
-        mock_repositories['contact_repository'].find_by_quickbooks_id.return_value = None
+        mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = None
         mock_repositories['contact_repository'].create.return_value = mock_new_contact
         mock_repositories['property_repository'].find_by_contact_id.return_value = mock_property
         mock_repositories['job_repository'].create.return_value = mock_job
