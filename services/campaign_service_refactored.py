@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from repositories.campaign_repository import CampaignRepository
 from repositories.contact_repository import ContactRepository
+from repositories.contact_flag_repository import ContactFlagRepository
 from repositories.base_repository import PaginationParams
 from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity, db
 import logging
@@ -26,6 +27,7 @@ class CampaignService:
     def __init__(self, 
                  campaign_repository: Optional[CampaignRepository] = None,
                  contact_repository: Optional[ContactRepository] = None,
+                 contact_flag_repository: Optional[ContactFlagRepository] = None,
                  openphone_service=None,
                  list_service=None,
                  session: Optional[Session] = None):
@@ -35,6 +37,7 @@ class CampaignService:
         Args:
             campaign_repository: CampaignRepository for campaign data access
             contact_repository: ContactRepository for contact data access
+            contact_flag_repository: ContactFlagRepository for flag management
             openphone_service: OpenPhoneService for SMS sending
             list_service: CampaignListService for list management
             session: Database session
@@ -42,6 +45,7 @@ class CampaignService:
         self.session = session or db.session
         self.campaign_repository = campaign_repository or CampaignRepository(self.session, Campaign)
         self.contact_repository = contact_repository or ContactRepository(self.session, Contact)
+        self.contact_flag_repository = contact_flag_repository or ContactFlagRepository(self.session, ContactFlag)
         self.openphone_service = openphone_service
         self.list_service = list_service
         
@@ -180,6 +184,10 @@ class CampaignService:
         logger.info(f"Added {added} recipients to campaign {campaign_id}")
         return added
     
+    def get_eligible_contacts(self, filters: Dict) -> List[Contact]:
+        """Public interface for getting eligible contacts with filters"""
+        return self._get_filtered_contacts(filters)
+    
     def _get_filtered_contacts(self, filters: Dict) -> List[Contact]:
         """
         Get contacts based on filters.
@@ -204,16 +212,22 @@ class CampaignService:
         
         if filters.get('exclude_office_numbers'):
             # Exclude contacts flagged as office numbers
-            office_flags = self.session.query(ContactFlag.contact_id).filter(
-                ContactFlag.flag_type == 'office_number'
-            ).all()
-            office_ids = {f[0] for f in office_flags}
+            office_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('office_number')
             contacts = [c for c in contacts if c.id not in office_ids]
         
         if filters.get('exclude_opted_out'):
-            opted_out = self.contact_repository.get_opted_out_contacts()
-            opted_out_ids = {c.id for c in opted_out}
+            opted_out_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('opted_out')
             contacts = [c for c in contacts if c.id not in opted_out_ids]
+        
+        if filters.get('exclude_do_not_contact'):
+            # Exclude contacts flagged as do not contact
+            do_not_contact_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('do_not_contact')
+            contacts = [c for c in contacts if c.id not in do_not_contact_ids]
+        
+        if filters.get('exclude_recently_contacted'):
+            # Exclude contacts that were recently texted
+            recently_contacted_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('recently_texted')
+            contacts = [c for c in contacts if c.id not in recently_contacted_ids]
         
         if filters.get('exclude_current_campaign'):
             # Exclude contacts already in any active campaign
@@ -520,3 +534,37 @@ class CampaignService:
             List of timeline events
         """
         return self.campaign_repository.get_campaign_timeline(campaign_id)
+    
+    def flag_contacted_members(self, campaign_id: int, contact_ids: List[int]) -> None:
+        """
+        Flag campaign members as recently contacted.
+        
+        Args:
+            campaign_id: Campaign ID
+            contact_ids: List of contact IDs that were contacted
+        """
+        campaign = self.campaign_repository.get_by_id(campaign_id)
+        if not campaign:
+            return
+        
+        # Create recently_texted flags for contacted members
+        self.contact_flag_repository.bulk_create_flags(
+            contact_ids=contact_ids,
+            flag_type='recently_texted',
+            flag_reason=f'Contacted via campaign: {campaign.name}',
+            applies_to='sms'
+        )
+        
+        logger.info(f"Flagged {len(contact_ids)} contacts as recently contacted from campaign {campaign_id}")
+    
+    def cleanup_expired_flags(self) -> int:
+        """
+        Clean up expired contact flags.
+        
+        Returns:
+            Number of flags cleaned up
+        """
+        count = self.contact_flag_repository.cleanup_expired_flags()
+        self.contact_flag_repository.commit()
+        logger.info(f"Cleaned up {count} expired contact flags")
+        return count

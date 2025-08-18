@@ -508,6 +508,11 @@ class TestContactFlagRepositoryIntegration:
     """Integration tests that require ContactFlagRepository to work with campaign filtering"""
     
     @pytest.fixture
+    def mock_session(self):
+        """Create mock database session"""
+        return Mock()
+    
+    @pytest.fixture
     def contact_flag_repository(self, mock_session):
         return ContactFlagRepository(mock_session, ContactFlag)
     
