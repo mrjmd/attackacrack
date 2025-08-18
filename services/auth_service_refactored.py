@@ -13,6 +13,9 @@ from sqlalchemy.orm import Session
 
 from crm_database import User, InviteToken, db
 from services.common.result import Result, PagedResult
+from repositories.user_repository import UserRepository
+from repositories.invite_token_repository import InviteTokenRepository
+from repositories.base_repository import PaginationParams
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +23,24 @@ logger = logging.getLogger(__name__)
 class AuthService:
     """Service for authentication and authorization using Result pattern"""
     
-    def __init__(self, email_service=None, session: Optional[Session] = None):
+    def __init__(self, email_service=None, session: Optional[Session] = None, 
+                 user_repository: Optional[UserRepository] = None,
+                 invite_repository: Optional[InviteTokenRepository] = None):
         """
         Initialize with optional dependencies.
         
         Args:
             email_service: Email service for sending invites
             session: Database session
+            user_repository: User repository for data access
+            invite_repository: Invite token repository for data access
         """
         self.email_service = email_service
         self.session = session or db.session
+        
+        # Initialize repositories with dependency injection
+        self.user_repository = user_repository or UserRepository(self.session, User)
+        self.invite_repository = invite_repository or InviteTokenRepository(self.session, InviteToken)
     
     def validate_password(self, password: str) -> Result[str]:
         """
@@ -58,16 +69,17 @@ class AuthService:
         
         return Result.success("Password is valid")
     
-    def create_user(self, email: str, password: str, name: str, 
-                   role: str = 'user', is_active: bool = True) -> Result[User]:
+    def create_user(self, email: str, password: str, first_name: str, last_name: str,
+                   role: str = 'marketer', is_active: bool = True) -> Result[User]:
         """
         Create a new user.
         
         Args:
             email: User email
             password: User password
-            name: User name
-            role: User role (admin/user)
+            first_name: User first name
+            last_name: User last name
+            role: User role (admin/marketer)
             is_active: Whether user is active
             
         Returns:
@@ -78,28 +90,28 @@ class AuthService:
         if password_result.is_failure:
             return Result.failure(password_result.error, code=password_result.error_code)
         
-        # Check if user exists
-        existing_user = User.query.filter_by(email=email).first()
+        # Check if user exists using repository
+        existing_user = self.user_repository.find_by_email(email)
         if existing_user:
             return Result.failure("User with this email already exists", code="USER_EXISTS")
         
-        # Create user
-        user = User(
-            email=email,
-            password_hash=generate_password_hash(password),
-            name=name,
-            role=role,
-            is_active=is_active,
-            created_at=datetime.utcnow()
-        )
-        
         try:
-            self.session.add(user)
-            self.session.commit()
+            # Create user using repository
+            user = self.user_repository.create(
+                email=email,
+                password_hash=generate_password_hash(password),
+                first_name=first_name,
+                last_name=last_name,
+                role=role,
+                is_active=is_active,
+                created_at=datetime.utcnow()
+            )
+            
+            self.user_repository.commit()
             logger.info(f"Created user: {email}")
             return Result.success(user, metadata={"created_at": datetime.utcnow()})
         except Exception as e:
-            self.session.rollback()
+            self.user_repository.rollback()
             logger.error(f"Failed to create user: {str(e)}")
             return Result.failure(f"Failed to create user: {str(e)}", code="DATABASE_ERROR")
     
@@ -114,7 +126,8 @@ class AuthService:
         Returns:
             Result[User]: Success with user or failure with error
         """
-        user = User.query.filter_by(email=email).first()
+        # Find user using repository
+        user = self.user_repository.find_by_email(email)
         
         if not user:
             return Result.failure("Invalid email or password", code="INVALID_CREDENTIALS")
@@ -125,11 +138,12 @@ class AuthService:
         if not check_password_hash(user.password_hash, password):
             return Result.failure("Invalid email or password", code="INVALID_CREDENTIALS")
         
-        # Update last login
-        user.last_login = datetime.utcnow()
-        self.session.commit()
+        # Update last login using repository
+        login_time = datetime.utcnow()
+        self.user_repository.update_last_login(user.id, login_time)
+        self.user_repository.commit()
         
-        return Result.success(user, metadata={"last_login": user.last_login})
+        return Result.success(user, metadata={"last_login": login_time})
     
     def login_user(self, user: User, remember: bool = False) -> Result[bool]:
         """
@@ -170,7 +184,7 @@ class AuthService:
         Returns:
             Result[User]: Success with user or failure
         """
-        user = User.query.get(user_id)
+        user = self.user_repository.get_by_id(user_id)
         if user:
             return Result.success(user)
         return Result.failure(f"User not found: {user_id}", code="USER_NOT_FOUND")
@@ -185,7 +199,7 @@ class AuthService:
         Returns:
             Result[User]: Success with user or failure
         """
-        user = User.query.filter_by(email=email).first()
+        user = self.user_repository.find_by_email(email)
         if user:
             return Result.success(user)
         return Result.failure(f"User not found: {email}", code="USER_NOT_FOUND")
@@ -202,7 +216,8 @@ class AuthService:
             PagedResult[List[User]]: Paginated users
         """
         try:
-            paginated = User.query.paginate(page=page, per_page=per_page, error_out=False)
+            pagination_params = PaginationParams(page=page, per_page=per_page)
+            paginated = self.user_repository.get_paginated(pagination_params)
             
             return PagedResult.paginated(
                 data=paginated.items,
@@ -280,7 +295,7 @@ class AuthService:
             self.session.rollback()
             return Result.failure(f"Failed to change password: {str(e)}", code="UPDATE_FAILED")
     
-    def create_invite(self, email: str, role: str = 'user', 
+    def create_invite(self, email: str, role: str = 'marketer', 
                      invited_by_id: Optional[int] = None) -> Result[InviteToken]:
         """
         Create an invite token.
@@ -293,43 +308,35 @@ class AuthService:
         Returns:
             Result[InviteToken]: Success with token or failure
         """
-        # Check if user already exists
-        existing_user = User.query.filter_by(email=email).first()
+        # Check if user already exists using repository
+        existing_user = self.user_repository.find_by_email(email)
         if existing_user:
             return Result.failure("User with this email already exists", code="USER_EXISTS")
         
-        # Check for existing invite
-        existing_invite = InviteToken.query.filter_by(
-            email=email,
-            used=False
-        ).first()
+        # Check for existing valid invite using repository
+        existing_invite = self.invite_repository.find_valid_invite_by_email(email)
         
         if existing_invite:
-            if existing_invite.expires_at > datetime.utcnow():
-                return Result.failure(
-                    "Invite already sent to this email",
-                    code="INVITE_EXISTS",
-                    metadata={"expires_at": existing_invite.expires_at}
-                )
-            else:
-                # Delete expired invite
-                self.session.delete(existing_invite)
-        
-        # Create new invite
-        invite = InviteToken(
-            email=email,
-            role=role,
-            invited_by_id=invited_by_id,
-            expires_at=datetime.utcnow() + timedelta(days=7)
-        )
+            return Result.failure(
+                "Invite already sent to this email",
+                code="INVITE_EXISTS",
+                metadata={"expires_at": existing_invite.expires_at}
+            )
         
         try:
-            self.session.add(invite)
-            self.session.commit()
+            # Create new invite using repository
+            invite = self.invite_repository.create(
+                email=email,
+                role=role,
+                created_by_id=invited_by_id,
+                expires_at=datetime.utcnow() + timedelta(days=7)
+            )
+            
+            self.invite_repository.commit()
             logger.info(f"Created invite for: {email}")
             return Result.success(invite, metadata={"expires_at": invite.expires_at})
         except Exception as e:
-            self.session.rollback()
+            self.invite_repository.rollback()
             logger.error(f"Failed to create invite: {str(e)}")
             return Result.failure(f"Failed to create invite: {str(e)}", code="DATABASE_ERROR")
     
@@ -370,7 +377,7 @@ class AuthService:
         Returns:
             Result[InviteToken]: Success with token or failure
         """
-        invite = InviteToken.query.filter_by(token=token).first()
+        invite = self.invite_repository.find_by_token(token)
         
         if not invite:
             return Result.failure("Invalid invite token", code="INVALID_TOKEN")
@@ -383,14 +390,15 @@ class AuthService:
         
         return Result.success(invite)
     
-    def use_invite(self, token: str, password: str, name: str) -> Result[User]:
+    def use_invite(self, token: str, password: str, first_name: str, last_name: str) -> Result[User]:
         """
         Use an invite to create a user.
         
         Args:
             token: Invite token
             password: User password
-            name: User name
+            first_name: User first name
+            last_name: User last name
             
         Returns:
             Result[User]: Success with created user or failure
@@ -406,16 +414,18 @@ class AuthService:
         user_result = self.create_user(
             email=invite.email,
             password=password,
-            name=name,
+            first_name=first_name,
+            last_name=last_name,
             role=invite.role
         )
         
         if user_result.is_success:
-            # Mark invite as used
-            invite.used = True
-            invite.used_at = datetime.utcnow()
-            invite.used_by_id = user_result.data.id
-            self.session.commit()
+            # Mark invite as used using repository
+            self.invite_repository.mark_as_used(
+                invite.id,
+                datetime.utcnow()
+            )
+            self.invite_repository.commit()
         
         return user_result
     
