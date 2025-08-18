@@ -442,13 +442,27 @@ def _create_ai_service():
     return AIService()
 
 def _create_quickbooks_service():
-    """Create QuickBooksService instance"""
+    """Create QuickBooksService instance with repository pattern"""
     from services.quickbooks_service import QuickBooksService
-    logger.info("Initializing QuickBooksService")
+    from repositories.quickbooks_auth_repository import QuickBooksAuthRepository
+    from repositories.quickbooks_sync_repository import QuickBooksSyncRepository
+    from crm_database import QuickBooksAuth, QuickBooksSync
+    
+    logger.info("Initializing QuickBooksService with repositories")
+    
     if not os.environ.get('QUICKBOOKS_CLIENT_ID'):
         logger.warning("QuickBooks not configured")
         return None
-    return QuickBooksService()
+    
+    # Create repository instances
+    db_session = db.session
+    auth_repo = QuickBooksAuthRepository(session=db_session, model_class=QuickBooksAuth)
+    sync_repo = QuickBooksSyncRepository(session=db_session, model_class=QuickBooksSync)
+    
+    return QuickBooksService(
+        auth_repository=auth_repo,
+        sync_repository=sync_repo
+    )
 
 def _create_campaign_list_service(db_session):
     """Create CampaignListService with dependencies"""

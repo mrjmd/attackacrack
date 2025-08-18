@@ -12,11 +12,15 @@ from typing import Dict, Optional, List, Any
 from urllib.parse import urlencode
 from cryptography.fernet import Fernet
 from flask import current_app
-from crm_database import db, QuickBooksAuth, QuickBooksSync
+from crm_database import QuickBooksAuth, QuickBooksSync
 
 
 class QuickBooksService:
-    def __init__(self):
+    def __init__(self, auth_repository=None, sync_repository=None):
+        # Inject repositories for dependency inversion
+        self.auth_repository = auth_repository
+        self.sync_repository = sync_repository
+        
         self.client_id = os.getenv('QUICKBOOKS_CLIENT_ID')
         self.client_secret = os.getenv('QUICKBOOKS_CLIENT_SECRET')
         self.redirect_uri = os.getenv('QUICKBOOKS_REDIRECT_URI', 'http://localhost:5000/auth/quickbooks/callback')
@@ -103,14 +107,19 @@ class QuickBooksService:
             
             token_data = response.json()
             
-            # Update tokens
-            auth.access_token = self.cipher.encrypt(token_data['access_token'].encode()).decode()
-            auth.refresh_token = self.cipher.encrypt(token_data['refresh_token'].encode()).decode()
-            auth.expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
-            auth.updated_at = datetime.utcnow()
+            # Update tokens using repository
+            encrypted_access_token = self.cipher.encrypt(token_data['access_token'].encode()).decode()
+            encrypted_refresh_token = self.cipher.encrypt(token_data['refresh_token'].encode()).decode()
+            expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
             
-            db.session.commit()
-            return True
+            updated_auth = self.auth_repository.update_tokens(
+                auth_id=auth.id,
+                access_token=encrypted_access_token,
+                refresh_token=encrypted_refresh_token,
+                expires_at=expires_at
+            )
+            
+            return updated_auth is not None
             
         except Exception as e:
             current_app.logger.error(f"Token refresh failed: {str(e)}")
@@ -124,7 +133,7 @@ class QuickBooksService:
             raise Exception("No QuickBooks authentication found")
         
         # Check if token needs refresh
-        if datetime.utcnow() >= auth.expires_at:
+        if self.auth_repository.is_token_expired(auth.id):
             if not self.refresh_access_token():
                 raise Exception("Failed to refresh access token")
             auth = self._get_auth()
@@ -159,25 +168,21 @@ class QuickBooksService:
         decoded = jwt.decode(token_data['access_token'], options={"verify_signature": False})
         company_id = decoded.get('realmid')
         
-        # Check if auth already exists
-        auth = QuickBooksAuth.query.filter_by(company_id=company_id).first()
-        if not auth:
-            auth = QuickBooksAuth(company_id=company_id)
-            db.session.add(auth)
+        # Prepare auth data for repository
+        auth_data = {
+            'company_id': company_id,
+            'access_token': self.cipher.encrypt(token_data['access_token'].encode()).decode(),
+            'refresh_token': self.cipher.encrypt(token_data['refresh_token'].encode()).decode(),
+            'expires_at': datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+        }
         
-        # Encrypt and save tokens
-        auth.access_token = self.cipher.encrypt(token_data['access_token'].encode()).decode()
-        auth.refresh_token = self.cipher.encrypt(token_data['refresh_token'].encode()).decode()
-        auth.expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
-        auth.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        return auth
+        # Use repository to create or update auth
+        return self.auth_repository.create_or_update_auth(auth_data)
     
     def _get_auth(self) -> Optional[QuickBooksAuth]:
         """Get current authentication record"""
         # For now, just get the first one (single company support)
-        return QuickBooksAuth.query.first()
+        return self.auth_repository.get_first_auth()
     
     # Convenience methods for common operations
     
