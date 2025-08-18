@@ -1,6 +1,7 @@
 # Direct Database Query Audit - Phase 2 Refactoring
 
 ## Date: December 17, 2024
+## Last Updated: August 17, 2025 - TDD Session
 
 ## Summary
 Audit of all services to identify remaining direct database queries that violate the repository pattern.
@@ -10,23 +11,18 @@ Audit of all services to identify remaining direct database queries that violate
 2. **message_service_refactored.py** - Uses repositories only
 3. **openphone_webhook_service_refactored.py** - Fully repository-based
 4. **todo_service_refactored.py** - Uses TodoRepository exclusively
+5. **appointment_service_refactored.py** - ✅ FIXED (Aug 17) - Now uses AppointmentRepository exclusively
+6. **auth_service_refactored.py** - ✅ FIXED (Aug 17) - Now uses UserRepository and InviteTokenRepository
 
 ## ⚠️ Partially Refactored Services (Still Have Direct Queries)
-1. **appointment_service_refactored.py**
-   - Still uses: `self.session.query(Appointment)`
-   - Needs: AppointmentRepository usage
 
-2. **auth_service_refactored.py**
-   - Still uses: `User.query.filter_by()`, `InviteToken.query`
-   - Needs: UserRepository, InviteTokenRepository
-
-3. **campaign_service_refactored.py**
+1. **campaign_service_refactored.py**
    - Still uses: `self.session.query(ContactFlag)`
-   - Needs: Complete repository conversion
+   - Needs: ContactFlagRepository
 
-4. **contact_service_refactored.py**
-   - Still uses: `Campaign.query.get()`, `CampaignMembership.query`
-   - Needs: CampaignRepository, CampaignMembershipRepository
+2. **contact_service_refactored.py**
+   - Still uses: Multiple `self.session.query()` calls, `ContactFlag.query`
+   - Needs: Proper ContactRepository usage, ContactFlagRepository
 
 ## 🔴 Non-Refactored Services (Heavy Direct DB Usage)
 1. **csv_import_service.py** - 22 direct DB calls
@@ -65,10 +61,11 @@ grep -c "db\.session\|\.query" services/*.py | grep -v ":0$"
 
 ## Metrics
 - **Total Services**: 29
-- **Fully Refactored**: 4 (14%)
-- **Partially Refactored**: 4 (14%)
+- **Fully Refactored**: 6 (21%) ✅ +2 today
+- **Partially Refactored**: 2 (7%) ✅ -2 (fixed)
 - **Not Refactored**: 21 (72%)
-- **Total Direct DB Violations**: ~150+
+- **Total Direct DB Violations**: ~130 (reduced from ~150+)
+- **New Repositories Created**: UserRepository, InviteTokenRepository
 
 ## Next Steps
 1. Complete partial refactorings first (less work)

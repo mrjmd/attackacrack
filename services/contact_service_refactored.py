@@ -15,6 +15,7 @@ from crm_database import Contact, ContactFlag, Campaign, CampaignMembership, Con
 from services.common.result import Result, PagedResult
 from repositories.contact_repository import ContactRepository
 from repositories.campaign_repository import CampaignRepository
+from repositories.contact_flag_repository import ContactFlagRepository
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class ContactService:
     
     def __init__(self, contact_repository: Optional[ContactRepository] = None, 
                  campaign_repository: Optional[CampaignRepository] = None,
+                 contact_flag_repository: Optional[ContactFlagRepository] = None,
                  session: Optional[Session] = None):
         """
         Initialize with optional repository and session.
@@ -31,11 +33,13 @@ class ContactService:
         Args:
             contact_repository: ContactRepository for data access
             campaign_repository: CampaignRepository for campaign data access
+            contact_flag_repository: ContactFlagRepository for flag data access
             session: Database session
         """
         self.session = session or db.session
         self.contact_repository = contact_repository or ContactRepository(self.session, Contact)
         self.campaign_repository = campaign_repository or CampaignRepository(self.session, Campaign)
+        self.contact_flag_repository = contact_flag_repository or ContactFlagRepository(self.session, ContactFlag)
     
     def add_contact(self, first_name: str, last_name: str, 
                    email: Optional[str] = None, 
@@ -82,7 +86,7 @@ class ContactService:
             }
             
             contact = self.contact_repository.create(**contact_data)
-            logger.info(f"Created contact: {contact.id} - {contact.full_name}")
+            logger.info(f"Created contact: {contact.id} - {contact.first_name} {contact.last_name}")
             
             return Result.success(contact, metadata={"created_at": datetime.utcnow()})
             
@@ -202,24 +206,39 @@ class ContactService:
             if not query:
                 return Result.success([])
             
-            # Search in multiple fields
-            search_filter = or_(
-                Contact.first_name.ilike(f'%{query}%'),
-                Contact.last_name.ilike(f'%{query}%'),
-                Contact.email.ilike(f'%{query}%'),
-                Contact.phone.ilike(f'%{query}%'),
-                Contact.company.ilike(f'%{query}%')
+            # Use repository search method
+            contacts = self.contact_repository.search(
+                query,
+                fields=['first_name', 'last_name', 'email', 'phone'],
+                limit=limit
             )
-            
-            contacts = self.session.query(Contact).filter(
-                search_filter
-            ).limit(limit).all()
             
             return Result.success(contacts)
             
         except Exception as e:
             logger.error(f"Search failed: {str(e)}")
             return Result.failure(f"Search failed: {str(e)}", code="SEARCH_ERROR")
+    
+    def get_by_ids(self, contact_ids: List[int]) -> Result[List[Contact]]:
+        """
+        Get multiple contacts by their IDs.
+        
+        Args:
+            contact_ids: List of contact IDs
+            
+        Returns:
+            Result[List[Contact]]: Success with contacts or failure
+        """
+        try:
+            if not contact_ids:
+                return Result.success([])
+            
+            contacts = self.contact_repository.get_by_ids(contact_ids)
+            return Result.success(contacts)
+            
+        except Exception as e:
+            logger.error(f"Failed to get contacts by IDs: {str(e)}")
+            return Result.failure(f"Failed to get contacts by IDs: {str(e)}", code="FETCH_ERROR")
     
     def update_contact(self, contact_id: int, **kwargs) -> Result[Contact]:
         """
@@ -446,9 +465,7 @@ class ContactService:
             return Result.failure("No contact IDs provided", code="NO_CONTACTS")
         
         try:
-            contacts = self.session.query(Contact).filter(
-                Contact.id.in_(contact_ids)
-            ).all()
+            contacts = self.contact_repository.get_by_ids(contact_ids)
             
             if not contacts:
                 return Result.failure("No contacts found", code="NO_CONTACTS_FOUND")
@@ -456,9 +473,7 @@ class ContactService:
             # Create CSV
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=[
-                'id', 'first_name', 'last_name', 'email', 'phone',
-                'company', 'address', 'city', 'state', 'zip_code',
-                'tags', 'created_at'
+                'id', 'first_name', 'last_name', 'email', 'phone', 'imported_at'
             ])
             
             writer.writeheader()
@@ -469,13 +484,7 @@ class ContactService:
                     'last_name': contact.last_name,
                     'email': contact.email,
                     'phone': contact.phone,
-                    'company': contact.company,
-                    'address': contact.address,
-                    'city': contact.city,
-                    'state': contact.state,
-                    'zip_code': contact.zip_code,
-                    'tags': ','.join(contact.tags) if contact.tags else '',
-                    'created_at': contact.created_at.isoformat() if contact.created_at else ''
+                    'imported_at': contact.imported_at.isoformat() if contact.imported_at else ''
                 })
             
             csv_data = output.getvalue()
@@ -493,13 +502,20 @@ class ContactService:
             Result[Dict]: Success with statistics or failure
         """
         try:
+            # Get contact stats from repository
+            contact_stats = self.contact_repository.get_contact_stats()
+            
+            # Get flag stats from repository
+            flag_stats = self.contact_flag_repository.get_flag_statistics()
+            
+            # Combine stats in expected format
             stats = {
-                'total_contacts': self.session.query(Contact).count(),
-                'with_phone': self.session.query(Contact).filter(Contact.phone.isnot(None)).count(),
-                'with_email': self.session.query(Contact).filter(Contact.email.isnot(None)).count(),
-                'with_conversations': self.session.query(Contact).join(Conversation).distinct().count(),
-                'opted_out': ContactFlag.query.filter_by(flag_type='opted_out').distinct(ContactFlag.contact_id).count(),
-                'invalid_phone': ContactFlag.query.filter_by(flag_type='invalid_phone').distinct(ContactFlag.contact_id).count()
+                'total_contacts': contact_stats.get('total', 0),
+                'with_phone': contact_stats.get('with_phone', 0),
+                'with_email': contact_stats.get('with_email', 0),
+                'with_conversations': contact_stats.get('with_conversation', 0),
+                'opted_out': flag_stats.get('opted_out', 0),
+                'invalid_phone': flag_stats.get('invalid_phone', 0)
             }
             
             return Result.success(stats)

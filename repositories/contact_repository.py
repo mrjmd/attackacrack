@@ -17,13 +17,14 @@ logger = logging.getLogger(__name__)
 class ContactRepository(BaseRepository[Contact]):
     """Repository for Contact data access"""
     
-    def search(self, query: str, fields: Optional[List[str]] = None) -> List[Contact]:
+    def search(self, query: str, fields: Optional[List[str]] = None, limit: Optional[int] = None) -> List[Contact]:
         """
         Search contacts by text query across multiple fields.
         
         Args:
             query: Search query string
             fields: Specific fields to search (default: name, phone, email, company)
+            limit: Maximum number of results to return
             
         Returns:
             List of matching contacts
@@ -41,7 +42,11 @@ class ContactRepository(BaseRepository[Contact]):
         if not conditions:
             return []
         
-        return self.session.query(Contact).filter(or_(*conditions)).all()
+        query_obj = self.session.query(Contact).filter(or_(*conditions))
+        if limit:
+            query_obj = query_obj.limit(limit)
+            
+        return query_obj.all()
     
     def find_by_phone(self, phone: str) -> Optional[Contact]:
         """
@@ -536,3 +541,18 @@ class ContactRepository(BaseRepository[Contact]):
             'opted_out': opted_out,
             'without_conversation': total - with_conversation
         }
+    
+    def get_by_ids(self, contact_ids: List[int]) -> List[Contact]:
+        """
+        Get multiple contacts by their IDs.
+        
+        Args:
+            contact_ids: List of contact IDs
+            
+        Returns:
+            List of contacts matching the IDs
+        """
+        if not contact_ids:
+            return []
+            
+        return self.session.query(Contact).filter(Contact.id.in_(contact_ids)).all()
