@@ -9,13 +9,13 @@ import statistics
 from datetime import datetime, time, timedelta
 from typing import List, Dict, Optional, Tuple
 from scipy import stats
-from sqlalchemy.orm import Session
+# Session import removed - using repositories only
 
 from repositories.campaign_repository import CampaignRepository
 from repositories.contact_repository import ContactRepository
 from repositories.contact_flag_repository import ContactFlagRepository
 from repositories.base_repository import PaginationParams
-from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity, db
+# Model imports removed - using repositories only
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class CampaignService:
                  contact_flag_repository: Optional[ContactFlagRepository] = None,
                  openphone_service=None,
                  list_service=None,
-                 session: Optional[Session] = None):
+):
         """
         Initialize with injected dependencies and repositories.
         
@@ -40,12 +40,11 @@ class CampaignService:
             contact_flag_repository: ContactFlagRepository for flag management
             openphone_service: OpenPhoneService for SMS sending
             list_service: CampaignListService for list management
-            session: Database session
         """
-        self.session = session or db.session
-        self.campaign_repository = campaign_repository or CampaignRepository(self.session, Campaign)
-        self.contact_repository = contact_repository or ContactRepository(self.session, Contact)
-        self.contact_flag_repository = contact_flag_repository or ContactFlagRepository(self.session, ContactFlag)
+        # Repositories must be injected - no fallback to direct instantiation
+        self.campaign_repository = campaign_repository
+        self.contact_repository = contact_repository
+        self.contact_flag_repository = contact_flag_repository
         self.openphone_service = openphone_service
         self.list_service = list_service
         
@@ -62,7 +61,7 @@ class CampaignService:
                        template_a: str = '',
                        template_b: str = None,
                        daily_limit: int = 125,
-                       business_hours_only: bool = True) -> Campaign:
+                       business_hours_only: bool = True) -> Dict:
         """
         Create a new marketing campaign.
         
@@ -519,7 +518,7 @@ class CampaignService:
         logger.info(f"Completed campaign {campaign_id}")
         return True
     
-    def clone_campaign(self, campaign_id: int, new_name: str) -> Campaign:
+    def clone_campaign(self, campaign_id: int, new_name: str) -> Dict:
         """
         Clone an existing campaign.
         

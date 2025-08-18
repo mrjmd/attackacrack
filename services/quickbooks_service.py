@@ -12,7 +12,7 @@ from typing import Dict, Optional, List, Any
 from urllib.parse import urlencode
 from cryptography.fernet import Fernet
 from flask import current_app
-from crm_database import QuickBooksAuth, QuickBooksSync
+# Model imports removed - using repositories only
 
 
 class QuickBooksService:
@@ -161,7 +161,7 @@ class QuickBooksService:
         response.raise_for_status()
         return response.json()
     
-    def _save_auth(self, token_data: Dict[str, Any]) -> QuickBooksAuth:
+    def _save_auth(self, token_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save authentication tokens (encrypted)"""
         # Extract company ID from access token (JWT)
         import jwt
@@ -179,7 +179,7 @@ class QuickBooksService:
         # Use repository to create or update auth
         return self.auth_repository.create_or_update_auth(auth_data)
     
-    def _get_auth(self) -> Optional[QuickBooksAuth]:
+    def _get_auth(self) -> Optional[Dict[str, Any]]:
         """Get current authentication record"""
         # For now, just get the first one (single company support)
         return self.auth_repository.get_first_auth()

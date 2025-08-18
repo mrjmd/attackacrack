@@ -7,45 +7,48 @@ from celery import Celery
 
 def create_celery_app(app_name=__name__):
     """Create a Celery app with proper SSL Redis configuration"""
-    redis_url = os.environ.get('REDIS_URL') or os.environ.get('CELERY_BROKER_URL') or 'redis://redis:6379/0'
+    broker_url = os.environ.get('CELERY_BROKER_URL') or os.environ.get('REDIS_URL') or 'redis://redis:6379/0'
+    result_backend_url = os.environ.get('CELERY_RESULT_BACKEND') or broker_url
     
-    # For Celery with SSL Redis, we need to configure it differently
-    if redis_url.startswith('rediss://'):
-        # Parse the URL to separate it into components
+    # Helper function to add SSL params to URL if needed
+    def add_ssl_params(url):
+        if not url.startswith('rediss://'):
+            return url
         from urllib.parse import urlparse, parse_qs
-        parsed = urlparse(redis_url)
-        
-        # Check if ssl_cert_reqs is already in the URL
+        parsed = urlparse(url)
         query_params = parse_qs(parsed.query)
-        
-        # Build the Redis URL with proper SSL parameters
         if 'ssl_cert_reqs' not in query_params:
-            # Add SSL parameters to the URL
             separator = '&' if parsed.query else '?'
-            ssl_params = f"{separator}ssl_cert_reqs=CERT_NONE"
-            celery_broker_url = redis_url + ssl_params
-            celery_result_backend = redis_url + ssl_params
-        else:
-            celery_broker_url = redis_url
-            celery_result_backend = redis_url
-        
-        # Create Celery instance with SSL configuration
+            return url + f"{separator}ssl_cert_reqs=CERT_NONE"
+        return url
+    
+    # Check if either URL uses SSL
+    broker_uses_ssl = broker_url.startswith('rediss://')
+    backend_uses_ssl = result_backend_url.startswith('rediss://')
+    
+    # Process URLs for SSL if needed
+    processed_broker_url = add_ssl_params(broker_url)
+    processed_backend_url = add_ssl_params(result_backend_url)
+    
+    # Create Celery instance with appropriate configuration
+    if broker_uses_ssl or backend_uses_ssl:
+        # SSL configuration
         celery = Celery(
             app_name,
-            broker=celery_broker_url,
-            backend=celery_result_backend,
+            broker=processed_broker_url,
+            backend=processed_backend_url,
             broker_use_ssl={
                 'ssl_cert_reqs': ssl.CERT_NONE,
                 'ssl_ca_certs': None,
                 'ssl_certfile': None,
                 'ssl_keyfile': None,
-            },
+            } if broker_uses_ssl else None,
             redis_backend_use_ssl={
                 'ssl_cert_reqs': ssl.CERT_NONE,
                 'ssl_ca_certs': None,
                 'ssl_certfile': None,
                 'ssl_keyfile': None,
-            },
+            } if backend_uses_ssl else None,
             broker_connection_retry_on_startup=True,
             broker_connection_retry=True,
             broker_connection_max_retries=3,
@@ -58,12 +61,14 @@ def create_celery_app(app_name=__name__):
         # Non-SSL Redis
         celery = Celery(
             app_name,
-            broker=redis_url,
-            backend=redis_url
+            broker=broker_url,
+            backend=result_backend_url
         )
     
     # Debug logging
-    print(f"Redis URL: {redis_url}")
-    print(f"Using SSL: {redis_url.startswith('rediss://')}")
+    print(f"Broker URL: {broker_url}")
+    print(f"Result Backend URL: {result_backend_url}")
+    print(f"Broker uses SSL: {broker_uses_ssl}")
+    print(f"Backend uses SSL: {backend_uses_ssl}")
     
     return celery

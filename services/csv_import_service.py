@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from werkzeug.datastructures import FileStorage
-from crm_database import Contact, CSVImport, CampaignList, CampaignListMember, ContactCSVImport
+# Model imports removed - using repositories only
 from services.contact_service_refactored import ContactService
 from repositories.csv_import_repository import CSVImportRepository
 from repositories.contact_csv_import_repository import ContactCSVImportRepository
@@ -500,11 +500,11 @@ class CSVImportService:
         
         return metadata if metadata else None
     
-    def get_import_history(self, limit: int = 10) -> List[CSVImport]:
+    def get_import_history(self, limit: int = 10) -> List[Dict]:
         """Get recent import history using repository"""
         return self.csv_import_repository.get_recent_imports(limit=limit)
     
-    def get_contacts_by_import(self, import_id: int) -> List[Contact]:
+    def get_contacts_by_import(self, import_id: int) -> List[Dict]:
         """Get all contacts from a specific import using repository"""
         contact_associations = self.contact_csv_import_repository.get_contacts_by_import_with_details(import_id)
         return [contact for contact, association in contact_associations]

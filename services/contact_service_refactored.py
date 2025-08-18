@@ -9,9 +9,7 @@ import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from sqlalchemy import or_, and_, func
-from sqlalchemy.orm import Session, joinedload
-
-from crm_database import Contact, ContactFlag, Campaign, CampaignMembership, Conversation, Activity, db
+# Model and Session imports removed - using repositories only
 from services.common.result import Result, PagedResult
 from repositories.contact_repository import ContactRepository
 from repositories.campaign_repository import CampaignRepository
@@ -25,8 +23,7 @@ class ContactService:
     
     def __init__(self, contact_repository: Optional[ContactRepository] = None, 
                  campaign_repository: Optional[CampaignRepository] = None,
-                 contact_flag_repository: Optional[ContactFlagRepository] = None,
-                 session: Optional[Session] = None):
+                 contact_flag_repository: Optional[ContactFlagRepository] = None):
         """
         Initialize with optional repository and session.
         
@@ -34,17 +31,16 @@ class ContactService:
             contact_repository: ContactRepository for data access
             campaign_repository: CampaignRepository for campaign data access
             contact_flag_repository: ContactFlagRepository for flag data access
-            session: Database session
         """
-        self.session = session or db.session
-        self.contact_repository = contact_repository or ContactRepository(self.session, Contact)
-        self.campaign_repository = campaign_repository or CampaignRepository(self.session, Campaign)
-        self.contact_flag_repository = contact_flag_repository or ContactFlagRepository(self.session, ContactFlag)
+        # Repositories must be injected - no fallback to direct instantiation
+        self.contact_repository = contact_repository
+        self.campaign_repository = campaign_repository
+        self.contact_flag_repository = contact_flag_repository
     
     def add_contact(self, first_name: str, last_name: str, 
                    email: Optional[str] = None, 
                    phone: Optional[str] = None,
-                   **kwargs) -> Result[Contact]:
+                   **kwargs) -> Result[Dict]:
         """
         Add a new contact.
         
@@ -56,7 +52,7 @@ class ContactService:
             **kwargs: Additional contact fields
             
         Returns:
-            Result[Contact]: Success with contact or failure with error
+            Result[Dict]: Success with contact data or failure with error
         """
         try:
             # Check for duplicates
@@ -94,7 +90,7 @@ class ContactService:
             logger.error(f"Failed to create contact: {str(e)}")
             return Result.failure(f"Failed to create contact: {str(e)}", code="CREATE_ERROR")
     
-    def get_contact_by_id(self, contact_id: int) -> Result[Contact]:
+    def get_contact_by_id(self, contact_id: int) -> Result[Dict]:
         """
         Get contact by ID.
         
@@ -102,14 +98,14 @@ class ContactService:
             contact_id: Contact ID
             
         Returns:
-            Result[Contact]: Success with contact or failure
+            Result[Dict]: Success with contact data or failure
         """
         contact = self.contact_repository.get_by_id(contact_id)
         if contact:
             return Result.success(contact)
         return Result.failure(f"Contact not found: {contact_id}", code="NOT_FOUND")
     
-    def get_contact_by_phone(self, phone_number: str) -> Result[Contact]:
+    def get_contact_by_phone(self, phone_number: str) -> Result[Dict]:
         """
         Get contact by phone number.
         
@@ -117,14 +113,14 @@ class ContactService:
             phone_number: Phone number to search
             
         Returns:
-            Result[Contact]: Success with contact or failure
+            Result[Dict]: Success with contact data or failure
         """
         contact = self.contact_repository.find_by_phone(phone_number)
         if contact:
             return Result.success(contact)
         return Result.failure(f"Contact not found with phone: {phone_number}", code="NOT_FOUND")
     
-    def get_all_contacts(self, page: int = 1, per_page: int = 100) -> PagedResult[List[Contact]]:
+    def get_all_contacts(self, page: int = 1, per_page: int = 100) -> PagedResult[List[Dict]]:
         """
         Get all contacts with pagination.
         
@@ -133,7 +129,7 @@ class ContactService:
             per_page: Items per page
             
         Returns:
-            PagedResult[List[Contact]]: Paginated contacts
+            PagedResult[List[Dict]]: Paginated contact data
         """
         try:
             from repositories.base_repository import PaginationParams
@@ -191,7 +187,7 @@ class ContactService:
                 'has_next': False
             }
     
-    def search_contacts(self, query: str, limit: int = 20) -> Result[List[Contact]]:
+    def search_contacts(self, query: str, limit: int = 20) -> Result[List[Dict]]:
         """
         Search contacts by name, email, or phone.
         
@@ -200,7 +196,7 @@ class ContactService:
             limit: Maximum results
             
         Returns:
-            Result[List[Contact]]: Success with contacts or failure
+            Result[List[Dict]]: Success with contact data or failure
         """
         try:
             if not query:
@@ -219,7 +215,7 @@ class ContactService:
             logger.error(f"Search failed: {str(e)}")
             return Result.failure(f"Search failed: {str(e)}", code="SEARCH_ERROR")
     
-    def get_by_ids(self, contact_ids: List[int]) -> Result[List[Contact]]:
+    def get_by_ids(self, contact_ids: List[int]) -> Result[List[Dict]]:
         """
         Get multiple contacts by their IDs.
         
@@ -227,7 +223,7 @@ class ContactService:
             contact_ids: List of contact IDs
             
         Returns:
-            Result[List[Contact]]: Success with contacts or failure
+            Result[List[Dict]]: Success with contact data or failure
         """
         try:
             if not contact_ids:
@@ -240,7 +236,7 @@ class ContactService:
             logger.error(f"Failed to get contacts by IDs: {str(e)}")
             return Result.failure(f"Failed to get contacts by IDs: {str(e)}", code="FETCH_ERROR")
     
-    def update_contact(self, contact_id: int, **kwargs) -> Result[Contact]:
+    def update_contact(self, contact_id: int, **kwargs) -> Result[Dict]:
         """
         Update contact attributes.
         
@@ -249,7 +245,7 @@ class ContactService:
             **kwargs: Fields to update
             
         Returns:
-            Result[Contact]: Success with updated contact or failure
+            Result[Dict]: Success with updated contact data or failure
         """
         try:
             contact = self.contact_repository.get_by_id(contact_id)
@@ -262,13 +258,13 @@ class ContactService:
                     setattr(contact, key, value)
             
             contact.updated_at = datetime.utcnow()
-            self.session.commit()
+            # Repository handles commit
             
             logger.info(f"Updated contact: {contact_id}")
             return Result.success(contact)
             
         except Exception as e:
-            self.session.rollback()
+            # Repository handles rollback
             logger.error(f"Failed to update contact: {str(e)}")
             return Result.failure(f"Failed to update contact: {str(e)}", code="UPDATE_ERROR")
     
@@ -338,7 +334,7 @@ class ContactService:
                         if tag not in current_tags:
                             current_tags.append(tag)
                             contact.tags = current_tags
-                            self.session.commit()
+                            # Repository handles commit
                         results["successful"] += 1
                     else:
                         results["failed"] += 1
@@ -363,7 +359,7 @@ class ContactService:
             logger.error(f"Bulk action failed: {str(e)}")
             return Result.failure(f"Bulk action failed: {str(e)}", code="BULK_ACTION_ERROR")
     
-    def add_to_campaign(self, contact_id: int, campaign_id: int) -> Result[CampaignMembership]:
+    def add_to_campaign(self, contact_id: int, campaign_id: int) -> Result[Dict]:
         """
         Add contact to a campaign.
         
@@ -372,7 +368,7 @@ class ContactService:
             campaign_id: Campaign ID
             
         Returns:
-            Result[CampaignMembership]: Success with membership or failure
+            Result[Dict]: Success with membership data or failure
         """
         try:
             # Verify contact exists
@@ -402,13 +398,13 @@ class ContactService:
                 status='pending'
             )
             
-            self.session.commit()
+            # Repository handles commit
             
             logger.info(f"Added contact {contact_id} to campaign {campaign_id}")
             return Result.success(membership)
             
         except Exception as e:
-            self.session.rollback()
+            # Repository handles rollback
             logger.error(f"Failed to add to campaign: {str(e)}")
             return Result.failure(f"Failed to add to campaign: {str(e)}", code="CAMPAIGN_ERROR")
     

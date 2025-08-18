@@ -483,8 +483,13 @@ def _create_quote_service():
 def _create_invoice_service():
     """Create InvoiceService instance"""
     from services.invoice_service_refactored import InvoiceService
+    from repositories.invoice_repository import InvoiceRepository
+    from repositories.quote_repository import QuoteRepository
+    from crm_database import Invoice, Quote, db
     logger.info("Initializing InvoiceService")
-    return InvoiceService()
+    invoice_repo = InvoiceRepository(db.session, Invoice)
+    quote_repo = QuoteRepository(db.session, Quote)
+    return InvoiceService(invoice_repository=invoice_repo, quote_repository=quote_repo)
 
 def _create_sms_metrics_service(activity_repository, contact_repository, campaign_repository):
     """Create SMSMetricsService with repository dependencies"""

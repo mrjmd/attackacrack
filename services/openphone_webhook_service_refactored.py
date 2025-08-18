@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 from services.common.result import Result
-from crm_database import Contact, Conversation, Activity, WebhookEvent
+# Model imports removed - using repositories only
 from repositories.activity_repository import ActivityRepository
 from repositories.conversation_repository import ConversationRepository
 from repositories.webhook_event_repository import WebhookEventRepository
@@ -100,7 +100,7 @@ class OpenPhoneWebhookServiceRefactored:
             logger.error(f"Error processing webhook: {e}", exc_info=True)
             return Result.failure(str(e), code="PROCESSING_ERROR")
     
-    def _log_webhook_event(self, webhook_data: Dict[str, Any]) -> Result[WebhookEvent]:
+    def _log_webhook_event(self, webhook_data: Dict[str, Any]) -> Result[Dict]:
         """
         Log webhook event to database using repository.
         
@@ -108,7 +108,7 @@ class OpenPhoneWebhookServiceRefactored:
             webhook_data: Webhook payload
             
         Returns:
-            Result[WebhookEvent]: Success with event or failure
+            Result[Dict]: Success with event data or failure
         """
         try:
             event_data = {
@@ -535,7 +535,7 @@ class OpenPhoneWebhookServiceRefactored:
             logger.error(f"Error handling call recording webhook: {e}", exc_info=True)
             return Result.failure(f"Error handling call recording webhook: {str(e)}", code="REPOSITORY_ERROR")
     
-    def _get_or_create_contact(self, phone_number: str) -> Result[Contact]:
+    def _get_or_create_contact(self, phone_number: str) -> Result[Dict]:
         """
         Get or create a contact by phone number using ContactService Result pattern.
         
@@ -543,7 +543,7 @@ class OpenPhoneWebhookServiceRefactored:
             phone_number: Phone number to search/create
             
         Returns:
-            Result[Contact]: Success with contact or failure
+            Result[Dict]: Success with contact data or failure
         """
         # Try to get existing contact
         contact_result = self.contact_service.get_contact_by_phone(phone_number)
@@ -562,7 +562,7 @@ class OpenPhoneWebhookServiceRefactored:
         else:
             return Result.failure(create_result.error, code="CONTACT_ERROR")
     
-    def _get_or_create_conversation(self, contact_id: int, openphone_conversation_id: str = None) -> Conversation:
+    def _get_or_create_conversation(self, contact_id: int, openphone_conversation_id: str = None) -> Dict[str, Any]:
         """
         Get or create a conversation using repository pattern.
         

@@ -1,5 +1,4 @@
-from extensions import db
-from crm_database import Job
+# Model and db imports removed - using repositories only
 from logging_config import get_logger
 from repositories.job_repository import JobRepository
 
@@ -11,9 +10,8 @@ class JobService:
         if job_repository is not None:
             self.repository = job_repository
         else:
-            # Fallback to direct session for backward compatibility
-            self.session = db.session
-            self.repository = JobRepository(session=db.session, model_class=Job)
+            # Repository must be injected - no fallback
+            raise ValueError("JobRepository must be provided via dependency injection")
 
     def get_or_create_active_job(self, property_id: int):
         """
@@ -30,12 +28,9 @@ class JobService:
             # If no active job exists, create a new one.
             logger.info("No active job found for property, creating new job", property_id=property_id)
             
-            # Get property address for backward compatibility
-            from crm_database import Property
-            prop = db.session.query(Property).get(property_id)
-            
+            # Create job without property lookup - repository handles this
             new_job = self.repository.create(
-                description=f"New job for {prop.address if prop else f'property {property_id}'}",
+                description=f"New job for property {property_id}",
                 property_id=property_id,
                 status='Active'
             )

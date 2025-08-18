@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from decimal import Decimal
 from flask import current_app
-from crm_database import Contact, Product, Quote, Invoice, Job, Property
+# Model imports removed - using repositories only
 from services.quickbooks_service import QuickBooksService
 
 if TYPE_CHECKING:
@@ -150,7 +150,7 @@ class QuickBooksSyncService:
         
         return results
     
-    def _sync_customer(self, qb_customer: Dict[str, Any]) -> Contact:
+    def _sync_customer(self, qb_customer: Dict[str, Any]) -> Dict[str, Any]:
         """Sync a single customer to contact"""
         qb_id = qb_customer['Id']
         
@@ -385,7 +385,7 @@ class QuickBooksSyncService:
         
         return is_new
     
-    def _sync_estimate_line_items(self, quote: Quote, qb_lines: List[Dict[str, Any]]):
+    def _sync_estimate_line_items(self, quote: Dict[str, Any], qb_lines: List[Dict[str, Any]]):
         """Sync line items for an estimate"""
         # Remove existing line items
         self.quote_line_item_repository.delete_by_quote_id(quote.id)
@@ -412,7 +412,7 @@ class QuickBooksSyncService:
                 # Create line item using repository
                 self.quote_line_item_repository.create(line_item_data)
     
-    def _sync_invoice_line_items(self, invoice: Invoice, qb_lines: List[Dict[str, Any]]):
+    def _sync_invoice_line_items(self, invoice: Dict[str, Any], qb_lines: List[Dict[str, Any]]):
         """Sync line items for an invoice"""
         # Remove existing line items
         self.invoice_line_item_repository.delete_by_invoice_id(invoice.id)
@@ -439,7 +439,7 @@ class QuickBooksSyncService:
                 # Create line item using repository
                 self.invoice_line_item_repository.create(line_item_data)
     
-    def _find_or_create_job_for_qb_transaction(self, qb_transaction: Dict[str, Any]) -> Job:
+    def _find_or_create_job_for_qb_transaction(self, qb_transaction: Dict[str, Any]) -> Dict[str, Any]:
         """Find or create a job for a QuickBooks transaction"""
         # Try to find contact first
         contact = None
@@ -530,7 +530,7 @@ class QuickBooksSyncService:
         else:
             sync = self.quickbooks_sync_repository.update(sync, sync_data)
     
-    def update_contact_financial_summary(self, contact: Contact):
+    def update_contact_financial_summary(self, contact: Dict[str, Any]):
         """Update contact's financial summary from invoices"""
         invoices = self.invoice_repository.find_by_contact_id(contact.id)
         

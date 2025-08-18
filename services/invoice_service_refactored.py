@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from datetime import date, timedelta
 from decimal import Decimal
 
-from crm_database import Invoice, Quote, db
+# Model imports removed - using repositories only
 from services.common.result import Result
 from repositories.invoice_repository import InvoiceRepository
 from repositories.quote_repository import QuoteRepository
@@ -37,9 +37,11 @@ class InvoiceServiceRefactored:
             invoice_repository: Repository for invoice data access
             quote_repository: Repository for quote data access
         """
-        # Use default repositories if not provided
-        self.invoice_repository = invoice_repository or InvoiceRepository(db.session, Invoice)
-        self.quote_repository = quote_repository or QuoteRepository(db.session, Quote)
+        # Repositories must be injected
+        if not invoice_repository or not quote_repository:
+            raise ValueError("Invoice and Quote repositories must be provided via dependency injection")
+        self.invoice_repository = invoice_repository
+        self.quote_repository = quote_repository
         self.logger = logger
     
     def get_all_invoices(self) -> Result[list]:
@@ -59,7 +61,7 @@ class InvoiceServiceRefactored:
                 code="INVOICE_RETRIEVAL_ERROR"
             )
     
-    def get_invoice_by_id(self, invoice_id: int) -> Result[Invoice]:
+    def get_invoice_by_id(self, invoice_id: int) -> Result[Dict]:
         """
         Retrieve an invoice by ID.
         
@@ -90,7 +92,7 @@ class InvoiceServiceRefactored:
                 code="INVOICE_RETRIEVAL_ERROR"
             )
     
-    def create_invoice(self, data: Dict[str, Any]) -> Result[Invoice]:
+    def create_invoice(self, data: Dict[str, Any]) -> Result[Dict]:
         """
         Create a new invoice.
         
@@ -133,7 +135,7 @@ class InvoiceServiceRefactored:
                 code="INVOICE_CREATION_ERROR"
             )
     
-    def update_invoice(self, invoice_id: int, data: Dict[str, Any]) -> Result[Invoice]:
+    def update_invoice(self, invoice_id: int, data: Dict[str, Any]) -> Result[Dict]:
         """
         Update an existing invoice.
         
@@ -167,7 +169,7 @@ class InvoiceServiceRefactored:
                 code="INVOICE_UPDATE_ERROR"
             )
     
-    def delete_invoice(self, invoice_id: int) -> Result[Invoice]:
+    def delete_invoice(self, invoice_id: int) -> Result[Dict]:
         """
         Delete an invoice.
         
@@ -197,7 +199,7 @@ class InvoiceServiceRefactored:
                 code="INVOICE_DELETION_ERROR"
             )
     
-    def create_invoice_from_quote(self, quote_id: int) -> Result[Invoice]:
+    def create_invoice_from_quote(self, quote_id: int) -> Result[Dict]:
         """
         Create an invoice from an existing quote.
         
@@ -298,7 +300,7 @@ class InvoiceServiceRefactored:
         
         return prepared_data
     
-    def _prepare_update_data(self, data: Dict[str, Any], existing_invoice: Invoice) -> Dict[str, Any]:
+    def _prepare_update_data(self, data: Dict[str, Any], existing_invoice: Dict) -> Dict[str, Any]:
         """
         Prepare update data with recalculated totals if needed.
         

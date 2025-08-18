@@ -4,10 +4,10 @@ Refactored to use PropertyRepository instead of direct database access.
 Follows dependency injection and clean architecture principles.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy.exc import SQLAlchemyError
 
-from crm_database import Property
+# Model imports removed - using repositories only
 from repositories.property_repository import PropertyRepository
 from services.common.result import Result
 import logging
@@ -36,7 +36,7 @@ class PropertyService:
     # CREATE OPERATIONS
     # ============================================
 
-    def add_property(self, **kwargs) -> Property:
+    def add_property(self, **kwargs) -> Dict[str, Any]:
         """Add a new property
         
         Args:
@@ -52,7 +52,7 @@ class PropertyService:
         logger.info(f"Adding new property at {kwargs.get('address', 'unknown address')}")
         return self.repository.create(**kwargs)
     
-    def add_property_safe(self, **kwargs) -> Result[Property]:
+    def add_property_safe(self, **kwargs) -> Result[Dict[str, Any]]:
         """Safely add a new property with error handling
         
         Args:
@@ -73,7 +73,7 @@ class PropertyService:
     # READ OPERATIONS
     # ============================================
 
-    def get_all_properties(self) -> List[Property]:
+    def get_all_properties(self) -> List[Dict[str, Any]]:
         """Get all properties
         
         Returns:
@@ -82,7 +82,7 @@ class PropertyService:
         logger.info("Retrieving all properties")
         return self.repository.get_all()
 
-    def get_property_by_id(self, property_id: int) -> Optional[Property]:
+    def get_property_by_id(self, property_id: int) -> Optional[Dict[str, Any]]:
         """Get property by ID
         
         Args:
@@ -94,7 +94,7 @@ class PropertyService:
         logger.info(f"Retrieving property with ID {property_id}")
         return self.repository.get_by_id(property_id)
     
-    def get_properties_by_contact(self, contact_id: int) -> List[Property]:
+    def get_properties_by_contact(self, contact_id: int) -> List[Dict[str, Any]]:
         """Get all properties for a specific contact
         
         Args:
@@ -106,7 +106,7 @@ class PropertyService:
         logger.info(f"Retrieving properties for contact {contact_id}")
         return self.repository.find_by_contact_id(contact_id)
     
-    def search_properties_by_address(self, address_query: str) -> List[Property]:
+    def search_properties_by_address(self, address_query: str) -> List[Dict[str, Any]]:
         """Search properties by address
         
         Args:
@@ -118,7 +118,7 @@ class PropertyService:
         logger.info(f"Searching properties by address: {address_query}")
         return self.repository.find_by_address_contains(address_query)
     
-    def get_properties_by_type(self, property_type: str) -> List[Property]:
+    def get_properties_by_type(self, property_type: str) -> List[Dict[str, Any]]:
         """Get properties by type
         
         Args:
@@ -134,7 +134,7 @@ class PropertyService:
     # UPDATE OPERATIONS
     # ============================================
 
-    def update_property(self, property_obj: Property, **kwargs) -> Property:
+    def update_property(self, property_obj: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Update an existing property
         
         Args:
@@ -150,7 +150,7 @@ class PropertyService:
         logger.info(f"Updating property {property_obj.id}")
         return self.repository.update(property_obj, **kwargs)
     
-    def update_property_by_id(self, property_id: int, **kwargs) -> Optional[Property]:
+    def update_property_by_id(self, property_id: int, **kwargs) -> Optional[Dict[str, Any]]:
         """Update property by ID
         
         Args:
@@ -167,7 +167,7 @@ class PropertyService:
     # DELETE OPERATIONS
     # ============================================
 
-    def delete_property(self, property_obj: Property) -> bool:
+    def delete_property(self, property_obj: Dict[str, Any]) -> bool:
         """Delete a property
         
         Args:
@@ -198,7 +198,7 @@ class PropertyService:
     # BUSINESS LOGIC OPERATIONS
     # ============================================
 
-    def get_properties_with_jobs(self) -> List[Property]:
+    def get_properties_with_jobs(self) -> List[Dict[str, Any]]:
         """Get properties that have associated jobs
         
         Returns:
@@ -216,7 +216,7 @@ class PropertyService:
         logger.info("Retrieving property statistics")
         return self.repository.count_by_property_type()
     
-    def search_properties(self, **search_params) -> List[Property]:
+    def search_properties(self, **search_params) -> List[Dict[str, Any]]:
         """Advanced property search with multiple criteria
         
         Args:

@@ -4,8 +4,7 @@ TodoServiceRefactored - Refactored Todo service with repository pattern and Resu
 
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-from extensions import db
-from crm_database import Todo
+# Model and db imports removed - using repositories only
 from repositories.todo_repository import TodoRepository
 from services.common.result import Result
 
@@ -20,9 +19,11 @@ class TodoServiceRefactored:
         Args:
             todo_repository: TodoRepository for data access
         """
-        self.todo_repository = todo_repository or TodoRepository(db.session, Todo)
+        if not todo_repository:
+            raise ValueError("TodoRepository must be provided via dependency injection")
+        self.todo_repository = todo_repository
     
-    def get_user_todos(self, user_id: int, include_completed: bool = True) -> Result[List[Todo]]:
+    def get_user_todos(self, user_id: int, include_completed: bool = True) -> Result[List[Dict]]:
         """
         Get all todos for a user.
         
@@ -80,7 +81,7 @@ class TodoServiceRefactored:
                 code="REPOSITORY_ERROR"
             )
     
-    def create_todo(self, user_id: int, todo_data: Dict[str, Any]) -> Result[Todo]:
+    def create_todo(self, user_id: int, todo_data: Dict[str, Any]) -> Result[Dict]:
         """
         Create a new todo.
         
@@ -139,7 +140,7 @@ class TodoServiceRefactored:
                 code="TODO_CREATION_ERROR"
             )
     
-    def update_todo(self, todo_id: int, user_id: int, updates: Dict[str, Any]) -> Result[Todo]:
+    def update_todo(self, todo_id: int, user_id: int, updates: Dict[str, Any]) -> Result[Dict]:
         """
         Update an existing todo.
         
@@ -210,7 +211,7 @@ class TodoServiceRefactored:
                 code="TODO_UPDATE_ERROR"
             )
     
-    def toggle_todo_completion(self, todo_id: int, user_id: int) -> Result[Todo]:
+    def toggle_todo_completion(self, todo_id: int, user_id: int) -> Result[Dict]:
         """
         Toggle the completion status of a todo.
         
@@ -290,7 +291,7 @@ class TodoServiceRefactored:
                 code="TODO_DELETION_ERROR"
             )
     
-    def get_todo_by_id(self, todo_id: int, user_id: int) -> Result[Todo]:
+    def get_todo_by_id(self, todo_id: int, user_id: int) -> Result[Dict]:
         """
         Get a single todo by ID.
         
@@ -350,7 +351,7 @@ class TodoServiceRefactored:
                 code="REPOSITORY_ERROR"
             )
     
-    def serialize_todo(self, todo: Todo) -> Result[Dict[str, Any]]:
+    def serialize_todo(self, todo: Dict[str, Any]) -> Result[Dict[str, Any]]:
         """
         Serialize a Todo object to dictionary for API responses.
         Now an instance method instead of static.

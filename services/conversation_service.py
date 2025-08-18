@@ -3,7 +3,7 @@ ConversationService - Handles conversation listing, filtering, and management
 """
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
-from crm_database import Conversation, Activity
+# Model imports removed - using repositories only
 from repositories.conversation_repository import ConversationRepository
 from repositories.campaign_repository import CampaignRepository
 
@@ -73,7 +73,7 @@ class ConversationService:
     
     # Removed _apply_search_filter, _apply_type_filter, _apply_date_filter - moved to repository
     
-    def _enhance_conversations(self, conversations: List[Conversation]) -> List[Dict[str, Any]]:
+    def _enhance_conversations(self, conversations: List[Dict]) -> List[Dict[str, Any]]:
         """
         Enhance conversations with additional metadata
         

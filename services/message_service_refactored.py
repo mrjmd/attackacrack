@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from services.common.result import Result
-from crm_database import Conversation, Activity
+# Model imports removed - using repositories only
 
 
 class MessageServiceRefactored:
@@ -49,7 +49,7 @@ class MessageServiceRefactored:
     def get_or_create_conversation(self, 
                                    contact_id: int, 
                                    openphone_convo_id: Optional[str] = None, 
-                                   participants: Optional[List[str]] = None) -> Result[Conversation]:
+                                   participants: Optional[List[str]] = None) -> Result[Dict]:
         """
         Get existing conversation or create a new one.
         
@@ -105,7 +105,7 @@ class MessageServiceRefactored:
                 code="REPOSITORY_ERROR"
             )
     
-    def get_activities_for_contact(self, contact_id: int) -> Result[List[Activity]]:
+    def get_activities_for_contact(self, contact_id: int) -> Result[List[Dict]]:
         """
         Get all activities for a contact, sorted chronologically.
         
@@ -134,7 +134,7 @@ class MessageServiceRefactored:
                 code="REPOSITORY_ERROR"
             )
     
-    def get_latest_conversations_from_db(self, limit: int = 10) -> Result[List[Conversation]]:
+    def get_latest_conversations_from_db(self, limit: int = 10) -> Result[List[Dict]]:
         """
         Get the most recent conversations from the database.
         

@@ -5,8 +5,7 @@ Manages appointments with proper separation of concerns
 
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta, date
-from extensions import db
-from crm_database import Appointment, Contact
+# Model and db imports removed - using repositories only
 from services.google_calendar_service import GoogleCalendarService
 from repositories.appointment_repository import AppointmentRepository
 from logging_config import get_logger
@@ -20,31 +19,23 @@ class AppointmentService:
     def __init__(self, 
                  calendar_service: Optional[GoogleCalendarService] = None,
                  repository: Optional[AppointmentRepository] = None,
-                 session=None):
+):
         """
         Initialize AppointmentService with dependencies
         
         Args:
             calendar_service: GoogleCalendarService instance for calendar integration
             repository: AppointmentRepository for data access (preferred over session)
-            session: Database session (deprecated, use repository instead)
         """
         self.calendar_service = calendar_service
         
-        # Use repository if provided, otherwise fall back to session
+        # Repository must be injected
         if repository:
             self.repository = repository
-            # Don't store session when using repository pattern
-        elif session:
-            # Legacy: create repository on the fly from session
-            self.session = session
-            self.repository = AppointmentRepository(session, Appointment)
         else:
-            # Default: use db.session
-            self.session = db.session
-            self.repository = AppointmentRepository(db.session, Appointment)
+            raise ValueError("AppointmentRepository must be provided via dependency injection")
     
-    def add_appointment(self, **kwargs) -> Appointment:
+    def add_appointment(self, **kwargs) -> Dict:
         """
         Add a new appointment with optional Google Calendar sync
         
@@ -87,12 +78,12 @@ class AppointmentService:
         
         return new_appointment
     
-    def _sync_to_google_calendar(self, appointment: Appointment, options: Dict) -> Optional[str]:
+    def _sync_to_google_calendar(self, appointment: Dict, options: Dict) -> Optional[str]:
         """
         Sync appointment to Google Calendar
         
         Args:
-            appointment: Appointment instance to sync
+            appointment: Dict instance to sync
             options: Additional options (appt_type, etc.)
             
         Returns:
@@ -165,12 +156,12 @@ class AppointmentService:
         }
         return duration_map.get(appt_type, 0.5)
     
-    def _build_attendee_list(self, appointment: Appointment) -> List[str]:
+    def _build_attendee_list(self, appointment: Dict) -> List[str]:
         """
         Build list of attendee emails for calendar event
         
         Args:
-            appointment: Appointment instance
+            appointment: Dict instance
             
         Returns:
             List of email addresses
@@ -186,12 +177,12 @@ class AppointmentService:
         
         return attendees
     
-    def _build_calendar_description(self, appointment: Appointment) -> str:
+    def _build_calendar_description(self, appointment: Dict) -> str:
         """
         Build detailed description for calendar event
         
         Args:
-            appointment: Appointment instance
+            appointment: Dict instance
             
         Returns:
             Formatted description string
@@ -212,12 +203,12 @@ class AppointmentService:
         
         return "\n".join(description_parts)
     
-    def _get_appointment_location(self, appointment: Appointment) -> Optional[str]:
+    def _get_appointment_location(self, appointment: Dict) -> Optional[str]:
         """
         Get appointment location from contact's property
         
         Args:
-            appointment: Appointment instance
+            appointment: Dict instance
             
         Returns:
             Location string or None
@@ -228,7 +219,7 @@ class AppointmentService:
             return first_property.address
         return None
     
-    def get_all_appointments(self) -> List[Appointment]:
+    def get_all_appointments(self) -> List[Dict]:
         """
         Get all appointments
         
@@ -237,7 +228,7 @@ class AppointmentService:
         """
         return self.repository.get_all()
     
-    def get_appointment_by_id(self, appointment_id: int) -> Optional[Appointment]:
+    def get_appointment_by_id(self, appointment_id: int) -> Optional[Dict]:
         """
         Get appointment by ID
         
@@ -249,7 +240,7 @@ class AppointmentService:
         """
         return self.repository.get_by_id(appointment_id)
     
-    def get_appointments_for_contact(self, contact_id: int) -> List[Appointment]:
+    def get_appointments_for_contact(self, contact_id: int) -> List[Dict]:
         """
         Get all appointments for a specific contact
         
@@ -261,7 +252,7 @@ class AppointmentService:
         """
         return self.repository.find_by_contact_id(contact_id)
     
-    def get_upcoming_appointments(self, days: int = 7) -> List[Appointment]:
+    def get_upcoming_appointments(self, days: int = 7) -> List[Dict]:
         """
         Get upcoming appointments within specified days
         
@@ -276,12 +267,12 @@ class AppointmentService:
         
         return self.repository.find_by_date_range(today, end_date)
     
-    def update_appointment(self, appointment: Appointment, **kwargs) -> Appointment:
+    def update_appointment(self, appointment: Dict, **kwargs) -> Dict:
         """
         Update an existing appointment
         
         Args:
-            appointment: Appointment instance to update
+            appointment: Dict instance to update
             **kwargs: Fields to update
             
         Returns:
@@ -309,12 +300,12 @@ class AppointmentService:
         
         return appointment
     
-    def _update_google_calendar_event(self, appointment: Appointment) -> bool:
+    def _update_google_calendar_event(self, appointment: Dict) -> bool:
         """
         Update the Google Calendar event for an appointment
         
         Args:
-            appointment: Appointment with updated data
+            appointment: Dict with updated data
             
         Returns:
             True if successful, False otherwise
@@ -363,12 +354,12 @@ class AppointmentService:
         
         return False
     
-    def delete_appointment(self, appointment: Appointment) -> bool:
+    def delete_appointment(self, appointment: Dict) -> bool:
         """
         Delete an appointment and its Google Calendar event
         
         Args:
-            appointment: Appointment instance to delete
+            appointment: Dict instance to delete
             
         Returns:
             True if successful, False otherwise
@@ -407,14 +398,14 @@ class AppointmentService:
             return False
     
     def reschedule_appointment(self, 
-                              appointment: Appointment,
+                              appointment: Dict,
                               new_date: Any,
-                              new_time: Any) -> Appointment:
+                              new_time: Any) -> Dict:
         """
         Reschedule an appointment to a new date/time
         
         Args:
-            appointment: Appointment to reschedule
+            appointment: Dict to reschedule
             new_date: New date for the appointment
             new_time: New time for the appointment
             
@@ -427,12 +418,12 @@ class AppointmentService:
             time=new_time
         )
     
-    def cancel_appointment(self, appointment: Appointment) -> Appointment:
+    def cancel_appointment(self, appointment: Dict) -> Dict:
         """
         Cancel an appointment (mark as cancelled rather than delete)
         
         Args:
-            appointment: Appointment to cancel
+            appointment: Dict to cancel
             
         Returns:
             Updated Appointment instance

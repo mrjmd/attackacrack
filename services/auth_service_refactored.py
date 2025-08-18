@@ -9,9 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from flask_login import login_user as flask_login_user, logout_user as flask_logout_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy.orm import Session
-
-from crm_database import User, InviteToken, db
+# Model and Session imports removed - using repositories only
 from services.common.result import Result, PagedResult
 from repositories.user_repository import UserRepository
 from repositories.invite_token_repository import InviteTokenRepository
@@ -23,7 +21,7 @@ logger = logging.getLogger(__name__)
 class AuthService:
     """Service for authentication and authorization using Result pattern"""
     
-    def __init__(self, email_service=None, session: Optional[Session] = None, 
+    def __init__(self, email_service=None,
                  user_repository: Optional[UserRepository] = None,
                  invite_repository: Optional[InviteTokenRepository] = None):
         """
@@ -31,16 +29,17 @@ class AuthService:
         
         Args:
             email_service: Email service for sending invites
-            session: Database session
             user_repository: User repository for data access
             invite_repository: Invite token repository for data access
         """
         self.email_service = email_service
-        self.session = session or db.session
         
-        # Initialize repositories with dependency injection
-        self.user_repository = user_repository or UserRepository(self.session, User)
-        self.invite_repository = invite_repository or InviteTokenRepository(self.session, InviteToken)
+        # Repositories must be injected
+        self.user_repository = user_repository
+        self.invite_repository = invite_repository
+        
+        if not self.user_repository or not self.invite_repository:
+            raise ValueError("User and Invite repositories must be provided via dependency injection")
     
     def validate_password(self, password: str) -> Result[str]:
         """
@@ -70,7 +69,7 @@ class AuthService:
         return Result.success("Password is valid")
     
     def create_user(self, email: str, password: str, first_name: str, last_name: str,
-                   role: str = 'marketer', is_active: bool = True) -> Result[User]:
+                   role: str = 'marketer', is_active: bool = True) -> Result[Dict[str, Any]]:
         """
         Create a new user.
         
@@ -83,7 +82,7 @@ class AuthService:
             is_active: Whether user is active
             
         Returns:
-            Result[User]: Success with user or failure with error
+            Result[Dict[str, Any]]: Success with user or failure with error
         """
         # Validate password
         password_result = self.validate_password(password)
@@ -115,7 +114,7 @@ class AuthService:
             logger.error(f"Failed to create user: {str(e)}")
             return Result.failure(f"Failed to create user: {str(e)}", code="DATABASE_ERROR")
     
-    def authenticate_user(self, email: str, password: str) -> Result[User]:
+    def authenticate_user(self, email: str, password: str) -> Result[Dict[str, Any]]:
         """
         Authenticate a user.
         
@@ -124,7 +123,7 @@ class AuthService:
             password: User password
             
         Returns:
-            Result[User]: Success with user or failure with error
+            Result[Dict[str, Any]]: Success with user or failure with error
         """
         # Find user using repository
         user = self.user_repository.find_by_email(email)
@@ -145,7 +144,7 @@ class AuthService:
         
         return Result.success(user, metadata={"last_login": login_time})
     
-    def login_user(self, user: User, remember: bool = False) -> Result[bool]:
+    def login_user(self, user: Dict[str, Any], remember: bool = False) -> Result[bool]:
         """
         Log in a user using Flask-Login.
         
@@ -174,7 +173,7 @@ class AuthService:
         flask_logout_user()
         return Result.success(True)
     
-    def get_user_by_id(self, user_id: int) -> Result[User]:
+    def get_user_by_id(self, user_id: int) -> Result[Dict[str, Any]]:
         """
         Get user by ID.
         
@@ -182,14 +181,14 @@ class AuthService:
             user_id: User ID
             
         Returns:
-            Result[User]: Success with user or failure
+            Result[Dict[str, Any]]: Success with user or failure
         """
         user = self.user_repository.get_by_id(user_id)
         if user:
             return Result.success(user)
         return Result.failure(f"User not found: {user_id}", code="USER_NOT_FOUND")
     
-    def get_user_by_email(self, email: str) -> Result[User]:
+    def get_user_by_email(self, email: str) -> Result[Dict[str, Any]]:
         """
         Get user by email.
         
@@ -197,14 +196,14 @@ class AuthService:
             email: User email
             
         Returns:
-            Result[User]: Success with user or failure
+            Result[Dict[str, Any]]: Success with user or failure
         """
         user = self.user_repository.find_by_email(email)
         if user:
             return Result.success(user)
         return Result.failure(f"User not found: {email}", code="USER_NOT_FOUND")
     
-    def get_all_users(self, page: int = 1, per_page: int = 50) -> PagedResult[List[User]]:
+    def get_all_users(self, page: int = 1, per_page: int = 50) -> PagedResult[List[Dict[str, Any]]]:
         """
         Get all users with pagination.
         
@@ -213,7 +212,7 @@ class AuthService:
             per_page: Items per page
             
         Returns:
-            PagedResult[List[User]]: Paginated users
+            PagedResult[List[Dict[str, Any]]]: Paginated users
         """
         try:
             pagination_params = PaginationParams(page=page, per_page=per_page)
@@ -228,7 +227,7 @@ class AuthService:
         except Exception as e:
             return PagedResult.failure(f"Failed to get users: {str(e)}", code="DATABASE_ERROR")
     
-    def update_user(self, user_id: int, **kwargs) -> Result[User]:
+    def update_user(self, user_id: int, **kwargs) -> Result[Dict[str, Any]]:
         """
         Update user attributes.
         
@@ -237,7 +236,7 @@ class AuthService:
             **kwargs: Attributes to update
             
         Returns:
-            Result[User]: Success with updated user or failure
+            Result[Dict[str, Any]]: Success with updated user or failure
         """
         user_result = self.get_user_by_id(user_id)
         if user_result.is_failure:
@@ -296,7 +295,7 @@ class AuthService:
             return Result.failure(f"Failed to change password: {str(e)}", code="UPDATE_FAILED")
     
     def create_invite(self, email: str, role: str = 'marketer', 
-                     invited_by_id: Optional[int] = None) -> Result[InviteToken]:
+                     invited_by_id: Optional[int] = None) -> Result[Dict[str, Any]]:
         """
         Create an invite token.
         
@@ -306,7 +305,7 @@ class AuthService:
             invited_by_id: ID of user creating invite
             
         Returns:
-            Result[InviteToken]: Success with token or failure
+            Result[Dict[str, Any]]: Success with token or failure
         """
         # Check if user already exists using repository
         existing_user = self.user_repository.find_by_email(email)
@@ -340,7 +339,7 @@ class AuthService:
             logger.error(f"Failed to create invite: {str(e)}")
             return Result.failure(f"Failed to create invite: {str(e)}", code="DATABASE_ERROR")
     
-    def send_invite_email(self, invite: InviteToken, base_url: str) -> Result[bool]:
+    def send_invite_email(self, invite: Dict[str, Any], base_url: str) -> Result[bool]:
         """
         Send invite email.
         
@@ -367,7 +366,7 @@ class AuthService:
             logger.error(f"Failed to send invite email: {str(e)}")
             return Result.failure(f"Failed to send email: {str(e)}", code="EMAIL_SEND_FAILED")
     
-    def validate_invite(self, token: str) -> Result[InviteToken]:
+    def validate_invite(self, token: str) -> Result[Dict[str, Any]]:
         """
         Validate an invite token.
         
@@ -375,7 +374,7 @@ class AuthService:
             token: Invite token
             
         Returns:
-            Result[InviteToken]: Success with token or failure
+            Result[Dict[str, Any]]: Success with token or failure
         """
         invite = self.invite_repository.find_by_token(token)
         
@@ -390,7 +389,7 @@ class AuthService:
         
         return Result.success(invite)
     
-    def use_invite(self, token: str, password: str, first_name: str, last_name: str) -> Result[User]:
+    def use_invite(self, token: str, password: str, first_name: str, last_name: str) -> Result[Dict[str, Any]]:
         """
         Use an invite to create a user.
         
@@ -401,7 +400,7 @@ class AuthService:
             last_name: User last name
             
         Returns:
-            Result[User]: Success with created user or failure
+            Result[Dict[str, Any]]: Success with created user or failure
         """
         # Validate invite
         invite_result = self.validate_invite(token)
@@ -429,7 +428,7 @@ class AuthService:
         
         return user_result
     
-    def toggle_user_status(self, user_id: int) -> Result[User]:
+    def toggle_user_status(self, user_id: int) -> Result[Dict[str, Any]]:
         """
         Toggle user active status.
         
@@ -437,7 +436,7 @@ class AuthService:
             user_id: User ID
             
         Returns:
-            Result[User]: Success with updated user or failure
+            Result[Dict[str, Any]]: Success with updated user or failure
         """
         user_result = self.get_user_by_id(user_id)
         if user_result.is_failure:

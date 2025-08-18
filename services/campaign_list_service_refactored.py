@@ -9,7 +9,7 @@ from services.common.result import Result
 from repositories.campaign_list_repository import CampaignListRepository
 from repositories.campaign_list_member_repository import CampaignListMemberRepository
 from repositories.contact_repository import ContactRepository
-from crm_database import CampaignList, CampaignListMember, Contact
+# Model imports removed - using repositories only
 import logging
 
 logger = logging.getLogger(__name__)

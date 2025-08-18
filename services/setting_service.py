@@ -3,9 +3,9 @@ SettingService - Business logic for settings management
 Implements template retrieval and management functionality.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from repositories.setting_repository import SettingRepository
-from crm_database import Setting
+# Model imports removed - using repositories only
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class SettingService:
         """Get the review request template"""
         return self.get_template_by_key('review_request_template')
     
-    def get_all_templates(self) -> List[Setting]:
+    def get_all_templates(self) -> List[Dict[str, Any]]:
         """
         Get all settings that are templates (keys ending with '_template').
         
@@ -73,7 +73,7 @@ class SettingService:
         self.repository.update(setting, value=new_value)
         return True
     
-    def create_template(self, template_key: str, template_value: str) -> Setting:
+    def create_template(self, template_key: str, template_value: str) -> Dict[str, Any]:
         """
         Create a new template setting.
         

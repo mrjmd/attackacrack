@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from crm_database import Quote, QuoteLineItem
+# Model imports removed - using repositories only
 from repositories.quote_repository import QuoteRepository
 from repositories.quote_line_item_repository import QuoteLineItemRepository
 from services.common.result import Result
@@ -18,7 +18,7 @@ class QuoteService:
         self.quote_repository = quote_repository
         self.line_item_repository = line_item_repository
 
-    def get_all_quotes(self) -> List[Quote]:
+    def get_all_quotes(self) -> List[Dict[str, Any]]:
         """Get all quotes ordered by ID descending.
         
         Returns:
@@ -26,7 +26,7 @@ class QuoteService:
         """
         return self.quote_repository.find_all_ordered_by_id_desc()
 
-    def get_quote_by_id(self, quote_id: int) -> Optional[Quote]:
+    def get_quote_by_id(self, quote_id: int) -> Optional[Dict[str, Any]]:
         """Get a quote by ID.
         
         Args:
@@ -51,7 +51,7 @@ class QuoteService:
             total += self.line_item_repository.calculate_line_total(item_data)
         return total
 
-    def create_quote(self, data: Dict[str, Any]) -> Result[Quote]:
+    def create_quote(self, data: Dict[str, Any]) -> Result[Dict[str, Any]]:
         """Create a new quote with line items.
         
         Args:
@@ -83,7 +83,7 @@ class QuoteService:
             logger.error("Error creating quote", error=str(e))
             return Result.failure(str(e))
 
-    def update_quote(self, quote_id: int, data: Dict[str, Any]) -> Result[Quote]:
+    def update_quote(self, quote_id: int, data: Dict[str, Any]) -> Result[Dict[str, Any]]:
         """Update an existing quote and its line items.
         
         Args:
@@ -135,7 +135,7 @@ class QuoteService:
             logger.error("Error updating quote", error=str(e), quote_id=quote_id)
             return Result.failure(str(e))
 
-    def delete_quote(self, quote_id: int) -> Result[Quote]:
+    def delete_quote(self, quote_id: int) -> Result[Dict[str, Any]]:
         """Delete a quote and its line items.
         
         Args:
