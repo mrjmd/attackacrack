@@ -6,15 +6,18 @@ import uuid
 import logging
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
-from crm_database import db, Activity, Contact
+from repositories.contact_repository import ContactRepository
+from repositories.activity_repository import ActivityRepository
 
 
 class OpenPhoneSyncService:
     """Service for managing OpenPhone data synchronization"""
     
-    def __init__(self):
-        """Initialize the OpenPhoneSyncService"""
+    def __init__(self, contact_repository: ContactRepository = None, activity_repository: ActivityRepository = None):
+        """Initialize the OpenPhoneSyncService with repository dependencies"""
         self.logger = logging.getLogger(__name__)
+        self.contact_repository = contact_repository
+        self.activity_repository = activity_repository
     
     def get_sync_statistics(self) -> Dict[str, Any]:
         """
@@ -24,15 +27,13 @@ class OpenPhoneSyncService:
             Dictionary containing sync statistics
         """
         stats = {
-            'total_contacts': Contact.query.filter(Contact.phone.isnot(None)).count(),
-            'total_messages': Activity.query.filter_by(activity_type='sms').count(),
+            'total_contacts': self.contact_repository.count_with_phone(),
+            'total_messages': self.activity_repository.count_by_type('sms'),
             'last_sync': None
         }
         
         # Get last sync time (most recent message)
-        last_activity = Activity.query.filter_by(
-            activity_type='sms'
-        ).order_by(Activity.created_at.desc()).first()
+        last_activity = self.activity_repository.find_latest_by_type('sms')
         
         if last_activity:
             stats['last_sync'] = last_activity.created_at
@@ -156,11 +157,7 @@ class OpenPhoneSyncService:
         Returns:
             List of recent sync activities
         """
-        recent_activities = Activity.query.filter_by(
-            activity_type='sms'
-        ).order_by(
-            Activity.created_at.desc()
-        ).limit(limit).all()
+        recent_activities = self.activity_repository.find_recent_by_type_with_contact('sms', limit=limit)
         
         return [
             {

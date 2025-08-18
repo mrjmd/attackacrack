@@ -1010,3 +1010,14 @@ class ContactRepository(BaseRepository[Contact]):
                     result.append(contact)
         
         return result
+    
+    def count_with_phone(self) -> int:
+        """
+        Count contacts that have phone numbers.
+        
+        Returns:
+            Count of contacts with non-null phone numbers
+        """
+        return self.session.query(Contact).filter(
+            Contact.phone.isnot(None)
+        ).count()

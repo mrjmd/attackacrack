@@ -625,8 +625,20 @@ def _create_csv_import_service(contact, db_session):
 def _create_openphone_sync_service(openphone, db_session):
     """Create OpenPhoneSyncService with dependencies"""
     from services.openphone_sync_service import OpenPhoneSyncService
+    from repositories.contact_repository import ContactRepository
+    from repositories.activity_repository import ActivityRepository
+    from crm_database import Contact, Activity
+    
     logger.info("Initializing OpenPhoneSyncService")
-    return OpenPhoneSyncService()
+    
+    # Create repository instances
+    contact_repo = ContactRepository(db_session, Contact)
+    activity_repo = ActivityRepository(db_session, Activity)
+    
+    return OpenPhoneSyncService(
+        contact_repository=contact_repo,
+        activity_repository=activity_repo
+    )
 
 def _create_openphone_webhook_service(contact, sms_metrics):
     """Create OpenPhoneWebhookService with dependencies"""

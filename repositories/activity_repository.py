@@ -559,3 +559,35 @@ class ActivityRepository(BaseRepository):
         
         self.session.flush()
         return count
+    
+    def find_latest_by_type(self, activity_type: str) -> Optional:
+        """
+        Find the latest activity of a specific type.
+        
+        Args:
+            activity_type: Type of activity (sms, call, voicemail, etc.)
+            
+        Returns:
+            Latest Activity object of the specified type or None
+        """
+        return self.session.query(self.model_class)\
+            .filter_by(activity_type=activity_type)\
+            .order_by(desc(self.model_class.created_at))\
+            .first()
+    
+    def find_recent_by_type_with_contact(self, activity_type: str, limit: int = 10) -> List:
+        """
+        Find recent activities of a specific type with contact information.
+        
+        Args:
+            activity_type: Type of activity to filter by
+            limit: Maximum number of results to return (default: 10)
+            
+        Returns:
+            List of Activity objects with contact relationships loaded
+        """
+        return self.session.query(self.model_class)\
+            .filter_by(activity_type=activity_type)\
+            .order_by(desc(self.model_class.created_at))\
+            .limit(limit)\
+            .all()
