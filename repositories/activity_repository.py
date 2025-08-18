@@ -2,9 +2,9 @@
 ActivityRepository - Data access layer for Activity model
 """
 
-from typing import List, Optional
-from datetime import datetime
-from sqlalchemy import desc
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
+from sqlalchemy import desc, func
 from repositories.base_repository import BaseRepository, PaginatedResult
 
 
@@ -207,3 +207,84 @@ class ActivityRepository(BaseRepository):
             .order_by(desc(self.model_class.created_at))\
             .limit(100)\
             .all()
+    
+    # Dashboard-specific methods
+    
+    def get_message_volume_data(self, days: int = 7) -> List[Dict[str, Any]]:
+        """
+        Get message volume data for the last N days.
+        
+        Args:
+            days: Number of days to look back
+            
+        Returns:
+            List of dictionaries with date and count for each day
+        """
+        from datetime import datetime, timedelta
+        
+        message_volume_data = []
+        for i in range(days):
+            day = datetime.utcnow().date() - timedelta(days=days-1-i)
+            count = self.session.query(self.model_class).filter(
+                self.model_class.activity_type == 'message',
+                func.date(self.model_class.created_at) == day
+            ).count()
+            message_volume_data.append({'date': day, 'count': count})
+            
+        return message_volume_data
+    
+    def get_messages_sent_today_count(self) -> int:
+        """
+        Get count of outgoing messages sent today.
+        
+        Returns:
+            Number of outgoing messages sent today
+        """
+        from datetime import datetime
+        
+        today = datetime.utcnow().date()
+        return self.session.query(self.model_class).filter(
+            self.model_class.activity_type == 'message',
+            self.model_class.direction == 'outgoing',
+            func.date(self.model_class.created_at) == today
+        ).count()
+    
+    def calculate_overall_response_rate(self) -> float:
+        """
+        Calculate overall response rate (incoming vs outgoing messages).
+        
+        Returns:
+            Response rate as percentage (0-100)
+        """
+        total_outgoing = self.session.query(self.model_class).filter(
+            self.model_class.activity_type == 'message',
+            self.model_class.direction == 'outgoing'
+        ).count()
+        
+        if total_outgoing == 0:
+            return 0
+        
+        total_incoming = self.session.query(self.model_class).filter(
+            self.model_class.activity_type == 'message',
+            self.model_class.direction == 'incoming'
+        ).count()
+        
+        return round((total_incoming / total_outgoing) * 100, 1)
+    
+    def get_distinct_contacts_with_recent_activity(self, days: int = 7) -> int:
+        """
+        Get count of distinct contacts with activity in the last N days.
+        
+        Args:
+            days: Number of days to look back
+            
+        Returns:
+            Number of distinct contacts with recent activity
+        """
+        from datetime import datetime, timedelta
+        
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        return self.session.query(self.model_class.contact_id).filter(
+            self.model_class.created_at >= cutoff_date,
+            self.model_class.contact_id.isnot(None)
+        ).distinct().count()

@@ -67,6 +67,31 @@ def create_app(config_name=None, test_config=None):
     # Register base services (no dependencies)
     registry.register('db_session', service=db.session)
     
+    # Register repository services
+    registry.register_factory(
+        'contact_repository',
+        lambda db_session: _create_contact_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'campaign_repository', 
+        lambda db_session: _create_campaign_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'activity_repository',
+        lambda db_session: _create_activity_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'conversation_repository',
+        lambda db_session: _create_conversation_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Register services with lazy loading factories
     # These won't be instantiated until first use
     
@@ -78,6 +103,7 @@ def create_app(config_name=None, test_config=None):
     registry.register_singleton('job', lambda: _create_job_service())
     registry.register_singleton('quote', lambda: _create_quote_service())
     registry.register_singleton('invoice', lambda: _create_invoice_service())
+    registry.register_singleton('sms_metrics', lambda: _create_sms_metrics_service())
     
     # Property service with database dependency
     registry.register_factory(
@@ -126,8 +152,8 @@ def create_app(config_name=None, test_config=None):
     
     registry.register_factory(
         'dashboard',
-        lambda db_session: _create_dashboard_service(db_session),
-        dependencies=['db_session']
+        lambda contact_repository, campaign_repository, activity_repository, conversation_repository: _create_dashboard_service_with_repositories(contact_repository, campaign_repository, activity_repository, conversation_repository),
+        dependencies=['contact_repository', 'campaign_repository', 'activity_repository', 'conversation_repository']
     )
     
     registry.register_factory(
@@ -356,19 +382,19 @@ def _create_contact_service():
 
 def _create_message_service():
     """Create MessageService instance"""
-    from services.message_service import MessageService
+    from services.message_service_refactored import MessageService
     logger.info("Initializing MessageService")
     return MessageService()
 
 def _create_todo_service():
     """Create TodoService instance"""
-    from services.todo_service import TodoService
+    from services.todo_service_refactored import TodoService
     logger.info("Initializing TodoService")
     return TodoService()
 
 def _create_auth_service():
     """Create AuthService instance"""
-    from services.auth_service import AuthService
+    from services.auth_service_refactored import AuthService
     logger.info("Initializing AuthService")
     return AuthService()
 
@@ -410,9 +436,15 @@ def _create_quote_service():
 
 def _create_invoice_service():
     """Create InvoiceService instance"""
-    from services.invoice_service import InvoiceService
+    from services.invoice_service_refactored import InvoiceService
     logger.info("Initializing InvoiceService")
     return InvoiceService()
+
+def _create_sms_metrics_service():
+    """Create SMSMetricsService instance"""
+    from services.sms_metrics_service import SMSMetricsService
+    logger.info("Initializing SMSMetricsService")
+    return SMSMetricsService()
 
 def _create_openphone_service():
     """Create OpenPhoneService instance - expensive due to API validation"""
@@ -488,10 +520,46 @@ def _create_campaign_list_service(db_session):
     return CampaignListService()
 
 def _create_dashboard_service(db_session):
-    """Create DashboardService with dependencies"""
+    """Create DashboardService with dependencies (deprecated - use repository version)"""
     from services.dashboard_service import DashboardService
     logger.info("Initializing DashboardService")
     return DashboardService()
+
+def _create_dashboard_service_with_repositories(contact_repository, campaign_repository, activity_repository, conversation_repository):
+    """Create DashboardService with repository dependencies"""
+    from services.dashboard_service import DashboardService
+    logger.info("Initializing DashboardService with repository pattern")
+    return DashboardService(
+        contact_repository=contact_repository,
+        campaign_repository=campaign_repository,
+        activity_repository=activity_repository,
+        conversation_repository=conversation_repository
+    )
+
+# Repository creation functions
+def _create_contact_repository(db_session):
+    """Create ContactRepository instance"""
+    from repositories.contact_repository import ContactRepository
+    from crm_database import Contact
+    return ContactRepository(session=db_session, model_class=Contact)
+
+def _create_campaign_repository(db_session):
+    """Create CampaignRepository instance"""
+    from repositories.campaign_repository import CampaignRepository
+    from crm_database import Campaign
+    return CampaignRepository(session=db_session, model_class=Campaign)
+
+def _create_activity_repository(db_session):
+    """Create ActivityRepository instance"""
+    from repositories.activity_repository import ActivityRepository
+    from crm_database import Activity
+    return ActivityRepository(session=db_session, model_class=Activity)
+
+def _create_conversation_repository(db_session):
+    """Create ConversationRepository instance"""
+    from repositories.conversation_repository import ConversationRepository
+    from crm_database import Conversation
+    return ConversationRepository(session=db_session, model_class=Conversation)
 
 def _create_conversation_service(db_session):
     """Create ConversationService with dependencies"""
@@ -519,7 +587,7 @@ def _create_sync_health_service(db_session):
 
 def _create_campaign_service(openphone, campaign_list):
     """Create CampaignService with dependencies"""
-    from services.campaign_service import CampaignService
+    from services.campaign_service_refactored import CampaignService
     logger.info("Initializing CampaignService")
     return CampaignService(
         openphone_service=openphone,

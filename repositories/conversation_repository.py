@@ -438,3 +438,26 @@ class ConversationRepository(BaseRepository):
         ).group_by(Activity.conversation_id).all()
         
         return {conv_id: count for conv_id, count in results}
+    
+    # Dashboard-specific methods
+    
+    def get_recent_conversations_with_activities(self, limit: int = 20) -> List:
+        """
+        Get recent conversations with activities and contacts preloaded.
+        Only returns conversations that have activities.
+        
+        Args:
+            limit: Maximum number of conversations to return
+            
+        Returns:
+            List of Conversation objects with contact and activities preloaded
+        """
+        return self.session.query(self.model_class).options(
+            joinedload(Conversation.contact),
+            selectinload(Conversation.activities)
+        ).filter(
+            self.model_class.last_activity_at.isnot(None),
+            exists().where(Activity.conversation_id == Conversation.id)
+        ).order_by(
+            desc(self.model_class.last_activity_at)
+        ).limit(limit).all()

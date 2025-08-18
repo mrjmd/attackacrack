@@ -6,7 +6,7 @@ Isolates all database queries related to campaigns
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from sqlalchemy import and_, or_, func, desc, asc
-from sqlalchemy.orm import joinedload, Query
+from sqlalchemy.orm import joinedload, selectinload, Query
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult, SortOrder
 from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity
 import logging
@@ -563,3 +563,71 @@ class CampaignRepository(BaseRepository[Campaign]):
         return self.session.query(Campaign).filter(
             Campaign.status.in_(statuses)
         ).all()
+    
+    # Dashboard-specific methods
+    
+    def get_active_campaigns_count(self) -> int:
+        """
+        Get count of active/running campaigns.
+        
+        Returns:
+            Number of campaigns with status 'running'
+        """
+        return self.session.query(Campaign).filter_by(status='running').count()
+    
+    def get_recent_campaigns_with_limit(self, limit: int = 3) -> List[Campaign]:
+        """
+        Get recently created campaigns with limit.
+        
+        Args:
+            limit: Maximum number of campaigns to return
+            
+        Returns:
+            List of recent campaigns ordered by created_at desc
+        """
+        return self.session.query(Campaign).order_by(
+            desc(Campaign.created_at)
+        ).limit(limit).all()
+    
+    def calculate_average_campaign_response_rate(self) -> float:
+        """
+        Calculate average response rate across all campaigns with memberships.
+        
+        Returns:
+            Average response rate as percentage (0-100)
+        """
+        # Get all campaigns with their memberships using eager loading
+        campaigns = self.session.query(Campaign).options(
+            selectinload(Campaign.memberships)
+        ).all()
+        
+        if not campaigns:
+            return 0
+        
+        response_rates = []
+        
+        for campaign in campaigns:
+            # Calculate response rate for this campaign
+            sent_statuses = ['sent', 'replied_positive', 'replied_negative']
+            replied_statuses = ['replied_positive', 'replied_negative']
+            
+            sent_count = sum(1 for m in campaign.memberships if m.status in sent_statuses)
+            
+            if sent_count > 0:
+                replied_count = sum(1 for m in campaign.memberships if m.status in replied_statuses)
+                response_rate = (replied_count / sent_count) * 100
+                response_rates.append(response_rate)
+        
+        if not response_rates:
+            return 0
+        
+        return round(sum(response_rates) / len(response_rates), 1)
+    
+    def get_pending_campaign_queue_size(self) -> int:
+        """
+        Get count of pending campaign messages across all campaigns.
+        
+        Returns:
+            Number of campaign memberships with status 'pending'
+        """
+        return self.session.query(CampaignMembership).filter_by(status='pending').count()

@@ -1,49 +1,80 @@
 """
 Dashboard Service
 Handles all business logic for dashboard statistics and activity feeds
+Refactored to use Repository Pattern
 """
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Any
-from sqlalchemy import func
-from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy import exists
+from typing import Dict, List, Any, Optional
+from flask import current_app
 
-from crm_database import (
-    db, Contact, Campaign, CampaignMembership, 
-    Activity, Conversation
-)
 from services.sms_metrics_service import SMSMetricsService
 
 
 class DashboardService:
-    """Service for dashboard data and statistics"""
+    """Service for dashboard data and statistics using Repository Pattern"""
     
-    def __init__(self):
+    def __init__(self, contact_repository=None, campaign_repository=None, 
+                 activity_repository=None, conversation_repository=None):
         self.metrics_service = SMSMetricsService()
+        
+        # Repository dependencies (injected or retrieved from service registry)
+        self.contact_repository = contact_repository
+        self.campaign_repository = campaign_repository
+        self.activity_repository = activity_repository
+        self.conversation_repository = conversation_repository
+    
+    def _get_contact_repository(self):
+        """Get contact repository (lazy load from service registry if not injected)"""
+        if self.contact_repository is None:
+            self.contact_repository = current_app.services.get('contact_repository')
+        return self.contact_repository
+        
+    def _get_campaign_repository(self):
+        """Get campaign repository (lazy load from service registry if not injected)"""
+        if self.campaign_repository is None:
+            self.campaign_repository = current_app.services.get('campaign_repository')
+        return self.campaign_repository
+        
+    def _get_activity_repository(self):
+        """Get activity repository (lazy load from service registry if not injected)"""
+        if self.activity_repository is None:
+            self.activity_repository = current_app.services.get('activity_repository')
+        return self.activity_repository
+        
+    def _get_conversation_repository(self):
+        """Get conversation repository (lazy load from service registry if not injected)"""
+        if self.conversation_repository is None:
+            self.conversation_repository = current_app.services.get('conversation_repository')
+        return self.conversation_repository
     
     def get_dashboard_stats(self) -> Dict[str, Any]:
         """
-        Get all dashboard statistics
+        Get all dashboard statistics using repositories
         Returns dict with all stats for dashboard cards
         """
         stats = {}
         
-        # Basic counts
-        stats['contact_count'] = self._get_total_contacts()
-        stats['contacts_added_this_week'] = self._get_contacts_added_this_week()
-        stats['active_campaigns'] = self._get_active_campaigns()
+        # Get repositories
+        contact_repo = self._get_contact_repository()
+        campaign_repo = self._get_campaign_repository()
+        activity_repo = self._get_activity_repository()
         
-        # Campaign metrics
-        stats['campaign_response_rate'] = self._calculate_avg_campaign_response_rate()
+        # Basic counts using repository methods
+        stats['contact_count'] = contact_repo.get_total_contacts_count()
+        stats['contacts_added_this_week'] = contact_repo.get_contacts_added_this_week_count()
+        stats['active_campaigns'] = campaign_repo.get_active_campaigns_count()
+        
+        # Campaign metrics using repository methods
+        stats['campaign_response_rate'] = campaign_repo.calculate_average_campaign_response_rate()
         
         # Revenue (placeholder for now)
         stats['monthly_revenue'] = 12500  # TODO: Implement actual revenue tracking
         stats['revenue_growth'] = 8.5  # TODO: Calculate actual growth
         
-        # Messaging metrics
-        stats['messages_today'] = self._get_messages_sent_today()
-        stats['overall_response_rate'] = self._calculate_overall_response_rate()
+        # Messaging metrics using repository methods
+        stats['messages_today'] = activity_repo.get_messages_sent_today_count()
+        stats['overall_response_rate'] = activity_repo.calculate_overall_response_rate()
         
         # SMS bounce metrics (30 day)
         sms_metrics = self.metrics_service.get_global_metrics(days=30)
@@ -56,11 +87,12 @@ class DashboardService:
     
     def get_activity_timeline(self, limit: int = 20) -> List[Dict[str, Any]]:
         """
-        Get recent activity for the dashboard timeline
+        Get recent activity for the dashboard timeline using repository
         Returns list of formatted activity items
         """
-        # Get conversations with recent activity
-        conversations = self._get_recent_conversations(limit)
+        # Get conversations with recent activity using repository
+        conversation_repo = self._get_conversation_repository()
+        conversations = conversation_repo.get_recent_conversations_with_activities(limit=limit)
         
         timeline_items = []
         for conv in conversations:
@@ -75,120 +107,31 @@ class DashboardService:
         
         return timeline_items
     
-    def get_recent_campaigns(self, limit: int = 3) -> List[Campaign]:
-        """Get recently created campaigns"""
-        return Campaign.query.order_by(Campaign.created_at.desc()).limit(limit).all()
+    def get_recent_campaigns(self, limit: int = 3):
+        """Get recently created campaigns using repository"""
+        campaign_repo = self._get_campaign_repository()
+        return campaign_repo.get_recent_campaigns_with_limit(limit=limit)
     
     def get_message_volume_data(self, days: int = 7) -> List[Dict[str, Any]]:
-        """Get message volume data for the last N days"""
-        message_volume_data = []
-        for i in range(days):
-            day = datetime.utcnow().date() - timedelta(days=days-1-i)
-            count = Activity.query.filter(
-                Activity.activity_type == 'message',
-                func.date(Activity.created_at) == day
-            ).count()
-            message_volume_data.append({'date': day, 'count': count})
-        return message_volume_data
+        """Get message volume data for the last N days using repository"""
+        activity_repo = self._get_activity_repository()
+        return activity_repo.get_message_volume_data(days=days)
     
     def get_campaign_queue_size(self) -> int:
-        """Get number of pending campaign messages"""
-        return CampaignMembership.query.filter_by(status='pending').count()
+        """Get number of pending campaign messages using repository"""
+        campaign_repo = self._get_campaign_repository()
+        return campaign_repo.get_pending_campaign_queue_size()
     
     def get_data_quality_score(self) -> int:
-        """Calculate data quality score (percentage of contacts with complete info)"""
-        from crm_database import Contact
-        total_contacts = Contact.query.count()
-        if total_contacts == 0:
-            return 0
-            
-        contacts_with_names = Contact.query.filter(~Contact.first_name.like('%+1%')).count()
-        contacts_with_emails = Contact.query.filter(
-            Contact.email.isnot(None), 
-            Contact.email != ''
-        ).count()
-        
-        return round(((contacts_with_names + contacts_with_emails) / (total_contacts * 2)) * 100)
+        """Calculate data quality score using repository"""
+        contact_repo = self._get_contact_repository()
+        quality_stats = contact_repo.get_data_quality_stats()
+        return quality_stats['data_quality_score']
     
     # Private helper methods
+    # All database queries now use repository pattern
     
-    def _get_total_contacts(self) -> int:
-        """Get total number of contacts"""
-        return Contact.query.count()
-    
-    def _get_contacts_added_this_week(self) -> int:
-        """Get number of contacts added in the last 7 days"""
-        week_ago = datetime.utcnow() - timedelta(days=7)
-        # Using Activity records as proxy since Contact doesn't have created_at
-        return Activity.query.filter(
-            Activity.created_at >= week_ago,
-            Activity.contact_id.isnot(None)
-        ).distinct(Activity.contact_id).count()
-    
-    def _get_active_campaigns(self) -> int:
-        """Get number of active campaigns"""
-        return Campaign.query.filter_by(status='running').count()
-    
-    def _calculate_avg_campaign_response_rate(self) -> float:
-        """Calculate average response rate across all campaigns"""
-        # Use eager loading to get campaigns with their memberships
-        all_campaigns = Campaign.query.options(
-            selectinload(Campaign.memberships)
-        ).all()
-        
-        response_rates = []
-        try:
-            for campaign in all_campaigns:
-                # Calculate response rate using pre-loaded memberships
-                sent_count = sum(1 for m in campaign.memberships 
-                                if m.status in ['sent', 'replied_positive', 'replied_negative'])
-                if sent_count > 0:
-                    replied_count = sum(1 for m in campaign.memberships 
-                                      if m.status in ['replied_positive', 'replied_negative'])
-                    response_rate = (replied_count / sent_count) * 100
-                    response_rates.append(response_rate)
-        except Exception as e:
-            # Log error but don't crash dashboard
-            pass
-        
-        return round(sum(response_rates) / len(response_rates), 1) if response_rates else 0
-    
-    def _get_messages_sent_today(self) -> int:
-        """Get count of messages sent today"""
-        today = datetime.utcnow().date()
-        return Activity.query.filter(
-            Activity.activity_type == 'message',
-            Activity.direction == 'outgoing',
-            func.date(Activity.created_at) == today
-        ).count()
-    
-    def _calculate_overall_response_rate(self) -> float:
-        """Calculate overall response rate (incoming vs outgoing messages)"""
-        total_outgoing = Activity.query.filter(
-            Activity.activity_type == 'message',
-            Activity.direction == 'outgoing'
-        ).count()
-        
-        total_incoming = Activity.query.filter(
-            Activity.activity_type == 'message',
-            Activity.direction == 'incoming'
-        ).count()
-        
-        if total_outgoing > 0:
-            return round((total_incoming / total_outgoing * 100), 1)
-        return 0
-    
-    def _get_recent_conversations(self, limit: int) -> List[Conversation]:
-        """Get recent conversations with activities"""
-        return Conversation.query.options(
-            joinedload(Conversation.contact),
-            selectinload(Conversation.activities)
-        ).filter(
-            Conversation.last_activity_at.isnot(None),
-            exists().where(Activity.conversation_id == Conversation.id)
-        ).order_by(Conversation.last_activity_at.desc()).limit(limit).all()
-    
-    def _format_activity_item(self, conversation: Conversation, activity: Activity) -> Dict[str, Any]:
+    def _format_activity_item(self, conversation, activity) -> Dict[str, Any]:
         """Format an activity for the timeline"""
         # Determine content based on activity type
         if activity.activity_type == 'call':

@@ -654,3 +654,83 @@ class ContactRepository(BaseRepository[Contact]):
             )
         
         return query.all()
+    
+    # Dashboard-specific methods
+    
+    def get_total_contacts_count(self) -> int:
+        """
+        Get total count of contacts.
+        
+        Returns:
+            Total number of contacts
+        """
+        return self.session.query(Contact).count()
+    
+    def get_contacts_added_this_week_count(self) -> int:
+        """
+        Get count of contacts added in the last 7 days using Activity as proxy.
+        Since Contact doesn't have created_at, we use Activity records.
+        
+        Returns:
+            Number of distinct contacts with activity in last 7 days
+        """
+        week_ago = datetime.now() - timedelta(days=7)
+        return self.session.query(Activity.contact_id).filter(
+            Activity.created_at >= week_ago,
+            Activity.contact_id.isnot(None)
+        ).distinct().count()
+    
+    def get_contacts_with_names_count(self) -> int:
+        """
+        Get count of contacts with real names (excluding phone numbers as names).
+        
+        Returns:
+            Number of contacts with non-phone-number names
+        """
+        return self.session.query(Contact).filter(
+            ~Contact.first_name.like('%+1%')
+        ).count()
+    
+    def get_contacts_with_emails_count(self) -> int:
+        """
+        Get count of contacts with valid email addresses.
+        
+        Returns:
+            Number of contacts with non-null, non-empty emails
+        """
+        return self.session.query(Contact).filter(
+            Contact.email.isnot(None),
+            Contact.email != ''
+        ).count()
+    
+    def get_data_quality_stats(self) -> Dict[str, int]:
+        """
+        Get comprehensive data quality statistics for contacts.
+        
+        Returns:
+            Dictionary with total contacts, quality counts, and score
+        """
+        total_contacts = self.get_total_contacts_count()
+        
+        if total_contacts == 0:
+            return {
+                'total_contacts': 0,
+                'contacts_with_names': 0,
+                'contacts_with_emails': 0,
+                'data_quality_score': 0
+            }
+        
+        contacts_with_names = self.get_contacts_with_names_count()
+        contacts_with_emails = self.get_contacts_with_emails_count()
+        
+        # Calculate score: (name_score + email_score) / (total * 2) * 100
+        data_quality_score = round(
+            ((contacts_with_names + contacts_with_emails) / (total_contacts * 2)) * 100
+        )
+        
+        return {
+            'total_contacts': total_contacts,
+            'contacts_with_names': contacts_with_names,
+            'contacts_with_emails': contacts_with_emails,
+            'data_quality_score': data_quality_score
+        }

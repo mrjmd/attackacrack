@@ -10,6 +10,20 @@ from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Se
 from datetime import date, time
 from unittest.mock import MagicMock # Import MagicMock
 
+def create_test_contact(**kwargs):
+    """
+    Helper function to create test contacts with default values.
+    Used across multiple test files.
+    """
+    defaults = {
+        'first_name': 'Test',
+        'last_name': 'User',
+        'phone': '+15551234567',
+        'email': None
+    }
+    defaults.update(kwargs)
+    return Contact(**defaults)
+
 @pytest.fixture(scope='module')
 def app():
     """
