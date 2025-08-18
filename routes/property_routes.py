@@ -13,18 +13,12 @@ def list_all():
     per_page = request.args.get('per_page', 100, type=int)
     search = request.args.get('search', '').strip()
     
-    # Get paginated properties
-    query = Property.query
-    if search:
-        query = query.filter(
-            db.or_(
-                Property.address.ilike(f'%{search}%'),
-                Property.property_type.ilike(f'%{search}%')
-            )
-        )
-    
-    properties_paginated = query.order_by(Property.address).paginate(
-        page=page, per_page=per_page, error_out=False
+    # Get paginated properties using PropertyService
+    property_service = current_app.services.get('property')
+    properties_paginated = property_service.get_paginated_properties(
+        page=page, 
+        per_page=per_page, 
+        search=search
     )
     
     return render_template('property_list.html', 

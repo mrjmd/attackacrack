@@ -92,18 +92,49 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    registry.register_factory(
+        'setting_repository',
+        lambda db_session: _create_setting_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Register services with lazy loading factories
     # These won't be instantiated until first use
     
     # Basic services without dependencies
     registry.register_singleton('contact', lambda: _create_contact_service())
+    
+    # Setting service with repository dependency
+    registry.register_factory(
+        'setting',
+        lambda setting_repository: _create_setting_service(setting_repository),
+        dependencies=['setting_repository']
+    )
     registry.register_singleton('message', lambda: _create_message_service())
     registry.register_singleton('todo', lambda: _create_todo_service())
     registry.register_singleton('auth', lambda: _create_auth_service())
-    registry.register_singleton('job', lambda: _create_job_service())
+    registry.register_singleton('product', lambda: _create_product_service())
+    # Job repository
+    registry.register_factory(
+        'job_repository',
+        lambda db_session: _create_job_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'job',
+        lambda job_repository: _create_job_service(job_repository),
+        dependencies=['job_repository']
+    )
     registry.register_singleton('quote', lambda: _create_quote_service())
     registry.register_singleton('invoice', lambda: _create_invoice_service())
-    registry.register_singleton('sms_metrics', lambda: _create_sms_metrics_service())
+    registry.register_singleton(
+        'sms_metrics',
+        lambda activity_repository, contact_repository, campaign_repository: _create_sms_metrics_service(
+            activity_repository, contact_repository, campaign_repository
+        ),
+        dependencies=['activity_repository', 'contact_repository', 'campaign_repository']
+    )
     
     # Property service with database dependency
     registry.register_factory(
@@ -152,8 +183,10 @@ def create_app(config_name=None, test_config=None):
     
     registry.register_factory(
         'dashboard',
-        lambda contact_repository, campaign_repository, activity_repository, conversation_repository: _create_dashboard_service_with_repositories(contact_repository, campaign_repository, activity_repository, conversation_repository),
-        dependencies=['contact_repository', 'campaign_repository', 'activity_repository', 'conversation_repository']
+        lambda contact_repository, campaign_repository, activity_repository, conversation_repository, sms_metrics: _create_dashboard_service_with_repositories(
+            contact_repository, campaign_repository, activity_repository, conversation_repository, sms_metrics
+        ),
+        dependencies=['contact_repository', 'campaign_repository', 'activity_repository', 'conversation_repository', 'sms_metrics']
     )
     
     registry.register_factory(
@@ -398,11 +431,24 @@ def _create_auth_service():
     logger.info("Initializing AuthService")
     return AuthService()
 
-def _create_job_service():
-    """Create JobService instance"""
+def _create_product_service():
+    """Create ProductService instance"""
+    from services.product_service import ProductService
+    logger.info("Initializing ProductService")
+    return ProductService()
+
+def _create_job_service(job_repository):
+    """Create JobService with repository dependency"""
     from services.job_service import JobService
-    logger.info("Initializing JobService")
-    return JobService()
+    logger.info("Initializing JobService with repository dependency")
+    return JobService(job_repository=job_repository)
+
+def _create_job_repository(db_session):
+    """Create JobRepository instance"""
+    from repositories.job_repository import JobRepository
+    from crm_database import Job
+    logger.info("Initializing JobRepository")
+    return JobRepository(session=db_session, model_class=Job)
 
 def _create_property_service(db_session):
     """Create PropertyService with PropertyRepository"""
@@ -440,11 +486,15 @@ def _create_invoice_service():
     logger.info("Initializing InvoiceService")
     return InvoiceService()
 
-def _create_sms_metrics_service():
-    """Create SMSMetricsService instance"""
+def _create_sms_metrics_service(activity_repository, contact_repository, campaign_repository):
+    """Create SMSMetricsService with repository dependencies"""
     from services.sms_metrics_service import SMSMetricsService
-    logger.info("Initializing SMSMetricsService")
-    return SMSMetricsService()
+    logger.info("Initializing SMSMetricsService with repository dependencies")
+    return SMSMetricsService(
+        activity_repository=activity_repository,
+        contact_repository=contact_repository,
+        campaign_repository=campaign_repository
+    )
 
 def _create_openphone_service():
     """Create OpenPhoneService instance - expensive due to API validation"""
@@ -525,11 +575,12 @@ def _create_dashboard_service(db_session):
     logger.info("Initializing DashboardService")
     return DashboardService()
 
-def _create_dashboard_service_with_repositories(contact_repository, campaign_repository, activity_repository, conversation_repository):
-    """Create DashboardService with repository dependencies"""
+def _create_dashboard_service_with_repositories(contact_repository, campaign_repository, activity_repository, conversation_repository, sms_metrics_service):
+    """Create DashboardService with repository and service dependencies"""
     from services.dashboard_service import DashboardService
-    logger.info("Initializing DashboardService with repository pattern")
+    logger.info("Initializing DashboardService with repository pattern and SMS metrics")
     return DashboardService(
+        sms_metrics_service=sms_metrics_service,
         contact_repository=contact_repository,
         campaign_repository=campaign_repository,
         activity_repository=activity_repository,
@@ -560,6 +611,17 @@ def _create_conversation_repository(db_session):
     from repositories.conversation_repository import ConversationRepository
     from crm_database import Conversation
     return ConversationRepository(session=db_session, model_class=Conversation)
+
+def _create_setting_repository(db_session):
+    """Create SettingRepository instance"""
+    from repositories.setting_repository import SettingRepository
+    from crm_database import Setting
+    return SettingRepository(session=db_session, model_class=Setting)
+
+def _create_setting_service(setting_repository):
+    """Create SettingService instance"""
+    from services.setting_service import SettingService
+    return SettingService(repository=setting_repository)
 
 def _create_conversation_service(db_session):
     """Create ConversationService with dependencies"""

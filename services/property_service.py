@@ -227,3 +227,29 @@ class PropertyService:
         """
         logger.info(f"Advanced property search with params: {search_params}")
         return self.repository.search_properties(**search_params)
+    
+    def get_paginated_properties(self, page: int = 1, per_page: int = 100, search: Optional[str] = None):
+        """Get paginated properties with optional search
+        
+        Args:
+            page: Page number (1-based)
+            per_page: Number of items per page
+            search: Optional search term for address or property type
+            
+        Returns:
+            PaginatedResult containing properties and pagination metadata
+        """
+        from repositories.base_repository import PaginationParams
+        
+        pagination_params = PaginationParams(page=page, per_page=per_page)
+        
+        if search:
+            # Use search filters
+            filters = {
+                'address': search,  # This will be handled by the repository's search logic
+                'property_type': search  # Repository should support OR logic
+            }
+            return self.repository.get_paginated(pagination_params, filters)
+        else:
+            # Get all properties paginated
+            return self.repository.get_paginated(pagination_params)

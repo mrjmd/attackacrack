@@ -3,7 +3,7 @@ Campaign routes for creating and managing text campaigns
 Refactored to use service registry pattern
 """
 
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app, abort
 from flask_login import login_required
 from datetime import datetime
 from extensions import db
@@ -94,7 +94,9 @@ def create_campaign():
 def campaign_detail(campaign_id):
     """Show campaign details and analytics"""
     campaign_service = current_app.services.get('campaign')
-    campaign = Campaign.query.get_or_404(campaign_id)
+    campaign = campaign_service.get_by_id(campaign_id)
+    if not campaign:
+        abort(404)
     analytics = campaign_service.get_campaign_analytics(campaign_id)
     
     # Get bounce metrics for this campaign
@@ -148,22 +150,32 @@ def pause_campaign(campaign_id):
 @login_required
 def campaign_recipients(campaign_id):
     """Show campaign recipients with filtering"""
-    campaign = Campaign.query.get_or_404(campaign_id)
+    campaign_service = current_app.services.get('campaign')
+    campaign = campaign_service.get_by_id(campaign_id)
+    if not campaign:
+        abort(404)
     
     # Get filter parameters
     status_filter = request.args.get('status', 'all')
     variant_filter = request.args.get('variant', 'all')
     
-    # Build query
-    query = CampaignMembership.query.filter_by(campaign_id=campaign_id)
+    # Use campaign service to get members
+    status = status_filter if status_filter != 'all' else None
     
-    if status_filter != 'all':
-        query = query.filter_by(status=status_filter)
+    # Get all members for now (pagination can be added later)
+    members_data = campaign_service.get_campaign_members(
+        campaign_id, 
+        status=status,
+        page=1,
+        per_page=1000  # Large number to get all for now
+    )
     
+    recipients = members_data.get('items', [])
+    
+    # TODO: Add variant filtering support to campaign service
+    # For now, we'll apply variant filter in memory if needed
     if variant_filter != 'all':
-        query = query.filter_by(variant_sent=variant_filter)
-    
-    recipients = query.order_by(CampaignMembership.sent_at.desc()).all()
+        recipients = [r for r in recipients if getattr(r, 'variant_sent', None) == variant_filter]
     
     return render_template('campaigns/recipients.html',
                          campaign=campaign,

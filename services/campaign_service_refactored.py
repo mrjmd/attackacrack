@@ -239,6 +239,18 @@ class CampaignService:
         
         return contacts
     
+    def get_by_id(self, campaign_id: int):
+        """
+        Get campaign by ID.
+        
+        Args:
+            campaign_id: Campaign ID
+            
+        Returns:
+            Campaign object or None if not found
+        """
+        return self.campaign_repository.get_by_id(campaign_id)
+    
     def get_campaign_stats(self, campaign_id: int) -> Dict:
         """
         Get campaign statistics.

@@ -134,23 +134,27 @@ def automation_settings():
             flash('Invalid form submission.', 'error')
             return redirect(url_for('main.automation_settings'))
 
-        setting = db.session.query(Setting).filter_by(key=template_key).first()
-        if setting:
-            setting.value = template_text
-        else:
-            setting = Setting(key=template_key, value=template_text)
-            db.session.add(setting)
+        # Use SettingService instead of direct database queries
+        setting_service = current_app.services.get('setting')
         
-        db.session.commit()
+        try:
+            # Try to update existing template
+            if not setting_service.update_template(template_key, template_text):
+                # Create new template if it doesn't exist
+                setting_service.create_template(template_key, template_text)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error saving template: {str(e)}', 'error')
+            return redirect(url_for('main.automation_settings'))
         flash(flash_message, 'success')
         return redirect(url_for('main.automation_settings'))
 
-    # For GET request, fetch both templates
-    reminder_setting = db.session.query(Setting).filter_by(key='appointment_reminder_template').first()
-    review_setting = db.session.query(Setting).filter_by(key='review_request_template').first()
-
-    reminder_text = reminder_setting.value if reminder_setting else "Hi [contact_first_name], this is a reminder for your appointment with Attack-a-Crack on [appointment_date] at [appointment_time]."
-    review_text = review_setting.value if review_setting else "Hi [contact_first_name], we hope you're happy with the work we did! If you have a moment, we'd love it if you could leave us a review on Google: [Your Google Review Link]"
+    # For GET request, fetch both templates using SettingService
+    setting_service = current_app.services.get('setting')
+    
+    reminder_text = setting_service.get_appointment_reminder_template() or "Hi [contact_first_name], this is a reminder for your appointment with Attack-a-Crack on [appointment_date] at [appointment_time]."
+    review_text = setting_service.get_review_request_template() or "Hi [contact_first_name], we hope you're happy with the work we did! If you have a moment, we'd love it if you could leave us a review on Google: [Your Google Review Link]"
     
     return render_template('automation_settings.html', reminder_template_text=reminder_text, review_template_text=review_text)
 

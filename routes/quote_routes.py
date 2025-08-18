@@ -45,7 +45,8 @@ def add_edit(quote_id=None):
             return jsonify({'error': 'Could not save quote'}), 500
 
     jobs = job_service.get_all_jobs()
-    product_services = ProductService.query.all()
+    product_service = current_app.services.get('product')
+    product_services = product_service.get_all()
     return render_template('add_edit_quote_form.html', quote=quote, jobs=jobs, product_services=product_services)
 
 @quote_bp.route('/quote/<int:quote_id>/delete', methods=['POST'])

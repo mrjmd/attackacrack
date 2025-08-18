@@ -113,9 +113,7 @@ def get_contacts():
 @login_required
 def get_latest_conversations():
     message_service = current_app.services.get('message')
-    # Refresh session to get latest data from webhooks
-    from extensions import db
-    db.session.expire_all()
+    # Get latest conversations without forcing session expiration
     latest_conversations = message_service.get_latest_conversations_from_db(limit=10)
     conversations_json = []
     for conv in latest_conversations:
