@@ -1021,3 +1021,134 @@ class ContactRepository(BaseRepository[Contact]):
         return self.session.query(Contact).filter(
             Contact.phone.isnot(None)
         ).count()
+    
+    # QuickBooks-specific methods
+    
+    def find_by_quickbooks_customer_id(self, quickbooks_customer_id: str) -> Optional[Contact]:
+        """
+        Find contact by QuickBooks customer ID.
+        
+        Args:
+            quickbooks_customer_id: QuickBooks customer ID
+            
+        Returns:
+            Contact or None
+        """
+        return self.session.query(Contact).filter_by(
+            quickbooks_customer_id=quickbooks_customer_id
+        ).first()
+    
+    def find_by_phone_or_email(self, phone: Optional[str], email: Optional[str]) -> Optional[Contact]:
+        """
+        Find contact by phone number or email address.
+        Tries phone first, then email.
+        
+        Args:
+            phone: Phone number to search for
+            email: Email address to search for
+            
+        Returns:
+            Contact or None
+        """
+        if not phone and not email:
+            return None
+        
+        # Try phone first
+        if phone:
+            contact = self.session.query(Contact).filter_by(phone=phone).first()
+            if contact:
+                return contact
+        
+        # Then try email
+        if email:
+            contact = self.session.query(Contact).filter_by(email=email).first()
+            if contact:
+                return contact
+        
+        return None
+    
+    def find_contacts_needing_quickbooks_sync(self) -> List[Contact]:
+        """
+        Find contacts that need QuickBooks sync (no QB customer ID).
+        
+        Returns:
+            List of contacts without QuickBooks sync
+        """
+        return self.session.query(Contact).filter(
+            or_(
+                Contact.quickbooks_customer_id.is_(None),
+                Contact.quickbooks_customer_id == ''
+            )
+        ).all()
+    
+    def find_synced_contacts(self) -> List[Contact]:
+        """
+        Find contacts that are synced with QuickBooks.
+        
+        Returns:
+            List of contacts with QuickBooks sync
+        """
+        return self.session.query(Contact).filter(
+            and_(
+                Contact.quickbooks_customer_id.isnot(None),
+                Contact.quickbooks_customer_id != ''
+            )
+        ).all()
+    
+    def update_quickbooks_sync_info(self, contact_id: int, quickbooks_customer_id: str, 
+                                   sync_token: str) -> Optional[Contact]:
+        """
+        Update QuickBooks sync information for a contact.
+        
+        Args:
+            contact_id: ID of the contact
+            quickbooks_customer_id: QuickBooks customer ID
+            sync_token: QuickBooks sync token
+            
+        Returns:
+            Updated contact or None if not found
+        """
+        contact = self.session.query(Contact).filter_by(id=contact_id).first()
+        if contact:
+            contact.quickbooks_customer_id = quickbooks_customer_id
+            contact.quickbooks_sync_token = sync_token
+            self.session.flush()
+        return contact
+    
+    def find_customers_only(self) -> List[Contact]:
+        """
+        Find contacts that are marked as customers.
+        
+        Returns:
+            List of customer contacts
+        """
+        return self.session.query(Contact).filter_by(customer_type='customer').all()
+    
+    def bulk_update_quickbooks_info(self, contact_updates: Dict[int, Dict[str, str]]) -> int:
+        """
+        Bulk update QuickBooks information for multiple contacts.
+        
+        Args:
+            contact_updates: Dictionary of {contact_id: {'quickbooks_customer_id': '...', 'quickbooks_sync_token': '...'}}
+            
+        Returns:
+            Number of contacts updated
+        """
+        if not contact_updates:
+            return 0
+            
+        contact_ids = list(contact_updates.keys())
+        contacts = self.session.query(Contact).filter(
+            Contact.id.in_(contact_ids)
+        ).all()
+        
+        updated_count = 0
+        for contact in contacts:
+            if contact.id in contact_updates:
+                update_data = contact_updates[contact.id]
+                contact.quickbooks_customer_id = update_data.get('quickbooks_customer_id')
+                contact.quickbooks_sync_token = update_data.get('quickbooks_sync_token')
+                updated_count += 1
+        
+        self.session.flush()
+        return updated_count
