@@ -5,12 +5,16 @@ import pytest
 from datetime import datetime, timedelta
 from services.todo_service_refactored import TodoService
 from crm_database import Todo
+from tests.fixtures.repository_fixtures import create_todo_repository_mock
 
 
 @pytest.fixture
 def todo_service():
-    """Fixture providing todo service instance"""
-    return TodoService()
+    """Fixture providing todo service instance with mock repository"""
+    # Create a mock repository with in-memory storage
+    mock_repo = create_todo_repository_mock(with_data=True)
+    # Pass it to the TodoService
+    return TodoService(todo_repository=mock_repo)
 
 
 @pytest.fixture
@@ -35,15 +39,19 @@ class TestTodoService:
     
     def test_create_todo(self, todo_service, test_user_id, sample_todo_data, db_session):
         """Test creating a new todo"""
-        todo = todo_service.create_todo(test_user_id, sample_todo_data)
+        result = todo_service.create_todo(test_user_id, sample_todo_data)
         
-        assert todo.id is not None
-        assert todo.title == sample_todo_data['title']
-        assert todo.description == sample_todo_data['description']
-        assert todo.priority == sample_todo_data['priority']
-        assert todo.user_id == test_user_id
-        assert todo.is_completed is False
-        assert todo.due_date is not None
+        # TodoService returns a Result object
+        assert result.success is True
+        todo = result.data
+        
+        assert todo['id'] is not None
+        assert todo['title'] == sample_todo_data['title']
+        assert todo['description'] == sample_todo_data['description']
+        assert todo['priority'] == sample_todo_data['priority']
+        assert todo['user_id'] == test_user_id
+        assert todo.get('is_completed', False) is False
+        assert todo.get('due_date') is not None
     
     def test_create_todo_without_title(self, todo_service, test_user_id, db_session):
         """Test creating todo without title raises error"""

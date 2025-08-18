@@ -166,7 +166,7 @@ class TodoServiceRefactored:
         }
         
         try:
-            todo = self.todo_repository.create(create_data)
+            todo = self.todo_repository.create(**create_data)
             return Result.success(todo)
         except Exception as e:
             return Result.failure(

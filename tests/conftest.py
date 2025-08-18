@@ -10,6 +10,17 @@ from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Se
 from datetime import date, time
 from unittest.mock import MagicMock # Import MagicMock
 
+# Import repository fixtures
+from tests.fixtures.repository_fixtures import (
+    repository_factory,
+    mock_repositories,
+    contact_repository,
+    todo_repository,
+    campaign_repository,
+    activity_repository,
+    conversation_repository
+)
+
 def create_test_contact(**kwargs):
     """
     Helper function to create test contacts with default values.
@@ -169,3 +180,14 @@ def mock_get_google_creds_globally(mocker):
     mock_creds = MagicMock()
     mock_creds.valid = True
     mocker.patch('api_integrations.get_google_creds', return_value=mock_creds)
+
+# Re-export repository fixtures so they're available globally
+__all__ = [
+    'repository_factory',
+    'mock_repositories', 
+    'contact_repository',
+    'todo_repository',
+    'campaign_repository',
+    'activity_repository',
+    'conversation_repository'
+]
