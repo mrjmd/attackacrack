@@ -10,7 +10,7 @@ FOCUS AREAS:
 1. SMSMetricsService requires and properly uses injected repositories
 2. JobService requires and properly uses injected JobRepository
 3. DashboardService uses injected SMSMetricsService instead of creating it
-4. OpenPhoneWebhookService uses injected services without fallbacks
+4. OpenPhoneWebhookServiceRefactored uses injected services without fallbacks
 5. Service registry factories properly inject all required dependencies
 
 TEST STRATEGY:
@@ -28,7 +28,7 @@ from flask import Flask
 from services.sms_metrics_service import SMSMetricsService
 from services.job_service import JobService
 from services.dashboard_service import DashboardService
-from services.openphone_webhook_service import OpenPhoneWebhookService
+from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
 
 
 class TestSMSMetricsServiceDICompliance:
@@ -368,47 +368,59 @@ class TestDashboardServiceDICompliance:
 
 
 class TestOpenPhoneWebhookServiceDICompliance:
-    """Test OpenPhoneWebhookService follows strict dependency injection patterns"""
+    """Test OpenPhoneWebhookServiceRefactored follows strict dependency injection patterns"""
     
     def test_webhook_service_requires_both_service_dependencies(self):
-        """Test that OpenPhoneWebhookService constructor requires both service dependencies"""
+        """Test that OpenPhoneWebhookServiceRefactored constructor requires both service dependencies"""
         # This test should FAIL initially because service has fallback logic
         
         # Act & Assert - Constructor should require both dependencies
         with pytest.raises(TypeError, match="missing.*required.*argument"):
             # This should fail if constructor allows None or has fallback logic
-            OpenPhoneWebhookService()
+            OpenPhoneWebhookServiceRefactored()
     
     def test_webhook_service_stores_injected_services(self):
-        """Test that OpenPhoneWebhookService stores both injected services"""
+        """Test that OpenPhoneWebhookServiceRefactored stores both injected services"""
         # Arrange
         mock_contact_service = Mock()
         mock_metrics_service = Mock()
+        mock_activity_repo = Mock()
+        mock_conversation_repo = Mock()
+        mock_webhook_repo = Mock()
         
         # Act
-        service = OpenPhoneWebhookService(
+        service = OpenPhoneWebhookServiceRefactored(
+            activity_repository=mock_activity_repo,
+            conversation_repository=mock_conversation_repo,
+            webhook_event_repository=mock_webhook_repo,
             contact_service=mock_contact_service,
-            metrics_service=mock_metrics_service
+            sms_metrics_service=mock_metrics_service
         )
         
         # Assert
         assert service.contact_service is mock_contact_service
-        assert service.metrics_service is mock_metrics_service
+        assert service.sms_metrics_service is mock_metrics_service
     
     def test_webhook_service_no_fallback_service_creation(self):
-        """Test that OpenPhoneWebhookService does NOT create fallback services"""
+        """Test that OpenPhoneWebhookServiceRefactored does NOT create fallback services"""
         # This test will fail initially because service has fallback logic
         
-        with patch('services.openphone_webhook_service.ContactService') as mock_contact_class:
-            with patch('services.openphone_webhook_service.SMSMetricsService') as mock_metrics_class:
+        with patch('services.openphone_webhook_service_refactored.ContactService') as mock_contact_class:
+            with patch('services.openphone_webhook_service_refactored.SMSMetricsService') as mock_metrics_class:
                 # Arrange
                 mock_contact_service = Mock()
                 mock_metrics_service = Mock()
+                mock_activity_repo = Mock()
+                mock_conversation_repo = Mock()
+                mock_webhook_repo = Mock()
                 
                 # Act
-                service = OpenPhoneWebhookService(
+                service = OpenPhoneWebhookServiceRefactored(
+                    activity_repository=mock_activity_repo,
+                    conversation_repository=mock_conversation_repo,
+                    webhook_event_repository=mock_webhook_repo,
                     contact_service=mock_contact_service,
-                    metrics_service=mock_metrics_service
+                    sms_metrics_service=mock_metrics_service
                 )
                 
                 # Assert - Neither service class should be instantiated
@@ -420,15 +432,21 @@ class TestOpenPhoneWebhookServiceDICompliance:
         # Arrange
         mock_contact_service = Mock()
         mock_metrics_service = Mock()
+        mock_activity_repo = Mock()
+        mock_conversation_repo = Mock()
+        mock_webhook_repo = Mock()
         
         # Mock contact service responses
         mock_contact = Mock()
         mock_contact.id = 123
         mock_contact_service.get_contact_by_phone.return_value = mock_contact
         
-        service = OpenPhoneWebhookService(
+        service = OpenPhoneWebhookServiceRefactored(
+            activity_repository=mock_activity_repo,
+            conversation_repository=mock_conversation_repo,
+            webhook_event_repository=mock_webhook_repo,
             contact_service=mock_contact_service,
-            metrics_service=mock_metrics_service
+            sms_metrics_service=mock_metrics_service
         )
         
         # Prepare test webhook data

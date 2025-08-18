@@ -8,7 +8,7 @@ import pytest
 from unittest.mock import MagicMock, patch, call
 from datetime import datetime, timedelta
 from services.campaign_service_refactored import CampaignService
-from services.campaign_list_service import CampaignListService
+from services.campaign_list_service_refactored import CampaignListServiceRefactored
 from crm_database import Campaign, CampaignMembership, Contact, CampaignList, CampaignListMember, Activity, ContactFlag
 
 
@@ -34,7 +34,7 @@ def campaign_service(list_service):
 @pytest.fixture
 def list_service():
     """Fixture providing campaign list service instance"""
-    return CampaignListService()
+    return CampaignListServiceRefactored()
 
 
 @pytest.fixture

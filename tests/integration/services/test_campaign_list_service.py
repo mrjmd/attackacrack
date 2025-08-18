@@ -6,14 +6,14 @@ contact filtering, and dynamic list functionality.
 
 import pytest
 from datetime import datetime, timedelta
-from services.campaign_list_service import CampaignListService
+from services.campaign_list_service_refactored import CampaignListServiceRefactored
 from crm_database import Contact, CampaignList, CampaignListMember, CSVImport, ContactCSVImport, Activity, ContactFlag
 
 
 @pytest.fixture
 def list_service():
     """Fixture providing campaign list service instance"""
-    return CampaignListService()
+    return CampaignListServiceRefactored()
 
 
 @pytest.fixture

@@ -5,9 +5,28 @@ conversation data from the database.
 """
 
 import pytest
-from services.openphone_webhook_service import OpenPhoneWebhookService
+from unittest.mock import Mock
+from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
 from crm_database import Contact, Conversation, Activity
 from datetime import datetime
+
+def create_webhook_service_with_mocks():
+    """Helper function to create service with mocked dependencies"""
+    mock_activity_repo = Mock()
+    mock_conversation_repo = Mock()
+    mock_webhook_repo = Mock()
+    mock_contact_service = Mock()
+    mock_sms_metrics_service = Mock()
+    
+    service = OpenPhoneWebhookServiceRefactored(
+        activity_repository=mock_activity_repo,
+        conversation_repository=mock_conversation_repo,
+        webhook_event_repository=mock_webhook_repo,
+        contact_service=mock_contact_service,
+        sms_metrics_service=mock_sms_metrics_service
+    )
+    
+    return service
 
 def test_process_incoming_message_webhook_new_contact(app, db_session):
     """
@@ -16,7 +35,7 @@ def test_process_incoming_message_webhook_new_contact(app, db_session):
     THEN it should create a new Contact, a new Conversation, and a new Activity record.
     """
     # 1. Setup
-    webhook_service = OpenPhoneWebhookService()
+    webhook_service = create_webhook_service_with_mocks()
     webhook_data = {
         "type": "message.received",  # Updated to actual webhook type
         "data": {
