@@ -556,3 +556,101 @@ class ContactRepository(BaseRepository[Contact]):
             return []
             
         return self.session.query(Contact).filter(Contact.id.in_(contact_ids)).all()
+    
+    def find_by_csv_import(self, csv_import_id: int) -> List[Contact]:
+        """
+        Find contacts by CSV import ID using the many-to-many relationship.
+        
+        Args:
+            csv_import_id: CSV import ID
+            
+        Returns:
+            List of contacts from the CSV import
+        """
+        from crm_database import ContactCSVImport
+        return self.session.query(Contact).join(ContactCSVImport).filter(
+            ContactCSVImport.csv_import_id == csv_import_id
+        ).all()
+    
+    def find_by_date_range(self, imported_after: Optional[datetime] = None, 
+                          imported_before: Optional[datetime] = None) -> List[Contact]:
+        """
+        Find contacts by import date range.
+        
+        Args:
+            imported_after: Start date (inclusive)
+            imported_before: End date (inclusive)
+            
+        Returns:
+            List of contacts imported in the date range
+        """
+        query = self.session.query(Contact)
+        
+        if imported_after:
+            query = query.filter(Contact.imported_at >= imported_after)
+        
+        if imported_before:
+            query = query.filter(Contact.imported_at <= imported_before)
+        
+        return query.all()
+    
+    def find_without_recent_activity(self, days: int = 30) -> List[Contact]:
+        """
+        Find contacts with no recent outgoing activity.
+        
+        Args:
+            days: Number of days to look back
+            
+        Returns:
+            List of contacts without recent activity
+        """
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Subquery to find contacts with recent outgoing activity
+        recent_contacts = self.session.query(Activity.contact_id).filter(
+            Activity.created_at > cutoff_date,
+            Activity.direction == 'outgoing'
+        )
+        
+        return self.session.query(Contact).filter(
+            ~Contact.id.in_(recent_contacts)
+        ).all()
+    
+    def find_not_opted_out(self) -> List[Contact]:
+        """
+        Find contacts that have not opted out.
+        
+        Returns:
+            List of contacts not opted out
+        """
+        opted_out = self.session.query(ContactFlag.contact_id).filter(
+            ContactFlag.flag_type == 'opted_out',
+            or_(ContactFlag.expires_at.is_(None), 
+                ContactFlag.expires_at > datetime.utcnow())
+        )
+        
+        return self.session.query(Contact).filter(
+            ~Contact.id.in_(opted_out)
+        ).all()
+    
+    def find_by_metadata_keys(self, metadata_keys: List[str]) -> List[Contact]:
+        """
+        Find contacts that have specific metadata keys.
+        
+        Args:
+            metadata_keys: List of metadata keys to check for
+            
+        Returns:
+            List of contacts with the metadata keys
+        """
+        query = self.session.query(Contact).filter(
+            Contact.contact_metadata.isnot(None)
+        )
+        
+        for key in metadata_keys:
+            # For SQLite compatibility, use LIKE operator on JSON string
+            query = query.filter(
+                func.json_extract(Contact.contact_metadata, f'$.{key}').isnot(None)
+            )
+        
+        return query.all()
