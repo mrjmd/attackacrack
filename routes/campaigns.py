@@ -352,10 +352,9 @@ def import_csv():
     if request.method == "POST":
         csv_service = current_app.services.get('csv_import')
         if not csv_service:
-            # If CSV service not registered, create it
-            contact_service = current_app.services.get('contact')
-            from services.csv_import_service import CSVImportService
-            csv_service = CSVImportService(contact_service)
+            # CSV service should always be registered
+            flash('CSV import service not available', 'error')
+            return redirect(url_for('campaigns.import_csv'))
         
         try:
             # Check if file was uploaded

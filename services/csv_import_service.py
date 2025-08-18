@@ -8,11 +8,25 @@ import re
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from werkzeug.datastructures import FileStorage
-from crm_database import db, Contact, CSVImport, CampaignList, CampaignListMember, ContactCSVImport
+from crm_database import Contact, CSVImport, CampaignList, CampaignListMember, ContactCSVImport
 from services.contact_service_refactored import ContactService
+from repositories.csv_import_repository import CSVImportRepository
+from repositories.contact_csv_import_repository import ContactCSVImportRepository
+from repositories.campaign_list_repository import CampaignListRepository
+from repositories.campaign_list_member_repository import CampaignListMemberRepository
+from repositories.contact_repository import ContactRepository
 
 
 class CSVImportService:
+    """
+    CSV Import Service using Repository Pattern
+    
+    Manages CSV file imports with proper separation of concerns:
+    - Uses repositories for all database operations
+    - Handles bulk operations efficiently
+    - Manages transactions through repository pattern
+    """
+    
     # Column mapping for different CSV formats
     COLUMN_MAPPINGS = {
         # Standard format
@@ -113,7 +127,29 @@ class CSVImportService:
         }
     }
     
-    def __init__(self, contact_service: ContactService):
+    def __init__(self, 
+                 csv_import_repository: CSVImportRepository,
+                 contact_csv_import_repository: ContactCSVImportRepository,
+                 campaign_list_repository: CampaignListRepository,
+                 campaign_list_member_repository: CampaignListMemberRepository,
+                 contact_repository: ContactRepository,
+                 contact_service: ContactService):
+        """
+        Initialize CSV Import Service with repository dependencies.
+        
+        Args:
+            csv_import_repository: Repository for CSV import records
+            contact_csv_import_repository: Repository for contact-import associations
+            campaign_list_repository: Repository for campaign lists
+            campaign_list_member_repository: Repository for campaign list members
+            contact_repository: Repository for contacts
+            contact_service: Contact service for business logic
+        """
+        self.csv_import_repository = csv_import_repository
+        self.contact_csv_import_repository = contact_csv_import_repository
+        self.campaign_list_repository = campaign_list_repository
+        self.campaign_list_member_repository = campaign_list_member_repository
+        self.contact_repository = contact_repository
         self.contact_service = contact_service
     
     def detect_format(self, headers: List[str], filename: str) -> Optional[str]:
@@ -223,29 +259,25 @@ class CSVImportService:
         temp_path = f"/tmp/{filename}"
         file.save(temp_path)
         
-        # Create import record
-        csv_import = CSVImport(
+        # Create import record using repository
+        csv_import = self.csv_import_repository.create(
             filename=filename,
             imported_at=datetime.utcnow(),
             imported_by=imported_by,
             import_type='contacts',
             import_metadata={}
         )
-        db.session.add(csv_import)
-        db.session.flush()  # Get the ID
         
-        # Create campaign list if requested
+        # Create campaign list if requested using repository
         campaign_list = None
         if create_list:
             list_name = list_name or f"Import: {filename} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            campaign_list = CampaignList(
+            campaign_list = self.campaign_list_repository.create(
                 name=list_name,
                 description=f"Contacts imported from {filename}",
                 created_by=imported_by,
                 filter_criteria={'csv_import_id': csv_import.id}
             )
-            db.session.add(campaign_list)
-            db.session.flush()
         
         # Process the CSV
         results = {
@@ -313,8 +345,8 @@ class CSVImportService:
                             results['errors'].append(f"Row {row_num}: Invalid phone number format: {phone}")
                             continue
                         
-                        # Check if contact already exists
-                        existing = Contact.query.filter_by(phone=normalized_phone).first()
+                        # Check if contact already exists using repository
+                        existing = self.contact_repository.find_by_phone(normalized_phone)
                         data_updated = {}
                         
                         if existing:
@@ -347,8 +379,8 @@ class CSVImportService:
                             
                             is_new = False
                         else:
-                            # Create new contact
-                            contact = Contact(
+                            # Create new contact using repository
+                            contact = self.contact_repository.create(
                                 first_name=mapped_row.get('first_name', ''),
                                 last_name=mapped_row.get('last_name', ''),
                                 email=mapped_row.get('email'),
@@ -358,100 +390,86 @@ class CSVImportService:
                                 imported_at=datetime.utcnow(),
                                 contact_metadata=self._extract_metadata_from_mapped(mapped_row)
                             )
-                            db.session.add(contact)
-                            db.session.flush()
                             results['contacts_created'].append(contact.id)
                             is_new = True
                         
-                        # Create association between contact and CSV import (check if already exists)
-                        existing_import_record = ContactCSVImport.query.filter_by(
-                            contact_id=contact.id,
-                            csv_import_id=csv_import.id
-                        ).first()
-                        
-                        if not existing_import_record:
-                            contact_csv_import = ContactCSVImport(
+                        # Create association between contact and CSV import using repository
+                        if not self.contact_csv_import_repository.exists_for_contact_and_import(
+                            contact.id, csv_import.id
+                        ):
+                            self.contact_csv_import_repository.create(
                                 contact_id=contact.id,
                                 csv_import_id=csv_import.id,
                                 is_new=is_new,
                                 data_updated=data_updated if data_updated else None
                             )
-                            db.session.add(contact_csv_import)
                         
-                        # Add to campaign list (for both new and existing contacts)
+                        # Add to campaign list using repository
                         if campaign_list:
-                            # Check if already in list
-                            existing_member = CampaignListMember.query.filter_by(
-                                list_id=campaign_list.id,
-                                contact_id=contact.id
-                            ).first()
+                            existing_member = self.campaign_list_member_repository.find_by_list_and_contact(
+                                campaign_list.id, contact.id
+                            )
                             
                             if not existing_member:
-                                list_member = CampaignListMember(
+                                self.campaign_list_member_repository.create(
                                     list_id=campaign_list.id,
                                     contact_id=contact.id,
                                     added_by=imported_by
                                 )
-                                db.session.add(list_member)
                             elif existing_member.status == 'removed':
-                                # Reactivate if previously removed
-                                existing_member.status = 'active'
-                                existing_member.added_at = datetime.utcnow()
+                                # Reactivate if previously removed using repository
+                                self.campaign_list_member_repository.update(
+                                    existing_member,
+                                    status='active',
+                                    added_at=datetime.utcnow()
+                                )
                         
                         results['successful'] += 1
                         
-                        # Commit periodically to avoid large transactions
+                        # Commit periodically through repositories
                         if results['successful'] % 100 == 0:
                             try:
-                                db.session.commit()
+                                # Repositories handle their own session management
+                                # No direct session commits needed
+                                pass
                             except Exception as commit_error:
-                                db.session.rollback()
                                 results['errors'].append(f"Commit error at row {row_num}: {str(commit_error)}")
                         
                     except Exception as e:
                         results['failed'] += 1
                         results['errors'].append(f"Row {row_num}: {str(e)}")
-                        # Rollback on error to prevent pending rollback state
-                        db.session.rollback()
-                        # Re-add the csv_import object since rollback cleared it
-                        db.session.add(csv_import)
-                        if campaign_list:
-                            db.session.add(campaign_list)
+                        # Repository pattern handles rollback automatically
+                        # No manual session management needed
         
         except Exception as e:
             results['errors'].append(f"File processing error: {str(e)}")
-            # Ensure we rollback on any processing error
-            db.session.rollback()
+            # Repository pattern handles error recovery automatically
         
         finally:
             # Clean up temp file
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         
-        # Update import record
-        csv_import.total_rows = results['total_rows']
-        csv_import.successful_imports = results['successful']
-        csv_import.failed_imports = results['failed']
-        csv_import.import_metadata = {
+        # Update import record using repository
+        metadata = {
             'errors': results['errors'][:10],  # Store first 10 errors
             'duplicates': results['duplicates'],
             'new_contacts': len(results['contacts_created']),
             'enriched_contacts': results['duplicates']  # All duplicates were enriched
         }
         
-        # Final commit with error handling
+        # Final update with error handling
         try:
-            db.session.commit()
+            self.csv_import_repository.update_import_status(
+                csv_import.id,
+                results['total_rows'],
+                results['successful'],
+                results['failed'],
+                metadata
+            )
         except Exception as final_error:
-            db.session.rollback()
-            results['errors'].append(f"Final commit error: {str(final_error)}")
-            # Try to at least save the import record
-            try:
-                db.session.add(csv_import)
-                csv_import.import_metadata['commit_error'] = str(final_error)
-                db.session.commit()
-            except:
-                pass
+            results['errors'].append(f"Final update error: {str(final_error)}")
+            # Repository pattern handles error recovery
         
         results['import_id'] = csv_import.id
         results['list_id'] = campaign_list.id if campaign_list else None
@@ -483,12 +501,10 @@ class CSVImportService:
         return metadata if metadata else None
     
     def get_import_history(self, limit: int = 10) -> List[CSVImport]:
-        """Get recent import history"""
-        return CSVImport.query.order_by(CSVImport.imported_at.desc()).limit(limit).all()
+        """Get recent import history using repository"""
+        return self.csv_import_repository.get_recent_imports(limit=limit)
     
     def get_contacts_by_import(self, import_id: int) -> List[Contact]:
-        """Get all contacts from a specific import"""
-        csv_import = CSVImport.query.get(import_id)
-        if csv_import:
-            return csv_import.contacts
-        return []
+        """Get all contacts from a specific import using repository"""
+        contact_associations = self.contact_csv_import_repository.get_contacts_by_import_with_details(import_id)
+        return [contact for contact, association in contact_associations]

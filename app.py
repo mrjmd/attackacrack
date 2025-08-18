@@ -156,8 +156,8 @@ def create_app(config_name=None, test_config=None):
     
     registry.register_factory(
         'csv_import',
-        lambda contact: _create_csv_import_service(contact),
-        dependencies=['contact']
+        lambda contact, db_session: _create_csv_import_service(contact, db_session),
+        dependencies=['contact', 'db_session']
     )
     
     registry.register_factory(
@@ -475,11 +475,33 @@ def _create_campaign_service(openphone, campaign_list):
         list_service=campaign_list
     )
 
-def _create_csv_import_service(contact):
-    """Create CSVImportService with dependencies"""
+def _create_csv_import_service(contact, db_session):
+    """Create CSVImportService with repository dependencies"""
     from services.csv_import_service import CSVImportService
-    logger.info("Initializing CSVImportService")
-    return CSVImportService(contact_service=contact)
+    from repositories.csv_import_repository import CSVImportRepository
+    from repositories.contact_csv_import_repository import ContactCSVImportRepository
+    from repositories.campaign_list_repository import CampaignListRepository
+    from repositories.campaign_list_member_repository import CampaignListMemberRepository
+    from repositories.contact_repository import ContactRepository
+    from crm_database import CSVImport, ContactCSVImport, CampaignList, CampaignListMember, Contact
+    
+    logger.info("Initializing CSVImportService with repository pattern")
+    
+    # Create repository instances
+    csv_import_repo = CSVImportRepository(session=db_session, model_class=CSVImport)
+    contact_csv_import_repo = ContactCSVImportRepository(session=db_session, model_class=ContactCSVImport)
+    campaign_list_repo = CampaignListRepository(session=db_session, model_class=CampaignList)
+    campaign_list_member_repo = CampaignListMemberRepository(session=db_session, model_class=CampaignListMember)
+    contact_repo = ContactRepository(session=db_session, model_class=Contact)
+    
+    return CSVImportService(
+        csv_import_repository=csv_import_repo,
+        contact_csv_import_repository=contact_csv_import_repo,
+        campaign_list_repository=campaign_list_repo,
+        campaign_list_member_repository=campaign_list_member_repo,
+        contact_repository=contact_repo,
+        contact_service=contact
+    )
 
 def _create_openphone_sync_service(openphone, db_session):
     """Create OpenPhoneSyncService with dependencies"""
