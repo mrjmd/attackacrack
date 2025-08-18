@@ -734,3 +734,279 @@ class ContactRepository(BaseRepository[Contact]):
             'contacts_with_emails': contacts_with_emails,
             'data_quality_score': data_quality_score
         }
+    
+    # SMS Metrics Enhancement Methods
+    
+    def update_contact_bounce_status(self, contact_id: int, bounce_info: dict):
+        """
+        Update contact bounce status and metadata for SMS metrics tracking.
+        
+        Args:
+            contact_id: ID of the contact to update
+            bounce_info: Bounce information to merge
+            
+        Returns:
+            Updated Contact object or None if not found
+        """
+        contact = self.get_by_id(contact_id)
+        if not contact:
+            return None
+        
+        # Initialize metadata if needed
+        if not contact.contact_metadata:
+            contact.contact_metadata = {}
+        
+        # Initialize bounce info if needed
+        if 'bounce_info' not in contact.contact_metadata:
+            contact.contact_metadata['bounce_info'] = {
+                'total_bounces': 0,
+                'counts': {}
+            }
+        
+        bounce_data = contact.contact_metadata['bounce_info']
+        bounce_type = bounce_info.get('bounce_type', 'unknown')
+        
+        # Update bounce counts
+        if 'counts' not in bounce_data:
+            bounce_data['counts'] = {}
+        
+        bounce_data['counts'][bounce_type] = bounce_data['counts'].get(bounce_type, 0) + 1
+        bounce_data['total_bounces'] = sum(bounce_data['counts'].values())
+        bounce_data['last_bounce'] = bounce_info.get('bounced_at')
+        bounce_data['last_bounce_type'] = bounce_type
+        
+        # Mark as SMS invalid if too many hard bounces
+        if bounce_data['counts'].get('hard', 0) >= 2:
+            contact.contact_metadata['sms_invalid'] = True
+            contact.contact_metadata['sms_invalid_reason'] = 'Multiple hard bounces'
+        
+        self.session.flush()
+        return contact
+    
+    def find_contacts_with_bounce_metadata(self, bounce_threshold: int = 1) -> List[Contact]:
+        """
+        Find contacts with bounce metadata above threshold.
+        
+        Args:
+            bounce_threshold: Minimum number of bounces to include
+            
+        Returns:
+            List of contacts with bounce history
+        """
+        contacts = self.session.query(Contact).filter(
+            Contact.contact_metadata.contains('bounce_info')
+        ).all()
+        
+        # Filter by bounce threshold
+        result = []
+        for contact in contacts:
+            if contact.contact_metadata and 'bounce_info' in contact.contact_metadata:
+                bounce_info = contact.contact_metadata['bounce_info']
+                if bounce_info.get('total_bounces', 0) >= bounce_threshold:
+                    result.append(contact)
+        
+        return result
+    
+    def find_contacts_by_sms_validity(self, valid: bool = True) -> List[Contact]:
+        """
+        Find contacts by SMS validity status.
+        
+        Args:
+            valid: If True, find valid SMS contacts; if False, find invalid ones
+            
+        Returns:
+            List of contacts matching validity criteria
+        """
+        if valid:
+            # Find contacts not marked as SMS invalid
+            return self.session.query(Contact).filter(
+                or_(
+                    Contact.contact_metadata.is_(None),
+                    ~Contact.contact_metadata.contains('sms_invalid'),
+                    func.json_extract(Contact.contact_metadata, '$.sms_invalid') != True
+                )
+            ).all()
+        else:
+            # Find contacts marked as SMS invalid
+            return self.session.query(Contact).filter(
+                func.json_extract(Contact.contact_metadata, '$.sms_invalid') == True
+            ).all()
+    
+    def get_contacts_bounce_summary(self) -> dict:
+        """
+        Get comprehensive bounce summary for all contacts.
+        
+        Returns:
+            Dictionary with bounce statistics
+        """
+        total_contacts = self.count()
+        
+        # Get contacts with bounce info
+        contacts_with_bounces = self.session.query(Contact).filter(
+            Contact.contact_metadata.contains('bounce_info')
+        ).all()
+        
+        # Get SMS invalid contacts
+        sms_invalid_contacts = len(self.find_contacts_by_sms_validity(valid=False))
+        
+        # Calculate bounce type breakdown
+        bounce_type_breakdown = {'hard': 0, 'soft': 0, 'carrier_rejection': 0, 'capability': 0, 'unknown': 0}
+        
+        for contact in contacts_with_bounces:
+            bounce_info = contact.contact_metadata.get('bounce_info', {})
+            counts = bounce_info.get('counts', {})
+            for bounce_type, count in counts.items():
+                if bounce_type in bounce_type_breakdown:
+                    bounce_type_breakdown[bounce_type] += count
+        
+        bounce_rate = (len(contacts_with_bounces) / total_contacts * 100) if total_contacts > 0 else 0
+        
+        return {
+            'total_contacts': total_contacts,
+            'contacts_with_bounces': len(contacts_with_bounces),
+            'sms_invalid_contacts': sms_invalid_contacts,
+            'bounce_rate_percentage': bounce_rate,
+            'bounce_type_breakdown': bounce_type_breakdown
+        }
+    
+    def bulk_update_contacts_metadata(self, contact_ids: List[int], metadata_update: dict, merge: bool = True) -> int:
+        """
+        Bulk update contact metadata.
+        
+        Args:
+            contact_ids: List of contact IDs to update
+            metadata_update: Metadata to set/merge
+            merge: Whether to merge with existing metadata
+            
+        Returns:
+            Number of contacts updated
+        """
+        if not contact_ids:
+            return 0
+        
+        contacts = self.session.query(Contact).filter(Contact.id.in_(contact_ids)).all()
+        
+        for contact in contacts:
+            if merge and contact.contact_metadata:
+                contact.contact_metadata.update(metadata_update)
+            else:
+                contact.contact_metadata = metadata_update
+        
+        self.session.flush()
+        return len(contacts)
+    
+    def find_contacts_with_metadata_keys(self, metadata_keys: List[str]) -> List[Contact]:
+        """
+        Find contacts that have specific metadata keys.
+        
+        Args:
+            metadata_keys: List of metadata keys to check for
+            
+        Returns:
+            List of contacts with the metadata keys
+        """
+        query = self.session.query(Contact).filter(
+            Contact.contact_metadata.isnot(None)
+        )
+        
+        for key in metadata_keys:
+            query = query.filter(
+                Contact.contact_metadata.contains(key)
+            )
+        
+        return query.all()
+    
+    def get_contact_reliability_score(self, contact_id: int) -> float:
+        """
+        Calculate contact reliability score based on bounce history.
+        
+        Args:
+            contact_id: Contact ID to calculate score for
+            
+        Returns:
+            Reliability score as percentage (0-100)
+        """
+        contact = self.get_by_id(contact_id)
+        if not contact or not contact.contact_metadata:
+            return 100.0  # No history means perfect score
+        
+        bounce_info = contact.contact_metadata.get('bounce_info')
+        if not bounce_info:
+            return 100.0
+        
+        total_bounces = bounce_info.get('total_bounces', 0)
+        hard_bounces = bounce_info.get('counts', {}).get('hard', 0)
+        
+        # Score calculation: start at 100%, deduct points for bounces
+        score = 100.0
+        score -= hard_bounces * 30  # Hard bounces heavily penalized
+        score -= (total_bounces - hard_bounces) * 5  # Other bounces lightly penalized
+        
+        return max(0.0, min(100.0, score))
+    
+    def find_problematic_numbers(self, bounce_threshold: int = 2) -> List[dict]:
+        """
+        Find problematic phone numbers with delivery issues.
+        
+        Args:
+            bounce_threshold: Minimum bounces to be considered problematic
+            
+        Returns:
+            List of problematic contact details
+        """
+        contacts = self.find_contacts_with_bounce_metadata(bounce_threshold)
+        
+        result = []
+        for contact in contacts:
+            bounce_info = contact.contact_metadata.get('bounce_info', {})
+            
+            result.append({
+                'contact_id': contact.id,
+                'phone': contact.phone,
+                'name': f'{contact.first_name or ""} {contact.last_name or ""}' if contact.first_name or contact.last_name else 'Unknown',
+                'total_bounces': bounce_info.get('total_bounces', 0),
+                'bounce_types': bounce_info.get('counts', {}),
+                'last_bounce': bounce_info.get('last_bounce'),
+                'sms_invalid': contact.contact_metadata.get('sms_invalid', False)
+            })
+        
+        # Sort by total bounces descending
+        result.sort(key=lambda x: x['total_bounces'], reverse=True)
+        return result
+    
+    def merge_bounce_metadata(self, contact_id: int, new_bounce_info: dict):
+        """
+        Merge new bounce information with existing contact bounce metadata.
+        
+        Args:
+            contact_id: Contact ID to update
+            new_bounce_info: New bounce information to merge
+            
+        Returns:
+            Updated Contact object or None if not found
+        """
+        return self.update_contact_bounce_status(contact_id, new_bounce_info)
+    
+    def find_contacts_by_bounce_type(self, bounce_type: str) -> List[Contact]:
+        """
+        Find contacts by specific bounce type.
+        
+        Args:
+            bounce_type: Type of bounce to filter by
+            
+        Returns:
+            List of contacts with the specified bounce type
+        """
+        contacts = self.session.query(Contact).filter(
+            Contact.contact_metadata.contains('bounce_info')
+        ).all()
+        
+        result = []
+        for contact in contacts:
+            if contact.contact_metadata and 'bounce_info' in contact.contact_metadata:
+                bounce_info = contact.contact_metadata['bounce_info']
+                counts = bounce_info.get('counts', {})
+                if counts.get(bounce_type, 0) > 0:
+                    result.append(contact)
+        
+        return result

@@ -11,7 +11,7 @@ from crm_database import (
     Contact, Campaign, CampaignList, CampaignMembership,
     CampaignListMember, Property, Activity, ContactFlag
 )
-from services.campaign_service import CampaignService
+from services.campaign_service_refactored import CampaignService
 from services.openphone_service import OpenPhoneService
 from extensions import db
 

@@ -7,7 +7,7 @@ create list -> create campaign -> add recipients -> process queue -> verify sent
 import pytest
 from unittest.mock import MagicMock, patch, call
 from datetime import datetime, timedelta
-from services.campaign_service import CampaignService
+from services.campaign_service_refactored import CampaignService
 from services.campaign_list_service import CampaignListService
 from crm_database import Campaign, CampaignMembership, Contact, CampaignList, CampaignListMember, Activity, ContactFlag
 

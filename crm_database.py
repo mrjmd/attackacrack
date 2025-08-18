@@ -318,6 +318,9 @@ class Activity(db.Model):
     ai_transcript = db.Column(db.JSON, nullable=True)  # Call transcript dialogue
     ai_content_status = db.Column(db.String(50), nullable=True)  # 'pending', 'completed', 'failed'
     
+    # SMS Metrics tracking
+    activity_metadata = db.Column(db.JSON, nullable=True)  # For bounce tracking and other metadata
+    
     # Timestamps
     created_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -386,6 +389,7 @@ class CampaignMembership(db.Model):
     status = db.Column(db.String(50), default='pending')  # 'pending', 'sent', 'failed', 'replied_positive', 'replied_negative', 'suppressed'
     variant_sent = db.Column(db.String(1), nullable=True)  # 'A' or 'B'
     sent_at = db.Column(db.DateTime, nullable=True)
+    sent_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)
     reply_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)
     
     # NEW: Enhanced tracking fields
@@ -400,8 +404,12 @@ class CampaignMembership(db.Model):
     previous_response = db.Column(db.String(50), nullable=True)  # 'positive', 'negative', 'no_response'
     script_adapted = db.Column(db.Boolean, default=False)
     
+    # SMS Metrics tracking
+    membership_metadata = db.Column(db.JSON, nullable=True)  # For bounce tracking and other metadata
+    
     contact = db.relationship('Contact', backref='campaign_memberships')
-    reply_activity = db.relationship('Activity', backref='campaign_reply')
+    sent_activity = db.relationship('Activity', foreign_keys=[sent_activity_id], backref='sent_campaign_memberships')
+    reply_activity = db.relationship('Activity', foreign_keys=[reply_activity_id], backref='reply_campaign_memberships')
 
 # --- NEW: ContactFlag Model (for opt-outs and compliance) ---
 class ContactFlag(db.Model):

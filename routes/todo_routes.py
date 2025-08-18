@@ -3,7 +3,7 @@ Todo routes for task management
 """
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from services.todo_service import TodoService
+from services.todo_service_refactored import TodoService
 
 todo_bp = Blueprint('todo', __name__)
 todo_service = TodoService()

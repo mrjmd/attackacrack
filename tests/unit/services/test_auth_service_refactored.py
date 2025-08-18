@@ -79,7 +79,8 @@ class TestAuthServiceRefactored:
         result = auth_service.create_user(
             email="test@example.com",
             password="StrongP@ss123",
-            name="Test User",
+            first_name="Test",
+            last_name="User",
             role="user"
         )
         

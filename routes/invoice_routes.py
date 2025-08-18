@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 from flask_login import login_required
-from services.invoice_service import InvoiceService
+from services.invoice_service_refactored import InvoiceService
 from services.job_service import JobService
 from datetime import datetime
 

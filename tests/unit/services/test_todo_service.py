@@ -3,7 +3,7 @@ Tests for TodoService
 """
 import pytest
 from datetime import datetime, timedelta
-from services.todo_service import TodoService
+from services.todo_service_refactored import TodoService
 from crm_database import Todo
 
 

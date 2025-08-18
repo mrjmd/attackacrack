@@ -335,3 +335,6 @@ class InvoiceServiceRefactored:
             })
         
         return update_data
+
+# Alias for compatibility
+InvoiceService = InvoiceServiceRefactored

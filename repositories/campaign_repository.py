@@ -631,3 +631,370 @@ class CampaignRepository(BaseRepository[Campaign]):
             Number of campaign memberships with status 'pending'
         """
         return self.session.query(CampaignMembership).filter_by(status='pending').count()
+    
+    # SMS Metrics Enhancement Methods
+    
+    def get_campaign_metrics_with_bounce_analysis(self, campaign_id: int) -> Dict[str, Any]:
+        """
+        Get comprehensive campaign metrics with detailed bounce analysis.
+        
+        Args:
+            campaign_id: Campaign ID to analyze
+            
+        Returns:
+            Dictionary with comprehensive metrics including bounce analysis
+        """
+        # Get basic stats
+        stats = self.get_campaign_stats(campaign_id)
+        
+        # Get memberships for detailed analysis
+        memberships = self.session.query(CampaignMembership).filter(
+            CampaignMembership.campaign_id == campaign_id
+        ).all()
+        
+        # Enhanced bounce analysis
+        bounce_breakdown = {
+            'hard': 0,
+            'soft': 0,
+            'carrier_rejection': 0,
+            'capability': 0,
+            'unknown': 0
+        }
+        
+        # Analyze failed memberships
+        failed_memberships = [m for m in memberships if m.status == 'failed']
+        for membership in failed_memberships:
+            if membership.membership_metadata and 'bounce_info' in membership.membership_metadata:
+                bounce_type = membership.membership_metadata['bounce_info'].get('bounce_type', 'unknown')
+                if bounce_type in bounce_breakdown:
+                    bounce_breakdown[bounce_type] += 1
+                else:
+                    bounce_breakdown['unknown'] += 1
+        
+        # Calculate rates
+        total_sent = stats.get('sent', 0)
+        bounce_rate = (stats.get('failed', 0) / total_sent * 100) if total_sent > 0 else 0
+        delivery_rate = (stats.get('delivered', 0) / total_sent * 100) if total_sent > 0 else 0
+        
+        # Status indicator based on bounce rate
+        if bounce_rate > 5.0:
+            status_indicator = 'critical'
+        elif bounce_rate > 3.0:
+            status_indicator = 'warning'
+        else:
+            status_indicator = 'healthy'
+        
+        return {
+            'total_contacts': stats.get('total_recipients', 0),
+            'sent': stats.get('sent', 0),
+            'delivered': stats.get('delivered', 0),
+            'bounced': stats.get('failed', 0),  # Map 'failed' to 'bounced'
+            'replied': stats.get('responded', 0),
+            'opted_out': stats.get('opted_out', 0),
+            'bounce_rate': bounce_rate,
+            'delivery_rate': delivery_rate,
+            'response_rate': stats.get('response_rate', 0),
+            'bounce_breakdown': bounce_breakdown,
+            'status_indicator': status_indicator
+        }
+    
+    def get_membership_status_distribution(self, campaign_id: int) -> Dict[str, Any]:
+        """
+        Get detailed status distribution for campaign memberships.
+        
+        Args:
+            campaign_id: Campaign ID to analyze
+            
+        Returns:
+            Dictionary with status counts and percentages
+        """
+        memberships = self.session.query(CampaignMembership.status, func.count(CampaignMembership.id)).filter(
+            CampaignMembership.campaign_id == campaign_id
+        ).group_by(CampaignMembership.status).all()
+        
+        status_counts = {status: count for status, count in memberships}
+        total_members = sum(status_counts.values())
+        
+        status_percentages = {}
+        if total_members > 0:
+            for status, count in status_counts.items():
+                status_percentages[status] = (count / total_members) * 100
+        
+        return {
+            'status_counts': status_counts,
+            'status_percentages': status_percentages,
+            'total_members': total_members
+        }
+    
+    def find_memberships_with_activity_ids(self, campaign_id: int) -> List[CampaignMembership]:
+        """
+        Find memberships that have sent activity IDs.
+        
+        Args:
+            campaign_id: Campaign ID to filter by
+            
+        Returns:
+            List of memberships with sent_activity_id populated
+        """
+        return self.session.query(CampaignMembership).filter(
+            CampaignMembership.campaign_id == campaign_id,
+            CampaignMembership.sent_activity_id.isnot(None)
+        ).all()
+    
+    def get_campaign_bounce_analysis(self, campaign_id: int) -> Dict[str, Any]:
+        """
+        Get detailed bounce analysis for a campaign.
+        
+        Args:
+            campaign_id: Campaign ID to analyze
+            
+        Returns:
+            Dictionary with detailed bounce analysis
+        """
+        memberships = self.session.query(CampaignMembership).filter(
+            CampaignMembership.campaign_id == campaign_id,
+            CampaignMembership.status == 'failed'
+        ).all()
+        
+        bounce_types = {'hard': 0, 'soft': 0, 'carrier_rejection': 0, 'capability': 0, 'unknown': 0}
+        bounce_reasons = {}
+        problematic_contacts = []
+        
+        for membership in memberships:
+            if membership.membership_metadata and 'bounce_info' in membership.membership_metadata:
+                bounce_info = membership.membership_metadata['bounce_info']
+                bounce_type = bounce_info.get('bounce_type', 'unknown')
+                bounce_reason = bounce_info.get('bounce_reason', 'unknown')
+                
+                if bounce_type in bounce_types:
+                    bounce_types[bounce_type] += 1
+                else:
+                    bounce_types['unknown'] += 1
+                
+                bounce_reasons[bounce_reason] = bounce_reasons.get(bounce_reason, 0) + 1
+                
+                if bounce_type == 'hard':
+                    problematic_contacts.append({
+                        'contact_id': membership.contact_id,
+                        'bounce_type': bounce_type,
+                        'bounce_reason': bounce_reason
+                    })
+        
+        recommendations = []
+        if bounce_types['hard'] > 0:
+            recommendations.append('Remove contacts with hard bounces from future campaigns')
+        if bounce_types['carrier_rejection'] > bounce_types['hard']:
+            recommendations.append('Review message content for compliance issues')
+        
+        return {
+            'total_bounces': len(memberships),
+            'bounce_types': bounce_types,
+            'bounce_reasons': bounce_reasons,
+            'problematic_contacts': problematic_contacts,
+            'recommendations': recommendations
+        }
+    
+    def update_membership_with_bounce_info(self, membership_id: int, bounce_info: Dict[str, Any]) -> Optional[CampaignMembership]:
+        """
+        Update membership with detailed bounce information.
+        
+        Args:
+            membership_id: Membership ID to update
+            bounce_info: Bounce information to store
+            
+        Returns:
+            Updated CampaignMembership or None if not found
+        """
+        membership = self.session.query(CampaignMembership).get(membership_id)
+        if not membership:
+            return None
+        
+        # Initialize metadata if needed
+        if not membership.membership_metadata:
+            membership.membership_metadata = {}
+        
+        # Store bounce info
+        membership.membership_metadata['bounce_info'] = bounce_info
+        membership.status = 'failed'  # Ensure status reflects bounce
+        
+        self.session.flush()
+        return membership
+    
+    def get_campaign_performance_over_time(self, campaign_id: int, days: int = 7) -> Dict[str, Any]:
+        """
+        Get campaign performance metrics over time.
+        
+        Args:
+            campaign_id: Campaign ID to analyze
+            days: Number of days to analyze
+            
+        Returns:
+            Dictionary with time-series performance data
+        """
+        daily_stats = []
+        
+        for i in range(days):
+            day = datetime.utcnow().date() - timedelta(days=days-1-i)
+            
+            # Get memberships sent on this day
+            day_memberships = self.session.query(CampaignMembership).filter(
+                CampaignMembership.campaign_id == campaign_id,
+                func.date(CampaignMembership.sent_at) == day
+            ).all()
+            
+            sent = len(day_memberships)
+            delivered = sum(1 for m in day_memberships if m.status == 'delivered')
+            bounced = sum(1 for m in day_memberships if m.status == 'failed')
+            bounce_rate = (bounced / sent * 100) if sent > 0 else 0
+            
+            daily_stats.append({
+                'date': day,
+                'sent': sent,
+                'delivered': delivered,
+                'bounced': bounced,
+                'bounce_rate': bounce_rate
+            })
+        
+        # Calculate trends
+        total_sent = sum(s['sent'] for s in daily_stats)
+        total_bounced = sum(s['bounced'] for s in daily_stats)
+        avg_bounce_rate = (total_bounced / total_sent * 100) if total_sent > 0 else 0
+        
+        return {
+            'daily_stats': daily_stats,
+            'trends': {
+                'avg_bounce_rate': avg_bounce_rate,
+                'total_sent': total_sent,
+                'total_bounced': total_bounced
+            },
+            'summary': {
+                'period_days': days,
+                'performance': 'good' if avg_bounce_rate < 3.0 else 'poor'
+            }
+        }
+    
+    def find_campaigns_with_high_bounce_rates(self, bounce_threshold: float = 10.0, min_sent_count: int = 1) -> List[Dict[str, Any]]:
+        """
+        Find campaigns with high bounce rates.
+        
+        Args:
+            bounce_threshold: Bounce rate percentage threshold
+            min_sent_count: Minimum messages sent to be included
+            
+        Returns:
+            List of campaigns with high bounce rates
+        """
+        campaigns = self.get_all()
+        high_bounce_campaigns = []
+        
+        for campaign in campaigns:
+            stats = self.get_campaign_stats(campaign.id)
+            
+            sent_count = stats.get('sent', 0)
+            if sent_count < min_sent_count:
+                continue
+            
+            bounce_rate = (stats.get('bounced', 0) / sent_count * 100)
+            
+            if bounce_rate >= bounce_threshold:
+                high_bounce_campaigns.append({
+                    'campaign': campaign,
+                    'bounce_rate': bounce_rate,
+                    'sent_count': sent_count,
+                    'bounce_count': stats.get('bounced', 0)
+                })
+        
+        return sorted(high_bounce_campaigns, key=lambda x: x['bounce_rate'], reverse=True)
+    
+    def get_membership_timeline(self, campaign_id: int, hours: int = 24) -> List[Dict[str, Any]]:
+        """
+        Get timeline of membership status changes.
+        
+        Args:
+            campaign_id: Campaign ID to analyze
+            hours: Number of hours to look back
+            
+        Returns:
+            List of timeline events
+        """
+        since_time = datetime.utcnow() - timedelta(hours=hours)
+        
+        # Get memberships with recent activity
+        memberships = self.session.query(CampaignMembership).filter(
+            CampaignMembership.campaign_id == campaign_id,
+            CampaignMembership.sent_at >= since_time
+        ).order_by(CampaignMembership.sent_at.desc()).all()
+        
+        timeline = []
+        for membership in memberships:
+            if membership.sent_at:
+                timeline.append({
+                    'timestamp': membership.sent_at,
+                    'status': 'sent',
+                    'contact_id': membership.contact_id,
+                    'event_type': 'sent'
+                })
+        
+        return timeline
+    
+    def bulk_update_membership_statuses(self, membership_ids: List[int], status: str, metadata: Dict[str, Any] = None) -> int:
+        """
+        Bulk update membership statuses.
+        
+        Args:
+            membership_ids: List of membership IDs to update
+            status: New status to set
+            metadata: Optional metadata to set
+            
+        Returns:
+            Number of memberships updated
+        """
+        if not membership_ids:
+            return 0
+        
+        memberships = self.session.query(CampaignMembership).filter(
+            CampaignMembership.id.in_(membership_ids)
+        ).all()
+        
+        for membership in memberships:
+            membership.status = status
+            if metadata:
+                if not membership.membership_metadata:
+                    membership.membership_metadata = {}
+                membership.membership_metadata.update(metadata)
+        
+        self.session.flush()
+        return len(memberships)
+    
+    def calculate_campaign_roi_metrics(self, campaign_id: int) -> Dict[str, Any]:
+        """
+        Calculate campaign ROI and effectiveness metrics.
+        
+        Args:
+            campaign_id: Campaign ID to analyze
+            
+        Returns:
+            Dictionary with ROI analysis
+        """
+        stats = self.get_campaign_stats(campaign_id)
+        
+        # Basic cost assumptions (can be made configurable)
+        cost_per_message = 0.02  # $0.02 per SMS
+        value_per_response = 10.0  # $10 per positive response
+        
+        sent_count = stats.get('sent', 0)
+        responded_count = stats.get('responded', 0)
+        
+        total_cost = sent_count * cost_per_message
+        total_value = responded_count * value_per_response
+        roi_percentage = ((total_value - total_cost) / total_cost * 100) if total_cost > 0 else 0
+        
+        effectiveness_score = min(100, (responded_count / sent_count * 100 * 2)) if sent_count > 0 else 0
+        
+        return {
+            'cost_per_message': cost_per_message,
+            'cost_per_response': total_cost / responded_count if responded_count > 0 else 0,
+            'response_value': value_per_response,
+            'roi_percentage': roi_percentage,
+            'effectiveness_score': effectiveness_score
+        }

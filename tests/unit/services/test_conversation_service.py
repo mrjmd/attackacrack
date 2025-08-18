@@ -18,28 +18,15 @@ class TestConversationService:
         return Mock()
     
     @pytest.fixture
-    def mock_activity_repository(self):
-        """Mock ActivityRepository"""
-        return Mock()
-    
-    @pytest.fixture
-    def mock_contact_flag_repository(self):
-        """Mock ContactFlagRepository"""
-        return Mock()
-    
-    @pytest.fixture
     def mock_campaign_repository(self):
         """Mock CampaignRepository"""
         return Mock()
     
     @pytest.fixture
-    def service(self, mock_conversation_repository, mock_activity_repository, 
-                mock_contact_flag_repository, mock_campaign_repository):
+    def service(self, mock_conversation_repository, mock_campaign_repository):
         """Create ConversationService with mocked repositories"""
         return ConversationService(
             conversation_repository=mock_conversation_repository,
-            activity_repository=mock_activity_repository,
-            contact_flag_repository=mock_contact_flag_repository,
             campaign_repository=mock_campaign_repository
         )
     

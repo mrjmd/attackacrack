@@ -384,3 +384,6 @@ class TodoServiceRefactored:
                 f"Failed to serialize todo: {str(e)}",
                 code="SERIALIZATION_ERROR"
             )
+
+# Alias for compatibility
+TodoService = TodoServiceRefactored

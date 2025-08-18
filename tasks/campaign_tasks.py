@@ -5,7 +5,7 @@ Handles background sending and queue processing
 
 from datetime import datetime
 from celery_worker import celery
-from services.campaign_service import CampaignService
+from services.campaign_service_refactored import CampaignService
 from logging_config import get_logger
 
 logger = get_logger(__name__)

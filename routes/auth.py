@@ -2,7 +2,7 @@
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user, logout_user
-from services.auth_service import AuthService
+from services.auth_service_refactored import AuthService
 from functools import wraps
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')

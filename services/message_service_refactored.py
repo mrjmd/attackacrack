@@ -178,3 +178,6 @@ class MessageServiceRefactored:
                 f"Failed to get latest conversations: {str(e)}",
                 code="REPOSITORY_ERROR"
             )
+
+# Alias for compatibility
+MessageService = MessageServiceRefactored

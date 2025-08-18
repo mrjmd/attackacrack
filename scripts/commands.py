@@ -3,7 +3,7 @@
 import click
 from flask.cli import with_appcontext
 from extensions import db
-from services.auth_service import AuthService
+from services.auth_service_refactored import AuthService
 from crm_database import User
 
 

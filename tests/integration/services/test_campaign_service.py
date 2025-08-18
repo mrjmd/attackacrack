@@ -7,7 +7,7 @@ recipient management, A/B testing, and compliance features.
 import pytest
 from unittest.mock import MagicMock, patch, Mock
 from datetime import datetime, timedelta, time
-from services.campaign_service import CampaignService
+from services.campaign_service_refactored import CampaignService
 from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity
 from scipy import stats
 

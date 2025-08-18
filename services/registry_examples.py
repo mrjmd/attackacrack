@@ -14,7 +14,7 @@ from services.email_service import EmailService, EmailConfig
 from services.appointment_service_refactored import AppointmentService
 from services.contact_service import ContactService
 from services.openphone_service import OpenPhoneService
-from services.campaign_service import CampaignService
+from services.campaign_service_refactored import CampaignService
 from services.campaign_list_service import CampaignListService
 from extensions import db
 import os

@@ -288,3 +288,274 @@ class ActivityRepository(BaseRepository):
             self.model_class.created_at >= cutoff_date,
             self.model_class.contact_id.isnot(None)
         ).distinct().count()
+    
+    # SMS Metrics Enhancement Methods
+    
+    def update_activity_status_with_metadata(self, activity_id: int, status: str, metadata: dict):
+        """
+        Update activity status and merge metadata for SMS metrics tracking.
+        
+        Args:
+            activity_id: ID of the activity to update
+            status: New status to set
+            metadata: Metadata to merge with existing metadata
+            
+        Returns:
+            Updated Activity object or None if not found
+        """
+        activity = self.get_by_id(activity_id)
+        if not activity:
+            return None
+        
+        # Update status
+        activity.status = status
+        activity.updated_at = datetime.utcnow()
+        
+        # Merge metadata
+        if activity.activity_metadata:
+            activity.activity_metadata.update(metadata)
+        else:
+            activity.activity_metadata = metadata
+        
+        self.session.flush()
+        return activity
+    
+    def find_messages_by_date_range_and_direction(self, since_date: datetime, direction: str) -> List:
+        """
+        Find message activities by date range and direction.
+        
+        Args:
+            since_date: Start date for filtering
+            direction: Message direction ('outgoing' or 'incoming')
+            
+        Returns:
+            List of matching Activity objects
+        """
+        return self.session.query(self.model_class).filter(
+            self.model_class.activity_type == 'message',
+            self.model_class.direction == direction,
+            self.model_class.created_at >= since_date
+        ).all()
+    
+    def find_messages_by_contact_with_order(self, contact_id: int, order: str = 'created_at_desc', limit: int = 10) -> List:
+        """
+        Find messages for a contact with specific ordering.
+        
+        Args:
+            contact_id: Contact ID to filter by
+            order: Ordering option ('created_at_desc' or 'created_at_asc')
+            limit: Maximum number of results
+            
+        Returns:
+            List of ordered Activity objects
+        """
+        query = self.session.query(self.model_class).filter(
+            self.model_class.contact_id == contact_id,
+            self.model_class.activity_type == 'message'
+        )
+        
+        if order == 'created_at_desc':
+            query = query.order_by(desc(self.model_class.created_at))
+        else:
+            query = query.order_by(self.model_class.created_at)
+            
+        return query.limit(limit).all()
+    
+    def get_message_status_counts_by_categories(self, status_categories: dict, since_date: datetime, direction: str = None) -> dict:
+        """
+        Get message counts grouped by status categories.
+        
+        Args:
+            status_categories: Dict mapping category names to list of statuses
+            since_date: Start date for filtering
+            direction: Optional direction filter
+            
+        Returns:
+            Dict with category names and their counts
+        """
+        # Build base query
+        query = self.session.query(self.model_class).filter(
+            self.model_class.activity_type == 'message',
+            self.model_class.created_at >= since_date
+        )
+        
+        if direction:
+            query = query.filter(self.model_class.direction == direction)
+        
+        # Get all messages
+        messages = query.all()
+        
+        # Count by categories
+        counts = {category: 0 for category in status_categories.keys()}
+        
+        for message in messages:
+            for category, statuses in status_categories.items():
+                if message.status in statuses:
+                    counts[category] += 1
+                    break
+        
+        return counts
+    
+    def find_activities_with_bounce_metadata(self, since_date: datetime) -> List:
+        """
+        Find activities that have bounce metadata.
+        
+        Args:
+            since_date: Start date for filtering
+            
+        Returns:
+            List of Activity objects with bounce metadata
+        """
+        return self.session.query(self.model_class).filter(
+            self.model_class.created_at >= since_date,
+            self.model_class.activity_metadata.contains('bounce_type')
+        ).all()
+    
+    def get_daily_message_stats(self, days: int = 7) -> List[dict]:
+        """
+        Get daily message statistics for the last N days.
+        
+        Args:
+            days: Number of days to analyze
+            
+        Returns:
+            List of daily statistics dictionaries
+        """
+        stats = []
+        
+        for i in range(days):
+            day = datetime.utcnow().date() - timedelta(days=days-1-i)
+            
+            # Count messages for this day
+            day_messages = self.session.query(self.model_class).filter(
+                self.model_class.activity_type == 'message',
+                func.date(self.model_class.created_at) == day
+            ).all()
+            
+            sent = sum(1 for m in day_messages if m.direction == 'outgoing')
+            bounced = sum(1 for m in day_messages if m.status in ['failed', 'undelivered', 'rejected', 'blocked'])
+            bounce_rate = (bounced / sent * 100) if sent > 0 else 0
+            
+            stats.append({
+                'date': day,
+                'sent': sent,
+                'bounced': bounced,
+                'bounce_rate': bounce_rate
+            })
+        
+        return stats
+    
+    def update_activity_metadata(self, activity_id: int, metadata: dict, merge: bool = True):
+        """
+        Update activity metadata.
+        
+        Args:
+            activity_id: ID of the activity to update
+            metadata: Metadata to set/merge
+            merge: Whether to merge with existing metadata
+            
+        Returns:
+            Updated Activity object or None if not found
+        """
+        activity = self.get_by_id(activity_id)
+        if not activity:
+            return None
+        
+        if merge and activity.activity_metadata:
+            activity.activity_metadata.update(metadata)
+        else:
+            activity.activity_metadata = metadata
+        
+        activity.updated_at = datetime.utcnow()
+        self.session.flush()
+        return activity
+    
+    def find_failed_messages_with_details(self, since_date: datetime, bounce_types: List[str] = None) -> List:
+        """
+        Find failed messages with bounce details.
+        
+        Args:
+            since_date: Start date for filtering
+            bounce_types: Optional list of bounce types to filter by
+            
+        Returns:
+            List of failed Activity objects
+        """
+        query = self.session.query(self.model_class).filter(
+            self.model_class.activity_type == 'message',
+            self.model_class.status.in_(['failed', 'undelivered', 'rejected', 'blocked']),
+            self.model_class.created_at >= since_date
+        )
+        
+        messages = query.all()
+        
+        if bounce_types:
+            # Filter by bounce types in metadata
+            filtered = []
+            for msg in messages:
+                if msg.activity_metadata and msg.activity_metadata.get('bounce_type') in bounce_types:
+                    filtered.append(msg)
+            return filtered
+        
+        return messages
+    
+    def get_contact_message_summary(self, contact_id: int) -> dict:
+        """
+        Get comprehensive message summary for a contact.
+        
+        Args:
+            contact_id: Contact ID to analyze
+            
+        Returns:
+            Dictionary with message statistics and recent messages
+        """
+        messages = self.session.query(self.model_class).filter(
+            self.model_class.contact_id == contact_id,
+            self.model_class.activity_type == 'message'
+        ).order_by(desc(self.model_class.created_at)).all()
+        
+        summary = {
+            'total_messages': len(messages),
+            'sent_count': sum(1 for m in messages if m.direction == 'outgoing'),
+            'received_count': sum(1 for m in messages if m.direction == 'incoming'),
+            'delivered_count': sum(1 for m in messages if m.status == 'delivered'),
+            'bounced_count': sum(1 for m in messages if m.status in ['failed', 'undelivered', 'rejected', 'blocked']),
+            'recent_messages': [
+                {
+                    'id': m.id,
+                    'direction': m.direction,
+                    'status': m.status,
+                    'body': m.body[:100] if m.body else None,
+                    'created_at': m.created_at.isoformat() if m.created_at else None
+                }
+                for m in messages[:10]
+            ]
+        }
+        
+        return summary
+    
+    def bulk_update_activities_status(self, activity_ids: List[int], status: str, metadata: dict = None) -> int:
+        """
+        Bulk update activity statuses.
+        
+        Args:
+            activity_ids: List of activity IDs to update
+            status: New status to set
+            metadata: Optional metadata to set
+            
+        Returns:
+            Number of activities updated
+        """
+        if not activity_ids:
+            return 0
+        
+        update_data = {'status': status, 'updated_at': datetime.utcnow()}
+        if metadata:
+            update_data['metadata'] = metadata
+        
+        count = self.session.query(self.model_class).filter(
+            self.model_class.id.in_(activity_ids)
+        ).update(update_data, synchronize_session=False)
+        
+        self.session.flush()
+        return count

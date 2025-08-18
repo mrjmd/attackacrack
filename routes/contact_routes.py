@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, curren
 from flask_login import login_required, current_user
 from datetime import datetime
 from services.contact_service_refactored import ContactService
-from services.message_service import MessageService
+from services.message_service_refactored import MessageService
 from services.conversation_service import ConversationService 
 
 contact_bp = Blueprint('contact', __name__)

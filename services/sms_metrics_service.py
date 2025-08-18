@@ -4,8 +4,6 @@ Tracks delivery rates, bounce rates, and message performance
 """
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from sqlalchemy import func, and_, or_
-from crm_database import db, Activity, Campaign, CampaignMembership, Contact
 import logging
 
 logger = logging.getLogger(__name__)
@@ -29,7 +27,12 @@ class SMSMetricsService:
         'capability': ['landline', 'voip_unsupported', 'not_sms_capable']
     }
     
-    def __init__(self):
+    def __init__(self, activity_repository, contact_repository, campaign_repository):
+        """Initialize SMS Metrics Service with repository dependencies"""
+        self.activity_repository = activity_repository
+        self.contact_repository = contact_repository
+        self.campaign_repository = campaign_repository
+        
         self.bounce_threshold_warning = 3.0  # 3% triggers warning
         self.bounce_threshold_critical = 5.0  # 5% triggers critical alert
     
@@ -47,35 +50,43 @@ class SMSMetricsService:
             Dict with tracking results
         """
         try:
-            activity = Activity.query.get(activity_id)
+            activity = self.activity_repository.get_by_id(activity_id)
             if not activity:
                 return {'error': 'Activity not found'}
             
-            # Update activity status
-            activity.status = status
-            activity.updated_at = datetime.utcnow()
-            
             # Store bounce details if failed
+            bounce_type = None
             if status in self.STATUS_CATEGORIES['bounced']:
                 bounce_type = self._classify_bounce(status_details)
-                activity.metadata = activity.metadata or {}
-                activity.metadata.update({
+                bounce_metadata = {
                     'bounce_type': bounce_type,
                     'bounce_details': status_details,
                     'bounced_at': datetime.utcnow().isoformat()
-                })
+                }
+                
+                # Update activity status and metadata via repository
+                self.activity_repository.update_activity_status_with_metadata(
+                    activity_id=activity_id,
+                    status=status,
+                    metadata=bounce_metadata
+                )
                 
                 # Mark contact as having bounce issues
                 if activity.contact_id:
                     self._update_contact_bounce_status(activity.contact_id, bounce_type)
-            
-            db.session.commit()
+            else:
+                # Just update status without metadata
+                self.activity_repository.update_activity_status_with_metadata(
+                    activity_id=activity_id,
+                    status=status,
+                    metadata={}
+                )
             
             return {
                 'status': 'tracked',
                 'activity_id': activity_id,
                 'message_status': status,
-                'bounce_type': bounce_type if status in self.STATUS_CATEGORIES['bounced'] else None
+                'bounce_type': bounce_type
             }
             
         except Exception as e:
@@ -97,30 +108,19 @@ class SMSMetricsService:
         return 'unknown'
     
     def _update_contact_bounce_status(self, contact_id: int, bounce_type: str):
-        """Update contact record with bounce information"""
-        contact = Contact.query.get(contact_id)
-        if contact:
-            contact.metadata = contact.metadata or {}
-            bounce_info = contact.metadata.get('bounce_info', {})
+        """Update contact record with bounce information using repository"""
+        bounce_info = {
+            'bounce_type': bounce_type,
+            'bounce_details': f'Bounce type: {bounce_type}',
+            'bounced_at': datetime.utcnow().isoformat()
+        }
+        
+        self.contact_repository.update_contact_bounce_status(
+            contact_id=contact_id,
+            bounce_info=bounce_info
+        )
             
-            # Track bounce counts by type
-            bounce_counts = bounce_info.get('counts', {})
-            bounce_counts[bounce_type] = bounce_counts.get(bounce_type, 0) + 1
-            
-            # Update bounce info
-            bounce_info.update({
-                'last_bounce': datetime.utcnow().isoformat(),
-                'last_bounce_type': bounce_type,
-                'counts': bounce_counts,
-                'total_bounces': sum(bounce_counts.values())
-            })
-            
-            contact.metadata['bounce_info'] = bounce_info
-            
-            # Mark as invalid if too many hard bounces
-            if bounce_counts.get('hard', 0) >= 2:
-                contact.metadata['sms_invalid'] = True
-                contact.metadata['sms_invalid_reason'] = 'Multiple hard bounces'
+            # The repository method handles marking contacts as invalid
     
     def get_campaign_metrics(self, campaign_id: int) -> Dict:
         """
@@ -130,77 +130,8 @@ class SMSMetricsService:
             Dict with sent, delivered, bounced, bounce_rate, etc.
         """
         try:
-            # Get all campaign memberships
-            memberships = CampaignMembership.query.filter_by(
-                campaign_id=campaign_id
-            ).all()
-            
-            metrics = {
-                'total_contacts': len(memberships),
-                'sent': 0,
-                'delivered': 0,
-                'bounced': 0,
-                'pending': 0,
-                'replied': 0,
-                'opted_out': 0,
-                'bounce_rate': 0.0,
-                'delivery_rate': 0.0,
-                'response_rate': 0.0,
-                'bounce_breakdown': {
-                    'hard': 0,
-                    'soft': 0,
-                    'carrier_rejection': 0,
-                    'capability': 0,
-                    'unknown': 0
-                }
-            }
-            
-            for membership in memberships:
-                status = membership.status
-                
-                if status == 'sent':
-                    metrics['sent'] += 1
-                    
-                    # Check actual delivery status from activity
-                    if membership.sent_activity_id:
-                        activity = Activity.query.get(membership.sent_activity_id)
-                        if activity:
-                            if activity.status in self.STATUS_CATEGORIES['delivered']:
-                                metrics['delivered'] += 1
-                            elif activity.status in self.STATUS_CATEGORIES['bounced']:
-                                metrics['bounced'] += 1
-                                # Track bounce type
-                                bounce_type = (activity.metadata or {}).get('bounce_type', 'unknown')
-                                metrics['bounce_breakdown'][bounce_type] += 1
-                            elif activity.status in self.STATUS_CATEGORIES['pending']:
-                                metrics['pending'] += 1
-                
-                elif status == 'failed':
-                    metrics['bounced'] += 1
-                elif status in ['replied_positive', 'replied_negative', 'replied_neutral']:
-                    metrics['replied'] += 1
-                    metrics['delivered'] += 1  # If they replied, it was delivered
-                elif status == 'opted_out':
-                    metrics['opted_out'] += 1
-            
-            # Calculate rates
-            if metrics['sent'] > 0:
-                metrics['bounce_rate'] = (metrics['bounced'] / metrics['sent']) * 100
-                metrics['delivery_rate'] = (metrics['delivered'] / metrics['sent']) * 100
-                metrics['response_rate'] = (metrics['replied'] / metrics['sent']) * 100
-            
-            # Add status indicator
-            if metrics['bounce_rate'] > self.bounce_threshold_critical:
-                metrics['status'] = 'critical'
-                metrics['status_message'] = f"Critical: Bounce rate {metrics['bounce_rate']:.1f}% exceeds {self.bounce_threshold_critical}% threshold"
-            elif metrics['bounce_rate'] > self.bounce_threshold_warning:
-                metrics['status'] = 'warning'
-                metrics['status_message'] = f"Warning: Bounce rate {metrics['bounce_rate']:.1f}% exceeds {self.bounce_threshold_warning}% threshold"
-            else:
-                metrics['status'] = 'healthy'
-                metrics['status_message'] = f"Healthy: Bounce rate {metrics['bounce_rate']:.1f}% within acceptable limits"
-            
-            return metrics
+            # Use campaign repository to get comprehensive metrics
+            return self.campaign_repository.get_campaign_metrics_with_bounce_analysis(campaign_id)
             
         except Exception as e:
             logger.error(f"Error getting campaign metrics: {str(e)}")
@@ -217,74 +148,25 @@ class SMSMetricsService:
             Dict with overall metrics
         """
         try:
-            since_date = datetime.utcnow() - timedelta(days=days)
+            # Use activity repository to get daily stats
+            daily_stats = self.activity_repository.get_daily_message_stats(days=days)
             
-            # Query all message activities in timeframe
-            messages = Activity.query.filter(
-                and_(
-                    Activity.activity_type == 'message',
-                    Activity.direction == 'outgoing',
-                    Activity.created_at >= since_date
-                )
-            ).all()
+            # Calculate global metrics from daily stats
+            total_sent = sum(day['sent'] for day in daily_stats)
+            total_bounced = sum(day['bounced'] for day in daily_stats)
             
             metrics = {
                 'period_days': days,
-                'total_sent': len(messages),
-                'delivered': 0,
-                'bounced': 0,
-                'pending': 0,
-                'bounce_rate': 0.0,
-                'delivery_rate': 0.0,
-                'daily_average': 0.0,
-                'bounce_trends': [],
-                'top_bounce_reasons': {}
+                'total_sent': total_sent,
+                'delivered': total_sent - total_bounced,  # Approximation
+                'bounced': total_bounced,
+                'pending': 0,  # Not tracked in daily stats
+                'bounce_rate': (total_bounced / total_sent * 100) if total_sent > 0 else 0.0,
+                'delivery_rate': ((total_sent - total_bounced) / total_sent * 100) if total_sent > 0 else 0.0,
+                'daily_average': total_sent / days if days > 0 else 0.0,
+                'bounce_trends': daily_stats,
+                'top_bounce_reasons': {}  # Could be enhanced with repository method
             }
-            
-            bounce_reasons = {}
-            daily_stats = {}
-            
-            for message in messages:
-                # Track daily stats
-                date_key = message.created_at.date()
-                if date_key not in daily_stats:
-                    daily_stats[date_key] = {'sent': 0, 'bounced': 0}
-                daily_stats[date_key]['sent'] += 1
-                
-                # Count by status
-                if message.status in self.STATUS_CATEGORIES['delivered']:
-                    metrics['delivered'] += 1
-                elif message.status in self.STATUS_CATEGORIES['bounced']:
-                    metrics['bounced'] += 1
-                    daily_stats[date_key]['bounced'] += 1
-                    
-                    # Track bounce reasons
-                    bounce_type = (message.metadata or {}).get('bounce_type', 'unknown')
-                    bounce_reasons[bounce_type] = bounce_reasons.get(bounce_type, 0) + 1
-                elif message.status in self.STATUS_CATEGORIES['pending']:
-                    metrics['pending'] += 1
-            
-            # Calculate rates
-            if metrics['total_sent'] > 0:
-                metrics['bounce_rate'] = (metrics['bounced'] / metrics['total_sent']) * 100
-                metrics['delivery_rate'] = (metrics['delivered'] / metrics['total_sent']) * 100
-                metrics['daily_average'] = metrics['total_sent'] / days
-            
-            # Generate daily bounce trend
-            for date in sorted(daily_stats.keys()):
-                stats = daily_stats[date]
-                bounce_rate = (stats['bounced'] / stats['sent'] * 100) if stats['sent'] > 0 else 0
-                metrics['bounce_trends'].append({
-                    'date': date.isoformat(),
-                    'sent': stats['sent'],
-                    'bounced': stats['bounced'],
-                    'bounce_rate': bounce_rate
-                })
-            
-            # Top bounce reasons
-            metrics['top_bounce_reasons'] = dict(
-                sorted(bounce_reasons.items(), key=lambda x: x[1], reverse=True)[:5]
-            )
             
             return metrics
             
@@ -300,59 +182,32 @@ class SMSMetricsService:
             Dict with contact's SMS history and bounce information
         """
         try:
-            contact = Contact.query.get(contact_id)
+            # Use repositories to get contact and message data
+            contact = self.contact_repository.get_by_id(contact_id)
             if not contact:
                 return {'error': 'Contact not found'}
             
-            # Get all SMS activities for this contact
-            messages = Activity.query.filter(
-                and_(
-                    Activity.contact_id == contact_id,
-                    Activity.activity_type == 'message'
-                )
-            ).order_by(Activity.created_at.desc()).all()
+            # Get message summary from activity repository
+            message_summary = self.activity_repository.get_contact_message_summary(contact_id)
             
-            metrics = {
+            # Combine data from contact and message summary
+            bounce_info = contact.contact_metadata.get('bounce_info', {}) if contact.contact_metadata else {}
+            sms_valid = not (contact.contact_metadata or {}).get('sms_invalid', False)
+            
+            return {
                 'contact_id': contact_id,
                 'phone': contact.phone,
-                'total_messages': len(messages),
-                'sent': 0,
-                'received': 0,
-                'delivered': 0,
-                'bounced': 0,
-                'bounce_info': contact.metadata.get('bounce_info', {}) if contact.metadata else {},
-                'sms_valid': not (contact.metadata or {}).get('sms_invalid', False),
-                'recent_messages': []
+                'total_messages': message_summary['total_messages'],
+                'sent_count': message_summary['sent_count'],
+                'received_count': message_summary['received_count'],
+                'delivered_count': message_summary['delivered_count'],
+                'bounced_count': message_summary['bounced_count'],
+                'bounce_info': bounce_info,
+                'sms_valid': sms_valid,
+                'recent_messages': message_summary['recent_messages'],
+                'delivery_rate': (message_summary['delivered_count'] / message_summary['sent_count'] * 100) if message_summary['sent_count'] > 0 else 100,
+                'reliability_score': self.contact_repository.get_contact_reliability_score(contact_id)
             }
-            
-            for message in messages:
-                if message.direction == 'outgoing':
-                    metrics['sent'] += 1
-                    if message.status in self.STATUS_CATEGORIES['delivered']:
-                        metrics['delivered'] += 1
-                    elif message.status in self.STATUS_CATEGORIES['bounced']:
-                        metrics['bounced'] += 1
-                else:
-                    metrics['received'] += 1
-                
-                # Add to recent messages (limit to 10)
-                if len(metrics['recent_messages']) < 10:
-                    metrics['recent_messages'].append({
-                        'id': message.id,
-                        'direction': message.direction,
-                        'status': message.status,
-                        'body': message.body[:100] if message.body else None,
-                        'created_at': message.created_at.isoformat() if message.created_at else None
-                    })
-            
-            # Calculate reliability score
-            if metrics['sent'] > 0:
-                metrics['delivery_rate'] = (metrics['delivered'] / metrics['sent']) * 100
-                metrics['reliability_score'] = min(100, metrics['delivery_rate'])
-            else:
-                metrics['reliability_score'] = 100  # No sends, assume good
-            
-            return metrics
             
         except Exception as e:
             logger.error(f"Error getting contact SMS history: {str(e)}")
@@ -369,32 +224,8 @@ class SMSMetricsService:
             List of problematic contacts with bounce details
         """
         try:
-            # Query contacts with bounce metadata
-            contacts = Contact.query.filter(
-                Contact.metadata.contains('bounce_info')
-            ).all()
-            
-            problematic = []
-            
-            for contact in contacts:
-                bounce_info = (contact.metadata or {}).get('bounce_info', {})
-                total_bounces = bounce_info.get('total_bounces', 0)
-                
-                if total_bounces >= bounce_threshold:
-                    problematic.append({
-                        'contact_id': contact.id,
-                        'phone': contact.phone,
-                        'name': contact.name,
-                        'total_bounces': total_bounces,
-                        'bounce_types': bounce_info.get('counts', {}),
-                        'last_bounce': bounce_info.get('last_bounce'),
-                        'sms_invalid': (contact.metadata or {}).get('sms_invalid', False)
-                    })
-            
-            # Sort by total bounces descending
-            problematic.sort(key=lambda x: x['total_bounces'], reverse=True)
-            
-            return problematic
+            # Use contact repository to find problematic numbers
+            return self.contact_repository.find_problematic_numbers(bounce_threshold=bounce_threshold)
             
         except Exception as e:
             logger.error(f"Error identifying problematic numbers: {str(e)}")
