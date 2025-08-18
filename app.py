@@ -604,17 +604,13 @@ def _create_campaign_list_service(db_session):
     from repositories.campaign_list_repository import CampaignListRepository
     from repositories.campaign_list_member_repository import CampaignListMemberRepository
     from repositories.contact_repository import ContactRepository
-    from repositories.activity_repository import ActivityRepository
-    from repositories.contact_flag_repository import ContactFlagRepository
-    from crm_database import CampaignList, CampaignListMember, Contact, Activity, ContactFlag
+    from crm_database import CampaignList, CampaignListMember, Contact
     
     logger.info("Initializing CampaignListServiceRefactored with repository pattern")
     return CampaignListServiceRefactored(
         campaign_list_repository=CampaignListRepository(db_session, CampaignList),
-        campaign_list_member_repository=CampaignListMemberRepository(db_session, CampaignListMember),
-        contact_repository=ContactRepository(db_session, Contact),
-        activity_repository=ActivityRepository(db_session, Activity),
-        contact_flag_repository=ContactFlagRepository(db_session, ContactFlag)
+        member_repository=CampaignListMemberRepository(db_session, CampaignListMember),
+        contact_repository=ContactRepository(db_session, Contact)
     )
 
 def _create_dashboard_service(db_session):
