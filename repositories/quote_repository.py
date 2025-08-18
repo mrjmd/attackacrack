@@ -12,6 +12,17 @@ from crm_database import Quote, Job
 class QuoteRepository(BaseRepository):
     """Repository for Quote data access"""
     
+    def find_all_ordered_by_id_desc(self) -> List:
+        """
+        Find all quotes ordered by ID descending.
+        
+        Returns:
+            List of Quote objects ordered by ID desc
+        """
+        return self.session.query(self.model_class)\
+            .order_by(desc(self.model_class.id))\
+            .all()
+    
     def find_by_job_id(self, job_id: int) -> List:
         """
         Find all quotes for a job.
@@ -38,6 +49,24 @@ class QuoteRepository(BaseRepository):
         """
         return self.session.query(self.model_class)\
             .filter_by(status=status)\
+            .all()
+    
+    def find_draft_quotes_by_job_id(self, job_id: int) -> List:
+        """
+        Find draft quotes for a specific job.
+        
+        This method is specifically designed for scheduler service needs,
+        matching the pattern from scheduler_service.py line 109:
+        Quote.query.filter_by(job_id=appt.job.id, status='Draft').all()
+        
+        Args:
+            job_id: ID of the job
+            
+        Returns:
+            List of Quote objects with Draft status for the job
+        """
+        return self.session.query(self.model_class)\
+            .filter_by(job_id=job_id, status='Draft')\
             .all()
     
     def find_by_quickbooks_id(self, quickbooks_id: str) -> Optional:

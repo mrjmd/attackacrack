@@ -184,6 +184,12 @@ def create_app(config_name=None, test_config=None):
         dependencies=['google_calendar', 'db_session']
     )
     
+    registry.register_factory(
+        'scheduler',
+        lambda openphone, invoice, db_session: _create_scheduler_service(openphone, invoice, db_session),
+        dependencies=['openphone', 'invoice', 'db_session']
+    )
+    
     # Validate all dependencies are registered
     errors = registry.validate_dependencies()
     if errors:
@@ -366,10 +372,24 @@ def _create_job_service():
     return JobService()
 
 def _create_quote_service():
-    """Create QuoteService instance"""
+    """Create QuoteService instance with repository dependencies"""
     from services.quote_service import QuoteService
-    logger.info("Initializing QuoteService")
-    return QuoteService()
+    from repositories.quote_repository import QuoteRepository
+    from repositories.quote_line_item_repository import QuoteLineItemRepository
+    from crm_database import Quote, QuoteLineItem
+    from extensions import db
+    
+    logger.info("Initializing QuoteService with repositories")
+    
+    # Create repository instances
+    db_session = db.session
+    quote_repo = QuoteRepository(session=db_session, model_class=Quote)
+    line_item_repo = QuoteLineItemRepository(session=db_session, model_class=QuoteLineItem)
+    
+    return QuoteService(
+        quote_repository=quote_repo,
+        line_item_repository=line_item_repo
+    )
 
 def _create_invoice_service():
     """Create InvoiceService instance"""
@@ -526,6 +546,33 @@ def _create_appointment_service(google_calendar, db_session):
     from services.appointment_service_refactored import AppointmentService
     logger.info("Initializing AppointmentService")
     return AppointmentService(calendar_service=google_calendar, session=db_session)
+
+
+def _create_scheduler_service(openphone, invoice, db_session):
+    """Create SchedulerService with repository dependencies"""
+    from services.scheduler_service import SchedulerService
+    from repositories.setting_repository import SettingRepository
+    from repositories.job_repository import JobRepository
+    from repositories.quote_repository import QuoteRepository
+    from repositories.appointment_repository import AppointmentRepository
+    from crm_database import Setting, Job, Quote, Appointment
+    
+    logger.info("Initializing SchedulerService with repositories")
+    
+    # Create repository instances
+    setting_repo = SettingRepository(session=db_session, model_class=Setting)
+    job_repo = JobRepository(session=db_session, model_class=Job)
+    quote_repo = QuoteRepository(session=db_session, model_class=Quote)
+    appointment_repo = AppointmentRepository(session=db_session, model_class=Appointment)
+    
+    return SchedulerService(
+        setting_repository=setting_repo,
+        job_repository=job_repo,
+        quote_repository=quote_repo,
+        appointment_repository=appointment_repo,
+        openphone_service=openphone,
+        invoice_service=invoice
+    )
 
 
 if __name__ == '__main__':
