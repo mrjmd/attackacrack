@@ -104,65 +104,100 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 | W3-15 | Create test data factories | 🔵 TODO | 2h | - | None | For all models |
 | W3-16 | Run coverage report | 🔵 TODO | 2h | - | All tests | Target 95% |
 
-## Week 4: Performance & Polish (40 hours total)
+## Week 4: Test Suite Recovery Phase (40 hours total) 🚨 CRITICAL
+
+### Current Test Suite Status
+- **Total test files**: 101
+- **Files with collection errors**: 12
+- **Tests unable to run**: ~1500
+- **Main issue**: Imports of deleted services (_refactored services not imported)
+- **Critical blocker**: Cannot proceed with campaign improvements until tests are fixed
+
+### Monday-Tuesday: Test Discovery & Import Fixes
+| ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
+|----|------|--------|------------|----------|--------------|-------|
+| W4-01 | Run full test suite and document failures | 🔵 TODO | 2h | - | None | Identify all 12 files with collection errors |
+| W4-02 | Fix all import errors from deleted services | 🔵 TODO | 4h | - | W4-01 | 11 tests importing old service names |
+| W4-03 | Update tests to use _refactored service names | 🔵 TODO | 4h | - | W4-02 | Systematic update of all service imports |
+| W4-04 | Create comprehensive test fixtures for service registry | 🔵 TODO | 3h | - | W4-03 | Shared fixtures for all tests |
+| W4-05 | Create repository mock factory | 🔵 TODO | 3h | - | W4-04 | Standardized mocking patterns |
+
+### Wednesday-Thursday: Test Refactoring
+| ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
+|----|------|--------|------------|----------|--------------|-------|
+| W4-06 | Fix unit tests to use mocks instead of database | 🔵 TODO | 6h | - | W4-05 | True unit tests, no DB |
+| W4-07 | Fix integration tests to use service registry | 🔵 TODO | 6h | - | W4-04 | Proper DI in tests |
+| W4-08 | Reorganize test structure (unit/integration/e2e) | 🔵 TODO | 4h | - | W4-06, W4-07 | Clear test organization |
+
+### Friday: Test Infrastructure & Coverage
+| ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
+|----|------|--------|------------|----------|--------------|-------|
+| W4-09 | Create test data factories | 🔵 TODO | 3h | - | W4-08 | Faker-based test data |
+| W4-10 | Achieve 80% test coverage | 🔵 TODO | 4h | - | W4-01 to W4-09 | Fix remaining coverage gaps |
+| W4-11 | Document new testing patterns | 🔵 TODO | 2h | - | W4-10 | Testing best practices |
+
+## Week 5: Performance & Polish (40 hours total)
 
 ### Monday-Tuesday: Performance Testing
 | ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
 |----|------|--------|------------|----------|--------------|-------|
-| W4-01 | Setup pytest-benchmark | 🔵 TODO | 2h | - | None | Performance framework |
-| W4-02 | Benchmark CSV import (10k contacts) | 🔵 TODO | 3h | - | W4-01, W2-09 | < 30 sec target |
-| W4-03 | Benchmark campaign send (1k recipients) | 🔵 TODO | 3h | - | W4-01, W2-15 | < 10 sec target |
-| W4-04 | Benchmark dashboard load | 🔵 TODO | 3h | - | W4-01 | < 2 sec target |
-| W4-05 | Create performance regression tests | 🔵 TODO | 3h | - | W4-01 to W4-04 | CI/CD integration |
-| W4-06 | Database query optimization | 🔵 TODO | 2h | - | W4-02 to W4-04 | Based on results |
+| W5-01 | Setup pytest-benchmark | 🔵 TODO | 2h | - | W4-11 | Performance framework |
+| W5-02 | Benchmark CSV import (10k contacts) | 🔵 TODO | 3h | - | W5-01 | < 30 sec target |
+| W5-03 | Benchmark campaign send (1k recipients) | 🔵 TODO | 3h | - | W5-01 | < 10 sec target |
+| W5-04 | Benchmark dashboard load | 🔵 TODO | 3h | - | W5-01 | < 2 sec target |
+| W5-05 | Create performance regression tests | 🔵 TODO | 3h | - | W5-01 to W5-04 | CI/CD integration |
+| W5-06 | Database query optimization | 🔵 TODO | 2h | - | W5-02 to W5-04 | Based on results |
 
 ### Wednesday: Documentation
 | ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
 |----|------|--------|------------|----------|--------------|-------|
-| W4-07 | Create docs/ARCHITECTURE.md | 🔵 TODO | 3h | - | Week 1-3 | System design |
-| W4-08 | Create docs/TESTING.md | 🔵 TODO | 2h | - | Week 2-3 | Test strategy |
-| W4-09 | Update docs/API.md | 🔵 TODO | 2h | - | Week 1 | Service interfaces |
-| W4-10 | Archive old README files | 🔵 TODO | 1h | - | None | Consolidate |
+| W5-07 | Create docs/ARCHITECTURE.md | 🔵 TODO | 3h | - | Week 1-4 | System design |
+| W5-08 | Create docs/TESTING.md | 🔵 TODO | 2h | - | Week 4 | Test strategy |
+| W5-09 | Update docs/API.md | 🔵 TODO | 2h | - | Week 1 | Service interfaces |
+| W5-10 | Archive old README files | 🔵 TODO | 1h | - | None | Consolidate |
 
 ### Thursday-Friday: Final Review
 | ID | Task | Status | Est. Hours | Assignee | Dependencies | Notes |
 |----|------|--------|------------|----------|--------------|-------|
-| W4-11 | Code coverage report | 🔵 TODO | 2h | - | All tests | Generate report |
-| W4-12 | Performance baseline report | 🔵 TODO | 2h | - | W4-01 to W4-06 | Document metrics |
-| W4-13 | Update CLAUDE.md with Phase 2 completion | 🔵 TODO | 1h | - | All tasks | Victory lap! |
-| W4-14 | Create Phase 3 planning document | 🔵 TODO | 3h | - | All tasks | Next steps |
-| W4-15 | Team retrospective | 🔵 TODO | 2h | - | All tasks | Lessons learned |
-| W4-16 | Deploy to staging for testing | 🔵 TODO | 2h | - | All tasks | Validation |
+| W5-11 | Code coverage report | 🔵 TODO | 2h | - | All tests | Generate report |
+| W5-12 | Performance baseline report | 🔵 TODO | 2h | - | W5-01 to W5-06 | Document metrics |
+| W5-13 | Update CLAUDE.md with Phase 2 completion | 🔵 TODO | 1h | - | All tasks | Victory lap! |
+| W5-14 | Create Phase 3 planning document | 🔵 TODO | 3h | - | All tasks | Next steps |
+| W5-15 | Team retrospective | 🔵 TODO | 2h | - | All tasks | Lessons learned |
+| W5-16 | Deploy to staging for testing | 🔵 TODO | 2h | - | All tasks | Validation |
 
 ## Metrics Dashboard
 
 ### Overall Progress ✅ REPOSITORY PATTERN 100% COMPLETE!
-- **Total Tasks**: 64
+- **Total Tasks**: 75 (expanded from 64 due to test recovery needs)
 - **Completed**: 49
 - **In Progress**: 0
 - **Blocked**: 0
 - **Paused**: 0
-- **Completion**: 77%
+- **Completion**: 65% (49/75)
 
 ### Week Progress
 - Week 1: 16/16 tasks (100%) ✅
 - Week 2: 20/20 tasks (100%) ✅ **FOUNDATION & TESTING COMPLETE**
 - Week 3: 13/15 tasks (87%) ✅ **REPOSITORY PATTERN COMPLETE**
-- Week 4: 0/16 tasks (0%)
+- Week 4: 0/11 tasks (0%) 🚨 **TEST RECOVERY - CRITICAL PATH**
+- Week 5: 0/16 tasks (0%)
 
 ### Test Coverage Progress
-- Current: 75%
-- Target: 95%
-- Progress: 0%
+- Current: Unknown (tests not running due to import errors)
+- Intermediate Target: 80% (Week 4)
+- Final Target: 95% (Week 5)
+- Progress: Blocked by test suite failures
 
 ### Critical Milestones ✅ MAJOR ACHIEVEMENTS!
 - [x] **Repository pattern implemented** (8/8 repositories complete)
 - [x] **Enhanced Dependency Injection System** (ServiceRegistryEnhanced with 24 services)
 - [x] **State-of-the-art DI patterns** (Factory pattern, lazy loading, lifecycle management)
-- [x] **Test infrastructure ready** (578 tests passing + 77 repository tests)
 - [x] **Clean Architecture achieved** (Routes → Services → Repositories → Database)
 - [x] **100% Repository Pattern Migration** (Zero direct DB queries in services/routes)
 - [x] **Application Successfully Running** (Login working, dashboard accessible)
+- [ ] **Test suite recovery** (0/11 tasks) 🚨 BLOCKING
+- [ ] **Test infrastructure operational** (~1500 tests need fixing)
 - [ ] CSV Import Service 95% coverage
 - [ ] Campaign Service 95% coverage
 - [ ] All critical paths tested
@@ -172,10 +207,12 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 
 | Risk | Probability | Impact | Mitigation | Status |
 |------|------------|--------|------------|--------|
+| Test suite failures blocking development | High | High | Week 4 dedicated to recovery | 🔴 ACTIVE |
 | Breaking production during refactor | Medium | High | Feature flags, gradual rollout | 🔵 OPEN |
 | Test suite becomes too slow | Medium | Medium | Separate unit/integration tests | 🔵 OPEN |
 | Merge conflicts with ongoing dev | High | Low | Small, frequent commits | 🔵 OPEN |
-| Repository pattern adds complexity | Low | Medium | Clear documentation, examples | 🔵 OPEN |
+| Repository pattern adds complexity | Low | Medium | Clear documentation, examples | ✅ MITIGATED |
+| Campaign launch delayed by test issues | High | High | Prioritize test recovery | 🔴 ACTIVE |
 
 ## Notes and Decisions
 
@@ -261,19 +298,25 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 - **Repository Pattern Success**: Systematic refactoring with TDD approach ensures clean architecture
 - **Service Cleanup**: Deleting obsolete files prevents confusion and maintains clean codebase
 
-### Next Steps - BACK ON TRACK!
+### Next Steps - TEST RECOVERY CRITICAL PATH!
 **✅ COMPLETED**: Repository pattern migration is now 100% complete!
+**🚨 BLOCKED**: Test suite failures preventing campaign launch
 
-#### Immediate Priority: Resume Test Infrastructure (W2-15 to W2-20)
-1. **W3-14**: Test CSVImportService (highest risk) - 4h
-2. **W3-15**: Create test data factories - 2h
-3. **W3-16**: Run coverage report - 2h
+#### Immediate Priority: Week 4 Test Recovery Phase
+1. **W4-01**: Document all test failures (12 files with collection errors)
+2. **W4-02**: Fix import errors from deleted services
+3. **W4-03**: Update to use _refactored service names
+4. **W4-04-05**: Create test fixtures and mock factories
+5. **W4-06-11**: Refactor tests and achieve 80% coverage
 
-#### Campaign System Production Ready
-1. Fix dashboard activity sorting (sort by recent activity, not import time)
-2. Overhaul contacts page (filters, pagination, intuitive UX)
-3. Vet campaign list generation and templating
-4. Launch first automated SMS campaign via OpenPhone API
+#### Blocked Until Tests Fixed:
+1. CSV Import Service testing (highest risk)
+2. Campaign Service testing
+3. Campaign System Production Launch:
+   - Fix dashboard activity sorting
+   - Overhaul contacts page
+   - Vet campaign list generation
+   - Launch first automated SMS campaign
 
 #### Minor Dashboard Issues to Address
 - TodoService initialization in dashboard route
@@ -283,4 +326,5 @@ This document tracks all tasks for Phase 2 of the refactoring project. Each task
 ---
 
 *Last Updated: August 18, 2025*
-*Status: 🎉 PHASE 2 PROGRESSING - 49/64 tasks (77%) - REPOSITORY PATTERN 100% COMPLETE*
+*Status: 🚨 PHASE 2 TEST RECOVERY NEEDED - 49/75 tasks (65%) - REPOSITORY PATTERN 100% COMPLETE*
+*Critical Path: Week 4 Test Recovery must complete before campaign launch*
