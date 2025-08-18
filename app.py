@@ -453,6 +453,7 @@ def _create_auth_service(db_session):
 def _create_product_service(db_session):
     """Create ProductService with ProductRepository"""
     from repositories.product_repository import ProductRepository
+    from crm_database import Product
     
     class ProductService:
         """Minimal ProductService wrapper using repository pattern"""
@@ -464,7 +465,7 @@ def _create_product_service(db_session):
             return self.repository.get_all()
     
     logger.info("Initializing ProductService with repository pattern")
-    return ProductService(ProductRepository(db_session))
+    return ProductService(ProductRepository(db_session, Product))
 
 def _create_job_service(job_repository):
     """Create JobService with repository dependency"""
@@ -605,14 +606,15 @@ def _create_campaign_list_service(db_session):
     from repositories.contact_repository import ContactRepository
     from repositories.activity_repository import ActivityRepository
     from repositories.contact_flag_repository import ContactFlagRepository
+    from crm_database import CampaignList, CampaignListMember, Contact, Activity, ContactFlag
     
     logger.info("Initializing CampaignListServiceRefactored with repository pattern")
     return CampaignListServiceRefactored(
-        campaign_list_repository=CampaignListRepository(db_session),
-        campaign_list_member_repository=CampaignListMemberRepository(db_session),
-        contact_repository=ContactRepository(db_session),
-        activity_repository=ActivityRepository(db_session),
-        contact_flag_repository=ContactFlagRepository(db_session)
+        campaign_list_repository=CampaignListRepository(db_session, CampaignList),
+        campaign_list_member_repository=CampaignListMemberRepository(db_session, CampaignListMember),
+        contact_repository=ContactRepository(db_session, Contact),
+        activity_repository=ActivityRepository(db_session, Activity),
+        contact_flag_repository=ContactFlagRepository(db_session, ContactFlag)
     )
 
 def _create_dashboard_service(db_session):
