@@ -9,6 +9,7 @@ from datetime import datetime
 from services.contact_service_refactored import ContactService
 from services.common.result import Result, PagedResult
 from repositories.contact_repository import ContactRepository
+from repositories.campaign_repository import CampaignRepository
 from crm_database import Contact, ContactFlag, Campaign, CampaignMembership
 
 
@@ -28,6 +29,16 @@ class TestContactServiceResult:
         return repo
     
     @pytest.fixture
+    def mock_campaign_repo(self):
+        """Mock CampaignRepository"""
+        repo = Mock(spec=CampaignRepository)
+        repo.get_by_id = Mock(return_value=None)
+        repo.get_member_by_contact = Mock(return_value=None)
+        repo.add_member = Mock()
+        repo.add_members_bulk = Mock(return_value=0)
+        return repo
+    
+    @pytest.fixture
     def mock_session(self):
         """Mock database session"""
         session = Mock()
@@ -38,12 +49,15 @@ class TestContactServiceResult:
         return session
     
     @pytest.fixture
-    def contact_service(self, mock_contact_repo, mock_session):
+    def contact_service(self, mock_contact_repo, mock_campaign_repo, mock_session):
         """Create ContactService with mocked dependencies"""
-        return ContactService(
+        service = ContactService(
             contact_repository=mock_contact_repo,
             session=mock_session
         )
+        # This injection should fail initially because ContactService doesn't accept campaign_repository
+        # service.campaign_repository = mock_campaign_repo  # Will be uncommented after implementation
+        return service
     
     def test_add_contact_success(self, contact_service, mock_contact_repo):
         """Test successful contact creation"""
@@ -281,33 +295,71 @@ class TestContactServiceResult:
         assert result.is_failure == True
         assert result.error_code == "NO_CONTACTS"
     
-    @patch('services.contact_service_refactored.Campaign')
-    @patch('services.contact_service_refactored.CampaignMembership')
-    def test_add_to_campaign_success(self, mock_membership_class, mock_campaign_class, 
-                                    contact_service, mock_contact_repo, mock_session):
-        """Test adding contact to campaign"""
+    def test_add_to_campaign_success_with_repository_pattern(self, contact_service, mock_contact_repo, mock_session):
+        """
+        Test adding contact to campaign using repository pattern.
+        
+        THIS TEST MUST FAIL INITIALLY because current implementation uses direct DB queries:
+        - Campaign.query.get(campaign_id)  # Should use campaign_repository.get_by_id()
+        - CampaignMembership.query.filter_by()  # Should use campaign_repository.get_member_by_contact()
+        """
         # Arrange
         mock_contact = Mock()
+        mock_contact.id = 1
         mock_contact_repo.find_by_id.return_value = mock_contact
+        
         mock_campaign = Mock()
-        mock_campaign_class.query.get.return_value = mock_campaign
-        mock_membership_class.query.filter_by.return_value.first.return_value = None
+        mock_campaign.id = 1
+        
+        # CRITICAL: ContactService should have campaign_repository injected
+        mock_campaign_repo = Mock()
+        mock_campaign_repo.get_by_id.return_value = mock_campaign
+        mock_campaign_repo.get_member_by_contact.return_value = None  # No existing membership
+        mock_campaign_repo.add_member.return_value = Mock()
+        
+        # This should fail because ContactService doesn't have campaign_repository
+        contact_service.campaign_repository = mock_campaign_repo
         
         # Act
         result = contact_service.add_to_campaign(1, 1)
         
-        # Assert
+        # Assert - These assertions verify repository pattern usage
         assert result.is_success == True
-        mock_session.add.assert_called_once()
+        mock_campaign_repo.get_by_id.assert_called_once_with(1)
+        mock_campaign_repo.get_member_by_contact.assert_called_once_with(1, 1)
+        mock_campaign_repo.add_member.assert_called_once_with(1, 1)
         mock_session.commit.assert_called_once()
     
-    @patch('services.contact_service_refactored.Campaign')
-    def test_add_to_campaign_not_found(self, mock_campaign_class, contact_service, mock_contact_repo):
-        """Test adding to non-existent campaign"""
+    def test_add_to_campaign_contact_not_found(self, contact_service, mock_contact_repo):
+        """Test adding to campaign when contact doesn't exist"""
+        # Arrange
+        mock_contact_repo.find_by_id.return_value = None
+        
+        # Act
+        result = contact_service.add_to_campaign(999, 1)
+        
+        # Assert
+        assert result.is_failure == True
+        assert result.error_code == "CONTACT_NOT_FOUND"
+        assert "Contact not found: 999" in result.error
+    
+    def test_add_to_campaign_campaign_not_found(self, contact_service, mock_contact_repo):
+        """
+        Test adding to non-existent campaign using repository pattern.
+        
+        THIS TEST MUST FAIL because current implementation uses Campaign.query.get()
+        instead of campaign_repository.get_by_id()
+        """
         # Arrange
         mock_contact = Mock()
+        mock_contact.id = 1
         mock_contact_repo.find_by_id.return_value = mock_contact
-        mock_campaign_class.query.get.return_value = None
+        
+        mock_campaign_repo = Mock()
+        mock_campaign_repo.get_by_id.return_value = None
+        
+        # This should fail because ContactService doesn't have campaign_repository
+        contact_service.campaign_repository = mock_campaign_repo
         
         # Act
         result = contact_service.add_to_campaign(1, 999)
@@ -315,6 +367,141 @@ class TestContactServiceResult:
         # Assert
         assert result.is_failure == True
         assert result.error_code == "CAMPAIGN_NOT_FOUND"
+        assert "Campaign not found: 999" in result.error
+        mock_campaign_repo.get_by_id.assert_called_once_with(999)
+    
+    def test_add_to_campaign_already_member(self, contact_service, mock_contact_repo):
+        """
+        Test adding contact to campaign when already a member.
+        
+        THIS TEST MUST FAIL because current implementation uses:
+        CampaignMembership.query.filter_by() instead of campaign_repository.get_member_by_contact()
+        """
+        # Arrange
+        mock_contact = Mock()
+        mock_contact.id = 1
+        mock_contact_repo.find_by_id.return_value = mock_contact
+        
+        mock_campaign = Mock()
+        mock_campaign.id = 1
+        
+        existing_membership = Mock()
+        existing_membership.id = 123
+        
+        mock_campaign_repo = Mock()
+        mock_campaign_repo.get_by_id.return_value = mock_campaign
+        mock_campaign_repo.get_member_by_contact.return_value = existing_membership
+        
+        # This should fail because ContactService doesn't have campaign_repository
+        contact_service.campaign_repository = mock_campaign_repo
+        
+        # Act
+        result = contact_service.add_to_campaign(1, 1)
+        
+        # Assert
+        assert result.is_failure == True
+        assert result.error_code == "ALREADY_MEMBER"
+        assert "Contact already in campaign" in result.error
+        mock_campaign_repo.get_by_id.assert_called_once_with(1)
+        mock_campaign_repo.get_member_by_contact.assert_called_once_with(1, 1)
+        mock_campaign_repo.add_member.assert_not_called()
+    
+    def test_bulk_add_to_campaign_success_with_repository_pattern(self, contact_service, mock_contact_repo, mock_session):
+        """
+        Test bulk adding contacts to campaign using repository pattern.
+        
+        THIS TEST MUST FAIL because current implementation uses:
+        - Campaign.query.get(campaign_id)  # Should use campaign_repository.get_by_id()
+        """
+        # Arrange
+        contact_ids = [1, 2, 3]
+        
+        mock_campaign = Mock()
+        mock_campaign.id = 1
+        
+        mock_campaign_repo = Mock()
+        mock_campaign_repo.get_by_id.return_value = mock_campaign
+        mock_campaign_repo.add_members_bulk.return_value = 3  # All 3 added successfully
+        
+        # This should fail because ContactService doesn't have campaign_repository
+        contact_service.campaign_repository = mock_campaign_repo
+        
+        # Act
+        result = contact_service.bulk_add_to_campaign(contact_ids, 1)
+        
+        # Assert - These verify repository pattern usage
+        assert result.is_success == True
+        assert result.data["added"] == 3
+        assert result.data["skipped"] == 0
+        assert len(result.data["errors"]) == 0
+        
+        mock_campaign_repo.get_by_id.assert_called_once_with(1)
+        mock_campaign_repo.add_members_bulk.assert_called_once_with(1, contact_ids, None)
+        mock_session.commit.assert_called_once()
+    
+    def test_bulk_add_to_campaign_no_contacts(self, contact_service):
+        """Test bulk add with empty contact list"""
+        # Act
+        result = contact_service.bulk_add_to_campaign([], 1)
+        
+        # Assert
+        assert result.is_failure == True
+        assert result.error_code == "NO_CONTACTS"
+        assert "No contact IDs provided" in result.error
+    
+    def test_bulk_add_to_campaign_campaign_not_found(self, contact_service):
+        """
+        Test bulk add to non-existent campaign using repository pattern.
+        
+        THIS TEST MUST FAIL because current implementation uses Campaign.query.get()
+        instead of campaign_repository.get_by_id()
+        """
+        # Arrange
+        contact_ids = [1, 2, 3]
+        
+        mock_campaign_repo = Mock()
+        mock_campaign_repo.get_by_id.return_value = None
+        
+        # This should fail because ContactService doesn't have campaign_repository
+        contact_service.campaign_repository = mock_campaign_repo
+        
+        # Act
+        result = contact_service.bulk_add_to_campaign(contact_ids, 999)
+        
+        # Assert
+        assert result.is_failure == True
+        assert result.error_code == "CAMPAIGN_NOT_FOUND"
+        assert "Campaign not found: 999" in result.error
+        mock_campaign_repo.get_by_id.assert_called_once_with(999)
+    
+    def test_bulk_add_to_campaign_partial_success(self, contact_service, mock_session):
+        """
+        Test bulk add with some successes and some failures.
+        
+        THIS TEST MUST FAIL because it requires repository pattern implementation.
+        """
+        # Arrange
+        contact_ids = [1, 2, 3, 4, 5]
+        
+        mock_campaign = Mock()
+        mock_campaign.id = 1
+        
+        mock_campaign_repo = Mock()
+        mock_campaign_repo.get_by_id.return_value = mock_campaign
+        mock_campaign_repo.add_members_bulk.return_value = 3  # Only 3 of 5 added
+        
+        # This should fail because ContactService doesn't have campaign_repository
+        contact_service.campaign_repository = mock_campaign_repo
+        
+        # Act
+        result = contact_service.bulk_add_to_campaign(contact_ids, 1)
+        
+        # Assert
+        assert result.is_success == True
+        assert result.data["added"] == 3
+        assert result.data["skipped"] == 2  # 5 - 3 = 2 skipped (duplicates)
+        
+        mock_campaign_repo.add_members_bulk.assert_called_once_with(1, contact_ids, None)
     
     def test_export_contacts_success(self, contact_service, mock_session):
         """Test successful contact export"""
