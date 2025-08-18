@@ -1,18 +1,17 @@
 """
 Todo routes for task management
 """
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
-from services.todo_service_refactored import TodoService
 
 todo_bp = Blueprint('todo', __name__)
-todo_service = TodoService()
 
 
 @todo_bp.route('/todos')
 @login_required
 def list_todos():
     """List all todos for the current user"""
+    todo_service = current_app.services.get('todo')
     todos = todo_service.get_user_todos(current_user.id)
     return render_template('todos/list.html', todos=todos)
 
@@ -21,6 +20,7 @@ def list_todos():
 @login_required
 def api_list_todos():
     """API endpoint to get todos"""
+    todo_service = current_app.services.get('todo')
     todos = todo_service.get_user_todos(current_user.id)
     
     return jsonify({
@@ -35,6 +35,7 @@ def api_create_todo():
     data = request.get_json()
     
     try:
+        todo_service = current_app.services.get('todo')
         todo = todo_service.create_todo(current_user.id, data)
         
         return jsonify({
@@ -55,6 +56,7 @@ def api_update_todo(todo_id):
     data = request.get_json()
     
     try:
+        todo_service = current_app.services.get('todo')
         todo = todo_service.update_todo(todo_id, current_user.id, data)
         
         if not todo:
@@ -76,6 +78,7 @@ def api_update_todo(todo_id):
 def api_toggle_todo(todo_id):
     """API endpoint to toggle todo completion status"""
     try:
+        todo_service = current_app.services.get('todo')
         todo = todo_service.toggle_todo_completion(todo_id, current_user.id)
         
         if not todo:
@@ -96,6 +99,7 @@ def api_toggle_todo(todo_id):
 def api_delete_todo(todo_id):
     """API endpoint to delete a todo"""
     try:
+        todo_service = current_app.services.get('todo')
         success = todo_service.delete_todo(todo_id, current_user.id)
         
         if not success:
@@ -112,6 +116,7 @@ def api_delete_todo(todo_id):
 def api_dashboard_todos():
     """API endpoint to get todos for dashboard widget"""
     try:
+        todo_service = current_app.services.get('todo')
         result = todo_service.get_dashboard_todos(current_user.id, limit=5)
         
         return jsonify({
@@ -136,6 +141,7 @@ def api_dashboard_todos():
 def api_todo_stats():
     """API endpoint to get todo statistics"""
     try:
+        todo_service = current_app.services.get('todo')
         stats = todo_service.get_todo_stats(current_user.id)
         return jsonify(stats)
         
