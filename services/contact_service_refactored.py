@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 from crm_database import Contact, ContactFlag, Campaign, CampaignMembership, Conversation, Activity, db
 from services.common.result import Result, PagedResult
 from repositories.contact_repository import ContactRepository
+from repositories.campaign_repository import CampaignRepository
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +23,19 @@ class ContactService:
     """Service for managing contacts using Result pattern and Repository"""
     
     def __init__(self, contact_repository: Optional[ContactRepository] = None, 
+                 campaign_repository: Optional[CampaignRepository] = None,
                  session: Optional[Session] = None):
         """
         Initialize with optional repository and session.
         
         Args:
             contact_repository: ContactRepository for data access
+            campaign_repository: CampaignRepository for campaign data access
             session: Database session
         """
         self.session = session or db.session
         self.contact_repository = contact_repository or ContactRepository(self.session, Contact)
+        self.campaign_repository = campaign_repository or CampaignRepository(self.session, Campaign)
     
     def add_contact(self, first_name: str, last_name: str, 
                    email: Optional[str] = None, 
@@ -358,15 +362,12 @@ class ContactService:
                 return Result.failure(f"Contact not found: {contact_id}", code="CONTACT_NOT_FOUND")
             
             # Verify campaign exists
-            campaign = Campaign.query.get(campaign_id)
+            campaign = self.campaign_repository.get_by_id(campaign_id)
             if not campaign:
                 return Result.failure(f"Campaign not found: {campaign_id}", code="CAMPAIGN_NOT_FOUND")
             
             # Check for existing membership
-            existing = CampaignMembership.query.filter_by(
-                contact_id=contact_id,
-                campaign_id=campaign_id
-            ).first()
+            existing = self.campaign_repository.get_member_by_contact(campaign_id, contact_id)
             
             if existing:
                 return Result.failure(
@@ -375,14 +376,13 @@ class ContactService:
                     metadata={"membership_id": existing.id}
                 )
             
-            # Create membership
-            membership = CampaignMembership(
-                contact_id=contact_id,
+            # Create membership using repository
+            membership = self.campaign_repository.add_member(
                 campaign_id=campaign_id,
+                contact_id=contact_id,
                 status='pending'
             )
             
-            self.session.add(membership)
             self.session.commit()
             
             logger.info(f"Added contact {contact_id} to campaign {campaign_id}")
@@ -408,7 +408,7 @@ class ContactService:
             return Result.failure("No contact IDs provided", code="NO_CONTACTS")
         
         # Verify campaign exists
-        campaign = Campaign.query.get(campaign_id)
+        campaign = self.campaign_repository.get_by_id(campaign_id)
         if not campaign:
             return Result.failure(f"Campaign not found: {campaign_id}", code="CAMPAIGN_NOT_FOUND")
         
