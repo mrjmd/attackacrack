@@ -19,6 +19,7 @@ from typing import List, Dict, Optional
 from services.campaign_service_refactored import CampaignService
 from repositories.campaign_repository import CampaignRepository
 from repositories.contact_repository import ContactRepository
+from repositories.contact_flag_repository import ContactFlagRepository
 from repositories.base_repository import PaginationParams, PaginatedResult
 from crm_database import Campaign, CampaignMembership, Contact, ContactFlag
 
@@ -44,6 +45,15 @@ class TestCampaignServiceUnit:
         return mock_repo
     
     @pytest.fixture
+    def mock_contact_flag_repository(self):
+        """Mock ContactFlagRepository for dependency injection"""
+        mock_repo = Mock(spec=ContactFlagRepository)
+        mock_repo.get_contact_ids_with_flag_type.return_value = set()
+        mock_repo.bulk_create_flags.return_value = []
+        mock_repo.cleanup_expired_flags.return_value = 0
+        return mock_repo
+    
+    @pytest.fixture
     def mock_openphone_service(self):
         """Mock OpenPhoneService for SMS sending"""
         mock_service = Mock()
@@ -59,11 +69,12 @@ class TestCampaignServiceUnit:
     
     @pytest.fixture
     def campaign_service(self, mock_campaign_repository, mock_contact_repository, 
-                        mock_openphone_service, mock_list_service):
+                        mock_contact_flag_repository, mock_openphone_service, mock_list_service):
         """Create CampaignService instance with mocked dependencies"""
         return CampaignService(
             campaign_repository=mock_campaign_repository,
             contact_repository=mock_contact_repository,
+            contact_flag_repository=mock_contact_flag_repository,
             openphone_service=mock_openphone_service,
             list_service=mock_list_service
         )
@@ -304,8 +315,8 @@ class TestCampaignServiceUnit:
         assert len(result) == 1
         assert result[0] == contact_with_email
     
-    def test_get_filtered_contacts_exclude_opted_out(self, campaign_service, mock_contact_repository):
-        """Test filtering out opted-out contacts"""
+    def test_get_filtered_contacts_exclude_opted_out(self, campaign_service, mock_contact_repository, mock_contact_flag_repository):
+        """Test filtering out opted-out contacts using ContactFlagRepository"""
         # Arrange
         good_contact = Mock(spec=Contact)
         good_contact.id = 1
@@ -314,7 +325,8 @@ class TestCampaignServiceUnit:
         opted_out_contact.id = 2
         
         mock_contact_repository.get_all.return_value = [good_contact, opted_out_contact]
-        mock_contact_repository.get_opted_out_contacts.return_value = [opted_out_contact]
+        # Mock that contact 2 is opted out via ContactFlagRepository
+        mock_contact_flag_repository.get_contact_ids_with_flag_type.return_value = {2}
         filters = {'exclude_opted_out': True}
         
         # Act
@@ -323,31 +335,19 @@ class TestCampaignServiceUnit:
         # Assert
         assert len(result) == 1
         assert result[0] == good_contact
+        mock_contact_flag_repository.get_contact_ids_with_flag_type.assert_called_once_with('opted_out')
     
     # ========== TESTS FOR OFFICE NUMBER FILTERING (TDD - REPOSITORY PATTERN ENFORCEMENT) ==========
     # These tests MUST FAIL initially (RED phase) to prove repository pattern violation exists
     
-    def test_get_filtered_contacts_exclude_office_numbers_violates_repository_pattern(self, mock_contact_repository):
-        """Test that exclude_office_numbers filter exposes the direct database query violation
+    def test_get_filtered_contacts_exclude_office_numbers_uses_repository_pattern(self, campaign_service, mock_contact_repository, mock_contact_flag_repository):
+        """Test that exclude_office_numbers filter now uses ContactFlagRepository correctly
         
-        This test is designed to FAIL (RED phase) because the current implementation
-        uses direct session.query(ContactFlag) instead of repository pattern.
-        
-        VIOLATION: Lines 207-209 in CampaignService._get_filtered_contacts() use:
-        self.session.query(ContactFlag.contact_id).filter(ContactFlag.flag_type == 'office_number')
-        
-        Expected: Should use ContactRepository.get_contacts_flagged_as_office_numbers()
+        This test was updated after fixing the repository pattern violation.
+        FIXED: Now uses ContactFlagRepository.get_contact_ids_with_flag_type('office_number')
+        instead of direct session.query(ContactFlag)
         """
-        # Arrange - Create service without session to expose violation
-        from services.campaign_service_refactored import CampaignService
-        service = CampaignService(
-            contact_repository=mock_contact_repository,
-            campaign_repository=Mock(),
-            session=None  # This will still be overridden by db.session
-        )
-        # Force remove the session to expose the violation
-        delattr(service, 'session')
-        
+        # Arrange
         contact1 = Mock(spec=Contact)
         contact1.id = 1
         contact1.first_name = 'John'
@@ -366,25 +366,24 @@ class TestCampaignServiceUnit:
         all_contacts = [contact1, contact2, contact3]
         mock_contact_repository.get_all.return_value = all_contacts
         
-        # Mock the repository method that SHOULD be used instead of direct query
-        mock_contact_repository.get_contacts_flagged_as_office_numbers = Mock()
-        mock_contact_repository.get_contacts_flagged_as_office_numbers.return_value = [contact2]
+        # Mock that contact 2 is flagged as office number via ContactFlagRepository
+        mock_contact_flag_repository.get_contact_ids_with_flag_type.return_value = {2}
         
         filters = {'exclude_office_numbers': True}
         
-        # Act & Assert
-        # This test will FAIL because the current implementation tries to use
-        # self.session.query() which doesn't exist on the mock service
-        with pytest.raises(AttributeError) as exc_info:
-            service._get_filtered_contacts(filters)
+        # Act
+        result = campaign_service._get_filtered_contacts(filters)
         
-        # The error should be related to missing 'session' attribute
-        error_msg = str(exc_info.value)
-        assert 'session' in error_msg, \
-               f"Expected session attribute error, got: {error_msg}"
+        # Assert
+        # Should exclude contact2 (office number)
+        assert len(result) == 2
+        result_ids = {contact.id for contact in result}
+        assert 1 in result_ids
+        assert 3 in result_ids
+        assert 2 not in result_ids  # Office number excluded
         
-        # Verify that the repository method was NOT called (proving direct query is used)
-        mock_contact_repository.get_contacts_flagged_as_office_numbers.assert_not_called()
+        # Verify that ContactFlagRepository was used correctly (FIXED VIOLATION)
+        mock_contact_flag_repository.get_contact_ids_with_flag_type.assert_called_once_with('office_number')
     
     def test_get_filtered_contacts_exclude_office_numbers_expected_repository_interface(self, campaign_service, mock_contact_repository):
         """Test the expected repository interface for office number filtering

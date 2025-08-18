@@ -9,10 +9,12 @@ from .base_repository import (
     PaginatedResult,
     SortOrder
 )
+from .contact_flag_repository import ContactFlagRepository
 
 __all__ = [
     'BaseRepository',
     'PaginationParams',
     'PaginatedResult',
-    'SortOrder'
+    'SortOrder',
+    'ContactFlagRepository'
 ]
