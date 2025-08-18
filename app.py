@@ -113,7 +113,11 @@ def create_app(config_name=None, test_config=None):
     registry.register_singleton('message', lambda: _create_message_service())
     registry.register_singleton('todo', lambda: _create_todo_service())
     registry.register_singleton('auth', lambda: _create_auth_service())
-    registry.register_singleton('product', lambda: _create_product_service())
+    registry.register_factory(
+        'product', 
+        lambda db_session: _create_product_service(db_session),
+        dependencies=['db_session']
+    )
     # Job repository
     registry.register_factory(
         'job_repository',
@@ -234,8 +238,8 @@ def create_app(config_name=None, test_config=None):
     
     registry.register_factory(
         'openphone_webhook',
-        lambda contact, sms_metrics: _create_openphone_webhook_service(contact, sms_metrics),
-        dependencies=['contact', 'sms_metrics']
+        lambda contact, sms_metrics, db_session: _create_openphone_webhook_service(contact, sms_metrics, db_session),
+        dependencies=['contact', 'sms_metrics', 'db_session']
     )
     
     registry.register_factory(
@@ -431,11 +435,21 @@ def _create_auth_service():
     logger.info("Initializing AuthService")
     return AuthService()
 
-def _create_product_service():
-    """Create ProductService instance"""
-    from services.product_service import ProductService
-    logger.info("Initializing ProductService")
-    return ProductService()
+def _create_product_service(db_session):
+    """Create ProductService with ProductRepository"""
+    from repositories.product_repository import ProductRepository
+    
+    class ProductService:
+        """Minimal ProductService wrapper using repository pattern"""
+        def __init__(self, repository):
+            self.repository = repository
+        
+        def get_all(self):
+            """Get all products using repository"""
+            return self.repository.get_all()
+    
+    logger.info("Initializing ProductService with repository pattern")
+    return ProductService(ProductRepository(db_session))
 
 def _create_job_service(job_repository):
     """Create JobService with repository dependency"""
@@ -569,10 +583,22 @@ def _create_quickbooks_service():
     )
 
 def _create_campaign_list_service(db_session):
-    """Create CampaignListService with dependencies"""
-    from services.campaign_list_service import CampaignListService
-    logger.info("Initializing CampaignListService")
-    return CampaignListService()
+    """Create CampaignListServiceRefactored with repository dependencies"""
+    from services.campaign_list_service_refactored import CampaignListServiceRefactored
+    from repositories.campaign_list_repository import CampaignListRepository
+    from repositories.campaign_list_member_repository import CampaignListMemberRepository
+    from repositories.contact_repository import ContactRepository
+    from repositories.activity_repository import ActivityRepository
+    from repositories.contact_flag_repository import ContactFlagRepository
+    
+    logger.info("Initializing CampaignListServiceRefactored with repository pattern")
+    return CampaignListServiceRefactored(
+        campaign_list_repository=CampaignListRepository(db_session),
+        campaign_list_member_repository=CampaignListMemberRepository(db_session),
+        contact_repository=ContactRepository(db_session),
+        activity_repository=ActivityRepository(db_session),
+        contact_flag_repository=ContactFlagRepository(db_session)
+    )
 
 def _create_dashboard_service(db_session):
     """Create DashboardService with dependencies (deprecated - use repository version)"""
@@ -713,11 +739,28 @@ def _create_openphone_sync_service(openphone, db_session):
         activity_repository=activity_repo
     )
 
-def _create_openphone_webhook_service(contact, sms_metrics):
-    """Create OpenPhoneWebhookService with dependencies"""
-    from services.openphone_webhook_service import OpenPhoneWebhookService
-    logger.info("Initializing OpenPhoneWebhookService")
-    return OpenPhoneWebhookService(contact_service=contact, metrics_service=sms_metrics)
+def _create_openphone_webhook_service(contact, sms_metrics, db_session):
+    """Create OpenPhoneWebhookServiceRefactored with repository dependencies"""
+    from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
+    from repositories.activity_repository import ActivityRepository
+    from repositories.conversation_repository import ConversationRepository
+    from repositories.webhook_event_repository import WebhookEventRepository
+    from crm_database import Activity, Conversation, WebhookEvent
+    
+    logger.info("Initializing OpenPhoneWebhookServiceRefactored with repository pattern")
+    
+    # Create repository instances
+    activity_repository = ActivityRepository(session=db_session, model_class=Activity)
+    conversation_repository = ConversationRepository(session=db_session, model_class=Conversation)
+    webhook_event_repository = WebhookEventRepository(session=db_session, model_class=WebhookEvent)
+    
+    return OpenPhoneWebhookServiceRefactored(
+        activity_repository=activity_repository,
+        conversation_repository=conversation_repository,
+        webhook_event_repository=webhook_event_repository,
+        contact_service=contact,
+        sms_metrics_service=sms_metrics
+    )
 
 def _create_quickbooks_sync_service(quickbooks, db_session):
     """Create QuickBooksSyncService with repository dependencies"""

@@ -40,7 +40,7 @@ class CampaignListServiceRefactored:
     
     def create_list(self, name: str, description: str = None, 
                    filter_criteria: Dict = None, is_dynamic: bool = False,
-                   created_by: str = None) -> Result[CampaignList]:
+                   created_by: str = None) -> Result[Dict[str, Any]]:
         """
         Create a new campaign list.
         
@@ -167,7 +167,7 @@ class CampaignListServiceRefactored:
             self.member_repository.rollback()
             return Result.failure(f"Failed to remove contacts from list: {str(e)}")
     
-    def get_list_contacts(self, list_id: int, include_removed: bool = False) -> Result[List[Contact]]:
+    def get_list_contacts(self, list_id: int, include_removed: bool = False) -> Result[List[Dict[str, Any]]]:
         """
         Get all contacts in a list.
         
@@ -224,7 +224,7 @@ class CampaignListServiceRefactored:
             logger.error(f"Failed to get stats for list {list_id}: {e}")
             return Result.failure(f"Failed to get list statistics: {str(e)}")
     
-    def find_contacts_by_criteria(self, criteria: Dict) -> Result[List[Contact]]:
+    def find_contacts_by_criteria(self, criteria: Dict) -> Result[List[Dict[str, Any]]]:
         """
         Find contacts based on filter criteria.
         
@@ -351,7 +351,7 @@ class CampaignListServiceRefactored:
             self.campaign_list_repository.rollback()
             return Result.failure(f"Failed to refresh dynamic list: {str(e)}")
     
-    def get_all_lists(self) -> Result[List[CampaignList]]:
+    def get_all_lists(self) -> Result[List[Dict[str, Any]]]:
         """
         Get all campaign lists.
         
@@ -366,7 +366,7 @@ class CampaignListServiceRefactored:
             logger.error(f"Failed to get all campaign lists: {e}")
             return Result.failure(f"Failed to get campaign lists: {str(e)}")
     
-    def duplicate_list(self, list_id: int, new_name: str, created_by: str = None) -> Result[CampaignList]:
+    def duplicate_list(self, list_id: int, new_name: str, created_by: str = None) -> Result[Dict[str, Any]]:
         """
         Create a copy of an existing list.
         
@@ -415,7 +415,7 @@ class CampaignListServiceRefactored:
             self.campaign_list_repository.rollback()
             return Result.failure(f"Failed to duplicate list: {str(e)}")
     
-    def get_campaign_list_by_id(self, list_id: int) -> Result[CampaignList]:
+    def get_campaign_list_by_id(self, list_id: int) -> Result[Dict[str, Any]]:
         """
         Get a campaign list by ID.
         

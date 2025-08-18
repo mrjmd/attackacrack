@@ -7,7 +7,7 @@ import json
 import random
 import statistics
 from datetime import datetime, time, timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from scipy import stats
 # Session import removed - using repositories only
 
@@ -61,7 +61,7 @@ class CampaignService:
                        template_a: str = '',
                        template_b: str = None,
                        daily_limit: int = 125,
-                       business_hours_only: bool = True) -> Dict:
+                       business_hours_only: bool = True) -> Dict[str, Any]:
         """
         Create a new marketing campaign.
         
@@ -183,11 +183,11 @@ class CampaignService:
         logger.info(f"Added {added} recipients to campaign {campaign_id}")
         return added
     
-    def get_eligible_contacts(self, filters: Dict) -> List[Contact]:
+    def get_eligible_contacts(self, filters: Dict) -> List[Dict[str, Any]]:
         """Public interface for getting eligible contacts with filters"""
         return self._get_filtered_contacts(filters)
     
-    def _get_filtered_contacts(self, filters: Dict) -> List[Contact]:
+    def _get_filtered_contacts(self, filters: Dict) -> List[Dict[str, Any]]:
         """
         Get contacts based on filters.
         
@@ -315,7 +315,7 @@ class CampaignService:
         
         return success
     
-    def get_campaigns_needing_send(self) -> List[Campaign]:
+    def get_campaigns_needing_send(self) -> List[Dict[str, Any]]:
         """
         Get campaigns that need messages sent.
         
@@ -518,7 +518,7 @@ class CampaignService:
         logger.info(f"Completed campaign {campaign_id}")
         return True
     
-    def clone_campaign(self, campaign_id: int, new_name: str) -> Dict:
+    def clone_campaign(self, campaign_id: int, new_name: str) -> Dict[str, Any]:
         """
         Clone an existing campaign.
         
