@@ -144,7 +144,9 @@ class TestQuickBooksSyncServiceCustomerSync:
         
         mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = None
         mock_repositories['contact_repository'].find_by_phone.return_value = existing_contact
-        # Don't need to mock _record_sync for this test
+        mock_repositories['contact_repository'].update.return_value = existing_contact
+        mock_repositories['quickbooks_sync_repository'].find_by_entity_id.return_value = Mock()
+        mock_repositories['quickbooks_sync_repository'].update.return_value = Mock()
         
         # Act
         result = service._sync_customer(qb_customer)
@@ -167,7 +169,9 @@ class TestQuickBooksSyncServiceCustomerSync:
         mock_repositories['contact_repository'].find_by_quickbooks_customer_id.return_value = None
         mock_repositories['contact_repository'].find_by_phone.return_value = None
         mock_repositories['contact_repository'].find_by_email.return_value = existing_contact
-        # Don't need to mock _record_sync for this test
+        mock_repositories['contact_repository'].update.return_value = existing_contact
+        mock_repositories['quickbooks_sync_repository'].find_by_entity_id.return_value = Mock()
+        mock_repositories['quickbooks_sync_repository'].update.return_value = Mock()
         
         # Act
         result = service._sync_customer(qb_customer)
@@ -195,7 +199,8 @@ class TestQuickBooksSyncServiceCustomerSync:
         mock_repositories['contact_repository'].find_by_phone.return_value = None
         mock_repositories['contact_repository'].find_by_email.return_value = None
         mock_repositories['contact_repository'].create.return_value = new_contact
-        # Don't need to mock _record_sync for this test
+        mock_repositories['quickbooks_sync_repository'].find_by_entity_id.return_value = None
+        mock_repositories['quickbooks_sync_repository'].create.return_value = Mock()
         
         # Act
         result = service._sync_customer(qb_customer)
