@@ -1,0 +1,480 @@
+"""Unit tests for PropertyService with Repository Pattern - TDD RED PHASE
+
+Test the refactored PropertyService that uses PropertyRepository instead of direct DB access.
+These tests MUST fail initially to verify proper TDD workflow.
+"""
+
+import pytest
+from unittest.mock import Mock, patch
+from sqlalchemy.exc import SQLAlchemyError
+from flask import current_app
+
+from services.property_service import PropertyService
+from repositories.property_repository import PropertyRepository
+from crm_database import Property
+from tests.fixtures.factories.property_factory import PropertyFactory
+from services.common.result import Result
+
+
+class TestPropertyServiceRefactored:
+    """Test suite for refactored PropertyService using repository pattern"""
+    
+    @pytest.fixture
+    def mock_repository(self):
+        """Mock PropertyRepository for testing service layer"""
+        return Mock(spec=PropertyRepository)
+    
+    @pytest.fixture
+    def service(self, mock_repository):
+        """Create PropertyService instance with mocked repository"""
+        return PropertyService(repository=mock_repository)
+    
+    @pytest.fixture
+    def sample_property_data(self):
+        """Sample property data for testing"""
+        return {
+            'address': '123 Main St',
+            'contact_id': 1,
+            'property_type': 'residential'
+        }
+    
+    @pytest.fixture
+    def sample_property(self, sample_property_data):
+        """Sample Property instance for testing"""
+        return PropertyFactory.build(**sample_property_data)
+
+    # ============================================
+    # DEPENDENCY INJECTION TESTS
+    # ============================================
+    
+    def test_service_initialization_with_repository(self, mock_repository):
+        """Test that PropertyService is properly initialized with repository"""
+        # Act
+        service = PropertyService(repository=mock_repository)
+        
+        # Assert
+        assert service.repository == mock_repository
+        assert hasattr(service, 'repository')
+        assert not hasattr(service, 'session')  # Should not have direct session access
+    
+    def test_service_initialization_requires_repository(self):
+        """Test that PropertyService requires repository parameter"""
+        # Act & Assert
+        with pytest.raises(TypeError):
+            PropertyService()  # Should fail without repository
+
+    # ============================================
+    # CREATE PROPERTY OPERATIONS
+    # ============================================
+    
+    def test_add_property_success(self, service, mock_repository, sample_property_data, sample_property):
+        """Test successful property addition through repository"""
+        # Arrange
+        mock_repository.create.return_value = sample_property
+        
+        # Act
+        result = service.add_property(**sample_property_data)
+        
+        # Assert
+        assert result == sample_property
+        mock_repository.create.assert_called_once_with(**sample_property_data)
+    
+    def test_add_property_with_validation_error(self, service, mock_repository, sample_property_data):
+        """Test property addition with validation error"""
+        # Arrange
+        mock_repository.create.side_effect = ValueError("contact_id is required")
+        
+        # Act & Assert
+        with pytest.raises(ValueError, match="contact_id is required"):
+            service.add_property(**sample_property_data)
+        
+        mock_repository.create.assert_called_once_with(**sample_property_data)
+    
+    def test_add_property_with_database_error(self, service, mock_repository, sample_property_data):
+        """Test property addition with database error"""
+        # Arrange
+        mock_repository.create.side_effect = SQLAlchemyError("Database connection failed")
+        
+        # Act & Assert
+        with pytest.raises(SQLAlchemyError):
+            service.add_property(**sample_property_data)
+        
+        mock_repository.create.assert_called_once_with(**sample_property_data)
+    
+    def test_add_property_with_result_pattern(self, service, mock_repository, sample_property_data, sample_property):
+        """Test property addition using Result pattern for error handling"""
+        # Arrange
+        mock_repository.create.return_value = sample_property
+        
+        # Act
+        result = service.add_property_safe(**sample_property_data)
+        
+        # Assert
+        assert isinstance(result, Result)
+        assert result.is_success
+        assert result.data == sample_property
+        assert result.error is None
+        mock_repository.create.assert_called_once_with(**sample_property_data)
+    
+    def test_add_property_safe_with_error(self, service, mock_repository, sample_property_data):
+        """Test safe property addition with error handling"""
+        # Arrange
+        error_message = "Database error occurred"
+        mock_repository.create.side_effect = SQLAlchemyError(error_message)
+        
+        # Act
+        result = service.add_property_safe(**sample_property_data)
+        
+        # Assert
+        assert isinstance(result, Result)
+        assert not result.is_success
+        assert result.data is None
+        assert error_message in str(result.error)
+
+    # ============================================
+    # READ PROPERTY OPERATIONS
+    # ============================================
+    
+    def test_get_all_properties(self, service, mock_repository):
+        """Test retrieving all properties through repository"""
+        # Arrange
+        expected_properties = [PropertyFactory.build() for _ in range(3)]
+        mock_repository.get_all.return_value = expected_properties
+        
+        # Act
+        result = service.get_all_properties()
+        
+        # Assert
+        assert result == expected_properties
+        mock_repository.get_all.assert_called_once()
+    
+    def test_get_property_by_id_found(self, service, mock_repository, sample_property):
+        """Test retrieving property by ID when found"""
+        # Arrange
+        property_id = 1
+        mock_repository.get_by_id.return_value = sample_property
+        
+        # Act
+        result = service.get_property_by_id(property_id)
+        
+        # Assert
+        assert result == sample_property
+        mock_repository.get_by_id.assert_called_once_with(property_id)
+    
+    def test_get_property_by_id_not_found(self, service, mock_repository):
+        """Test retrieving property by ID when not found"""
+        # Arrange
+        property_id = 999
+        mock_repository.get_by_id.return_value = None
+        
+        # Act
+        result = service.get_property_by_id(property_id)
+        
+        # Assert
+        assert result is None
+        mock_repository.get_by_id.assert_called_once_with(property_id)
+    
+    def test_get_properties_by_contact(self, service, mock_repository):
+        """Test retrieving properties for a specific contact"""
+        # Arrange
+        contact_id = 1
+        expected_properties = [PropertyFactory.build(contact_id=contact_id) for _ in range(2)]
+        mock_repository.find_by_contact_id.return_value = expected_properties
+        
+        # Act
+        result = service.get_properties_by_contact(contact_id)
+        
+        # Assert
+        assert result == expected_properties
+        mock_repository.find_by_contact_id.assert_called_once_with(contact_id)
+    
+    def test_search_properties_by_address(self, service, mock_repository):
+        """Test searching properties by address"""
+        # Arrange
+        address_query = "Main St"
+        expected_properties = [PropertyFactory.build()]
+        mock_repository.find_by_address_contains.return_value = expected_properties
+        
+        # Act
+        result = service.search_properties_by_address(address_query)
+        
+        # Assert
+        assert result == expected_properties
+        mock_repository.find_by_address_contains.assert_called_once_with(address_query)
+    
+    def test_get_properties_by_type(self, service, mock_repository):
+        """Test retrieving properties by type"""
+        # Arrange
+        property_type = "residential"
+        expected_properties = [PropertyFactory.build(property_type=property_type)]
+        mock_repository.find_by_type.return_value = expected_properties
+        
+        # Act
+        result = service.get_properties_by_type(property_type)
+        
+        # Assert
+        assert result == expected_properties
+        mock_repository.find_by_type.assert_called_once_with(property_type)
+
+    # ============================================
+    # UPDATE PROPERTY OPERATIONS
+    # ============================================
+    
+    def test_update_property_success(self, service, mock_repository, sample_property):
+        """Test successful property update through repository"""
+        # Arrange
+        updates = {'address': '456 Oak Ave', 'property_type': 'commercial'}
+        updated_property = PropertyFactory.build(**updates)
+        mock_repository.update.return_value = updated_property
+        
+        # Act
+        result = service.update_property(sample_property, **updates)
+        
+        # Assert
+        assert result == updated_property
+        mock_repository.update.assert_called_once_with(sample_property, **updates)
+    
+    def test_update_property_by_id_found(self, service, mock_repository, sample_property):
+        """Test updating property by ID when found"""
+        # Arrange
+        property_id = 1
+        updates = {'property_type': 'industrial'}
+        mock_repository.update_by_id.return_value = sample_property
+        
+        # Act
+        result = service.update_property_by_id(property_id, **updates)
+        
+        # Assert
+        assert result == sample_property
+        mock_repository.update_by_id.assert_called_once_with(property_id, **updates)
+    
+    def test_update_property_by_id_not_found(self, service, mock_repository):
+        """Test updating property by ID when not found"""
+        # Arrange
+        property_id = 999
+        updates = {'property_type': 'industrial'}
+        mock_repository.update_by_id.return_value = None
+        
+        # Act
+        result = service.update_property_by_id(property_id, **updates)
+        
+        # Assert
+        assert result is None
+        mock_repository.update_by_id.assert_called_once_with(property_id, **updates)
+    
+    def test_update_property_with_database_error(self, service, mock_repository, sample_property):
+        """Test property update with database error"""
+        # Arrange
+        updates = {'address': '456 Oak Ave'}
+        mock_repository.update.side_effect = SQLAlchemyError("Update failed")
+        
+        # Act & Assert
+        with pytest.raises(SQLAlchemyError):
+            service.update_property(sample_property, **updates)
+        
+        mock_repository.update.assert_called_once_with(sample_property, **updates)
+
+    # ============================================
+    # DELETE PROPERTY OPERATIONS
+    # ============================================
+    
+    def test_delete_property_success(self, service, mock_repository, sample_property):
+        """Test successful property deletion through repository"""
+        # Arrange
+        mock_repository.delete.return_value = True
+        
+        # Act
+        result = service.delete_property(sample_property)
+        
+        # Assert
+        assert result is True
+        mock_repository.delete.assert_called_once_with(sample_property)
+    
+    def test_delete_property_by_id_found(self, service, mock_repository):
+        """Test deleting property by ID when found"""
+        # Arrange
+        property_id = 1
+        mock_repository.delete_by_id.return_value = True
+        
+        # Act
+        result = service.delete_property_by_id(property_id)
+        
+        # Assert
+        assert result is True
+        mock_repository.delete_by_id.assert_called_once_with(property_id)
+    
+    def test_delete_property_by_id_not_found(self, service, mock_repository):
+        """Test deleting property by ID when not found"""
+        # Arrange
+        property_id = 999
+        mock_repository.delete_by_id.return_value = False
+        
+        # Act
+        result = service.delete_property_by_id(property_id)
+        
+        # Assert
+        assert result is False
+        mock_repository.delete_by_id.assert_called_once_with(property_id)
+    
+    def test_delete_property_with_database_error(self, service, mock_repository, sample_property):
+        """Test property deletion with database error"""
+        # Arrange
+        mock_repository.delete.side_effect = SQLAlchemyError("Delete failed")
+        
+        # Act & Assert
+        with pytest.raises(SQLAlchemyError):
+            service.delete_property(sample_property)
+        
+        mock_repository.delete.assert_called_once_with(sample_property)
+
+    # ============================================
+    # BUSINESS LOGIC OPERATIONS
+    # ============================================
+    
+    def test_get_properties_with_jobs(self, service, mock_repository):
+        """Test retrieving properties that have jobs"""
+        # Arrange
+        expected_properties = [PropertyFactory.build()]
+        mock_repository.get_properties_with_jobs.return_value = expected_properties
+        
+        # Act
+        result = service.get_properties_with_jobs()
+        
+        # Assert
+        assert result == expected_properties
+        mock_repository.get_properties_with_jobs.assert_called_once()
+    
+    def test_get_property_statistics(self, service, mock_repository):
+        """Test retrieving property statistics by type"""
+        # Arrange
+        expected_stats = [('residential', 5), ('commercial', 3), ('industrial', 1)]
+        mock_repository.count_by_property_type.return_value = expected_stats
+        
+        # Act
+        result = service.get_property_statistics()
+        
+        # Assert
+        assert result == expected_stats
+        mock_repository.count_by_property_type.assert_called_once()
+    
+    def test_advanced_property_search(self, service, mock_repository):
+        """Test advanced property search with multiple criteria"""
+        # Arrange
+        search_params = {'address_query': 'Main', 'property_type': 'residential'}
+        expected_properties = [PropertyFactory.build()]
+        mock_repository.search_properties.return_value = expected_properties
+        
+        # Act
+        result = service.search_properties(**search_params)
+        
+        # Assert
+        assert result == expected_properties
+        mock_repository.search_properties.assert_called_once_with(**search_params)
+
+    # ============================================
+    # NO DIRECT DATABASE ACCESS VALIDATION
+    # ============================================
+    
+    def test_service_has_no_direct_database_access(self, service):
+        """Test that service doesn't have direct database session access"""
+        # Assert
+        assert not hasattr(service, 'session')
+        assert not hasattr(service, 'db')
+        assert hasattr(service, 'repository')
+    
+    def test_service_methods_use_repository_only(self, service, mock_repository):
+        """Test that all service methods use repository, not direct DB queries"""
+        # This test verifies that the service is properly refactored
+        
+        # Test that each public method calls repository methods
+        property_data = {'address': '123 Test St', 'contact_id': 1}
+        mock_property = PropertyFactory.build()
+        
+        # Configure mocks
+        mock_repository.create.return_value = mock_property
+        mock_repository.get_all.return_value = [mock_property]
+        mock_repository.get_by_id.return_value = mock_property
+        mock_repository.update.return_value = mock_property
+        mock_repository.delete.return_value = True
+        
+        # Call service methods and verify repository is used
+        service.add_property(**property_data)
+        service.get_all_properties()
+        service.get_property_by_id(1)
+        service.update_property(mock_property, address='Updated')
+        service.delete_property(mock_property)
+        
+        # Verify repository methods were called (not direct DB)
+        assert mock_repository.create.called
+        assert mock_repository.get_all.called
+        assert mock_repository.get_by_id.called
+        assert mock_repository.update.called
+        assert mock_repository.delete.called
+
+
+class TestPropertyServiceRegistration:
+    """Test PropertyService integration with service registry"""
+    
+    def test_service_registration_in_registry(self, app):
+        """Test that PropertyService is properly registered in service registry"""
+        with app.app_context():
+            # Act
+            service = current_app.services.get('property')
+            
+            # Assert
+            assert service is not None
+            assert isinstance(service, PropertyService)
+            assert hasattr(service, 'repository')
+            assert isinstance(service.repository, PropertyRepository)
+    
+    def test_service_dependencies_injected(self, app):
+        """Test that service dependencies are properly injected"""
+        with app.app_context():
+            # Act
+            service = current_app.services.get('property')
+            
+            # Assert
+            assert service.repository is not None
+            assert hasattr(service.repository, 'session')
+            assert hasattr(service.repository, 'model_class')
+            assert service.repository.model_class == Property
+
+
+class TestPropertyServiceIntegration:
+    """Integration tests for PropertyService with real repository"""
+    
+    def test_service_integration_with_real_repository(self, db_session):
+        """Test service with real repository and database"""
+        # Arrange
+        from repositories.property_repository import PropertyRepository
+        repository = PropertyRepository(session=db_session, model_class=Property)
+        service = PropertyService(repository=repository)
+        
+        property_data = {
+            'address': '789 Integration Ave',
+            'contact_id': 1,  # Assume contact exists
+            'property_type': 'residential'
+        }
+        
+        # Act
+        created_property = service.add_property(**property_data)
+        found_property = service.get_property_by_id(created_property.id)
+        
+        # Assert
+        assert found_property is not None
+        assert found_property.address == '789 Integration Ave'
+        assert found_property.contact_id == 1
+        assert found_property.property_type == 'residential'
+    
+    def test_service_error_handling_integration(self, db_session):
+        """Test service error handling with real repository"""
+        # Arrange
+        from repositories.property_repository import PropertyRepository
+        repository = PropertyRepository(session=db_session, model_class=Property)
+        service = PropertyService(repository=repository)
+        
+        invalid_data = {'address': '123 Test St'}  # Missing contact_id
+        
+        # Act & Assert
+        with pytest.raises(ValueError, match="contact_id is required"):
+            service.add_property(**invalid_data)

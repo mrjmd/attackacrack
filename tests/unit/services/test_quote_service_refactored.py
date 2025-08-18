@@ -55,14 +55,14 @@ class TestQuoteServiceRefactored:
         """Test that get_quote_by_id uses repository"""
         # Arrange
         mock_quote = Mock(id=123)
-        mock_quote_repository.find_by_id.return_value = mock_quote
+        mock_quote_repository.get_by_id.return_value = mock_quote
         
         # Act
         result = quote_service.get_quote_by_id(123)
         
         # Assert
         assert result == mock_quote
-        mock_quote_repository.find_by_id.assert_called_once_with(123)
+        mock_quote_repository.get_by_id.assert_called_once_with(123)
     
     def test_create_quote_with_line_items_uses_repositories(self, quote_service, mock_quote_repository, mock_line_item_repository):
         """Test create_quote uses repositories and Result pattern"""
@@ -90,7 +90,7 @@ class TestQuoteServiceRefactored:
         
         # Assert
         assert isinstance(result, Result)
-        assert result.is_success()
+        assert result.is_success
         assert result.data == mock_quote
         mock_quote_repository.create.assert_called_once()
         mock_line_item_repository.bulk_create_line_items.assert_called_once()
@@ -106,7 +106,7 @@ class TestQuoteServiceRefactored:
         
         # Assert
         assert isinstance(result, Result)
-        assert result.is_failure()
+        assert result.is_failure
         assert "Database error" in result.error
     
     def test_update_quote_uses_repositories(self, quote_service, mock_quote_repository, mock_line_item_repository):
@@ -120,9 +120,13 @@ class TestQuoteServiceRefactored:
             ]
         }
         
-        mock_quote = Mock(id=123, status='Draft')
-        mock_quote_repository.find_by_id.return_value = mock_quote
-        mock_quote_repository.update.return_value = mock_quote
+        mock_quote = Mock(id=123, status='Draft', job_id=1)
+        mock_quote_repository.get_by_id.return_value = mock_quote
+        mock_quote_repository.update_by_id.return_value = mock_quote
+        
+        # Mock existing line items
+        existing_item = Mock(id=1)
+        mock_line_item_repository.find_by_quote_id.return_value = [existing_item]
         
         mock_updated_items = [Mock(id=1)]
         mock_line_item_repository.bulk_update_line_items.return_value = mock_updated_items
@@ -133,23 +137,23 @@ class TestQuoteServiceRefactored:
         
         # Assert
         assert isinstance(result, Result)
-        assert result.is_success()
-        mock_quote_repository.find_by_id.assert_called_once_with(quote_id)
-        mock_quote_repository.update.assert_called_once()
+        assert result.is_success
+        mock_quote_repository.get_by_id.assert_called_once_with(quote_id)
+        mock_quote_repository.update_by_id.assert_called_once()
         mock_line_item_repository.bulk_update_line_items.assert_called_once()
     
     def test_update_quote_not_found(self, quote_service, mock_quote_repository):
         """Test update_quote returns error when quote not found"""
         # Arrange
         quote_id = 999
-        mock_quote_repository.find_by_id.return_value = None
+        mock_quote_repository.get_by_id.return_value = None
         
         # Act
         result = quote_service.update_quote(quote_id, {})
         
         # Assert
         assert isinstance(result, Result)
-        assert result.is_failure()
+        assert result.is_failure
         assert "not found" in result.error
     
     def test_delete_quote_uses_repositories(self, quote_service, mock_quote_repository, mock_line_item_repository):
@@ -157,7 +161,7 @@ class TestQuoteServiceRefactored:
         # Arrange
         quote_id = 123
         mock_quote = Mock(id=123)
-        mock_quote_repository.find_by_id.return_value = mock_quote
+        mock_quote_repository.get_by_id.return_value = mock_quote
         mock_line_item_repository.delete_by_quote_id.return_value = 2  # Deleted 2 line items
         mock_quote_repository.delete.return_value = True
         
@@ -166,24 +170,24 @@ class TestQuoteServiceRefactored:
         
         # Assert
         assert isinstance(result, Result)
-        assert result.is_success()
+        assert result.is_success
         assert result.data == mock_quote
-        mock_quote_repository.find_by_id.assert_called_once_with(quote_id)
+        mock_quote_repository.get_by_id.assert_called_once_with(quote_id)
         mock_line_item_repository.delete_by_quote_id.assert_called_once_with(quote_id)
-        mock_quote_repository.delete.assert_called_once_with(quote_id)
+        mock_quote_repository.delete.assert_called_once_with(mock_quote)
     
     def test_delete_quote_not_found(self, quote_service, mock_quote_repository):
         """Test delete_quote returns error when quote not found"""
         # Arrange
         quote_id = 999
-        mock_quote_repository.find_by_id.return_value = None
+        mock_quote_repository.get_by_id.return_value = None
         
         # Act
         result = quote_service.delete_quote(quote_id)
         
         # Assert
         assert isinstance(result, Result)
-        assert result.is_failure()
+        assert result.is_failure
         assert "not found" in result.error
     
     def test_calculate_quote_totals_uses_line_items(self, quote_service, mock_line_item_repository):
@@ -219,8 +223,9 @@ class TestQuoteServiceRefactored:
     def test_transaction_rollback_on_error(self, quote_service, mock_quote_repository, mock_line_item_repository):
         """Test that failed operations trigger repository rollbacks"""
         # Arrange
-        quote_data = {'job_id': 1, 'status': 'Draft', 'line_items': []}
+        quote_data = {'job_id': 1, 'status': 'Draft', 'line_items': [{'description': 'Test', 'quantity': 1, 'unit_price': 100}]}
         mock_quote_repository.create.return_value = Mock(id=1)
+        mock_line_item_repository.calculate_line_total.return_value = 100
         mock_line_item_repository.bulk_create_line_items.side_effect = Exception("Line item error")
         
         # Act
@@ -228,5 +233,6 @@ class TestQuoteServiceRefactored:
         
         # Assert
         assert isinstance(result, Result)
-        assert result.is_failure()
+        assert result.is_failure
+        assert "Line item error" in result.error
         # Repository should handle rollback internally

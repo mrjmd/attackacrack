@@ -79,6 +79,13 @@ def create_app(config_name=None, test_config=None):
     registry.register_singleton('quote', lambda: _create_quote_service())
     registry.register_singleton('invoice', lambda: _create_invoice_service())
     
+    # Property service with database dependency
+    registry.register_factory(
+        'property',
+        lambda db_session: _create_property_service(db_session),
+        dependencies=['db_session']
+    )
+    
     # External API services (expensive to initialize)
     registry.register_singleton(
         'openphone',
@@ -370,6 +377,16 @@ def _create_job_service():
     from services.job_service import JobService
     logger.info("Initializing JobService")
     return JobService()
+
+def _create_property_service(db_session):
+    """Create PropertyService with PropertyRepository"""
+    from services.property_service import PropertyService
+    from repositories.property_repository import PropertyRepository
+    from crm_database import Property
+    
+    logger.info("Initializing PropertyService with repository")
+    property_repo = PropertyRepository(session=db_session, model_class=Property)
+    return PropertyService(repository=property_repo)
 
 def _create_quote_service():
     """Create QuoteService instance with repository dependencies"""

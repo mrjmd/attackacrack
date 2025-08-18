@@ -154,3 +154,70 @@ class TestQuoteRepository:
         # Assert
         assert result == mock_quotes
         mock_query.filter.assert_called()
+
+
+class TestQuoteRepositorySchedulerMethods:
+    """Test specialized methods for scheduler service needs"""
+    
+    @pytest.fixture
+    def mock_session(self):
+        """Mock database session"""
+        return MagicMock()
+    
+    @pytest.fixture
+    def repository(self, mock_session):
+        """Create QuoteRepository instance"""
+        return QuoteRepository(mock_session, Quote)
+    
+    def test_find_draft_quotes_by_job_id(self, repository, mock_session):
+        """Test finding draft quotes by job ID (scheduler service pattern)"""
+        # Arrange
+        job_id = 123
+        mock_draft_quotes = [
+            Mock(id=1, job_id=123, status='Draft'),
+            Mock(id=2, job_id=123, status='Draft')
+        ]
+        
+        mock_query = Mock()
+        mock_query.filter_by.return_value.all.return_value = mock_draft_quotes
+        mock_session.query.return_value = mock_query
+        
+        # Act
+        result = repository.find_draft_quotes_by_job_id(job_id)
+        
+        # Assert
+        assert result == mock_draft_quotes
+        mock_query.filter_by.assert_called_once_with(job_id=job_id, status='Draft')
+    
+    def test_find_draft_quotes_by_job_id_no_results(self, repository, mock_session):
+        """Test finding draft quotes when none exist for job"""
+        # Arrange
+        job_id = 999
+        
+        mock_query = Mock()
+        mock_query.filter_by.return_value.all.return_value = []
+        mock_session.query.return_value = mock_query
+        
+        # Act
+        result = repository.find_draft_quotes_by_job_id(job_id)
+        
+        # Assert
+        assert result == []
+        mock_query.filter_by.assert_called_once_with(job_id=job_id, status='Draft')
+    
+    def test_find_draft_quotes_excludes_other_statuses(self, repository, mock_session):
+        """Test that only Draft status quotes are returned"""
+        # Arrange - This test verifies the filter is correct
+        job_id = 456
+        mock_draft_quotes = [Mock(id=3, job_id=456, status='Draft')]
+        
+        mock_query = Mock()
+        mock_query.filter_by.return_value.all.return_value = mock_draft_quotes
+        mock_session.query.return_value = mock_query
+        
+        # Act
+        result = repository.find_draft_quotes_by_job_id(job_id)
+        
+        # Assert
+        assert all(quote.status == 'Draft' for quote in result)
+        mock_query.filter_by.assert_called_once_with(job_id=job_id, status='Draft')

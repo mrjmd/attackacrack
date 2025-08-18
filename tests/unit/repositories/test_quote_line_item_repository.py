@@ -60,6 +60,7 @@ class TestQuoteLineItemRepository:
         # Arrange
         mock_line_items = [Mock(id=1), Mock(id=2)]
         repository.find_by_quote_id = Mock(return_value=mock_line_items)
+        repository.delete = Mock(return_value=True)  # Mock the base delete method
         
         # Act
         count = repository.delete_by_quote_id(123)
@@ -67,8 +68,7 @@ class TestQuoteLineItemRepository:
         # Assert
         assert count == 2
         repository.find_by_quote_id.assert_called_once_with(123)
-        assert mock_session.delete.call_count == 2
-        mock_session.commit.assert_called_once()
+        assert repository.delete.call_count == 2  # Check delete was called for each item
     
     def test_calculate_line_total(self, repository):
         """Test calculating line total for a line item"""

@@ -1,13 +1,9 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from flask_login import login_required
-from services.property_service import PropertyService
-from services.contact_service_refactored import ContactService
 from crm_database import Property
 from extensions import db
 
 property_bp = Blueprint('property', __name__)
-property_service = PropertyService()
-contact_service = ContactService()
 
 @property_bp.route('/')
 @login_required
@@ -39,12 +35,16 @@ def list_all():
 @property_bp.route('/<int:property_id>')
 @login_required
 def property_detail(property_id):
+    property_service = current_app.services.get('property')
     prop = property_service.get_property_by_id(property_id)
     return render_template('property_detail.html', property=prop)
 
 @property_bp.route('/add', methods=['GET', 'POST'])
 @login_required
 def add_property():
+    property_service = current_app.services.get('property')
+    contact_service = current_app.services.get('contact')
+    
     if request.method == 'POST':
         property_service.add_property(
             address=request.form['address'],
@@ -57,6 +57,9 @@ def add_property():
 @property_bp.route('/<int:property_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_property(property_id):
+    property_service = current_app.services.get('property')
+    contact_service = current_app.services.get('contact')
+    
     prop = property_service.get_property_by_id(property_id)
     if request.method == 'POST':
         property_service.update_property(
@@ -71,6 +74,8 @@ def edit_property(property_id):
 @property_bp.route('/<int:property_id>/delete', methods=['POST'])
 @login_required
 def delete_property(property_id):
+    property_service = current_app.services.get('property')
+    
     prop = property_service.get_property_by_id(property_id)
     property_service.delete_property(prop)
     return redirect(url_for('property.list_all'))
