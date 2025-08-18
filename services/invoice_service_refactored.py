@@ -44,9 +44,21 @@ class InvoiceServiceRefactored:
         self.quote_repository = quote_repository
         self.logger = logger
     
-    def get_all_invoices(self) -> Result[list]:
+    def get_all_invoices(self):
         """
         Retrieve all invoices.
+        
+        Returns:
+            List of invoices (for backward compatibility)
+        """
+        result = self.get_all_invoices_result()
+        if result.success:
+            return result.data
+        return []  # Return empty list on error for compatibility
+    
+    def get_all_invoices_result(self) -> Result[list]:
+        """
+        Retrieve all invoices with Result pattern.
         
         Returns:
             Result containing list of invoices or error
@@ -61,9 +73,24 @@ class InvoiceServiceRefactored:
                 code="INVOICE_RETRIEVAL_ERROR"
             )
     
-    def get_invoice_by_id(self, invoice_id: int) -> Result[Dict]:
+    def get_invoice_by_id(self, invoice_id: int):
         """
         Retrieve an invoice by ID.
+        
+        Args:
+            invoice_id: ID of the invoice to retrieve
+            
+        Returns:
+            Invoice object or None (for backward compatibility)
+        """
+        result = self.get_invoice_by_id_result(invoice_id)
+        if result.success:
+            return result.data
+        return None  # Return None on error for compatibility
+    
+    def get_invoice_by_id_result(self, invoice_id: int) -> Result[Dict]:
+        """
+        Retrieve an invoice by ID with Result pattern.
         
         Args:
             invoice_id: ID of the invoice to retrieve

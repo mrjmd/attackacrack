@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, current_app, flash
 from flask_login import login_required
 from crm_database import Property
 from extensions import db
@@ -45,7 +45,15 @@ def add_property():
             contact_id=request.form['contact_id']
         )
         return redirect(url_for('property.list_all'))
-    contacts = contact_service.get_all_contacts()
+    # Get contacts and extract data from PagedResult for template iteration
+    contacts_result = contact_service.get_all_contacts()
+    
+    if contacts_result.success:
+        contacts = contacts_result.data
+    else:
+        contacts = []
+        flash('Failed to load contacts', 'error')
+    
     return render_template('add_edit_property_form.html', contacts=contacts)
 
 @property_bp.route('/<int:property_id>/edit', methods=['GET', 'POST'])
@@ -62,7 +70,15 @@ def edit_property(property_id):
             contact_id=request.form['contact_id']
         )
         return redirect(url_for('property.property_detail', property_id=prop.id))
-    contacts = contact_service.get_all_contacts()
+    # Get contacts and extract data from PagedResult for template iteration
+    contacts_result = contact_service.get_all_contacts()
+    
+    if contacts_result.success:
+        contacts = contacts_result.data
+    else:
+        contacts = []
+        flash('Failed to load contacts', 'error')
+    
     return render_template('add_edit_property_form.html', property=prop, contacts=contacts)
 
 @property_bp.route('/<int:property_id>/delete', methods=['POST'])

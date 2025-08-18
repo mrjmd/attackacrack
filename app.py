@@ -98,6 +98,18 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    registry.register_factory(
+        'todo_repository',
+        lambda db_session: _create_todo_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'appointment_repository',
+        lambda db_session: _create_appointment_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Register services with lazy loading factories
     # These won't be instantiated until first use
     
@@ -111,7 +123,11 @@ def create_app(config_name=None, test_config=None):
         dependencies=['setting_repository']
     )
     registry.register_singleton('message', lambda: _create_message_service())
-    registry.register_singleton('todo', lambda: _create_todo_service())
+    registry.register_factory(
+        'todo',
+        lambda todo_repository: _create_todo_service(todo_repository),
+        dependencies=['todo_repository']
+    )
     registry.register_singleton('auth', lambda: _create_auth_service(db.session))
     registry.register_factory(
         'product', 
@@ -220,8 +236,10 @@ def create_app(config_name=None, test_config=None):
     # Services with multiple dependencies
     registry.register_factory(
         'campaign',
-        lambda openphone, campaign_list: _create_campaign_service(openphone, campaign_list),
-        dependencies=['openphone', 'campaign_list']
+        lambda openphone, campaign_list, campaign_repository, contact_repository: _create_campaign_service(
+            openphone, campaign_list, campaign_repository, contact_repository
+        ),
+        dependencies=['openphone', 'campaign_list', 'campaign_repository', 'contact_repository']
     )
     
     registry.register_factory(
@@ -423,11 +441,11 @@ def _create_message_service():
     logger.info("Initializing MessageService")
     return MessageService()
 
-def _create_todo_service():
-    """Create TodoService instance"""
-    from services.todo_service_refactored import TodoService
-    logger.info("Initializing TodoService")
-    return TodoService()
+def _create_todo_service(todo_repository):
+    """Create TodoService instance with repository dependency"""
+    from services.todo_service_refactored import TodoServiceRefactored
+    logger.info("Initializing TodoService with repository")
+    return TodoServiceRefactored(todo_repository=todo_repository)
 
 def _create_auth_service(db_session):
     """Create AuthService instance with required repositories"""
@@ -662,16 +680,40 @@ def _create_setting_repository(db_session):
     from crm_database import Setting
     return SettingRepository(session=db_session, model_class=Setting)
 
+def _create_todo_repository(db_session):
+    """Create TodoRepository instance"""
+    from repositories.todo_repository import TodoRepository
+    from crm_database import Todo
+    return TodoRepository(session=db_session, model_class=Todo)
+
+def _create_appointment_repository(db_session):
+    """Create AppointmentRepository instance"""
+    from repositories.appointment_repository import AppointmentRepository
+    from crm_database import Appointment
+    return AppointmentRepository(session=db_session, model_class=Appointment)
+
 def _create_setting_service(setting_repository):
     """Create SettingService instance"""
     from services.setting_service import SettingService
     return SettingService(repository=setting_repository)
 
 def _create_conversation_service(db_session):
-    """Create ConversationService with dependencies"""
+    """Create ConversationService with repository dependencies"""
     from services.conversation_service import ConversationService
-    logger.info("Initializing ConversationService")
-    return ConversationService()
+    from repositories.conversation_repository import ConversationRepository
+    from repositories.campaign_repository import CampaignRepository
+    from crm_database import Conversation, Campaign
+    
+    logger.info("Initializing ConversationService with repositories")
+    
+    # Create repository instances
+    conversation_repo = ConversationRepository(session=db_session, model_class=Conversation)
+    campaign_repo = CampaignRepository(session=db_session, model_class=Campaign)
+    
+    return ConversationService(
+        conversation_repository=conversation_repo,
+        campaign_repository=campaign_repo
+    )
 
 def _create_task_service(db_session):
     """Create TaskService with dependencies"""
@@ -697,11 +739,21 @@ def _create_sync_health_service(db_session):
     logger.info("Initializing SyncHealthService")
     return SyncHealthService()
 
-def _create_campaign_service(openphone, campaign_list):
+def _create_campaign_service(openphone, campaign_list, campaign_repository, contact_repository):
     """Create CampaignService with dependencies"""
     from services.campaign_service_refactored import CampaignService
-    logger.info("Initializing CampaignService")
+    from repositories.contact_flag_repository import ContactFlagRepository
+    from crm_database import ContactFlag
+    
+    logger.info("Initializing CampaignService with repositories")
+    
+    # Create contact flag repository
+    contact_flag_repo = ContactFlagRepository(session=db.session, model_class=ContactFlag)
+    
     return CampaignService(
+        campaign_repository=campaign_repository,
+        contact_repository=contact_repository,
+        contact_flag_repository=contact_flag_repo,
         openphone_service=openphone,
         list_service=campaign_list
     )
@@ -741,7 +793,7 @@ def _create_openphone_sync_service(openphone, db_session):
     from repositories.activity_repository import ActivityRepository
     from crm_database import Contact, Activity
     
-    logger.info("Initializing OpenPhoneSyncService")
+    logger.info("Initializing OpenPhoneSyncService with repositories")
     
     # Create repository instances
     contact_repo = ContactRepository(db_session, Contact)

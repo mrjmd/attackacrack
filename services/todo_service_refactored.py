@@ -23,9 +23,26 @@ class TodoServiceRefactored:
             raise ValueError("TodoRepository must be provided via dependency injection")
         self.todo_repository = todo_repository
     
-    def get_user_todos(self, user_id: int, include_completed: bool = True) -> Result[List[Dict]]:
+    def get_user_todos(self, user_id: int, include_completed: bool = True):
         """
         Get all todos for a user.
+        
+        Args:
+            user_id: The user's ID
+            include_completed: Whether to include completed todos
+            
+        Returns:
+            List of Todo objects (for backward compatibility)
+        """
+        # For backward compatibility, return the data directly
+        result = self.get_user_todos_result(user_id, include_completed)
+        if result.success:
+            return result.data
+        return []  # Return empty list on error for compatibility
+    
+    def get_user_todos_result(self, user_id: int, include_completed: bool = True) -> Result[List[Dict]]:
+        """
+        Get all todos for a user with Result pattern.
         
         Args:
             user_id: The user's ID
@@ -48,9 +65,26 @@ class TodoServiceRefactored:
                 code="REPOSITORY_ERROR"
             )
     
-    def get_dashboard_todos(self, user_id: int, limit: int = 5) -> Result[Dict[str, Any]]:
+    def get_dashboard_todos(self, user_id: int, limit: int = 5) -> Dict[str, Any]:
         """
         Get todos for dashboard widget with priority sorting.
+        
+        Args:
+            user_id: The user's ID
+            limit: Maximum number of todos to return
+            
+        Returns:
+            Dict with todos list and pending count (for backward compatibility)
+        """
+        # For backward compatibility, return the data directly
+        result = self.get_dashboard_todos_result(user_id, limit)
+        if result.success:
+            return result.data
+        return {'todos': [], 'pending_count': 0}  # Return safe defaults on error
+    
+    def get_dashboard_todos_result(self, user_id: int, limit: int = 5) -> Result[Dict[str, Any]]:
+        """
+        Get todos for dashboard widget with priority sorting (Result pattern).
         
         Args:
             user_id: The user's ID
@@ -351,10 +385,26 @@ class TodoServiceRefactored:
                 code="REPOSITORY_ERROR"
             )
     
-    def serialize_todo(self, todo: Dict[str, Any]) -> Result[Dict[str, Any]]:
+    def serialize_todo(self, todo) -> Dict[str, Any]:
         """
         Serialize a Todo object to dictionary for API responses.
-        Now an instance method instead of static.
+        
+        Args:
+            todo: Todo object to serialize
+            
+        Returns:
+            Dictionary representation of the todo (for backward compatibility)
+        """
+        # For backward compatibility, return the data directly
+        result = self.serialize_todo_result(todo)
+        if result.success:
+            return result.data
+        # Return a minimal representation on error
+        return {'id': getattr(todo, 'id', None), 'title': getattr(todo, 'title', 'Unknown')}
+    
+    def serialize_todo_result(self, todo) -> Result[Dict[str, Any]]:
+        """
+        Serialize a Todo object to dictionary for API responses (Result pattern).
         
         Args:
             todo: Todo object to serialize

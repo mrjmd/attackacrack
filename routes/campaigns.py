@@ -33,11 +33,16 @@ def new_campaign():
     
     # Get available campaign lists with stats
     campaign_lists = []
-    for lst in list_service.get_all_lists():
-        stats = list_service.get_list_stats(lst.id)
-        # Add active members count as a property for the template
-        lst.active_members_count = stats['active_members']
-        campaign_lists.append(lst)
+    lists_result = list_service.get_all_lists()
+    if lists_result.success and lists_result.data:
+        for lst in lists_result.data:
+            stats_result = list_service.get_list_stats(lst.id)
+            if stats_result.success:
+                # Add active members count as a property for the template
+                lst.active_members_count = stats_result.data.get('active_members', 0)
+            else:
+                lst.active_members_count = 0
+            campaign_lists.append(lst)
     
     return render_template('campaigns/new.html', 
                          audience_stats=audience_stats,
@@ -232,12 +237,23 @@ def campaign_lists():
     list_service = current_app.services.get('campaign_list')
     csv_service = current_app.services.get('csv_import')
     
-    lists = list_service.get_all_lists()
+    lists_result = list_service.get_all_lists()
+    
+    # Handle Result object properly
+    if not lists_result.success:
+        flash('Failed to load campaign lists', 'error')
+        lists = []
+    else:
+        lists = lists_result.data if lists_result.data else []
     
     # Get stats for each list
     list_data = []
     for lst in lists:
-        stats = list_service.get_list_stats(lst.id)
+        stats_result = list_service.get_list_stats(lst.id)
+        if stats_result.success:
+            stats = stats_result.data
+        else:
+            stats = {'active_members': 0, 'removed_members': 0, 'total_members': 0}
         list_data.append({
             "list": lst,
             "stats": stats

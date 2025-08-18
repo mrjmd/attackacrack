@@ -213,10 +213,22 @@ def manage_users():
     else:
         invites = []
     
+    # Create pagination object from PagedResult metadata
+    pagination = None
+    if users_result.success:
+        pagination = {
+            'total': users_result.total,
+            'page': users_result.page,
+            'per_page': users_result.per_page,
+            'total_pages': users_result.total_pages,
+            'has_prev': users_result.page > 1 if users_result.page else False,
+            'has_next': users_result.page < users_result.total_pages if users_result.page and users_result.total_pages else False
+        }
+    
     return render_template('auth/manage_users.html', 
                          users=users, 
                          invites=invites,
-                         pagination=users_result.pagination if users_result.success else None)
+                         pagination=pagination)
 
 
 @auth_bp.route('/users/<int:user_id>/toggle-status', methods=['POST'])

@@ -69,7 +69,7 @@ class ActivityRepository(BaseRepository):
             List of Activity objects of the specified type
         """
         return self.session.query(self.model_class)\
-            .filter_by(type=activity_type)\
+            .filter_by(activity_type=activity_type)\
             .all()
     
     def find_by_openphone_id(self, openphone_id: str) -> Optional:
@@ -130,7 +130,7 @@ class ActivityRepository(BaseRepository):
             Count of activities
         """
         return self.session.query(self.model_class)\
-            .filter_by(type=activity_type)\
+            .filter_by(activity_type=activity_type)\
             .count()
     
     def update_activity_summary(self, activity_id: int, summary: str):

@@ -568,6 +568,100 @@ class CampaignService:
         
         logger.info(f"Flagged {len(contact_ids)} contacts as recently contacted from campaign {campaign_id}")
     
+    def get_all_campaigns_with_analytics(self) -> List[Dict[str, Any]]:
+        """
+        Get all campaigns with their analytics data.
+        
+        Returns:
+            List of campaigns with analytics information
+        """
+        campaigns = self.campaign_repository.get_all()
+        campaign_data = []
+        
+        for campaign in campaigns:
+            try:
+                analytics = self.get_campaign_analytics(campaign.id)
+                campaign_dict = {
+                    'id': campaign.id,
+                    'name': campaign.name,
+                    'status': campaign.status,
+                    'campaign_type': campaign.campaign_type,
+                    'audience_type': campaign.audience_type,
+                    'created_at': campaign.created_at,
+                    'sent_count': analytics.get('sent_count', 0),
+                    'response_count': analytics.get('response_count', 0),
+                    'response_rate': analytics.get('response_rate', 0)
+                }
+                campaign_data.append(campaign_dict)
+            except Exception as e:
+                logger.error(f"Error getting analytics for campaign {campaign.id}: {e}")
+                # Add campaign without analytics on error
+                campaign_dict = {
+                    'id': campaign.id,
+                    'name': campaign.name,
+                    'status': campaign.status,
+                    'campaign_type': campaign.campaign_type,
+                    'audience_type': campaign.audience_type,
+                    'created_at': campaign.created_at,
+                    'sent_count': 0,
+                    'response_count': 0,
+                    'response_rate': 0
+                }
+                campaign_data.append(campaign_dict)
+        
+        return campaign_data
+    
+    def get_audience_stats(self) -> Dict[str, int]:
+        """
+        Get statistics about the available audience for campaigns.
+        
+        Returns:
+            Dictionary with audience statistics
+        """
+        if not self.contact_repository:
+            return {
+                'total_contacts': 0,
+                'with_phone': 0,
+                'never_contacted': 0,
+                'cold_contacts': 0,
+                'customers': 0
+            }
+        
+        try:
+            # Get total contacts
+            total_contacts = self.contact_repository.count()
+            
+            # Get contacts with phone numbers
+            with_phone = self.contact_repository.count_with_phone()
+            
+            # TODO: Implement these repository methods
+            # Get never contacted (no messages)
+            # never_contacted = self.contact_repository.count_never_contacted()
+            never_contacted = 0  # Placeholder until method is implemented
+            
+            # Get cold vs customers
+            # cold_contacts = self.contact_repository.count_by_type('cold')
+            # customers = self.contact_repository.count_by_type('customer')
+            cold_contacts = 0  # Placeholder until method is implemented
+            customers = 0  # Placeholder until method is implemented
+            
+            return {
+                'total_contacts': total_contacts,
+                'with_phone': with_phone,
+                'never_contacted': never_contacted,
+                'cold_contacts': cold_contacts,
+                'customers': customers
+            }
+        except Exception as e:
+            logger.error(f"Error getting audience stats: {e}")
+            return {
+                'total_contacts': 0,
+                'with_phone': 0,
+                'never_contacted': 0,
+                'cold_contacts': 0,
+                'customers': 0
+            }
+    
     def cleanup_expired_flags(self) -> int:
         """
         Clean up expired contact flags.

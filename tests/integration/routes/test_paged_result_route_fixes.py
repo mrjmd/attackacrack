@@ -74,7 +74,7 @@ class TestAuthUsersRoutePagedResult:
             # This should work after fix
             # Look for pagination elements (this may not be visible in current template)
             
-    @patch('services.auth_service_refactored.AuthServiceRefactored.get_all_users')
+    @patch('services.auth_service_refactored.AuthService.get_all_users')
     def test_auth_users_handles_paged_result_success(self, mock_get_users, admin_client, app):
         """Test route handles successful PagedResult from service"""
         # Create mock PagedResult
@@ -99,7 +99,7 @@ class TestAuthUsersRoutePagedResult:
             assert b'user1@test.com' in response.data
             assert b'user2@test.com' in response.data
     
-    @patch('services.auth_service_refactored.AuthServiceRefactored.get_all_users')
+    @patch('services.auth_service_refactored.AuthService.get_all_users')
     def test_auth_users_handles_paged_result_failure(self, mock_get_users, admin_client, app):
         """Test route handles failed PagedResult from service"""
         # Create mock failed PagedResult
@@ -113,15 +113,22 @@ class TestAuthUsersRoutePagedResult:
             # Should show error message
             assert b'Failed to load users' in response.data or b'error' in response.data.lower()
     
-    @patch('services.auth_service_refactored.AuthServiceRefactored.get_pending_invites')
+    @patch('services.auth_service_refactored.AuthService.get_pending_invites')
     def test_auth_users_handles_invites_result(self, mock_get_invites, admin_client, app):
         """Test route handles invites Result from service"""
-        # Create mock successful Result for invites
-        mock_invites_data = [
-            {'email': 'invite1@test.com', 'role': 'marketer', 'created_at': '2024-01-01', 'expires_at': '2024-01-08'}
-        ]
+        # Create mock invite with proper structure
+        mock_invite = Mock()
+        mock_invite.email = 'invite1@test.com'
+        mock_invite.role = 'marketer'
+        mock_invite.created_at = Mock()
+        mock_invite.created_at.strftime.return_value = 'Jan 01, 2024'
+        mock_invite.expires_at = Mock()
+        mock_invite.expires_at.strftime.return_value = 'Jan 08, 2024'
+        mock_invite.created_by = Mock()
+        mock_invite.created_by.first_name = 'Admin'
+        mock_invite.created_by.last_name = 'User'
         
-        mock_result = Result.success(mock_invites_data)
+        mock_result = Result.success([mock_invite])
         mock_get_invites.return_value = mock_result
         
         with app.app_context():
@@ -152,7 +159,7 @@ class TestPropertyAddRoutePagedResult:
             assert b'<select' in response.data  # Contact select exists
             assert b'contact_id' in response.data  # Contact select field exists
     
-    @patch('services.contact_service_refactored.ContactServiceRefactored.get_all_contacts')
+    @patch('services.contact_service_refactored.ContactService.get_all_contacts')
     def test_property_add_handles_paged_result_success(self, mock_get_contacts, admin_client, app):
         """Test route handles successful PagedResult from contact service"""
         # Create mock PagedResult with contact data
@@ -177,7 +184,7 @@ class TestPropertyAddRoutePagedResult:
             assert b'John Doe' in response.data
             assert b'Jane Smith' in response.data
     
-    @patch('services.contact_service_refactored.ContactServiceRefactored.get_all_contacts')
+    @patch('services.contact_service_refactored.ContactService.get_all_contacts')
     def test_property_add_handles_paged_result_failure(self, mock_get_contacts, admin_client, app):
         """Test route handles failed PagedResult from contact service"""
         # Create mock failed PagedResult
@@ -192,7 +199,7 @@ class TestPropertyAddRoutePagedResult:
             assert b'<select' in response.data  # Form still renders
             assert b'contact_id' in response.data
     
-    @patch('services.contact_service_refactored.ContactServiceRefactored.get_all_contacts')
+    @patch('services.contact_service_refactored.ContactService.get_all_contacts')
     def test_property_add_handles_empty_contacts(self, mock_get_contacts, admin_client, app):
         """Test route handles empty contacts PagedResult"""
         # Create mock PagedResult with no data
@@ -217,7 +224,7 @@ class TestPropertyEditRoutePagedResult:
     """Test /properties/<id>/edit route PagedResult handling (similar issue)"""
     
     @patch('services.property_service.PropertyService.get_property_by_id')
-    @patch('services.contact_service_refactored.ContactServiceRefactored.get_all_contacts')
+    @patch('services.contact_service_refactored.ContactService.get_all_contacts')
     def test_property_edit_handles_paged_result(self, mock_get_contacts, mock_get_property, admin_client, app):
         """Test property edit route handles PagedResult from contact service"""
         # Mock property

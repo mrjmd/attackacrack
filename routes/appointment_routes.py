@@ -1,9 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from flask_login import login_required
-from services.appointment_service_refactored import AppointmentService
-from services.contact_service_refactored import ContactService
-from services.message_service_refactored import MessageService
-from services.ai_service import AIService
 from datetime import datetime
 
 appointment_bp = Blueprint('appointment', __name__)
@@ -11,22 +7,22 @@ appointment_bp = Blueprint('appointment', __name__)
 @appointment_bp.route('/')
 @login_required
 def list_all():
-    appointment_service = AppointmentService()
+    appointment_service = current_app.services.get('appointment')
     all_appointments = appointment_service.get_all_appointments()
     return render_template('appointment_list.html', appointments=all_appointments)
 
 @appointment_bp.route('/<int:appointment_id>')
 @login_required
 def appointment_detail(appointment_id):
-    appointment_service = AppointmentService()
+    appointment_service = current_app.services.get('appointment')
     appointment = appointment_service.get_appointment_by_id(appointment_id)
     return render_template('appointment_detail.html', appointment=appointment)
 
 @appointment_bp.route('/add', methods=['GET', 'POST'])
 @login_required
 def add_appointment():
-    appointment_service = AppointmentService()
-    contact_service = ContactService()
+    appointment_service = current_app.services.get('appointment')
+    contact_service = current_app.services.get('contact')
 
     if request.method == 'POST':
         appointment_service.add_appointment(
@@ -59,8 +55,8 @@ def add_appointment():
 @login_required
 def edit_appointment(appointment_id):
     # This function will need a similar update if you enable the edit button
-    appointment_service = AppointmentService()
-    contact_service = ContactService()
+    appointment_service = current_app.services.get('appointment')
+    contact_service = current_app.services.get('contact')
     appointment = appointment_service.get_appointment_by_id(appointment_id)
     # ... (rest of edit logic)
     contacts = contact_service.get_all_contacts()
@@ -70,10 +66,7 @@ def edit_appointment(appointment_id):
 @appointment_bp.route('/<int:appointment_id>/delete', methods=['POST'])
 @login_required
 def delete_appointment(appointment_id):
-    # --- FIX FOR NameError ---
-    # Instantiate the service inside the function
-    appointment_service = AppointmentService()
-    # --- END FIX ---
+    appointment_service = current_app.services.get('appointment')
     appointment = appointment_service.get_appointment_by_id(appointment_id)
     if appointment:
         appointment_service.delete_appointment(appointment)
