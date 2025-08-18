@@ -367,3 +367,95 @@ class TestJobRepositorySchedulerMethods:
         assert yesterday_ids.isdisjoint(two_days_ago_ids)
         assert yesterday_ids.isdisjoint(today_ids)
         assert two_days_ago_ids.isdisjoint(today_ids)
+
+
+class TestJobRepositoryServiceMethods:
+    """Test methods specifically needed by JobService"""
+    
+    @pytest.fixture
+    def job_repository(self, db_session):
+        """Create JobRepository instance"""
+        return JobRepository(session=db_session, model_class=Job)
+    
+    def test_find_active_job_by_property_id(self, job_repository, test_contact_and_property, db_session):
+        """Test finding active job for a specific property - JobService line 18-21"""
+        # Arrange
+        contact, property_obj = test_contact_and_property
+        
+        # Create multiple jobs for the property
+        active_job = Job(
+            description='Active job for property',
+            status='Active',
+            property_id=property_obj.id
+        )
+        completed_job = Job(
+            description='Completed job for property',
+            status='Completed',
+            completed_at=datetime.utcnow(),
+            property_id=property_obj.id
+        )
+        
+        db_session.add(active_job)
+        db_session.add(completed_job)
+        db_session.commit()
+        
+        # Act
+        found_job = job_repository.find_active_job_by_property_id(property_obj.id)
+        
+        # Assert
+        assert found_job is not None
+        assert found_job.id == active_job.id
+        assert found_job.status == 'Active'
+        assert found_job.property_id == property_obj.id
+    
+    def test_find_active_job_by_property_id_none_exists(self, job_repository, test_contact_and_property, db_session):
+        """Test finding active job when only completed jobs exist"""
+        # Arrange
+        contact, property_obj = test_contact_and_property
+        
+        # Create only completed job
+        completed_job = Job(
+            description='Completed job for property',
+            status='Completed',
+            completed_at=datetime.utcnow(),
+            property_id=property_obj.id
+        )
+        db_session.add(completed_job)
+        db_session.commit()
+        
+        # Act
+        found_job = job_repository.find_active_job_by_property_id(property_obj.id)
+        
+        # Assert
+        assert found_job is None
+    
+    def test_find_active_job_by_property_id_multiple_active(self, job_repository, test_contact_and_property, db_session):
+        """Test finding active job when multiple active jobs exist (should return first)"""
+        # Arrange
+        contact, property_obj = test_contact_and_property
+        
+        # Create multiple active jobs (edge case)
+        job1 = Job(
+            description='First active job',
+            status='Active',
+            property_id=property_obj.id
+        )
+        job2 = Job(
+            description='Second active job',
+            status='Active',
+            property_id=property_obj.id
+        )
+        
+        db_session.add(job1)
+        db_session.add(job2)
+        db_session.commit()
+        
+        # Act
+        found_job = job_repository.find_active_job_by_property_id(property_obj.id)
+        
+        # Assert
+        assert found_job is not None
+        assert found_job.status == 'Active'
+        assert found_job.property_id == property_obj.id
+        # Should return one of the active jobs (implementation decides which)
+        assert found_job.id in [job1.id, job2.id]

@@ -52,3 +52,23 @@ class JobRepository(BaseRepository):
             .filter(search_filter)\
             .limit(100)\
             .all()
+    
+    def find_active_job_by_property_id(self, property_id: int) -> Optional:
+        """
+        Find the active job for a given property.
+        
+        This method supports JobService.get_or_create_active_job() line 18-21:
+        self.session.query(Job).filter_by(property_id=property_id, status='Active').first()
+        
+        Args:
+            property_id: ID of the property to find active job for
+            
+        Returns:
+            Job object if found, None otherwise
+        """
+        return self.session.query(self.model_class)\
+            .filter_by(
+                property_id=property_id,
+                status='Active'
+            )\
+            .first()
