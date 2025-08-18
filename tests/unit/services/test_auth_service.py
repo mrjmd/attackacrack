@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from services.auth_service import AuthService
+from services.auth_service_refactored import AuthService
 from crm_database import User, InviteToken
 from datetime import datetime, timedelta
 from flask import Flask
@@ -12,8 +12,11 @@ class TestAuthService:
 
     def test_create_user_success(self, app, db_session):
         """Test successful user creation"""
+        # Create service instance
+        auth_service = AuthService()
+        
         # Call the service method
-        user, message = AuthService.create_user(
+        result = auth_service.create_user(
             email='newuser@example.com',
             password='Password123!',
             first_name='New',
@@ -22,20 +25,24 @@ class TestAuthService:
         )
 
         # Assert
+        assert result.is_success
+        user = result.value
         assert user is not None
         assert user.email == 'newuser@example.com'
         assert user.first_name == 'New'
         assert user.last_name == 'User'
         assert user.role == 'marketer'
-        assert message == "User created successfully"
         
         # Verify password was hashed (not stored as plain text)
         assert user.password_hash != 'Password123!'
         
     def test_create_user_duplicate_email(self, app, db_session):
         """Test creating user with duplicate email"""
+        # Create service instance
+        auth_service = AuthService()
+        
         # Create first user
-        AuthService.create_user(
+        auth_service.create_user(
             email='duplicate@example.com',
             password='Password123!',
             first_name='First',
@@ -43,20 +50,23 @@ class TestAuthService:
         )
         
         # Try to create another user with same email
-        user, message = AuthService.create_user(
+        result = auth_service.create_user(
             email='duplicate@example.com',
             password='Password456!',
             first_name='Second',
             last_name='User'
         )
         
-        assert user is None
-        assert "already exists" in message
+        assert result.is_failure
+        assert "already exists" in result.error
 
     def test_authenticate_user_success(self, app, db_session):
         """Test successful authentication"""
+        # Create service instance
+        auth_service = AuthService()
+        
         # Create a user
-        AuthService.create_user(
+        auth_service.create_user(
             email='auth@example.com',
             password='Password123!',
             first_name='Auth',
@@ -64,7 +74,7 @@ class TestAuthService:
         )
         
         # Authenticate
-        user, message = AuthService.authenticate_user('auth@example.com', 'Password123!')
+        user, message = auth_service.authenticate_user('auth@example.com', 'Password123!')
         
         assert user is not None
         assert user.email == 'auth@example.com'
