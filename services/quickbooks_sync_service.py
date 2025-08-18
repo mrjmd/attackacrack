@@ -6,12 +6,8 @@ Handles syncing data between QuickBooks and CRM
 from datetime import datetime
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from decimal import Decimal
-from sqlalchemy import and_
 from flask import current_app
-from crm_database import (
-    db, Contact, Product, Quote, Invoice, QuickBooksSync,
-    QuoteLineItem, InvoiceLineItem, Job, Property
-)
+from crm_database import Contact, Product, Quote, Invoice, Job, Property
 from services.quickbooks_service import QuickBooksService
 
 if TYPE_CHECKING:
@@ -273,40 +269,44 @@ class QuickBooksSyncService:
         """Sync a single estimate to quote. Returns True if created, False if updated"""
         qb_id = qb_estimate['Id']
         
-        # Find or create quote
-        quote = Quote.query.filter_by(quickbooks_estimate_id=qb_id).first()
+        # Find existing quote
+        quote = self.quote_repository.find_by_quickbooks_id(qb_id)
         is_new = quote is None
         
-        if not quote:
-            # Need to find or create a job for this quote
-            job = self._find_or_create_job_for_qb_transaction(qb_estimate)
-            
-            quote = Quote(job_id=job.id)
-            db.session.add(quote)
+        # Build quote data
+        quote_data = {
+            'quickbooks_estimate_id': qb_id,
+            'quickbooks_sync_token': qb_estimate.get('SyncToken'),
+            'subtotal': Decimal(str(qb_estimate.get('TotalAmt', 0))),
+            'total_amount': Decimal(str(qb_estimate.get('TotalAmt', 0)))
+        }
         
-        # Update fields
-        quote.quickbooks_estimate_id = qb_id
-        quote.quickbooks_sync_token = qb_estimate.get('SyncToken')
-        
-        # Financial fields
-        quote.subtotal = Decimal(str(qb_estimate.get('TotalAmt', 0)))
+        # Tax amount
         if qb_estimate.get('TxnTaxDetail'):
-            quote.tax_amount = Decimal(str(qb_estimate['TxnTaxDetail'].get('TotalTax', 0)))
-        quote.total_amount = Decimal(str(qb_estimate.get('TotalAmt', 0)))
+            quote_data['tax_amount'] = Decimal(str(qb_estimate['TxnTaxDetail'].get('TotalTax', 0)))
         
         # Dates
         if qb_estimate.get('TxnDate'):
-            quote.created_at = datetime.strptime(qb_estimate['TxnDate'], '%Y-%m-%d')
+            quote_data['created_at'] = datetime.strptime(qb_estimate['TxnDate'], '%Y-%m-%d')
         if qb_estimate.get('ExpirationDate'):
-            quote.expiration_date = datetime.strptime(qb_estimate['ExpirationDate'], '%Y-%m-%d').date()
+            quote_data['expiration_date'] = datetime.strptime(qb_estimate['ExpirationDate'], '%Y-%m-%d').date()
         
         # Status mapping
         if qb_estimate.get('AcceptedDate'):
-            quote.status = 'Accepted'
+            quote_data['status'] = 'Accepted'
         elif qb_estimate.get('EmailStatus') == 'EmailSent':
-            quote.status = 'Sent'
+            quote_data['status'] = 'Sent'
         else:
-            quote.status = 'Draft'
+            quote_data['status'] = 'Draft'
+        
+        # Create or update quote using repository
+        if not quote:
+            # Need to find or create a job for this quote
+            job = self._find_or_create_job_for_qb_transaction(qb_estimate)
+            quote_data['job_id'] = job.id
+            quote = self.quote_repository.create(quote_data)
+        else:
+            quote = self.quote_repository.update(quote, quote_data)
         
         # Sync line items
         self._sync_estimate_line_items(quote, qb_estimate.get('Line', []))
@@ -320,53 +320,62 @@ class QuickBooksSyncService:
         """Sync a single invoice. Returns True if created, False if updated"""
         qb_id = qb_invoice['Id']
         
-        # Find or create invoice
-        invoice = Invoice.query.filter_by(quickbooks_invoice_id=qb_id).first()
+        # Find existing invoice
+        invoice = self.invoice_repository.find_by_quickbooks_id(qb_id)
         is_new = invoice is None
         
-        if not invoice:
-            # Need to find or create a job for this invoice
-            job = self._find_or_create_job_for_qb_transaction(qb_invoice)
-            
-            invoice = Invoice(job_id=job.id)
-            db.session.add(invoice)
+        # Calculate financial fields
+        total_amount = Decimal(str(qb_invoice.get('TotalAmt', 0)))
+        balance_due = Decimal(str(qb_invoice.get('Balance', 0)))
+        amount_paid = total_amount - balance_due
         
-        # Update fields
-        invoice.quickbooks_invoice_id = qb_id
-        invoice.quickbooks_sync_token = qb_invoice.get('SyncToken')
+        # Build invoice data
+        invoice_data = {
+            'quickbooks_invoice_id': qb_id,
+            'quickbooks_sync_token': qb_invoice.get('SyncToken'),
+            'subtotal': total_amount,
+            'total_amount': total_amount,
+            'balance_due': balance_due,
+            'amount_paid': amount_paid
+        }
         
-        # Financial fields
-        invoice.subtotal = Decimal(str(qb_invoice.get('TotalAmt', 0)))
+        # Tax amount
         if qb_invoice.get('TxnTaxDetail'):
-            invoice.tax_amount = Decimal(str(qb_invoice['TxnTaxDetail'].get('TotalTax', 0)))
-        invoice.total_amount = Decimal(str(qb_invoice.get('TotalAmt', 0)))
-        invoice.balance_due = Decimal(str(qb_invoice.get('Balance', 0)))
-        invoice.amount_paid = invoice.total_amount - invoice.balance_due
+            invoice_data['tax_amount'] = Decimal(str(qb_invoice['TxnTaxDetail'].get('TotalTax', 0)))
         
         # Dates
         if qb_invoice.get('TxnDate'):
-            invoice.invoice_date = datetime.strptime(qb_invoice['TxnDate'], '%Y-%m-%d').date()
+            invoice_data['invoice_date'] = datetime.strptime(qb_invoice['TxnDate'], '%Y-%m-%d').date()
         if qb_invoice.get('DueDate'):
-            invoice.due_date = datetime.strptime(qb_invoice['DueDate'], '%Y-%m-%d').date()
+            invoice_data['due_date'] = datetime.strptime(qb_invoice['DueDate'], '%Y-%m-%d').date()
         
         # Payment status
-        if invoice.balance_due == 0:
-            invoice.payment_status = 'paid'
-        elif invoice.amount_paid > 0:
-            invoice.payment_status = 'partial'
-        elif invoice.due_date and invoice.due_date < datetime.now().date():
-            invoice.payment_status = 'overdue'
+        if balance_due == 0:
+            invoice_data['payment_status'] = 'paid'
+        elif amount_paid > 0:
+            invoice_data['payment_status'] = 'partial'
+        elif invoice_data.get('due_date') and invoice_data['due_date'] < datetime.now().date():
+            invoice_data['payment_status'] = 'overdue'
         else:
-            invoice.payment_status = 'unpaid'
+            invoice_data['payment_status'] = 'unpaid'
         
         # Link to estimate if exists
         if qb_invoice.get('LinkedTxn'):
             for linked in qb_invoice['LinkedTxn']:
                 if linked['TxnType'] == 'Estimate':
                     estimate_qb_id = linked['TxnId']
-                    quote = Quote.query.filter_by(quickbooks_estimate_id=estimate_qb_id).first()
+                    quote = self.quote_repository.find_by_quickbooks_id(estimate_qb_id)
                     if quote:
-                        invoice.quote_id = quote.id
+                        invoice_data['quote_id'] = quote.id
+        
+        # Create or update invoice using repository
+        if not invoice:
+            # Need to find or create a job for this invoice
+            job = self._find_or_create_job_for_qb_transaction(qb_invoice)
+            invoice_data['job_id'] = job.id
+            invoice = self.invoice_repository.create(invoice_data)
+        else:
+            invoice = self.invoice_repository.update(invoice, invoice_data)
         
         # Sync line items
         self._sync_invoice_line_items(invoice, qb_invoice.get('Line', []))
@@ -379,52 +388,56 @@ class QuickBooksSyncService:
     def _sync_estimate_line_items(self, quote: Quote, qb_lines: List[Dict[str, Any]]):
         """Sync line items for an estimate"""
         # Remove existing line items
-        QuoteLineItem.query.filter_by(quote_id=quote.id).delete()
+        self.quote_line_item_repository.delete_by_quote_id(quote.id)
         
         for qb_line in qb_lines:
             if qb_line.get('DetailType') == 'SalesItemLineDetail':
-                line_item = QuoteLineItem(quote_id=quote.id)
+                # Build line item data
+                line_item_data = {
+                    'quote_id': quote.id,
+                    'description': qb_line.get('Description', ''),
+                    'quantity': Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('Qty', 1))),
+                    'unit_price': Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('UnitPrice', 0))),
+                    'line_total': Decimal(str(qb_line.get('Amount', 0))),
+                    'quickbooks_line_id': qb_line.get('Id')
+                }
                 
                 # Link to product if exists
                 if qb_line['SalesItemLineDetail'].get('ItemRef'):
                     item_qb_id = qb_line['SalesItemLineDetail']['ItemRef']['value']
-                    product = Product.query.filter_by(quickbooks_item_id=item_qb_id).first()
+                    product = self.product_repository.find_by_quickbooks_item_id(item_qb_id)
                     if product:
-                        line_item.product_id = product.id
+                        line_item_data['product_id'] = product.id
                 
-                # Line details
-                line_item.description = qb_line.get('Description', '')
-                line_item.quantity = Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('Qty', 1)))
-                line_item.unit_price = Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('UnitPrice', 0)))
-                line_item.line_total = Decimal(str(qb_line.get('Amount', 0)))
-                line_item.quickbooks_line_id = qb_line.get('Id')
-                
-                db.session.add(line_item)
+                # Create line item using repository
+                self.quote_line_item_repository.create(line_item_data)
     
     def _sync_invoice_line_items(self, invoice: Invoice, qb_lines: List[Dict[str, Any]]):
         """Sync line items for an invoice"""
         # Remove existing line items
-        InvoiceLineItem.query.filter_by(invoice_id=invoice.id).delete()
+        self.invoice_line_item_repository.delete_by_invoice_id(invoice.id)
         
         for qb_line in qb_lines:
             if qb_line.get('DetailType') == 'SalesItemLineDetail':
-                line_item = InvoiceLineItem(invoice_id=invoice.id)
+                # Build line item data
+                line_item_data = {
+                    'invoice_id': invoice.id,
+                    'description': qb_line.get('Description', ''),
+                    'quantity': Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('Qty', 1))),
+                    'unit_price': Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('UnitPrice', 0))),
+                    'line_total': Decimal(str(qb_line.get('Amount', 0))),
+                    'quickbooks_line_id': qb_line.get('Id')
+                }
                 
                 # Link to product if exists
                 if qb_line['SalesItemLineDetail'].get('ItemRef'):
                     item_qb_id = qb_line['SalesItemLineDetail']['ItemRef']['value']
-                    product = Product.query.filter_by(quickbooks_item_id=item_qb_id).first()
+                    product = self.product_repository.find_by_quickbooks_item_id(item_qb_id)
                     if product:
-                        line_item.product_id = product.id
+                        line_item_data['product_id'] = product.id
                 
-                # Line details
-                line_item.description = qb_line.get('Description', '')
-                line_item.quantity = Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('Qty', 1)))
-                line_item.unit_price = Decimal(str(qb_line.get('SalesItemLineDetail', {}).get('UnitPrice', 0)))
-                line_item.line_total = Decimal(str(qb_line.get('Amount', 0)))
-                line_item.quickbooks_line_id = qb_line.get('Id')
-                
-                db.session.add(line_item)
+                # Create line item using repository
+                self.invoice_line_item_repository.create(line_item_data)
     
     def _find_or_create_job_for_qb_transaction(self, qb_transaction: Dict[str, Any]) -> Job:
         """Find or create a job for a QuickBooks transaction"""
@@ -432,19 +445,18 @@ class QuickBooksSyncService:
         contact = None
         if qb_transaction.get('CustomerRef'):
             customer_qb_id = qb_transaction['CustomerRef']['value']
-            contact = Contact.query.filter_by(quickbooks_customer_id=customer_qb_id).first()
+            contact = self.contact_repository.find_by_quickbooks_customer_id(customer_qb_id)
         
         if not contact:
             # Create a placeholder contact
-            contact = Contact(
-                first_name=qb_transaction.get('CustomerRef', {}).get('name', 'Unknown'),
-                customer_type='customer'
-            )
-            db.session.add(contact)
-            db.session.flush()
+            contact_data = {
+                'first_name': qb_transaction.get('CustomerRef', {}).get('name', 'Unknown'),
+                'customer_type': 'customer'
+            }
+            contact = self.contact_repository.create(contact_data)
         
         # Find or create property
-        property = Property.query.filter_by(contact_id=contact.id).first()
+        property = self.property_repository.find_by_contact_id(contact.id)
         if not property:
             # Extract address from billing address if available
             bill_addr = qb_transaction.get('BillAddr', {})
@@ -458,24 +470,22 @@ class QuickBooksSyncService:
             
             address = ', '.join(address_parts) if address_parts else 'Unknown Address'
             
-            property = Property(
-                contact_id=contact.id,
-                address=address
-            )
-            db.session.add(property)
-            db.session.flush()
+            property_data = {
+                'contact_id': contact.id,
+                'address': address
+            }
+            property = self.property_repository.create(property_data)
         
         # Create job
         doc_number = qb_transaction.get('DocNumber', '')
         description = f"QuickBooks Import - {qb_transaction.get('TxnType', 'Transaction')} #{doc_number}"
         
-        job = Job(
-            property_id=property.id,
-            description=description,
-            status='Active'
-        )
-        db.session.add(job)
-        db.session.flush()
+        job_data = {
+            'property_id': property.id,
+            'description': description,
+            'status': 'Active'
+        }
+        job = self.job_repository.create(job_data)
         
         return job
     
@@ -522,9 +532,7 @@ class QuickBooksSyncService:
     
     def update_contact_financial_summary(self, contact: Contact):
         """Update contact's financial summary from invoices"""
-        invoices = Invoice.query.join(Job).join(Property).filter(
-            Property.contact_id == contact.id
-        ).all()
+        invoices = self.invoice_repository.find_by_contact_id(contact.id)
         
         total_sales = Decimal('0')
         outstanding = Decimal('0')
@@ -533,16 +541,22 @@ class QuickBooksSyncService:
             total_sales += invoice.total_amount
             outstanding += invoice.balance_due
         
-        contact.total_sales = total_sales
-        contact.outstanding_balance = outstanding
-        
         # Calculate average days to pay from paid invoices
-        paid_invoices = [inv for inv in invoices if inv.payment_status == 'paid' and inv.paid_date]
+        paid_invoices = [inv for inv in invoices if inv.payment_status == 'paid' and hasattr(inv, 'paid_date') and inv.paid_date]
+        average_days_to_pay = None
         if paid_invoices:
             total_days = 0
             for inv in paid_invoices:
                 days_to_pay = (inv.paid_date.date() - inv.invoice_date).days
                 total_days += days_to_pay
-            contact.average_days_to_pay = total_days // len(paid_invoices)
+            average_days_to_pay = total_days // len(paid_invoices)
         
-        db.session.commit()
+        # Update contact using repository
+        contact_data = {
+            'total_sales': total_sales,
+            'outstanding_balance': outstanding
+        }
+        if average_days_to_pay is not None:
+            contact_data['average_days_to_pay'] = average_days_to_pay
+            
+        self.contact_repository.update(contact, contact_data)

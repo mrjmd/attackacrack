@@ -244,7 +244,9 @@ class TestQuickBooksSyncServiceProductSync:
         existing_product = Mock(spec=Product)
         
         mock_repositories['product_repository'].find_by_quickbooks_item_id.return_value = existing_product
-        # Don't need to mock _record_sync for this test
+        mock_repositories['product_repository'].update.return_value = existing_product
+        mock_repositories['quickbooks_sync_repository'].find_by_entity_id.return_value = Mock()
+        mock_repositories['quickbooks_sync_repository'].update.return_value = Mock()
         
         # Act
         is_new = service._sync_item(qb_item)
@@ -271,7 +273,8 @@ class TestQuickBooksSyncServiceProductSync:
         
         mock_repositories['product_repository'].find_by_quickbooks_item_id.return_value = None
         mock_repositories['product_repository'].create.return_value = new_product
-        # Don't need to mock _record_sync for this test
+        mock_repositories['quickbooks_sync_repository'].find_by_entity_id.return_value = None
+        mock_repositories['quickbooks_sync_repository'].create.return_value = Mock()
         
         # Act
         is_new = service._sync_item(qb_item)
