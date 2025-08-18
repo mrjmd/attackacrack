@@ -820,10 +820,11 @@ def _create_appointment_service(google_calendar, db_session):
     """Create AppointmentService with dependencies"""
     from services.appointment_service_refactored import AppointmentService
     from repositories.appointment_repository import AppointmentRepository
+    from crm_database import Appointment
     logger.info("Initializing AppointmentService with repository")
     return AppointmentService(
         calendar_service=google_calendar, 
-        repository=AppointmentRepository(db_session)
+        repository=AppointmentRepository(db_session, Appointment)
     )
 
 
