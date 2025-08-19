@@ -1,6 +1,15 @@
 """
-Enhanced Service Registry with Advanced Lazy Loading
+Enhanced Service Registry with Advanced Lazy Loading and Test Isolation
 Implements factory pattern with dependency resolution and lifecycle management
+
+TEST ISOLATION FEATURES ADDED:
+- clear_all_instances(): Clears all cached services while preserving registrations
+- clear_dependency_chain(): Clears a service and all dependents for refresh
+- get_debug_status(): Provides detailed status for debugging test issues
+- clear_all_scopes(): Clears all scoped instances across all scopes
+
+These methods enable proper test isolation by ensuring services don't retain
+stale database sessions or other state between tests.
 """
 from typing import Dict, Any, Callable, Optional, Set, List, TypeVar, Generic
 from enum import Enum
@@ -260,6 +269,64 @@ class ServiceRegistryEnhanced:
             if hasattr(self._thread_local, 'initialization_stack'):
                 self._thread_local.initialization_stack.clear()
     
+    def clear_all_instances(self) -> None:
+        """Clear all cached service instances while preserving registrations.
+        
+        This is useful for test isolation where you want to force
+        re-creation of all services with fresh dependencies.
+        """
+        with self._lock:
+            # Clear all singleton instances
+            for descriptor in self._descriptors.values():
+                with descriptor.lock:
+                    descriptor.instance = None
+                    descriptor.is_initializing = False
+            
+            # Clear all scoped instances
+            self._scoped_instances.clear()
+            
+            # Clear thread-local initialization stack
+            if hasattr(self._thread_local, 'initialization_stack'):
+                self._thread_local.initialization_stack.clear()
+    
+    def clear_dependency_chain(self, service_name: str) -> None:
+        """Clear a service and all services that depend on it.
+        
+        This is useful when a core dependency (like db_session) changes
+        and you need to ensure all dependent services are recreated.
+        """
+        if service_name not in self._descriptors:
+            return
+        
+        # Find all services that depend on this service (direct or indirect)
+        dependents = self._find_all_dependents(service_name)
+        dependents.add(service_name)  # Include the service itself
+        
+        with self._lock:
+            for dependent in dependents:
+                if dependent in self._descriptors:
+                    descriptor = self._descriptors[dependent]
+                    with descriptor.lock:
+                        descriptor.instance = None
+                        descriptor.is_initializing = False
+                
+                # Clear from all scopes
+                for scope in self._scoped_instances.values():
+                    scope.pop(dependent, None)
+    
+    def _find_all_dependents(self, service_name: str) -> set:
+        """Find all services that directly or indirectly depend on the given service."""
+        dependents = set()
+        
+        def find_recursive(name: str):
+            for desc_name, descriptor in self._descriptors.items():
+                if name in descriptor.dependencies and desc_name not in dependents:
+                    dependents.add(desc_name)
+                    find_recursive(desc_name)  # Find dependents of dependents
+        
+        find_recursive(service_name)
+        return dependents
+    
     def reset_service(self, name: str) -> None:
         """Reset a specific service, forcing re-instantiation on next get"""
         if name in self._descriptors:
@@ -276,6 +343,11 @@ class ServiceRegistryEnhanced:
         """Clear all services in a specific scope"""
         with self._lock:
             self._scoped_instances.pop(scope_id, None)
+    
+    def clear_all_scopes(self) -> None:
+        """Clear all scoped service instances across all scopes"""
+        with self._lock:
+            self._scoped_instances.clear()
     
     def list_services(self) -> List[str]:
         """List all registered service names"""
@@ -382,6 +454,38 @@ class ServiceRegistryEnhanced:
             if name in services:
                 logger.info(f"Warming up service: {name}")
                 self.get(name)
+    
+    def get_debug_status(self) -> Dict[str, Any]:
+        """
+        Get detailed status of all services for debugging.
+        
+        Returns:
+            Dictionary with service status information
+        """
+        status = {
+            'total_services': len(self._descriptors),
+            'instantiated_services': [],
+            'uninstantiated_services': [],
+            'scoped_instances_count': len(self._scoped_instances),
+            'service_details': {}
+        }
+        
+        for name, descriptor in self._descriptors.items():
+            is_instantiated = descriptor.instance is not None
+            if is_instantiated:
+                status['instantiated_services'].append(name)
+            else:
+                status['uninstantiated_services'].append(name)
+            
+            status['service_details'][name] = {
+                'lifecycle': descriptor.lifecycle.value,
+                'dependencies': descriptor.dependencies,
+                'tags': list(descriptor.tags),
+                'is_instantiated': is_instantiated,
+                'is_initializing': descriptor.is_initializing
+            }
+        
+        return status
 
 
 def create_enhanced_registry() -> ServiceRegistryEnhanced:

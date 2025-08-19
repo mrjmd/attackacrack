@@ -582,6 +582,47 @@ class CampaignService:
         
         logger.info(f"Flagged {len(contact_ids)} contacts as recently contacted from campaign {campaign_id}")
     
+    def get_campaign_analytics(self, campaign_id: int) -> Dict[str, Any]:
+        """
+        Get analytics data for a specific campaign.
+        
+        Args:
+            campaign_id: Campaign ID
+            
+        Returns:
+            Dictionary with analytics data
+        """
+        try:
+            # Get campaign memberships for analytics (more accurate than activities)
+            memberships = self.campaign_repository.get_campaign_memberships(campaign_id)
+            
+            total_recipients = len(memberships)
+            sent_count = len([m for m in memberships if m.status == 'sent'])
+            # Count replies by checking for reply_activity_id
+            response_count = len([m for m in memberships if m.reply_activity_id is not None])
+            response_rate = (response_count / sent_count) if sent_count > 0 else 0
+            
+            return {
+                'sent_count': sent_count,
+                'response_count': response_count,
+                'response_rate': round(response_rate, 2),
+                'total_recipients': total_recipients,
+                'sends_today': 0,  # TODO: Calculate actual sends today
+                'daily_limit': 125,  # Default OpenPhone limit
+                'ab_test': None  # TODO: Add A/B test analytics if needed
+            }
+        except Exception as e:
+            logger.error(f"Error calculating analytics for campaign {campaign_id}: {e}")
+            return {
+                'sent_count': 0,
+                'response_count': 0,
+                'response_rate': 0,
+                'total_recipients': 0,
+                'sends_today': 0,
+                'daily_limit': 125,
+                'ab_test': None
+            }
+    
     def get_all_campaigns_with_analytics(self) -> List[Dict[str, Any]]:
         """
         Get all campaigns with their analytics data.
@@ -595,33 +636,46 @@ class CampaignService:
         for campaign in campaigns:
             try:
                 analytics = self.get_campaign_analytics(campaign.id)
-                campaign_dict = {
-                    'id': campaign.id,
-                    'name': campaign.name,
-                    'status': campaign.status,
-                    'campaign_type': campaign.campaign_type,
-                    'audience_type': campaign.audience_type,
-                    'created_at': campaign.created_at,
-                    'sent_count': analytics.get('sent_count', 0),
-                    'response_count': analytics.get('response_count', 0),
-                    'response_rate': analytics.get('response_rate', 0)
+                # Structure expected by template: {"campaign": {...}, "analytics": {...}}
+                campaign_item = {
+                    'campaign': {
+                        'id': campaign.id,
+                        'name': campaign.name,
+                        'status': campaign.status,
+                        'campaign_type': campaign.campaign_type,
+                        'audience_type': campaign.audience_type,
+                        'created_at': campaign.created_at
+                    },
+                    'analytics': {
+                        'sent_count': analytics.get('sent_count', 0),
+                        'response_count': analytics.get('response_count', 0),
+                        'response_rate': analytics.get('response_rate', 0)
+                    }
                 }
-                campaign_data.append(campaign_dict)
+                campaign_data.append(campaign_item)
             except Exception as e:
                 logger.error(f"Error getting analytics for campaign {campaign.id}: {e}")
                 # Add campaign without analytics on error
-                campaign_dict = {
-                    'id': campaign.id,
-                    'name': campaign.name,
-                    'status': campaign.status,
-                    'campaign_type': campaign.campaign_type,
-                    'audience_type': campaign.audience_type,
-                    'created_at': campaign.created_at,
-                    'sent_count': 0,
-                    'response_count': 0,
-                    'response_rate': 0
+                campaign_item = {
+                    'campaign': {
+                        'id': campaign.id,
+                        'name': campaign.name,
+                        'status': campaign.status,
+                        'campaign_type': campaign.campaign_type,
+                        'audience_type': campaign.audience_type,
+                        'created_at': campaign.created_at
+                    },
+                    'analytics': {
+                        'sent_count': 0,
+                        'response_count': 0,
+                        'response_rate': 0,
+                        'total_recipients': 0,
+                        'sends_today': 0,
+                        'daily_limit': 125,
+                        'ab_test': None
+                    }
                 }
-                campaign_data.append(campaign_dict)
+                campaign_data.append(campaign_item)
         
         return campaign_data
     

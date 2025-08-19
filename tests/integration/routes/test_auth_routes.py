@@ -247,10 +247,11 @@ class TestInviteFlow:
             response = marketer_client.get('/auth/invite', follow_redirects=False)
             assert response.status_code == 302  # Redirected
     
-    @patch('services.auth_service.AuthService.send_invite_email')
+    @patch('services.auth_service_refactored.AuthService.send_invite_email')
     def test_invite_user_success(self, mock_send_email, admin_client, app):
         """Test successful user invite"""
-        mock_send_email.return_value = (True, "Email sent")
+        from services.common.result import Result
+        mock_send_email.return_value = Result.success(True)
         
         with app.test_request_context():
             response = admin_client.post('/auth/invite', data={
@@ -286,7 +287,7 @@ class TestInviteFlow:
         assert response.status_code == 302  # Redirect
         
         response = client.get('/auth/accept-invite/invalid_token', follow_redirects=True)
-        assert b'Invalid invitation' in response.data
+        assert b'Invalid invite token' in response.data
     
     def test_accept_invite_success(self, client, valid_invite, app):
         """Test successful invite acceptance"""
@@ -351,7 +352,7 @@ class TestUserManagement:
                                    follow_redirects=True)
         
         assert response.status_code == 200
-        assert b'deactivated successfully' in response.data
+        assert b'User status updated successfully' in response.data
         
         db_session.refresh(marketer_user)
         assert marketer_user.is_active is False
@@ -413,7 +414,7 @@ class TestUserManagement:
         }, follow_redirects=True)
         
         assert response.status_code == 200
-        assert b'Current password is incorrect' in response.data
+        assert b'Invalid current password' in response.data
     
     def test_change_password_mismatch(self, admin_client):
         """Test change password with password mismatch"""

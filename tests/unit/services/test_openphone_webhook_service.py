@@ -594,9 +594,13 @@ class TestCallRecordingWebhooks:
         
         result = service._handle_call_recording_webhook(webhook_data)
         
-        assert result.is_failure
-        assert 'Call activity not found' in result.error
-        mock_logger.warning.assert_called_with('Call activity not found for call ID: call_123')
+        # After webhook service improvement, missing calls return success with 'skipped' status
+        assert result.is_success
+        assert result.data['status'] == 'skipped'
+        assert result.data['reason'] == 'call_activity_not_found'
+        assert result.data['call_id'] == 'call_123'
+        # Verify appropriate warning was logged
+        mock_logger.warning.assert_called_with('Call activity not found for call ID: call_123. This is likely a recording for a call made before webhook setup.')
 
 
 class TestAIContentWebhooks:

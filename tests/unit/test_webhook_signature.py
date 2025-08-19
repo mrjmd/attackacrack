@@ -174,8 +174,13 @@ class TestWebhookSignatureVerification:
             # Should be forbidden
             assert response.status_code == 403
     
-    def test_replay_attack_with_old_timestamp(self, client, app, webhook_signing_key, webhook_payload):
+    @patch('services.openphone_webhook_service_refactored.OpenPhoneWebhookServiceRefactored.process_webhook')
+    def test_replay_attack_with_old_timestamp(self, mock_process_webhook, client, app, webhook_signing_key, webhook_payload):
         """Test that old timestamps are handled (basic replay protection awareness)"""
+        # Mock the webhook service to avoid database session issues
+        from services.common.result import Result
+        mock_process_webhook.return_value = Result.success({'status': 'test_success'})
+        
         with app.app_context():
             app.config['OPENPHONE_WEBHOOK_SIGNING_KEY'] = webhook_signing_key
             
@@ -196,6 +201,8 @@ class TestWebhookSignatureVerification:
             # Currently the implementation doesn't check timestamp freshness
             # but signature should still be valid
             assert response.status_code == 200
+            # Verify the webhook service was called (signature was valid)
+            mock_process_webhook.assert_called_once()
     
     def test_missing_signing_key_config(self, client, app, webhook_payload):
         """Test behavior when signing key is not configured"""
@@ -233,8 +240,13 @@ class TestWebhookSignatureVerification:
             # Should return 500 (server error)
             assert response.status_code == 500
     
-    def test_signature_verification_with_different_payloads(self, client, app, webhook_signing_key):
+    @patch('services.openphone_webhook_service_refactored.OpenPhoneWebhookServiceRefactored.process_webhook')
+    def test_signature_verification_with_different_payloads(self, mock_process_webhook, client, app, webhook_signing_key):
         """Test signature verification with various webhook types"""
+        # Mock the webhook service to avoid database session issues
+        from services.common.result import Result
+        mock_process_webhook.return_value = Result.success({'status': 'test_success'})
+        
         with app.app_context():
             app.config['OPENPHONE_WEBHOOK_SIGNING_KEY'] = webhook_signing_key
             
@@ -268,9 +280,17 @@ class TestWebhookSignatureVerification:
                 
                 # All should be accepted with valid signature
                 assert response.status_code == 200
+            
+            # Verify the webhook service was called for each payload (signature was valid)
+            assert mock_process_webhook.call_count == len(test_payloads)
     
-    def test_signature_with_unicode_content(self, client, app, webhook_signing_key):
+    @patch('services.openphone_webhook_service_refactored.OpenPhoneWebhookServiceRefactored.process_webhook')
+    def test_signature_with_unicode_content(self, mock_process_webhook, client, app, webhook_signing_key):
         """Test signature verification with unicode content"""
+        # Mock the webhook service to avoid database session issues
+        from services.common.result import Result
+        mock_process_webhook.return_value = Result.success({'status': 'test_success'})
+        
         with app.app_context():
             app.config['OPENPHONE_WEBHOOK_SIGNING_KEY'] = webhook_signing_key
             
@@ -301,6 +321,8 @@ class TestWebhookSignatureVerification:
             
             # Should be accepted
             assert response.status_code == 200
+            # Verify the webhook service was called (signature was valid)
+            mock_process_webhook.assert_called_once()
     
     def test_signature_case_sensitivity(self, client, app, webhook_signing_key, webhook_payload):
         """Test that signature verification is case sensitive"""
@@ -365,8 +387,13 @@ class TestWebhookEndpointSecurity:
                 response = getattr(client, method.lower())('/api/webhooks/openphone')
                 assert response.status_code in [403, 405]  # Forbidden or Method Not Allowed
     
-    def test_webhook_endpoint_logging(self, client, app, webhook_signing_key, webhook_payload, caplog):
+    @patch('services.openphone_webhook_service_refactored.OpenPhoneWebhookServiceRefactored.process_webhook')
+    def test_webhook_endpoint_logging(self, mock_process_webhook, client, app, webhook_signing_key, webhook_payload, caplog):
         """Test that webhook verification is properly logged"""
+        # Mock the webhook service to avoid database session issues
+        from services.common.result import Result
+        mock_process_webhook.return_value = Result.success({'status': 'test_success'})
+        
         with app.app_context():
             app.config['OPENPHONE_WEBHOOK_SIGNING_KEY'] = webhook_signing_key
             
@@ -387,3 +414,5 @@ class TestWebhookEndpointSecurity:
             # Check that verification was logged
             assert any("OpenPhone signature verified successfully" in record.message 
                       for record in caplog.records)
+            # Verify the webhook service was called (signature was valid)
+            mock_process_webhook.assert_called_once()

@@ -55,11 +55,11 @@ def test_process_incoming_message_webhook_new_contact(app, db_session):
 
     # 3. Assertions
     # Check that webhook processing succeeded
-    assert result['status'] == 'created'
-    assert 'activity_id' in result
+    assert result.is_success
+    assert 'activity_id' in result.data
 
     # Get the created activity
-    activity_id = result['activity_id']
+    activity_id = result.data['activity_id']
     new_activity = db_session.query(Activity).get(activity_id)
     assert new_activity is not None
     assert new_activity.openphone_id == "msg_new_contact_123"

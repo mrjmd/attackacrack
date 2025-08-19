@@ -726,6 +726,22 @@ class CampaignRepository(BaseRepository[Campaign]):
             'total_members': total_members
         }
     
+    def get_campaign_memberships(self, campaign_id: int) -> List[CampaignMembership]:
+        """
+        Get all memberships for a campaign.
+        
+        Args:
+            campaign_id: Campaign ID
+            
+        Returns:
+            List of campaign memberships
+        """
+        try:
+            return self.session.query(CampaignMembership).filter_by(campaign_id=campaign_id).all()
+        except Exception as e:
+            logger.error(f"Error getting campaign memberships: {e}")
+            return []
+    
     def find_memberships_with_activity_ids(self, campaign_id: int) -> List[CampaignMembership]:
         """
         Find memberships that have sent activity IDs.

@@ -213,7 +213,16 @@ class OpenPhoneWebhookServiceRefactored:
                     'activity_id': existing_activity.id
                 })
             
-            # Activity doesn't exist, need to create new one - resolve contact and conversation
+            # Activity doesn't exist - check if this is a status update for a message we don't have
+            # For delivery status updates without message data, we should not create new activities
+            if event_type in ['message.delivered', 'message.failed', 'message.undelivered'] and not (from_number or to_number):
+                logger.warning(f"Received {event_type} webhook for message {openphone_id} but no existing activity found and no contact info available. This is likely a delivery status for a message sent before webhook setup.")
+                return Result.success({
+                    'status': 'skipped',
+                    'reason': 'delivery_status_without_existing_activity',
+                    'message_id': openphone_id
+                })
+            
             # Determine contact based on direction
             if direction == 'incoming':
                 contact_phone = from_number
@@ -222,6 +231,11 @@ class OpenPhoneWebhookServiceRefactored:
                 # 'to' is a list, get the first number
                 contact_phone = to_number[0] if isinstance(to_number, list) and to_number else to_number
                 db_direction = 'outgoing'
+            
+            # Validate that we have contact information
+            if not contact_phone:
+                logger.error(f"Cannot process message webhook {event_type} for {openphone_id}: no contact phone number available")
+                return Result.failure('No contact phone number available in webhook data', code="MISSING_CONTACT_INFO")
             
             # Get or create contact using Result pattern
             contact_result = self._get_or_create_contact(contact_phone)
@@ -327,11 +341,19 @@ class OpenPhoneWebhookServiceRefactored:
                     'activity_id': existing_activity.id
                 })
             
-            # Activity doesn't exist, need to create new one - resolve contact and conversation
-            # Get participants
+            # Activity doesn't exist - check if this is a status update for a call we don't have
+            # For call status updates without participant data, we should not create new activities
             participants = call_data.get('participants', [])
             if not participants:
-                return Result.failure('No participants in call data', code="INVALID_DATA")
+                if event_type in ['call.completed', 'call.ended', 'call.failed']:
+                    logger.warning(f"Received {event_type} webhook for call {openphone_id} but no existing activity found and no participant info available. This is likely a status update for a call made before webhook setup.")
+                    return Result.success({
+                        'status': 'skipped',
+                        'reason': 'call_status_without_existing_activity',
+                        'call_id': openphone_id
+                    })
+                else:
+                    return Result.failure('No participants in call data', code="INVALID_DATA")
             
             # Determine contact phone (participant who is not our number)
             our_number = self._get_our_phone_number()
@@ -417,8 +439,12 @@ class OpenPhoneWebhookServiceRefactored:
             call_activity = self.activity_repository.find_by_openphone_id(call_id)
             
             if not call_activity:
-                logger.warning(f"Call activity not found for call ID: {call_id}")
-                return Result.failure('Call activity not found', code="NOT_FOUND")
+                logger.warning(f"Call activity not found for call ID: {call_id}. This is likely a summary for a call made before webhook setup.")
+                return Result.success({
+                    'status': 'skipped',
+                    'reason': 'call_activity_not_found',
+                    'call_id': call_id
+                })
             
             # Update with AI summary using repository
             updated_activity = self.activity_repository.update(
@@ -462,8 +488,12 @@ class OpenPhoneWebhookServiceRefactored:
             call_activity = self.activity_repository.find_by_openphone_id(call_id)
             
             if not call_activity:
-                logger.warning(f"Call activity not found for call ID: {call_id}")
-                return Result.failure('Call activity not found', code="NOT_FOUND")
+                logger.warning(f"Call activity not found for call ID: {call_id}. This is likely a transcript for a call made before webhook setup.")
+                return Result.success({
+                    'status': 'skipped',
+                    'reason': 'call_activity_not_found',
+                    'call_id': call_id
+                })
             
             # Update with AI transcript using repository
             updated_activity = self.activity_repository.update(
@@ -508,8 +538,12 @@ class OpenPhoneWebhookServiceRefactored:
             call_activity = self.activity_repository.find_by_openphone_id(call_id)
             
             if not call_activity:
-                logger.warning(f"Call activity not found for call ID: {call_id}")
-                return Result.failure('Call activity not found', code="NOT_FOUND")
+                logger.warning(f"Call activity not found for call ID: {call_id}. This is likely a recording for a call made before webhook setup.")
+                return Result.success({
+                    'status': 'skipped',
+                    'reason': 'call_activity_not_found',
+                    'call_id': call_id
+                })
             
             # Update with recording URL using repository
             update_data = {

@@ -72,11 +72,12 @@
             </div>
 
             <!-- Progress Bar -->
-            {% set progress_pct = (analytics.sent_count / analytics.total_recipients * 100) if analytics.total_recipients > 0 else 0 %}
+            {% set total_recipients = analytics.get('total_recipients', 0) %}
+            {% set progress_pct = (analytics.sent_count / total_recipients * 100) if total_recipients > 0 else 0 %}
             <div>
                 <div class="flex justify-between text-sm text-gray-400 mb-1">
                     <span>Progress</span>
-                    <span>{{ analytics.sent_count }}/{{ analytics.total_recipients }}</span>
+                    <span>{{ analytics.sent_count }}/{{ total_recipients }}</span>
                 </div>
                 <div class="w-full bg-gray-600 rounded-full h-2">
                     <div class="bg-blue-500 h-2 rounded-full" style="width: {{ progress_pct }}%"></div>

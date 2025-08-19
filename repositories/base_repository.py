@@ -6,7 +6,7 @@ Implements common database operations following the Repository Pattern
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, List, Optional, Dict, Any, Tuple, Type
 from sqlalchemy.orm import Session, Query
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, DisconnectionError, InvalidRequestError
 from sqlalchemy import and_, or_, desc, asc
 from dataclasses import dataclass
 from enum import Enum
@@ -94,6 +94,61 @@ class BaseRepository(ABC, Generic[T]):
         self.session = session
         self.model_class = model_class
     
+    def _is_session_valid(self) -> bool:
+        """
+        Check if the database session is still valid and connected.
+        
+        Returns:
+            True if session is valid, False otherwise
+        """
+        try:
+            if not self.session:
+                return False
+            
+            # Check if session has a connection and it's not closed
+            bind = self.session.get_bind()
+            if hasattr(bind, 'closed') and bind.closed:
+                return False
+                
+            # Try a simple query to test connection
+            self.session.execute('SELECT 1')
+            return True
+        except Exception:
+            return False
+    
+    def _handle_connection_error(self, operation: str, error: Exception) -> None:
+        """
+        Handle connection-related errors with better error messages and test context.
+        
+        Args:
+            operation: Description of the operation that failed
+            error: The original exception
+        """
+        import os
+        is_testing = os.environ.get('FLASK_ENV') == 'testing' or 'pytest' in os.environ.get('_', '')
+        
+        if isinstance(error, (DisconnectionError, InvalidRequestError)):
+            logger.error(f"Database connection error during {operation}: {error}")
+            if is_testing:
+                logger.error("This may be due to session being closed prematurely in tests")
+                logger.error("Check test isolation and service registry session management")
+            logger.error(f"Session valid: {self._is_session_valid()}")
+        else:
+            logger.error(f"Error during {operation}: {error}")
+        
+        # Only attempt rollback if we have a valid session and connection
+        try:
+            if (hasattr(self.session, 'rollback') and 
+                hasattr(self.session, 'get_bind') and 
+                not getattr(self.session.get_bind(), 'closed', False)):
+                self.session.rollback()
+        except Exception as rollback_error:
+            logger.error(f"Additional error during rollback: {rollback_error}")
+            if is_testing:
+                logger.error("This is common in test teardown - ignoring rollback error")
+        
+        raise error
+    
     # CREATE Operations
     
     def create(self, **kwargs) -> T:
@@ -115,9 +170,8 @@ class BaseRepository(ABC, Generic[T]):
             self.session.flush()  # Flush to get ID without committing
             logger.debug(f"Created {self.model_class.__name__} with id {entity.id}")
             return entity
-        except SQLAlchemyError as e:
-            logger.error(f"Error creating {self.model_class.__name__}: {e}")
-            self.session.rollback()
+        except Exception as e:
+            self._handle_connection_error(f"creating {self.model_class.__name__}", e)
             raise
     
     def create_many(self, entities_data: List[Dict[str, Any]]) -> List[T]:
@@ -139,9 +193,8 @@ class BaseRepository(ABC, Generic[T]):
             self.session.flush()
             logger.debug(f"Created {len(entities)} {self.model_class.__name__} entities")
             return entities
-        except SQLAlchemyError as e:
-            logger.error(f"Error creating multiple {self.model_class.__name__}: {e}")
-            self.session.rollback()
+        except Exception as e:
+            self._handle_connection_error(f"creating multiple {self.model_class.__name__}", e)
             raise
     
     # READ Operations

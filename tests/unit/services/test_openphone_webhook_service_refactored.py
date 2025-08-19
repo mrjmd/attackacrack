@@ -465,8 +465,8 @@ class TestCallWebhooksWithRepositories:
         # Verify repository update
         service.activity_repository.update.assert_called_once()
     
-    def test_call_webhook_missing_participants_returns_failure(self):
-        """Test call webhook with missing participants returns Result.failure"""
+    def test_call_webhook_missing_participants_returns_skipped(self):
+        """Test call webhook with missing participants (for status updates like call.completed)"""
         service = self._create_service()
         
         # Mock NO existing activity so validation is attempted
@@ -484,6 +484,35 @@ class TestCallWebhooksWithRepositories:
         
         result = service._handle_call_webhook(webhook_data)
         
+        # After webhook service improvement, call status updates without participants
+        # return success with 'skipped' status. This handles cases where we receive
+        # status updates for calls made before webhook setup.
+        assert result.is_success
+        assert result.data['status'] == 'skipped'
+        assert result.data['reason'] == 'call_status_without_existing_activity'
+        assert result.data['call_id'] == 'call_123'
+    
+    def test_call_webhook_missing_participants_for_new_call_fails(self):
+        """Test that new call events (not status updates) still fail with missing participants"""
+        service = self._create_service()
+        
+        # Mock NO existing activity so validation is attempted
+        service.activity_repository.find_by_openphone_id.return_value = None
+        
+        # Use a non-status event type (hypothetical call.started)
+        webhook_data = {
+            'type': 'call.started',
+            'data': {
+                'object': {
+                    'id': 'call_123',
+                    'participants': []  # Missing participants should fail for new calls
+                }
+            }
+        }
+        
+        result = service._handle_call_webhook(webhook_data)
+        
+        # New call events should still fail if participants are missing
         assert result.is_failure
         assert 'No participants in call data' in result.error
         assert result.error_code == "INVALID_DATA"
@@ -661,8 +690,8 @@ class TestAIContentWebhooksWithRepositories:
         assert 'Missing call ID or summary' in result.error
         assert result.error_code == "INVALID_DATA"
     
-    def test_ai_webhook_call_not_found_returns_failure(self):
-        """Test AI webhooks when call activity not found"""
+    def test_ai_webhook_call_not_found_returns_skipped(self):
+        """Test AI webhooks when call activity not found (should be skipped gracefully)"""
         service = self._create_service()
         
         # Mock no existing call activity
@@ -680,9 +709,13 @@ class TestAIContentWebhooksWithRepositories:
         
         result = service._handle_call_summary_webhook(webhook_data)
         
-        assert result.is_failure
-        assert 'Call activity not found' in result.error
-        assert result.error_code == "NOT_FOUND"
+        # After webhook service improvement, missing calls return success with 'skipped' status
+        # This is more appropriate for webhook handling - we shouldn't fail for webhooks 
+        # about activities that don't exist (they may predate our webhook setup)
+        assert result.is_success
+        assert result.data['status'] == 'skipped'
+        assert result.data['reason'] == 'call_activity_not_found'
+        assert result.data['call_id'] == 'call_123'
     
     def _create_service(self):
         # Create mocks with sensible defaults

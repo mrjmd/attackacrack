@@ -86,6 +86,24 @@ class ActivityRepository(BaseRepository):
             .filter_by(openphone_id=openphone_id)\
             .first()
     
+    def find_by_campaign_id(self, campaign_id: int) -> List:
+        """
+        Find activities by campaign ID.
+        
+        Args:
+            campaign_id: Campaign ID to search for
+            
+        Returns:
+            List of activities
+        """
+        try:
+            return self.session.query(self.model_class).filter_by(campaign_id=campaign_id).all()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error finding activities by campaign ID: {e}")
+            return []
+    
     def get_activities_page(self, page: int = 1, per_page: int = 50, 
                            filters: Optional[dict] = None) -> PaginatedResult:
         """

@@ -4,6 +4,7 @@ Handles user authentication, authorization, and invite management
 """
 
 import re
+import uuid
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
@@ -299,7 +300,7 @@ class AuthService:
             new_password_hash = new_password_hash.decode('utf-8')
         
         try:
-            self.user_repository.update(user_id, password_hash=new_password_hash)
+            self.user_repository.update_by_id(user_id, password_hash=new_password_hash)
             self.user_repository.commit()
             return Result.success(True)
         except Exception as e:
@@ -335,9 +336,13 @@ class AuthService:
             )
         
         try:
+            # Generate unique token
+            token = str(uuid.uuid4())
+            
             # Create new invite using repository
             invite = self.invite_repository.create(
                 email=email,
+                token=token,
                 role=role,
                 created_by_id=invited_by_id,
                 expires_at=datetime.utcnow() + timedelta(days=7)
@@ -459,7 +464,7 @@ class AuthService:
         
         try:
             # Use repository to update status
-            updated_user = self.user_repository.update(user_id, is_active=new_status)
+            updated_user = self.user_repository.update_by_id(user_id, is_active=new_status)
             self.user_repository.commit()
             logger.info(f"Toggled user status for {user.email}: is_active={new_status}")
             return Result.success(updated_user, metadata={"is_active": new_status})
