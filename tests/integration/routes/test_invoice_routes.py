@@ -41,13 +41,16 @@ class TestInvoiceRoutesServiceRegistry:
         mock_invoice_service = Mock()
         mock_invoice_service.get_all_invoices.return_value = []
         
-        mock_current_app.services.get.return_value = mock_invoice_service
+        # Create a mock services object with a regular Mock get method
+        mock_services = Mock()
+        mock_services.get = Mock(return_value=mock_invoice_service)
+        mock_current_app.services = mock_services
         
         # Make request
         response = authenticated_client.get('/invoices/')
         
         # Verify service registry was called
-        mock_current_app.services.get.assert_called_with('invoice')
+        mock_services.get.assert_called_with('invoice')
         mock_invoice_service.get_all_invoices.assert_called_once()
         assert response.status_code == 200
     
@@ -57,15 +60,26 @@ class TestInvoiceRoutesServiceRegistry:
         # Setup mock services
         mock_invoice_service = Mock()
         mock_invoice = Mock()
+        mock_invoice.id = 1
+        mock_invoice.total_amount = 100.00
+        mock_invoice.due_date = '2025-01-01'
+        mock_invoice.status = 'Unpaid'
+        mock_job = Mock()
+        mock_job.id = 1
+        mock_job.description = 'Test Job'
+        mock_invoice.job = mock_job
         mock_invoice_service.get_invoice_by_id.return_value = mock_invoice
         
-        mock_current_app.services.get.return_value = mock_invoice_service
+        # Create a mock services object with a regular Mock get method
+        mock_services = Mock()
+        mock_services.get = Mock(return_value=mock_invoice_service)
+        mock_current_app.services = mock_services
         
         # Make request
         response = authenticated_client.get('/invoices/1')
         
         # Verify service registry was called
-        mock_current_app.services.get.assert_called_with('invoice')
+        mock_services.get.assert_called_with('invoice')
         mock_invoice_service.get_invoice_by_id.assert_called_once_with(1)
         assert response.status_code == 200
     
@@ -82,13 +96,16 @@ class TestInvoiceRoutesServiceRegistry:
                 return mock_job_service
             return Mock()
         
-        mock_current_app.services.get.side_effect = mock_get_service
+        # Create a mock services object with a regular Mock get method
+        mock_services = Mock()
+        mock_services.get = Mock(side_effect=mock_get_service)
+        mock_current_app.services = mock_services
         
         # Make request
         response = authenticated_client.get('/invoices/add')
         
         # Verify service registry was called for job service
-        mock_current_app.services.get.assert_any_call('job')
+        mock_services.get.assert_any_call('job')
         mock_job_service.get_all_jobs.assert_called_once()
         assert response.status_code == 200
     
@@ -98,8 +115,12 @@ class TestInvoiceRoutesServiceRegistry:
         # Setup mock services
         mock_invoice_service = Mock()
         mock_invoice_service.add_invoice.return_value = None
+        mock_invoice_service.get_all_invoices.return_value = []  # For redirect to list_all
         
-        mock_current_app.services.get.return_value = mock_invoice_service
+        # Create a mock services object with a regular Mock get method
+        mock_services = Mock()
+        mock_services.get = Mock(return_value=mock_invoice_service)
+        mock_current_app.services = mock_services
         
         # Make request
         response = authenticated_client.post('/invoices/add', data={
@@ -110,7 +131,7 @@ class TestInvoiceRoutesServiceRegistry:
         }, follow_redirects=True)
         
         # Verify service registry was called
-        mock_current_app.services.get.assert_any_call('invoice')
+        mock_services.get.assert_any_call('invoice')
         mock_invoice_service.add_invoice.assert_called_once()
         assert response.status_code == 200
     
@@ -121,6 +142,12 @@ class TestInvoiceRoutesServiceRegistry:
         mock_invoice_service = Mock()
         mock_job_service = Mock()
         mock_invoice = Mock()
+        mock_invoice.id = 1  # Add id for template URL generation
+        mock_invoice.job_id = 1
+        mock_invoice.status = 'Unpaid'
+        mock_invoice.total_amount = 100.00
+        mock_invoice.issue_date = date(2025, 1, 1)  # Use actual date object
+        mock_invoice.due_date = date(2025, 2, 1)  # Use actual date object
         
         mock_invoice_service.get_invoice_by_id.return_value = mock_invoice
         mock_job_service.get_all_jobs.return_value = []
@@ -132,14 +159,17 @@ class TestInvoiceRoutesServiceRegistry:
                 return mock_job_service
             return Mock()
         
-        mock_current_app.services.get.side_effect = mock_get_service
+        # Create a mock services object with a regular Mock get method
+        mock_services = Mock()
+        mock_services.get = Mock(side_effect=mock_get_service)
+        mock_current_app.services = mock_services
         
         # Make request
         response = authenticated_client.get('/invoices/1/edit')
         
         # Verify service registry was called for both services
-        mock_current_app.services.get.assert_any_call('invoice')
-        mock_current_app.services.get.assert_any_call('job')
+        mock_services.get.assert_any_call('invoice')
+        mock_services.get.assert_any_call('job')
         mock_invoice_service.get_invoice_by_id.assert_called_once_with(1)
         mock_job_service.get_all_jobs.assert_called_once()
         assert response.status_code == 200
@@ -151,11 +181,21 @@ class TestInvoiceRoutesServiceRegistry:
         mock_invoice_service = Mock()
         mock_invoice = Mock()
         mock_invoice.id = 1
+        mock_invoice.total_amount = 150.00
+        mock_invoice.due_date = '2025-02-01'
+        mock_invoice.status = 'Paid'
+        mock_job = Mock()
+        mock_job.id = 1
+        mock_job.description = 'Test Job'
+        mock_invoice.job = mock_job
         
         mock_invoice_service.get_invoice_by_id.return_value = mock_invoice
         mock_invoice_service.update_invoice.return_value = None
         
-        mock_current_app.services.get.return_value = mock_invoice_service
+        # Create a mock services object with a regular Mock get method
+        mock_services = Mock()
+        mock_services.get = Mock(return_value=mock_invoice_service)
+        mock_current_app.services = mock_services
         
         # Make request
         response = authenticated_client.post('/invoices/1/edit', data={
@@ -166,7 +206,7 @@ class TestInvoiceRoutesServiceRegistry:
         }, follow_redirects=True)
         
         # Verify service registry was called
-        mock_current_app.services.get.assert_any_call('invoice')
+        mock_services.get.assert_any_call('invoice')
         mock_invoice_service.get_invoice_by_id.assert_called_with(1)
         mock_invoice_service.update_invoice.assert_called_once()
         assert response.status_code == 200
@@ -177,17 +217,22 @@ class TestInvoiceRoutesServiceRegistry:
         # Setup mock services
         mock_invoice_service = Mock()
         mock_invoice = Mock()
+        mock_invoice.id = 1  # Add id for redirect after delete
         
         mock_invoice_service.get_invoice_by_id.return_value = mock_invoice
         mock_invoice_service.delete_invoice.return_value = None
+        mock_invoice_service.get_all_invoices.return_value = []  # For redirect to list_all
         
-        mock_current_app.services.get.return_value = mock_invoice_service
+        # Create a mock services object with a regular Mock get method
+        mock_services = Mock()
+        mock_services.get = Mock(return_value=mock_invoice_service)
+        mock_current_app.services = mock_services
         
         # Make request
         response = authenticated_client.post('/invoices/1/delete', follow_redirects=True)
         
         # Verify service registry was called
-        mock_current_app.services.get.assert_called_with('invoice')
+        mock_services.get.assert_called_with('invoice')
         mock_invoice_service.get_invoice_by_id.assert_called_once_with(1)
         mock_invoice_service.delete_invoice.assert_called_once_with(mock_invoice)
         assert response.status_code == 200

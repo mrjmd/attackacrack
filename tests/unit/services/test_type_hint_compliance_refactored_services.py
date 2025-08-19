@@ -232,16 +232,17 @@ class TestCampaignServiceTypeHints:
             template_a='Hello {first_name}'
         )
         
-        # Assert - should return Dict[str, Any], not Campaign model
-        assert isinstance(result, dict), f"Expected dict, got {type(result)}"
-        assert 'id' in result
-        assert 'name' in result
-        assert result['name'] == 'Test Campaign'
-        assert result['campaign_type'] == 'blast'
+        # Assert - should return Result[Dict[str, Any]], not Result[Campaign]
+        assert result.is_success, f"Expected success, got: {result.error if not result.is_success else 'N/A'}"
+        assert isinstance(result.data, dict), f"Expected dict, got {type(result.data)}"
+        assert 'id' in result.data
+        assert 'name' in result.data
+        assert result.data['name'] == 'Test Campaign'
+        assert result.data['campaign_type'] == 'blast'
         
         # Verify the data structure matches expected dictionary format
         expected_keys = {'id', 'name', 'campaign_type', 'status', 'template_a', 'daily_limit', 'created_at'}
-        actual_keys = set(result.keys())
+        actual_keys = set(result.data.keys())
         assert expected_keys.issubset(actual_keys), f"Missing keys: {expected_keys - actual_keys}"
     
     def test_get_by_id_returns_dict_or_none(self, service, mock_campaign_repository):

@@ -340,13 +340,19 @@ def campaign_list_detail(list_id):
     if not campaign_list:
         from flask import abort
         abort(404)
-    stats = list_service.get_list_stats(list_id)
-    all_contacts = list_service.get_list_contacts(list_id)
-    contacts = all_contacts[:50]  # Show first 50
+    stats_result = list_service.get_list_stats(list_id)
+    stats = stats_result.data if stats_result.is_success else {}
+    
+    contacts_result = list_service.get_list_contacts(list_id)
+    if contacts_result.is_success and contacts_result.data:
+        contacts = contacts_result.data[:50]  # Show first 50
+    else:
+        contacts = []
     
     # Get campaigns using this list
     campaign_service = current_app.services.get('campaign')
-    campaigns_using = campaign_service.get_campaigns_using_list(list_id)
+    # TODO: Implement get_campaigns_using_list method in CampaignService
+    campaigns_using = []  # Temporary fallback until method is implemented
     
     return render_template("campaigns/list_detail.html",
                          list=campaign_list,

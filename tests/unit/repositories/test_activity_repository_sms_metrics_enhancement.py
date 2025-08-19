@@ -265,7 +265,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
         updated_count = repository.bulk_update_activities_status(
             activity_ids=activity_ids,
             status='processed',
-            activity_metadata={'processed_at': datetime.utcnow().isoformat()}
+            metadata={'processed_at': datetime.utcnow().isoformat()}
         )
         
         # Should return count of updated activities

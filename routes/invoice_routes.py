@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, current_app, abort
 from flask_login import login_required
 from datetime import datetime
 
@@ -16,6 +16,9 @@ def list_all():
 def invoice_detail(invoice_id):
     invoice_service = current_app.services.get('invoice')
     invoice = invoice_service.get_invoice_by_id(invoice_id)
+    if invoice is None:
+        # Handle non-existent invoice
+        abort(404)
     return render_template('invoice_detail.html', invoice=invoice)
 
 @invoice_bp.route('/add', methods=['GET', 'POST'])
@@ -39,6 +42,9 @@ def add_invoice():
 def edit_invoice(invoice_id):
     invoice_service = current_app.services.get('invoice')
     invoice = invoice_service.get_invoice_by_id(invoice_id)
+    if invoice is None:
+        # Handle non-existent invoice
+        abort(404)
     if request.method == 'POST':
         invoice_service.update_invoice(
             invoice,
@@ -57,5 +63,8 @@ def edit_invoice(invoice_id):
 def delete_invoice(invoice_id):
     invoice_service = current_app.services.get('invoice')
     invoice = invoice_service.get_invoice_by_id(invoice_id)
+    if invoice is None:
+        # Handle non-existent invoice - redirect to list
+        return redirect(url_for('invoice.list_all'))
     invoice_service.delete_invoice(invoice)
     return redirect(url_for('invoice.list_all'))

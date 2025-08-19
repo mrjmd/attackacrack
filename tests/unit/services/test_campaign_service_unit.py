@@ -662,7 +662,23 @@ class TestCampaignServiceUnit:
         
         # Assert
         assert result is True
-        assert campaign.status == 'active'
+        assert campaign.status == 'running'  # Updated to match system-wide 'running' status
+        mock_campaign_repository.commit.assert_called_once()
+    
+    def test_start_campaign_success(self, campaign_service, mock_campaign_repository):
+        """Test start_campaign method as alias for activate_campaign"""
+        # Arrange
+        campaign_id = 1
+        campaign = Mock(spec=Campaign)
+        campaign.status = 'draft'
+        mock_campaign_repository.get_by_id.return_value = campaign
+        
+        # Act
+        result = campaign_service.start_campaign(campaign_id)
+        
+        # Assert
+        assert result is True
+        assert campaign.status == 'running'
         mock_campaign_repository.commit.assert_called_once()
     
     def test_activate_campaign_not_found(self, campaign_service, mock_campaign_repository):
@@ -694,11 +710,11 @@ class TestCampaignServiceUnit:
         mock_campaign_repository.commit.assert_not_called()
     
     def test_pause_campaign_success(self, campaign_service, mock_campaign_repository):
-        """Test successfully pausing an active campaign"""
+        """Test successfully pausing a running campaign"""
         # Arrange
         campaign_id = 1
         campaign = Mock(spec=Campaign)
-        campaign.status = 'active'
+        campaign.status = 'running'  # Updated to use 'running' status
         mock_campaign_repository.get_by_id.return_value = campaign
         
         # Act
@@ -729,7 +745,7 @@ class TestCampaignServiceUnit:
         # Arrange
         campaign_id = 1
         campaign = Mock(spec=Campaign)
-        campaign.status = 'active'
+        campaign.status = 'running'  # Updated to use 'running' status
         mock_campaign_repository.get_by_id.return_value = campaign
         
         # Act

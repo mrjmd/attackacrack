@@ -486,8 +486,11 @@ class TestCallWebhooks:
         
         result = service._handle_call_webhook(webhook_data)
         
-        assert result.is_failure
-        assert 'No participants in call data' in result.error
+        # Should skip gracefully rather than fail
+        assert result.is_success
+        assert result.data['status'] == 'skipped'
+        assert result.data['reason'] == 'call_status_without_existing_activity'
+        assert result.data['call_id'] == 'call_123'
     
     def test_call_webhook_cannot_determine_contact_phone(self):
         """Test call webhook when contact phone cannot be determined"""

@@ -567,13 +567,21 @@ class ActivityRepository(BaseRepository):
         if not activity_ids:
             return 0
         
-        update_data = {'status': status, 'updated_at': datetime.utcnow()}
-        if metadata:
-            update_data['metadata'] = metadata
-        
-        count = self.session.query(self.model_class).filter(
-            self.model_class.id.in_(activity_ids)
-        ).update(update_data, synchronize_session=False)
+        # Update each activity individually to properly handle metadata merging
+        count = 0
+        for activity_id in activity_ids:
+            activity = self.get_by_id(activity_id)
+            if activity:
+                activity.status = status
+                activity.updated_at = datetime.utcnow()
+                
+                if metadata:
+                    if activity.activity_metadata:
+                        activity.activity_metadata.update(metadata)
+                    else:
+                        activity.activity_metadata = metadata
+                
+                count += 1
         
         self.session.flush()
         return count

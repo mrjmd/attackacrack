@@ -334,7 +334,7 @@ class TestAuthService:
         updated_user.is_active = False
         
         mock_user_repository.get_by_id.return_value = mock_user
-        mock_user_repository.update.return_value = updated_user
+        mock_user_repository.update_by_id.return_value = updated_user
         mock_user_repository.commit = Mock()
         
         # Toggle status (deactivate)
@@ -342,7 +342,7 @@ class TestAuthService:
         
         assert result.is_success
         # Verify repository update was called with correct parameters
-        mock_user_repository.update.assert_called_with(mock_user.id, is_active=False)
+        mock_user_repository.update_by_id.assert_called_with(mock_user.id, is_active=False)
 
 
 class TestAuthServiceAppInit:

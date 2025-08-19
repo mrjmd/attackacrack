@@ -346,6 +346,8 @@ class TestMessageWebhooksWithRepositories:
             'data': {
                 'object': {
                     'id': 'msg_123',
+                    'from': '+15555551234',
+                    'direction': 'incoming',
                     'text': 'Check out these photos',
                     'media': [
                         {'url': 'https://example.com/photo1.jpg', 'type': 'image/jpeg'},

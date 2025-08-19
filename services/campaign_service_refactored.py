@@ -128,7 +128,10 @@ class CampaignService:
         )
         
         self.campaign_repository.commit()
-        logger.info(f"Created campaign: {campaign.id} - {name}")
+        
+        # Handle both dict and object returns from repository
+        campaign_id = campaign['id'] if isinstance(campaign, dict) else campaign.id
+        logger.info(f"Created campaign: {campaign_id} - {name}")
         
         return Result.success(campaign)
     
@@ -469,6 +472,18 @@ class CampaignService:
             'results': results
         }
     
+    def start_campaign(self, campaign_id: int) -> bool:
+        """
+        Start a campaign (alias for activate_campaign with running status).
+        
+        Args:
+            campaign_id: Campaign ID
+            
+        Returns:
+            True if started
+        """
+        return self.activate_campaign(campaign_id)
+    
     def activate_campaign(self, campaign_id: int) -> bool:
         """
         Activate a campaign for sending.
@@ -484,16 +499,16 @@ class CampaignService:
             return False
         
         if campaign.status == 'draft':
-            campaign.status = 'active'
+            campaign.status = 'running'
             self.campaign_repository.commit()
-            logger.info(f"Activated campaign {campaign_id}")
+            logger.info(f"Started campaign {campaign_id}")
             return True
         
         return False
     
     def pause_campaign(self, campaign_id: int) -> bool:
         """
-        Pause an active campaign.
+        Pause a running campaign.
         
         Args:
             campaign_id: Campaign ID
@@ -505,7 +520,7 @@ class CampaignService:
         if not campaign:
             return False
         
-        if campaign.status == 'active':
+        if campaign.status == 'running':
             campaign.status = 'paused'
             self.campaign_repository.commit()
             logger.info(f"Paused campaign {campaign_id}")

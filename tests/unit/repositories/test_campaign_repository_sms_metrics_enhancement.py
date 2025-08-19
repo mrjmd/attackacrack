@@ -183,10 +183,10 @@ class TestCampaignRepositorySMSMetricsEnhancement:
         # Should update membership with bounce information
         assert result is not None
         assert result.status == 'failed'
-        assert result.metadata is not None
-        assert 'bounce_info' in result.metadata
+        assert result.membership_metadata is not None
+        assert 'bounce_info' in result.membership_metadata
         
-        stored_bounce = result.metadata['bounce_info']
+        stored_bounce = result.membership_metadata['bounce_info']
         assert stored_bounce['bounce_type'] == 'hard'
         assert stored_bounce['bounce_reason'] == 'invalid_number'
     
@@ -282,8 +282,8 @@ class TestCampaignRepositorySMSMetricsEnhancement:
             # Use a separate query to avoid session cache
             membership = repository.session.query(CampaignMembership).get(membership_id)
             assert membership.status == 'processed'
-            assert membership.metadata is not None
-            assert 'processed_at' in membership.metadata
+            assert membership.membership_metadata is not None
+            assert 'processed_at' in membership.membership_metadata
     
     def test_calculate_campaign_roi_metrics(self, repository, sample_campaign_with_memberships):
         """Test calculating campaign ROI and effectiveness metrics - MUST FAIL initially"""
