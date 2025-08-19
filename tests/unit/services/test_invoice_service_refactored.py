@@ -33,6 +33,16 @@ class TestInvoiceServiceRefactored:
     @pytest.fixture
     def service(self, mock_invoice_repository, mock_quote_repository):
         """Create InvoiceService instance with mocked repositories"""
+        # Add required methods to mocks
+        mock_invoice_repository.get_all = Mock()
+        mock_invoice_repository.get_by_id = Mock()
+        mock_invoice_repository.create = Mock()
+        mock_invoice_repository.update = Mock()
+        mock_invoice_repository.delete = Mock()
+        
+        mock_quote_repository.get_by_id = Mock()
+        mock_quote_repository.update = Mock()
+        
         return InvoiceServiceRefactored(
             invoice_repository=mock_invoice_repository,
             quote_repository=mock_quote_repository
@@ -90,7 +100,7 @@ class TestInvoiceServiceRefactored:
         mock_invoice_repository.get_all.return_value = invoices
         
         # Act
-        result = service.get_all_invoices()
+        result = service.get_all_invoices_result()
         
         # Assert
         assert result.is_success
@@ -103,7 +113,7 @@ class TestInvoiceServiceRefactored:
         mock_invoice_repository.get_all.return_value = []
         
         # Act
-        result = service.get_all_invoices()
+        result = service.get_all_invoices_result()
         
         # Assert
         assert result.is_success
@@ -116,7 +126,7 @@ class TestInvoiceServiceRefactored:
         mock_invoice_repository.get_all.side_effect = Exception("Database error")
         
         # Act
-        result = service.get_all_invoices()
+        result = service.get_all_invoices_result()
         
         # Assert
         assert result.is_failure
@@ -132,7 +142,7 @@ class TestInvoiceServiceRefactored:
         mock_invoice_repository.get_by_id.return_value = sample_invoice
         
         # Act
-        result = service.get_invoice_by_id(invoice_id)
+        result = service.get_invoice_by_id_result(invoice_id)
         
         # Assert
         assert result.is_success
@@ -146,7 +156,7 @@ class TestInvoiceServiceRefactored:
         mock_invoice_repository.get_by_id.return_value = None
         
         # Act
-        result = service.get_invoice_by_id(invoice_id)
+        result = service.get_invoice_by_id_result(invoice_id)
         
         # Assert
         assert result.is_failure
@@ -156,7 +166,7 @@ class TestInvoiceServiceRefactored:
     def test_get_invoice_by_id_invalid_id(self, service):
         """Test with invalid invoice ID"""
         # Act
-        result = service.get_invoice_by_id(None)
+        result = service.get_invoice_by_id_result(None)
         
         # Assert
         assert result.is_failure
@@ -170,7 +180,7 @@ class TestInvoiceServiceRefactored:
         mock_invoice_repository.get_by_id.side_effect = Exception("Database error")
         
         # Act
-        result = service.get_invoice_by_id(invoice_id)
+        result = service.get_invoice_by_id_result(invoice_id)
         
         # Assert
         assert result.is_failure
@@ -569,12 +579,20 @@ class TestInvoiceServiceRefactored:
         expected_balance = sample_invoice.total_amount - Decimal('500.00')
         assert update_dict['balance_due'] == expected_balance
     
-    def test_service_initialization_with_defaults(self):
-        """Test service initialization uses defaults when repositories not provided"""
-        # Act
-        service = InvoiceServiceRefactored()
+    def test_service_initialization_requires_dependencies(self):
+        """Test service initialization requires repository dependencies"""
+        # Act & Assert - Service should raise ValueError without repositories
+        with pytest.raises(ValueError, match="Invoice and Quote repositories must be provided"):
+            InvoiceServiceRefactored()
         
-        # Assert
-        assert service.invoice_repository is not None
-        assert service.quote_repository is not None
+        # Test with proper dependencies
+        mock_invoice_repo = Mock(spec=InvoiceRepository)
+        mock_quote_repo = Mock(spec=QuoteRepository)
+        service = InvoiceServiceRefactored(
+            invoice_repository=mock_invoice_repo,
+            quote_repository=mock_quote_repo
+        )
+        
+        assert service.invoice_repository is mock_invoice_repo
+        assert service.quote_repository is mock_quote_repo
         assert hasattr(service, 'logger')

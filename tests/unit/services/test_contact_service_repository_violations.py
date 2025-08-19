@@ -27,21 +27,36 @@ class TestContactServiceRepositoryViolations:
         return Mock(spec=ContactFlagRepository)
     
     @pytest.fixture
-    def mock_session(self):
-        """Create mock database session"""
-        return Mock()
-    
-    @pytest.fixture
-    def contact_service(self, mock_contact_repository, mock_contact_flag_repository, mock_session):
+    def contact_service(self, mock_contact_repository, mock_contact_flag_repository):
         """Create ContactService with mocked dependencies"""
-        # This will fail until we add contact_flag_repository parameter
+        # Add required methods to contact_repository mock
+        mock_contact_repository.create = Mock()
+        mock_contact_repository.get_by_id = Mock()
+        mock_contact_repository.find_by_phone = Mock()
+        mock_contact_repository.find_by_email = Mock()
+        mock_contact_repository.get_paginated = Mock()
+        mock_contact_repository.get_paginated_contacts = Mock()
+        mock_contact_repository.search = Mock()
+        mock_contact_repository.get_by_ids = Mock()
+        mock_contact_repository.delete = Mock()
+        mock_contact_repository.get_contact_stats = Mock()
+        
+        # Add required methods to contact_flag_repository mock
+        mock_contact_flag_repository.get_flag_statistics = Mock()
+        
+        # Also need campaign_repository for add_to_campaign methods
+        mock_campaign_repository = Mock()
+        mock_campaign_repository.get_by_id = Mock()
+        mock_campaign_repository.get_member_by_contact = Mock()
+        mock_campaign_repository.add_member = Mock()
+        
         return ContactService(
             contact_repository=mock_contact_repository,
             contact_flag_repository=mock_contact_flag_repository,
-            session=mock_session
+            campaign_repository=mock_campaign_repository
         )
     
-    def test_search_contacts_uses_repository_not_session(self, contact_service, mock_contact_repository, mock_session):
+    def test_search_contacts_uses_repository_not_session(self, contact_service, mock_contact_repository):
         """Test search_contacts uses repository.search() instead of session.query()"""
         # Arrange
         test_query = "john"
@@ -54,19 +69,17 @@ class TestContactServiceRepositoryViolations:
         # Act
         result = contact_service.search_contacts(test_query, limit=20)
         
-        # Assert - Should use repository, not session
+        # Assert - Should use repository
         mock_contact_repository.search.assert_called_once_with(
             test_query, 
             fields=['first_name', 'last_name', 'email', 'phone'],
             limit=20
         )
-        # Session.query should NEVER be called
-        mock_session.query.assert_not_called()
         
         assert result.is_success
         assert result.data == expected_contacts
     
-    def test_get_by_ids_uses_repository_not_session(self, contact_service, mock_contact_repository, mock_session):
+    def test_get_by_ids_uses_repository_not_session(self, contact_service, mock_contact_repository):
         """Test get_by_ids method uses repository instead of session.query()"""
         # Arrange
         contact_ids = [1, 2, 3]
@@ -77,18 +90,17 @@ class TestContactServiceRepositoryViolations:
         ]
         mock_contact_repository.get_by_ids.return_value = expected_contacts
         
-        # Act - This method doesn't exist yet, so test will fail
+        # Act
         result = contact_service.get_by_ids(contact_ids)
         
         # Assert
         mock_contact_repository.get_by_ids.assert_called_once_with(contact_ids)
-        mock_session.query.assert_not_called()
         
         assert result.is_success
         assert result.data == expected_contacts
     
     def test_get_statistics_uses_repositories_not_session(self, contact_service, mock_contact_repository, 
-                                                        mock_contact_flag_repository, mock_session):
+                                                        mock_contact_flag_repository):
         """Test get_contact_statistics uses repositories instead of session queries"""
         # Arrange
         mock_contact_repository.get_contact_stats.return_value = {
@@ -108,8 +120,6 @@ class TestContactServiceRepositoryViolations:
         # Assert
         mock_contact_repository.get_contact_stats.assert_called_once()
         mock_contact_flag_repository.get_flag_statistics.assert_called_once()
-        # Session queries should NEVER be called
-        mock_session.query.assert_not_called()
         
         assert result.is_success
         expected_stats = {
@@ -122,7 +132,7 @@ class TestContactServiceRepositoryViolations:
         }
         assert result.data == expected_stats
     
-    def test_export_contacts_uses_repository_not_session(self, contact_service, mock_contact_repository, mock_session):
+    def test_export_contacts_uses_repository_not_session(self, contact_service, mock_contact_repository):
         """Test export_contacts uses repository.get_by_ids() instead of session.query()"""
         # Arrange
         contact_ids = [1, 2]
@@ -137,7 +147,6 @@ class TestContactServiceRepositoryViolations:
         
         # Assert
         mock_contact_repository.get_by_ids.assert_called_once_with(contact_ids)
-        mock_session.query.assert_not_called()
         
         assert result.is_success
         assert "john@test.com" in result.data

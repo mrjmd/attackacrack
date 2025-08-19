@@ -123,7 +123,7 @@ class CampaignService:
         )
         
         self.campaign_repository.commit()
-        logger.info(f"Created campaign: {campaign.id} - {name}")
+        logger.info(f"Created campaign: {campaign.get('id')} - {name}")
         
         return campaign
     
@@ -143,7 +143,7 @@ class CampaignService:
         
         # Get all active contacts from the list
         contacts = self.list_service.get_list_contacts(list_id)
-        contact_ids = [c.id for c in contacts]
+        contact_ids = [c.get('id') for c in contacts]
         
         # Add contacts to campaign
         added = self.campaign_repository.add_members_bulk(campaign_id, contact_ids)
@@ -174,7 +174,7 @@ class CampaignService:
         
         # Get contacts based on filters
         contacts = self._get_filtered_contacts(contact_filters)
-        contact_ids = [c.id for c in contacts]
+        contact_ids = [c.get('id') for c in contacts]
         
         # Add to campaign
         added = self.campaign_repository.add_members_bulk(campaign_id, contact_ids)
@@ -202,31 +202,31 @@ class CampaignService:
             # Get all contacts and filter in memory for complex logic
             contacts = self.contact_repository.get_all()
             # Only contacts with real names (not phone numbers)
-            contacts = [c for c in contacts if not (c.first_name and c.first_name.startswith('+1'))]
+            contacts = [c for c in contacts if not (c.get('first_name') and c.get('first_name', '').startswith('+1'))]
         else:
             contacts = self.contact_repository.get_all()
         
         if filters.get('has_email'):
-            contacts = [c for c in contacts if c.email]
+            contacts = [c for c in contacts if c.get('email')]
         
         if filters.get('exclude_office_numbers'):
             # Exclude contacts flagged as office numbers
             office_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('office_number')
-            contacts = [c for c in contacts if c.id not in office_ids]
+            contacts = [c for c in contacts if c.get('id') not in office_ids]
         
         if filters.get('exclude_opted_out'):
             opted_out_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('opted_out')
-            contacts = [c for c in contacts if c.id not in opted_out_ids]
+            contacts = [c for c in contacts if c.get('id') not in opted_out_ids]
         
         if filters.get('exclude_do_not_contact'):
             # Exclude contacts flagged as do not contact
             do_not_contact_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('do_not_contact')
-            contacts = [c for c in contacts if c.id not in do_not_contact_ids]
+            contacts = [c for c in contacts if c.get('id') not in do_not_contact_ids]
         
         if filters.get('exclude_recently_contacted'):
             # Exclude contacts that were recently texted
             recently_contacted_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('recently_texted')
-            contacts = [c for c in contacts if c.id not in recently_contacted_ids]
+            contacts = [c for c in contacts if c.get('id') not in recently_contacted_ids]
         
         if filters.get('exclude_current_campaign'):
             # Exclude contacts already in any active campaign
@@ -234,7 +234,7 @@ class CampaignService:
             for active_campaign in active_campaigns:
                 members = self.campaign_repository.get_campaign_members(active_campaign.id)
                 member_ids = {m.contact_id for m in members.items}
-                contacts = [c for c in contacts if c.id not in member_ids]
+                contacts = [c for c in contacts if c.get('id') not in member_ids]
         
         return contacts
     
@@ -531,7 +531,7 @@ class CampaignService:
         """
         cloned = self.campaign_repository.clone_campaign(campaign_id, new_name)
         self.campaign_repository.commit()
-        logger.info(f"Cloned campaign {campaign_id} as {cloned.id}")
+        logger.info(f"Cloned campaign {campaign_id} as {cloned.get('id')}")
         return cloned
     
     def get_campaign_timeline(self, campaign_id: int) -> List[Dict]:

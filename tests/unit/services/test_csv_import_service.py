@@ -39,9 +39,103 @@ def mock_contact_service():
 
 
 @pytest.fixture
-def csv_import_service(mock_contact_service):
+def csv_file_mock_helper():
+    """Helper to create proper CSV file mocks for tests"""
+    def _create_csv_mock(csv_content):
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        return mock_open_handler
+    return _create_csv_mock
+
+
+@pytest.fixture
+def mock_csv_import_repository():
+    """Mock CSV Import Repository"""
+    from repositories.csv_import_repository import CSVImportRepository
+    return Mock(spec=CSVImportRepository)
+
+
+@pytest.fixture
+def mock_contact_csv_import_repository():
+    """Mock Contact CSV Import Repository"""
+    from repositories.contact_csv_import_repository import ContactCSVImportRepository
+    return Mock(spec=ContactCSVImportRepository)
+
+
+@pytest.fixture
+def mock_campaign_list_repository():
+    """Mock Campaign List Repository"""
+    from repositories.campaign_list_repository import CampaignListRepository
+    return Mock(spec=CampaignListRepository)
+
+
+@pytest.fixture
+def mock_campaign_list_member_repository():
+    """Mock Campaign List Member Repository"""
+    from repositories.campaign_list_member_repository import CampaignListMemberRepository
+    return Mock(spec=CampaignListMemberRepository)
+
+
+@pytest.fixture
+def mock_contact_repository():
+    """Mock Contact Repository"""
+    from repositories.contact_repository import ContactRepository
+    return Mock(spec=ContactRepository)
+
+
+@pytest.fixture
+def csv_import_service(mock_csv_import_repository, mock_contact_csv_import_repository, 
+                      mock_campaign_list_repository, mock_campaign_list_member_repository,
+                      mock_contact_repository, mock_contact_service):
     """Factory fixture providing CSVImportService instance with mocked dependencies"""
-    return CSVImportService(contact_service=mock_contact_service)
+    # Configure mock return values for common operations
+    
+    # Mock CSVImport creation
+    mock_csv_import = Mock()
+    mock_csv_import.id = 1
+    mock_csv_import_repository.create.return_value = mock_csv_import
+    
+    # Mock CampaignList creation
+    mock_campaign_list = Mock()
+    mock_campaign_list.id = 1
+    mock_campaign_list_repository.create.return_value = mock_campaign_list
+    
+    # Mock Contact operations - by default no existing contacts (find_by_phone returns None)
+    mock_contact_repository.find_by_phone.return_value = None
+    
+    # Mock Contact creation - return a different contact for each call
+    def create_contact(**kwargs):
+        contact = Mock()
+        contact.id = kwargs.get('phone', 'default')  # Use phone as ID for uniqueness
+        contact.phone = kwargs.get('phone')
+        contact.first_name = kwargs.get('first_name', '')
+        contact.last_name = kwargs.get('last_name', '')
+        contact.email = kwargs.get('email')
+        contact.contact_metadata = kwargs.get('contact_metadata', {})
+        return contact
+    mock_contact_repository.create.side_effect = create_contact
+    
+    # Mock ContactCSVImport operations
+    mock_contact_csv_import_repository.exists_for_contact_and_import.return_value = False
+    mock_contact_csv_import = Mock()
+    mock_contact_csv_import_repository.create.return_value = mock_contact_csv_import
+    
+    # Mock CampaignListMember operations
+    mock_campaign_list_member_repository.find_by_list_and_contact.return_value = None
+    mock_campaign_list_member = Mock()
+    mock_campaign_list_member_repository.create.return_value = mock_campaign_list_member
+    
+    return CSVImportService(
+        csv_import_repository=mock_csv_import_repository,
+        contact_csv_import_repository=mock_contact_csv_import_repository,
+        campaign_list_repository=mock_campaign_list_repository,
+        campaign_list_member_repository=mock_campaign_list_member_repository,
+        contact_repository=mock_contact_repository,
+        contact_service=mock_contact_service
+    )
 
 
 @pytest.fixture
@@ -409,10 +503,9 @@ class TestPhoneNormalization:
 class TestImportContacts:
     """Test main import functionality"""
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_successful_standard_format(self, mock_remove, mock_exists, mock_db, 
+    def test_import_contacts_successful_standard_format(self, mock_remove, mock_exists, 
                                                        csv_import_service, mock_file_storage):
         """Test successful import of contacts in standard CSV format"""
         # Arrange
@@ -420,7 +513,14 @@ class TestImportContacts:
         mock_file = mock_file_storage('test.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return mock_open()()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(
                 file=mock_file,
@@ -439,10 +539,9 @@ class TestImportContacts:
         assert 'list_id' in result
         mock_remove.assert_called_once()
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_handles_duplicate_phones(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_handles_duplicate_phones(self, mock_remove, mock_exists,
                                                      csv_import_service, mock_file_storage):
         """Test import handling of duplicate phone numbers"""
         # Arrange
@@ -458,10 +557,17 @@ class TestImportContacts:
         existing_contact.email = 'john@example.com'
         existing_contact.contact_metadata = {}
         
-        with patch('builtins.open', mock_open(read_data=csv_content)), \
-             patch('services.csv_import_service.Contact') as mock_contact_class:
-            mock_contact_class.query.filter_by.return_value.first.return_value = existing_contact
-            
+        # Configure the contact repository to return existing contact for this phone
+        csv_import_service.contact_repository.find_by_phone.return_value = existing_contact
+        
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(
                 file=mock_file,
@@ -475,10 +581,9 @@ class TestImportContacts:
         assert result['duplicates'] == 1
         assert result['failed'] == 0
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists') 
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_skips_rows_without_phone(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_skips_rows_without_phone(self, mock_remove, mock_exists,
                                                      csv_import_service, mock_file_storage):
         """Test that rows without phone numbers are skipped with error"""
         # Arrange
@@ -486,7 +591,14 @@ class TestImportContacts:
         mock_file = mock_file_storage('test.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         
@@ -497,10 +609,9 @@ class TestImportContacts:
         assert len(result['errors']) == 1
         assert 'Row 2: Missing phone number' in result['errors'][0]
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_skips_invalid_phone_format(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_skips_invalid_phone_format(self, mock_remove, mock_exists,
                                                        csv_import_service, mock_file_storage):
         """Test that rows with invalid phone formats are skipped"""
         # Arrange
@@ -508,7 +619,14 @@ class TestImportContacts:
         mock_file = mock_file_storage('test.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         
@@ -518,8 +636,7 @@ class TestImportContacts:
         assert result['failed'] == 1
         assert any('Invalid phone number format' in error for error in result['errors'])
     
-    @patch('services.csv_import_service.db')
-    def test_import_contacts_handles_file_processing_error(self, mock_db, csv_import_service, mock_file_storage):
+    def test_import_contacts_handles_file_processing_error(self, csv_import_service, mock_file_storage):
         """Test handling of file processing errors"""
         # Arrange
         mock_file = mock_file_storage('test.csv')
@@ -537,10 +654,9 @@ class TestImportContacts:
         assert len(result['errors']) > 0
         assert any('File processing error' in error for error in result['errors'])
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_unknown_format_fallback(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_unknown_format_fallback(self, mock_remove, mock_exists,
                                                     csv_import_service, mock_file_storage):
         """Test fallback behavior when CSV format cannot be detected"""
         # Arrange
@@ -548,7 +664,14 @@ class TestImportContacts:
         mock_file = mock_file_storage('unknown.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act  
             result = csv_import_service.import_contacts(file=mock_file)
         
@@ -559,10 +682,9 @@ class TestImportContacts:
         assert len(result['errors']) > 0
         assert any('Could not detect CSV format' in error for error in result['errors'])
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_creates_campaign_list_when_requested(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_creates_campaign_list_when_requested(self, mock_remove, mock_exists,
                                                                  csv_import_service, mock_file_storage):
         """Test that campaign list is created when create_list=True"""
         # Arrange
@@ -570,7 +692,14 @@ class TestImportContacts:
         mock_file = mock_file_storage('test.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(
                 file=mock_file,
@@ -582,10 +711,9 @@ class TestImportContacts:
         assert 'list_id' in result
         assert result['list_id'] is not None
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_skips_campaign_list_when_not_requested(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_skips_campaign_list_when_not_requested(self, mock_remove, mock_exists,
                                                                    csv_import_service, mock_file_storage):
         """Test that no campaign list is created when create_list=False"""
         # Arrange
@@ -603,10 +731,9 @@ class TestImportContacts:
         # Assert
         assert result['list_id'] is None
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_handles_database_commit_errors(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_handles_database_commit_errors(self, mock_remove, mock_exists,
                                                            csv_import_service, mock_file_storage):
         """Test handling of database commit errors during import"""
         # Arrange
@@ -614,21 +741,27 @@ class TestImportContacts:
         mock_file = mock_file_storage('test.csv', csv_content)
         mock_exists.return_value = True
         
-        # Mock database session to raise commit error
-        mock_db.session.commit.side_effect = Exception("Database commit failed")
+        # Mock repository to raise commit error by making contact creation fail
+        csv_import_service.contact_repository.create.side_effect = Exception("Database commit failed")
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         
         # Assert
         assert len(result['errors']) > 0
-        assert any('commit error' in error.lower() for error in result['errors'])
+        assert any('database commit failed' in error.lower() for error in result['errors'])
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_contacts_detects_delimiter_automatically(self, mock_remove, mock_exists, mock_db,
+    def test_import_contacts_detects_delimiter_automatically(self, mock_remove, mock_exists,
                                                            csv_import_service, mock_file_storage):
         """Test that CSV delimiter is detected automatically"""
         # Arrange - Use semicolon delimiter
@@ -636,7 +769,14 @@ class TestImportContacts:
         mock_file = mock_file_storage('test.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         
@@ -777,63 +917,64 @@ class TestMetadataExtraction:
 class TestImportHistory:
     """Test import history functionality"""
     
-    @patch('services.csv_import_service.CSVImport')
-    def test_get_import_history_returns_recent_imports(self, mock_csv_import, csv_import_service):
+    # Removed CSVImport patch
+    def test_get_import_history_returns_recent_imports(self, csv_import_service):
         """Test that import history returns recent imports ordered by date"""
         # Arrange
         mock_imports = [
-            Mock(id=1, filename='import1.csv', imported_at=datetime(2025, 1, 15)),
-            Mock(id=2, filename='import2.csv', imported_at=datetime(2025, 1, 14)),
-            Mock(id=3, filename='import3.csv', imported_at=datetime(2025, 1, 13))
+            {'id': 1, 'filename': 'import1.csv', 'imported_at': datetime(2025, 1, 15)},
+            {'id': 2, 'filename': 'import2.csv', 'imported_at': datetime(2025, 1, 14)},
+            {'id': 3, 'filename': 'import3.csv', 'imported_at': datetime(2025, 1, 13)}
         ]
-        mock_csv_import.query.order_by.return_value.limit.return_value.all.return_value = mock_imports
+        csv_import_service.csv_import_repository.get_recent_imports.return_value = mock_imports
         
         # Act
         result = csv_import_service.get_import_history(limit=10)
         
         # Assert
         assert len(result) == 3
-        assert result[0].id == 1  # Most recent first
-        assert result[0].filename == 'import1.csv'
-        mock_csv_import.query.order_by.assert_called_once()
+        assert result[0]['id'] == 1  # Most recent first
+        assert result[0]['filename'] == 'import1.csv'
+        csv_import_service.csv_import_repository.get_recent_imports.assert_called_once_with(limit=10)
     
-    @patch('services.csv_import_service.CSVImport')
-    def test_get_import_history_respects_limit(self, mock_csv_import, csv_import_service):
+    # Removed CSVImport patch
+    def test_get_import_history_respects_limit(self, csv_import_service):
         """Test that import history respects the limit parameter"""
         # Arrange
-        mock_imports = [Mock(id=1), Mock(id=2)]
-        mock_csv_import.query.order_by.return_value.limit.return_value.all.return_value = mock_imports
+        mock_imports = [{'id': 1}, {'id': 2}]
+        csv_import_service.csv_import_repository.get_recent_imports.return_value = mock_imports
         
         # Act
         result = csv_import_service.get_import_history(limit=5)
         
         # Assert
-        mock_csv_import.query.order_by.return_value.limit.assert_called_with(5)
+        csv_import_service.csv_import_repository.get_recent_imports.assert_called_once_with(limit=5)
         assert len(result) == 2
     
-    @patch('services.csv_import_service.CSVImport')
-    def test_get_import_history_default_limit(self, mock_csv_import, csv_import_service):
+    # Removed CSVImport patch
+    def test_get_import_history_default_limit(self, csv_import_service):
         """Test that import history uses default limit of 10"""
         # Arrange
-        mock_csv_import.query.order_by.return_value.limit.return_value.all.return_value = []
+        csv_import_service.csv_import_repository.get_recent_imports.return_value = []
         
         # Act
         csv_import_service.get_import_history()
         
         # Assert
-        mock_csv_import.query.order_by.return_value.limit.assert_called_with(10)
+        csv_import_service.csv_import_repository.get_recent_imports.assert_called_once_with(limit=10)
     
-    @patch('services.csv_import_service.CSVImport')
-    def test_get_import_history_handles_empty_result(self, mock_csv_import, csv_import_service):
+    # Removed CSVImport patch
+    def test_get_import_history_handles_empty_result(self, csv_import_service):
         """Test that import history handles empty results gracefully"""
         # Arrange
-        mock_csv_import.query.order_by.return_value.limit.return_value.all.return_value = []
+        csv_import_service.csv_import_repository.get_recent_imports.return_value = []
         
         # Act
         result = csv_import_service.get_import_history()
         
         # Assert
         assert result == []
+        csv_import_service.csv_import_repository.get_recent_imports.assert_called_once_with(limit=10)
 
 
 # ============================================================================
@@ -843,53 +984,50 @@ class TestImportHistory:
 class TestGetContactsByImport:
     """Test getting contacts by import ID functionality"""
     
-    @patch('services.csv_import_service.CSVImport')
-    def test_get_contacts_by_import_returns_contacts(self, mock_csv_import, csv_import_service):
+    # Removed CSVImport patch
+    def test_get_contacts_by_import_returns_contacts(self, csv_import_service):
         """Test that get_contacts_by_import returns contacts for valid import ID"""
         # Arrange
         mock_contacts = [
-            Mock(id=1, first_name='John', last_name='Doe'),
-            Mock(id=2, first_name='Jane', last_name='Smith')
+            {'id': 1, 'first_name': 'John', 'last_name': 'Doe'},
+            {'id': 2, 'first_name': 'Jane', 'last_name': 'Smith'}
         ]
-        mock_import = Mock()
-        mock_import.contacts = mock_contacts
-        mock_csv_import.query.get.return_value = mock_import
+        csv_import_service.contact_csv_import_repository.get_contacts_by_import_with_details.return_value = [(contact, None) for contact in mock_contacts]
         
         # Act
         result = csv_import_service.get_contacts_by_import(import_id=1)
         
         # Assert
         assert len(result) == 2
-        assert result[0].first_name == 'John'
-        assert result[1].first_name == 'Jane'
-        mock_csv_import.query.get.assert_called_once_with(1)
+        assert result[0]['first_name'] == 'John'
+        assert result[1]['first_name'] == 'Jane'
+        csv_import_service.contact_csv_import_repository.get_contacts_by_import_with_details.assert_called_once_with(1)
     
-    @patch('services.csv_import_service.CSVImport')
-    def test_get_contacts_by_import_handles_invalid_id(self, mock_csv_import, csv_import_service):
+    # Removed CSVImport patch
+    def test_get_contacts_by_import_handles_invalid_id(self, csv_import_service):
         """Test that get_contacts_by_import handles invalid import ID"""
         # Arrange
-        mock_csv_import.query.get.return_value = None  # Import not found
+        csv_import_service.contact_csv_import_repository.get_contacts_by_import_with_details.return_value = []  # Import not found
         
         # Act
         result = csv_import_service.get_contacts_by_import(import_id=999)
         
         # Assert
         assert result == []
-        mock_csv_import.query.get.assert_called_once_with(999)
+        csv_import_service.contact_csv_import_repository.get_contacts_by_import_with_details.assert_called_once_with(999)
     
-    @patch('services.csv_import_service.CSVImport')
-    def test_get_contacts_by_import_handles_empty_contacts(self, mock_csv_import, csv_import_service):
+    # Removed CSVImport patch
+    def test_get_contacts_by_import_handles_empty_contacts(self, csv_import_service):
         """Test that get_contacts_by_import handles import with no contacts"""
         # Arrange
-        mock_import = Mock()
-        mock_import.contacts = []
-        mock_csv_import.query.get.return_value = mock_import
+        csv_import_service.contact_csv_import_repository.get_contacts_by_import_with_details.return_value = []  # Empty contacts
         
         # Act
         result = csv_import_service.get_contacts_by_import(import_id=1)
         
         # Assert
         assert result == []
+        csv_import_service.contact_csv_import_repository.get_contacts_by_import_with_details.assert_called_once_with(1)
 
 
 # ============================================================================
@@ -899,10 +1037,9 @@ class TestGetContactsByImport:
 class TestCSVImportServiceIntegration:
     """Integration tests combining multiple service methods"""
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_full_import_workflow_openphone_format(self, mock_remove, mock_exists, mock_db,
+    def test_full_import_workflow_openphone_format(self, mock_remove, mock_exists,
                                                   csv_import_service, mock_file_storage):
         """Test complete import workflow with OpenPhone format CSV"""
         # Arrange
@@ -913,7 +1050,14 @@ Jane,Smith,(555) 987-6543,jane@example.com,456 Oak Ave,Manager"""
         mock_file = mock_file_storage('openphone_export.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(
                 file=mock_file,
@@ -928,10 +1072,9 @@ Jane,Smith,(555) 987-6543,jane@example.com,456 Oak Ave,Manager"""
         assert result['failed'] == 0
         assert result['list_id'] is not None
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_full_import_workflow_propertyradar_format(self, mock_remove, mock_exists, mock_db,
+    def test_full_import_workflow_propertyradar_format(self, mock_remove, mock_exists,
                                                       csv_import_service, mock_file_storage):
         """Test complete import workflow with PropertyRadar format CSV"""
         # Arrange
@@ -942,7 +1085,14 @@ Alice,Brown,555.333.4444,alice@example.com,321 Elm St,Cambridge,02139"""
         mock_file = mock_file_storage('cleaned_data_phone.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(
                 file=mock_file,
@@ -954,13 +1104,27 @@ Alice,Brown,555.333.4444,alice@example.com,321 Elm St,Cambridge,02139"""
         assert result['successful'] == 2
         # Should extract property metadata
     
-    def test_service_initialization_with_contact_service(self, mock_contact_service):
-        """Test that service initializes properly with ContactService dependency"""
+    def test_service_initialization_with_contact_service(self, mock_contact_service,
+                                                           mock_csv_import_repository,
+                                                           mock_contact_csv_import_repository,
+                                                           mock_campaign_list_repository,
+                                                           mock_campaign_list_member_repository,
+                                                           mock_contact_repository):
+        """Test that service initializes properly with all required dependencies"""
         # Act
-        service = CSVImportService(contact_service=mock_contact_service)
+        service = CSVImportService(
+            csv_import_repository=mock_csv_import_repository,
+            contact_csv_import_repository=mock_contact_csv_import_repository,
+            campaign_list_repository=mock_campaign_list_repository,
+            campaign_list_member_repository=mock_campaign_list_member_repository,
+            contact_repository=mock_contact_repository,
+            contact_service=mock_contact_service
+        )
         
         # Assert
         assert service.contact_service == mock_contact_service
+        assert service.csv_import_repository == mock_csv_import_repository
+        assert service.contact_repository == mock_contact_repository
     
     def test_service_initialization_requires_contact_service(self):
         """Test that service requires ContactService dependency"""
@@ -976,8 +1140,7 @@ Alice,Brown,555.333.4444,alice@example.com,321 Elm St,Cambridge,02139"""
 class TestErrorHandling:
     """Test error handling scenarios"""
     
-    @patch('services.csv_import_service.db')
-    def test_import_handles_corrupted_csv_file(self, mock_db, csv_import_service, mock_file_storage):
+    def test_import_handles_corrupted_csv_file(self, csv_import_service, mock_file_storage):
         """Test handling of corrupted CSV files"""
         # Arrange
         mock_file = mock_file_storage('corrupted.csv')
@@ -991,9 +1154,8 @@ class TestErrorHandling:
         assert result['successful'] == 0
         assert len(result['errors']) > 0
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
-    def test_import_handles_file_not_found(self, mock_exists, mock_db, csv_import_service, mock_file_storage):
+    def test_import_handles_file_not_found(self, mock_exists, csv_import_service, mock_file_storage):
         """Test handling when saved file cannot be found"""
         # Arrange
         mock_file = mock_file_storage('missing.csv')
@@ -1007,10 +1169,9 @@ class TestErrorHandling:
         assert result['successful'] == 0
         assert len(result['errors']) > 0
     
-    @patch('services.csv_import_service.db')
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_handles_malformed_csv_rows(self, mock_remove, mock_exists, mock_db,
+    def test_import_handles_malformed_csv_rows(self, mock_remove, mock_exists,
                                               csv_import_service, mock_file_storage):
         """Test handling of malformed CSV rows"""
         # Arrange
@@ -1022,7 +1183,14 @@ Bob,Johnson,5559876543"""
         mock_file = mock_file_storage('malformed.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         
@@ -1031,8 +1199,7 @@ Bob,Johnson,5559876543"""
         assert result['failed'] > 0
         assert len(result['errors']) > 0
     
-    @patch('services.csv_import_service.db')
-    def test_import_handles_permission_denied_file_save(self, mock_db, csv_import_service, mock_file_storage):
+    def test_import_handles_permission_denied_file_save(self, csv_import_service, mock_file_storage):
         """Test handling of permission denied during file save"""
         # Arrange
         mock_file = mock_file_storage('test.csv')
@@ -1077,10 +1244,10 @@ class TestEdgeCases:
         # Assert
         assert result is None  # Should reject overly long numbers
     
-    @patch('services.csv_import_service.db')
+    # Removed db patch
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_with_extremely_large_csv(self, mock_remove, mock_exists, mock_db,
+    def test_import_with_extremely_large_csv(self, mock_remove, mock_exists,
                                            csv_import_service, mock_file_storage):
         """Test import performance with large CSV files"""
         # Arrange
@@ -1092,7 +1259,14 @@ class TestEdgeCases:
         mock_file = mock_file_storage('large.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         
@@ -1111,10 +1285,10 @@ class TestEdgeCases:
         # Assert
         assert result == '+15551234567'  # Should strip Unicode and normalize
     
-    @patch('services.csv_import_service.db')
+    # Removed db patch
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_csv_with_empty_file(self, mock_remove, mock_exists, mock_db,
+    def test_import_csv_with_empty_file(self, mock_remove, mock_exists,
                                        csv_import_service, mock_file_storage):
         """Test import of completely empty CSV file"""
         # Arrange
@@ -1122,7 +1296,14 @@ class TestEdgeCases:
         mock_file = mock_file_storage('empty.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         
@@ -1131,10 +1312,10 @@ class TestEdgeCases:
         assert result['successful'] == 0
         assert result['failed'] == 0
     
-    @patch('services.csv_import_service.db')
+    # Removed db patch
     @patch('services.csv_import_service.os.path.exists')
     @patch('services.csv_import_service.os.remove')
-    def test_import_csv_with_only_headers(self, mock_remove, mock_exists, mock_db,
+    def test_import_csv_with_only_headers(self, mock_remove, mock_exists,
                                          csv_import_service, mock_file_storage):
         """Test import of CSV file with only headers and no data rows"""
         # Arrange
@@ -1142,7 +1323,14 @@ class TestEdgeCases:
         mock_file = mock_file_storage('headers_only.csv', csv_content)
         mock_exists.return_value = True
         
-        with patch('builtins.open', mock_open(read_data=csv_content)):
+        # Mock open to handle the temp file path
+        def mock_open_handler(path, *args, **kwargs):
+            if '/tmp/' in str(path):
+                from io import StringIO
+                return StringIO(csv_content)
+            return Mock()
+        
+        with patch('builtins.open', side_effect=mock_open_handler):
             # Act
             result = csv_import_service.import_contacts(file=mock_file)
         

@@ -68,10 +68,10 @@ def app():
         
         # Create test user for authentication
         from crm_database import User
-        from flask_bcrypt import generate_password_hash
+        from werkzeug.security import generate_password_hash
         test_user = User(
             email='test@example.com',
-            password_hash=generate_password_hash('testpassword').decode('utf-8'),
+            password_hash=generate_password_hash('testpassword'),
             first_name='Test',
             last_name='User',
             role='admin',

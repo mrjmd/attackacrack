@@ -106,7 +106,7 @@ class QuoteService:
             # Delete removed line items
             for existing_item in existing_items:
                 if str(existing_item.id) not in incoming_item_ids:
-                    self.line_item_repository.delete(existing_item.id)
+                    self.line_item_repository.delete_by_id(existing_item.id)
             
             # Update existing and create new line items
             items_to_update = [item for item in line_items_data if item.get('id')]

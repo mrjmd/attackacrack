@@ -92,7 +92,7 @@ class TestTodoServiceWithMocks:
         assert todo3_result.success
         
         # Mark one as complete
-        todo_service.mark_todo_complete(todo3_result.data['id'], test_user_id)
+        todo_service.toggle_todo_completion(todo3_result.data['id'], test_user_id)
         
         # Get all todos (backward compatibility method)
         todos = todo_service.get_user_todos(test_user_id)
@@ -137,7 +137,7 @@ class TestTodoServiceWithMocks:
         todo = create_result.data
         
         # Mark it as complete
-        result = todo_service.mark_todo_complete(todo['id'], test_user_id)
+        result = todo_service.toggle_todo_completion(todo['id'], test_user_id)
         assert result.success is True
         
         completed_todo = result.data
@@ -151,10 +151,10 @@ class TestTodoServiceWithMocks:
         assert create_result.success
         todo = create_result.data
         
-        todo_service.mark_todo_complete(todo['id'], test_user_id)
+        todo_service.toggle_todo_completion(todo['id'], test_user_id)
         
-        # Mark it as incomplete
-        result = todo_service.mark_todo_incomplete(todo['id'], test_user_id)
+        # Mark it as incomplete (toggle again to make it incomplete)
+        result = todo_service.toggle_todo_completion(todo['id'], test_user_id)
         assert result.success is True
         
         incomplete_todo = result.data
@@ -184,7 +184,7 @@ class TestTodoServiceWithMocks:
         todo_service.create_todo(test_user_id, {'title': 'Low Priority', 'priority': 'low'})
         
         result = todo_service.create_todo(test_user_id, {'title': 'Completed', 'priority': 'high'})
-        todo_service.mark_todo_complete(result.data['id'], test_user_id)
+        todo_service.toggle_todo_completion(result.data['id'], test_user_id)
         
         # Get stats
         stats_result = todo_service.get_todo_stats(test_user_id)
@@ -231,7 +231,7 @@ class TestTodoServiceWithMocks:
         
         # Should fail
         assert update_result.success is False
-        assert update_result.code == 'NOT_FOUND'
+        assert update_result.error_code == 'TODO_NOT_FOUND'
     
     def test_repository_isolation(self, todo_service, test_user_id):
         """Test that each test has isolated repository data"""
@@ -275,7 +275,7 @@ class TestTodoServiceEdgeCases:
         result = todo_service.update_todo(99999, test_user_id, {'title': 'Updated'})
         
         assert result.success is False
-        assert result.error_code == 'NOT_FOUND'
+        assert result.error_code == 'TODO_NOT_FOUND'
     
     def test_empty_title_after_trim(self, todo_service, test_user_id):
         """Test creating todo with only whitespace in title"""

@@ -25,6 +25,37 @@ from datetime import datetime, date
 from dataclasses import dataclass, field
 import copy
 
+
+class MockModel(dict):
+    """A mock model that supports both dict access and attribute access.
+    
+    This allows our mock repositories to return objects that behave like
+    SQLAlchemy models (with .id attributes) while still being dictionaries.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ensure every model has an id
+        if 'id' not in self:
+            self['id'] = None
+    
+    def __getattr__(self, name):
+        """Allow attribute access like model.id"""
+        if name in self:
+            return self[name]
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")  
+    
+    def __setattr__(self, name, value):
+        """Allow attribute setting like model.id = 5"""
+        self[name] = value
+    
+    def __delattr__(self, name):
+        """Allow attribute deletion"""
+        if name in self:
+            del self[name]
+        else:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
 from repositories.base_repository import (
     BaseRepository, PaginationParams, PaginatedResult, SortOrder
 )
@@ -45,7 +76,7 @@ class InMemoryStorage:
         self._next_id = 1
         self._lock = threading.Lock()
     
-    def create(self, **kwargs) -> Dict[str, Any]:
+    def create(self, **kwargs) -> MockModel:
         """Create a new entity with auto-generated ID."""
         with self._lock:
             if 'id' not in kwargs or kwargs['id'] is None:
@@ -63,28 +94,28 @@ class InMemoryStorage:
             if 'updated_at' not in kwargs:
                 kwargs['updated_at'] = now
             
-            entity = copy.deepcopy(kwargs)
+            entity = MockModel(kwargs)
             self._data[entity['id']] = entity
-            return copy.deepcopy(entity)
+            return MockModel(entity)
     
-    def get_by_id(self, entity_id: int) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, entity_id: int) -> Optional[MockModel]:
         """Get entity by ID."""
         with self._lock:
             entity = self._data.get(entity_id)
-            return copy.deepcopy(entity) if entity else None
+            return MockModel(entity) if entity else None
     
-    def get_all(self) -> List[Dict[str, Any]]:
+    def get_all(self) -> List[MockModel]:
         """Get all entities."""
         with self._lock:
-            return [copy.deepcopy(entity) for entity in self._data.values()]
+            return [MockModel(entity) for entity in self._data.values()]
     
-    def update(self, entity_id: int, **updates) -> Optional[Dict[str, Any]]:
+    def update(self, entity_id: int, **updates) -> Optional[MockModel]:
         """Update an entity."""
         with self._lock:
             if entity_id in self._data:
                 self._data[entity_id].update(updates)
                 self._data[entity_id]['updated_at'] = datetime.utcnow()
-                return copy.deepcopy(self._data[entity_id])
+                return MockModel(self._data[entity_id])
             return None
     
     def delete(self, entity_id: int) -> bool:
@@ -95,13 +126,13 @@ class InMemoryStorage:
                 return True
             return False
     
-    def find_by(self, **filters) -> List[Dict[str, Any]]:
+    def find_by(self, **filters) -> List[MockModel]:
         """Find entities matching filters."""
         with self._lock:
             results = []
             for entity in self._data.values():
                 if all(entity.get(k) == v for k, v in filters.items()):
-                    results.append(copy.deepcopy(entity))
+                    results.append(MockModel(entity))
             return results
     
     def count(self, **filters) -> int:
@@ -130,20 +161,20 @@ class MockRepositoryBase:
         self.rollback = MagicMock()
         self.flush = MagicMock()
     
-    def create(self, **kwargs) -> Dict[str, Any]:
+    def create(self, **kwargs) -> MockModel:
         """Create a new entity."""
         return self.storage.create(**kwargs)
     
-    def create_many(self, entities_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def create_many(self, entities_data: List[Dict[str, Any]]) -> List[MockModel]:
         """Create multiple entities."""
         return [self.storage.create(**data) for data in entities_data]
     
-    def get_by_id(self, entity_id: int) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, entity_id: int) -> Optional[MockModel]:
         """Get entity by ID."""
         return self.storage.get_by_id(entity_id)
     
     def get_all(self, order_by: Optional[str] = None, 
-                order: SortOrder = SortOrder.ASC) -> List[Dict[str, Any]]:
+                order: SortOrder = SortOrder.ASC) -> List[MockModel]:
         """Get all entities with optional ordering."""
         entities = self.storage.get_all()
         
@@ -190,11 +221,11 @@ class MockRepositoryBase:
             per_page=pagination.per_page
         )
     
-    def find_by(self, **filters) -> List[Dict[str, Any]]:
+    def find_by(self, **filters) -> List[MockModel]:
         """Find entities by filters."""
         return self.storage.find_by(**filters)
     
-    def find_one_by(self, **filters) -> Optional[Dict[str, Any]]:
+    def find_one_by(self, **filters) -> Optional[MockModel]:
         """Find single entity by filters."""
         results = self.find_by(**filters)
         return results[0] if results else None
@@ -207,18 +238,18 @@ class MockRepositoryBase:
         """Count entities."""
         return self.storage.count(**filters)
     
-    def update(self, entity: Dict[str, Any], **updates) -> Dict[str, Any]:
+    def update(self, entity: MockModel, **updates) -> MockModel:
         """Update an entity."""
         entity_id = entity.get('id')
         if entity_id:
             updated = self.storage.update(entity_id, **updates)
             if updated:
                 return updated
-        # If not found, update the passed entity dict
+        # If not found, update the passed entity
         entity.update(updates)
         return entity
     
-    def update_by_id(self, entity_id: int, **updates) -> Optional[Dict[str, Any]]:
+    def update_by_id(self, entity_id: int, **updates) -> Optional[MockModel]:
         """Update entity by ID."""
         return self.storage.update(entity_id, **updates)
     
@@ -229,7 +260,7 @@ class MockRepositoryBase:
             self.storage.update(entity['id'], **updates)
         return len(entities)
     
-    def delete(self, entity: Dict[str, Any]) -> bool:
+    def delete(self, entity: MockModel) -> bool:
         """Delete an entity."""
         entity_id = entity.get('id')
         if entity_id:
@@ -249,7 +280,7 @@ class MockRepositoryBase:
                 count += 1
         return count
     
-    def search(self, query: str, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def search(self, query: str, fields: Optional[List[str]] = None) -> List[MockModel]:
         """Search entities by text query."""
         if not query:
             return []
@@ -452,6 +483,111 @@ class MockConversationRepository(MockRepositoryBase):
         return self.find_by(status='active')
 
 
+class MockQuoteRepository(MockRepositoryBase):
+    """Mock QuoteRepository with specific methods."""
+    
+    def find_all_ordered_by_id_desc(self) -> List[MockModel]:
+        """Find all quotes ordered by ID descending."""
+        quotes = self.get_all()
+        quotes.sort(key=lambda x: x.get('id', 0), reverse=True)
+        return quotes
+    
+    def find_by_job_id(self, job_id: int) -> List[MockModel]:
+        """Find quotes by job ID."""
+        return self.find_by(job_id=job_id)
+    
+    def find_by_status(self, status: str) -> List[MockModel]:
+        """Find quotes by status."""
+        return self.find_by(status=status)
+    
+    def find_draft_quotes_by_job_id(self, job_id: int) -> List[MockModel]:
+        """Find draft quotes for a job."""
+        return self.find_by(job_id=job_id, status='Draft')
+    
+    def find_by_quickbooks_id(self, quickbooks_id: str) -> Optional[MockModel]:
+        """Find quote by QuickBooks ID."""
+        return self.find_one_by(quickbooks_estimate_id=quickbooks_id)
+    
+    def update_status(self, quote_id: int, status: str) -> Optional[MockModel]:
+        """Update quote status."""
+        return self.update_by_id(quote_id, status=status)
+    
+    def calculate_totals(self, quote_id: int) -> Optional[MockModel]:
+        """Calculate and update quote totals."""
+        quote = self.get_by_id(quote_id)
+        if quote:
+            total_amount = quote.get('subtotal', 0) + quote.get('tax_amount', 0)
+            return self.update_by_id(quote_id, total_amount=total_amount)
+        return None
+
+
+class MockQuoteLineItemRepository(MockRepositoryBase):
+    """Mock QuoteLineItemRepository with specific methods."""
+    
+    def find_by_quote_id(self, quote_id: int) -> List[MockModel]:
+        """Find line items by quote ID."""
+        return self.find_by(quote_id=quote_id)
+    
+    def find_by_product_id(self, product_id: int) -> List[MockModel]:
+        """Find line items by product ID."""
+        return self.find_by(product_id=product_id)
+    
+    def delete_by_quote_id(self, quote_id: int) -> int:
+        """Delete all line items for a quote."""
+        line_items = self.find_by_quote_id(quote_id)
+        count = 0
+        for item in line_items:
+            if self.delete(item):
+                count += 1
+        return count
+    
+    def calculate_line_total(self, line_item_data: Dict[str, Any]) -> float:
+        """Calculate line total from quantity and price."""
+        quantity = float(line_item_data.get('quantity', 0))
+        unit_price = float(line_item_data.get('unit_price', 
+                          line_item_data.get('price', 0)))
+        return quantity * unit_price
+    
+    def bulk_create_line_items(self, quote_id: int, line_items_data: List[Dict[str, Any]]) -> List[MockModel]:
+        """Create multiple line items for a quote."""
+        created_items = []
+        for item_data in line_items_data:
+            line_total = self.calculate_line_total(item_data)
+            line_item = self.create(
+                quote_id=quote_id,
+                product_id=item_data.get('product_id'),
+                description=item_data.get('description', ''),
+                quantity=float(item_data.get('quantity', 0)),
+                unit_price=float(item_data.get('unit_price', 
+                               item_data.get('price', 0))),
+                line_total=line_total
+            )
+            created_items.append(line_item)
+        return created_items
+    
+    def bulk_update_line_items(self, line_items_data: List[Dict[str, Any]]) -> List[MockModel]:
+        """Update multiple line items."""
+        updated_items = []
+        for item_data in line_items_data:
+            item_id = item_data.get('id')
+            if item_id:
+                existing_item = self.get_by_id(item_id)
+                if existing_item:
+                    line_total = self.calculate_line_total(item_data)
+                    updated_item = self.update_by_id(
+                        item_id,
+                        product_id=item_data.get('product_id', existing_item.get('product_id')),
+                        description=item_data.get('description', existing_item.get('description')),
+                        quantity=float(item_data.get('quantity', existing_item.get('quantity', 0))),
+                        unit_price=float(item_data.get('unit_price', 
+                                       item_data.get('price', existing_item.get('unit_price', 0)))),
+                        line_total=line_total
+                    )
+                    if updated_item:
+                        updated_items.append(updated_item)
+        return updated_items
+
+
 class RepositoryMockFactory:
     """Factory for creating repository mocks with appropriate methods."""
     
@@ -462,6 +598,8 @@ class RepositoryMockFactory:
             'campaign': MockCampaignRepository,
             'activity': MockActivityRepository,
             'conversation': MockConversationRepository,
+            'quote': MockQuoteRepository,
+            'quote_line_item': MockQuoteLineItemRepository,
             # Default to base for others
         }
     
@@ -598,6 +736,36 @@ def create_conversation_repository_mock(with_data: bool = True) -> MockConversat
     return factory.create_mock('conversation')
 
 
+def create_quote_repository_mock(with_data: bool = True) -> MockQuoteRepository:
+    """Create a QuoteRepository mock.
+    
+    Args:
+        with_data: If True, creates with in-memory storage. If False, creates pure mock.
+        
+    Returns:
+        MockQuoteRepository instance
+    """
+    factory = RepositoryMockFactory()
+    if with_data:
+        return factory.create_with_data('quote')
+    return factory.create_mock('quote')
+
+
+def create_quote_line_item_repository_mock(with_data: bool = True) -> MockQuoteLineItemRepository:
+    """Create a QuoteLineItemRepository mock.
+    
+    Args:
+        with_data: If True, creates with in-memory storage. If False, creates pure mock.
+        
+    Returns:
+        MockQuoteLineItemRepository instance
+    """
+    factory = RepositoryMockFactory()
+    if with_data:
+        return factory.create_with_data('quote_line_item')
+    return factory.create_mock('quote_line_item')
+
+
 def create_all_repository_mocks(with_data: bool = True) -> Dict[str, MockRepositoryBase]:
     """Create all repository mocks.
     
@@ -674,3 +842,15 @@ def activity_repository():
 def conversation_repository():
     """Pytest fixture for conversation repository mock."""
     return create_conversation_repository_mock(with_data=True)
+
+
+@pytest.fixture
+def quote_repository():
+    """Pytest fixture for quote repository mock."""
+    return create_quote_repository_mock(with_data=True)
+
+
+@pytest.fixture
+def quote_line_item_repository():
+    """Pytest fixture for quote line item repository mock."""
+    return create_quote_line_item_repository_mock(with_data=True)

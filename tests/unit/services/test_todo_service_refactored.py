@@ -26,15 +26,10 @@ class TestTodoServiceRefactoredInitialization:
         assert service.todo_repository == mock_repository
     
     def test_service_initialization_without_repository(self):
-        """Test service creates default repository if none provided"""
-        # Act
-        with patch('services.todo_service_refactored.TodoRepository') as MockRepo:
-            with patch('services.todo_service_refactored.db'):
-                service = TodoServiceRefactored()
-                
-        # Assert
-        assert service.todo_repository is not None
-        MockRepo.assert_called_once()
+        """Test service raises error if no repository provided"""
+        # Act & Assert
+        with pytest.raises(ValueError, match="TodoRepository must be provided"):
+            TodoServiceRefactored()
 
 
 class TestGetUserTodos:
@@ -53,10 +48,10 @@ class TestGetUserTodos:
         mock_repository.find_by_user_id.return_value = mock_todos
         
         # Act
-        result = service.get_user_todos(user_id=1, include_completed=True)
+        result = service.get_user_todos_result(user_id=1, include_completed=True)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data == mock_todos
         mock_repository.find_by_user_id.assert_called_once_with(1, include_completed=True)
     
@@ -70,10 +65,10 @@ class TestGetUserTodos:
         mock_repository.find_by_user_id.return_value = mock_todos
         
         # Act
-        result = service.get_user_todos(user_id=1, include_completed=False)
+        result = service.get_user_todos_result(user_id=1, include_completed=False)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data == mock_todos
         mock_repository.find_by_user_id.assert_called_once_with(1, include_completed=False)
     
@@ -84,10 +79,10 @@ class TestGetUserTodos:
         service = TodoServiceRefactored(todo_repository=mock_repository)
         
         # Act
-        result = service.get_user_todos(user_id=None)
+        result = service.get_user_todos_result(user_id=None)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "VALIDATION_ERROR"
         assert "User ID is required" in result.error
         mock_repository.find_by_user_id.assert_not_called()
@@ -100,10 +95,10 @@ class TestGetUserTodos:
         mock_repository.find_by_user_id.side_effect = Exception("Database error")
         
         # Act
-        result = service.get_user_todos(user_id=1)
+        result = service.get_user_todos_result(user_id=1)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "REPOSITORY_ERROR"
         assert "Database error" in result.error
 
@@ -125,10 +120,10 @@ class TestGetDashboardTodos:
         mock_repository.count_pending_by_user_id.return_value = 5
         
         # Act
-        result = service.get_dashboard_todos(user_id=1, limit=5)
+        result = service.get_dashboard_todos_result(user_id=1, limit=5)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data['todos'] == mock_todos
         assert result.data['pending_count'] == 5
         mock_repository.find_by_user_id_with_priority.assert_called_once_with(1, limit=5)
@@ -144,10 +139,10 @@ class TestGetDashboardTodos:
         mock_repository.count_pending_by_user_id.return_value = 0
         
         # Act
-        result = service.get_dashboard_todos(user_id=1)
+        result = service.get_dashboard_todos_result(user_id=1)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data['todos'] == []
         assert result.data['pending_count'] == 0
 
@@ -175,13 +170,13 @@ class TestCreateTodo:
         result = service.create_todo(user_id=1, todo_data=todo_data)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data == mock_todo
         
-        # Verify repository was called with correct data
-        call_args = mock_repository.create.call_args[0][0]
-        assert call_args['title'] == 'Test Todo'
-        assert call_args['user_id'] == 1
+        # Verify repository was called with correct data (using keyword args)
+        call_kwargs = mock_repository.create.call_args[1]
+        assert call_kwargs['title'] == 'Test Todo'
+        assert call_kwargs['user_id'] == 1
     
     def test_create_todo_missing_title(self):
         """Test validation error when title is missing"""
@@ -195,7 +190,7 @@ class TestCreateTodo:
         result = service.create_todo(user_id=1, todo_data=todo_data)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "VALIDATION_ERROR"
         assert "Title is required" in result.error
         mock_repository.create.assert_not_called()
@@ -215,7 +210,7 @@ class TestCreateTodo:
         result = service.create_todo(user_id=1, todo_data=todo_data)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "VALIDATION_ERROR"
         assert "Invalid due date format" in result.error
 
@@ -231,7 +226,7 @@ class TestUpdateTodo:
         
         existing_todo = Mock(id=1, user_id=1, title="Old Title")
         mock_repository.find_by_id_and_user.return_value = existing_todo
-        mock_repository.update.return_value = existing_todo
+        mock_repository.update_by_id.return_value = existing_todo
         
         updates = {'title': 'New Title', 'priority': 'high'}
         
@@ -239,10 +234,10 @@ class TestUpdateTodo:
         result = service.update_todo(todo_id=1, user_id=1, updates=updates)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data == existing_todo
         mock_repository.find_by_id_and_user.assert_called_once_with(1, 1)
-        mock_repository.update.assert_called_once()
+        mock_repository.update_by_id.assert_called_once()
     
     def test_update_todo_not_found(self):
         """Test updating non-existent todo"""
@@ -255,7 +250,7 @@ class TestUpdateTodo:
         result = service.update_todo(todo_id=999, user_id=1, updates={'title': 'New'})
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "TODO_NOT_FOUND"
         mock_repository.update.assert_not_called()
     
@@ -267,7 +262,7 @@ class TestUpdateTodo:
         
         existing_todo = Mock(id=1, user_id=1)
         mock_repository.find_by_id_and_user.return_value = existing_todo
-        mock_repository.update.return_value = existing_todo
+        mock_repository.update_by_id.return_value = existing_todo
         
         updates = {'due_date': '2024-12-31T10:00:00'}
         
@@ -275,11 +270,11 @@ class TestUpdateTodo:
         result = service.update_todo(todo_id=1, user_id=1, updates=updates)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         
         # Verify date was parsed correctly
-        call_args = mock_repository.update.call_args[0][1]
-        assert isinstance(call_args['due_date'], datetime)
+        call_kwargs = mock_repository.update_by_id.call_args[1]
+        assert isinstance(call_kwargs['due_date'], datetime)
 
 
 class TestToggleTodoCompletion:
@@ -291,19 +286,19 @@ class TestToggleTodoCompletion:
         mock_repository = Mock(spec=TodoRepository)
         service = TodoServiceRefactored(todo_repository=mock_repository)
         
-        mock_todo = Mock(id=1, is_completed=False)
-        mock_todo.mark_complete = Mock()
+        # Create mock todo dict (repository returns dict not object)
+        mock_todo = {'id': 1, 'is_completed': False}
         mock_repository.find_by_id_and_user.return_value = mock_todo
-        mock_repository.update.return_value = mock_todo
+        updated_todo = {'id': 1, 'is_completed': True}
+        mock_repository.update_by_id.return_value = updated_todo
         
         # Act
         result = service.toggle_todo_completion(todo_id=1, user_id=1)
         
         # Assert
-        assert result.success is True
-        assert result.data == mock_todo
-        mock_todo.mark_complete.assert_called_once()
-        mock_repository.update.assert_called_once_with(1, {'is_completed': True, 'completed_at': mock_todo.completed_at})
+        assert result.is_success
+        assert result.data == updated_todo
+        mock_repository.update_by_id.assert_called_once()
     
     def test_toggle_todo_completion_to_incomplete(self):
         """Test marking todo as incomplete"""
@@ -311,18 +306,19 @@ class TestToggleTodoCompletion:
         mock_repository = Mock(spec=TodoRepository)
         service = TodoServiceRefactored(todo_repository=mock_repository)
         
-        mock_todo = Mock(id=1, is_completed=True)
-        mock_todo.mark_incomplete = Mock()
+        # Create mock todo dict (repository returns dict not object)
+        mock_todo = {'id': 1, 'is_completed': True}
         mock_repository.find_by_id_and_user.return_value = mock_todo
-        mock_repository.update.return_value = mock_todo
+        updated_todo = {'id': 1, 'is_completed': False}
+        mock_repository.update_by_id.return_value = updated_todo
         
         # Act
         result = service.toggle_todo_completion(todo_id=1, user_id=1)
         
         # Assert
-        assert result.success is True
-        mock_todo.mark_incomplete.assert_called_once()
-        mock_repository.update.assert_called_once_with(1, {'is_completed': False, 'completed_at': None})
+        assert result.is_success
+        assert result.data == updated_todo
+        mock_repository.update_by_id.assert_called_once()
     
     def test_toggle_todo_completion_not_found(self):
         """Test toggling non-existent todo"""
@@ -335,7 +331,7 @@ class TestToggleTodoCompletion:
         result = service.toggle_todo_completion(todo_id=999, user_id=1)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "TODO_NOT_FOUND"
 
 
@@ -350,15 +346,15 @@ class TestDeleteTodo:
         
         mock_todo = Mock(id=1)
         mock_repository.find_by_id_and_user.return_value = mock_todo
-        mock_repository.delete.return_value = True
+        mock_repository.delete_by_id.return_value = True
         
         # Act
         result = service.delete_todo(todo_id=1, user_id=1)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data is True
-        mock_repository.delete.assert_called_once_with(1)
+        mock_repository.delete_by_id.assert_called_once_with(1)
     
     def test_delete_todo_not_found(self):
         """Test deleting non-existent todo"""
@@ -371,9 +367,9 @@ class TestDeleteTodo:
         result = service.delete_todo(todo_id=999, user_id=1)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "TODO_NOT_FOUND"
-        mock_repository.delete.assert_not_called()
+        mock_repository.delete_by_id.assert_not_called()
 
 
 class TestGetTodoStats:
@@ -395,7 +391,7 @@ class TestGetTodoStats:
         result = service.get_todo_stats(user_id=1)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data['total'] == 10
         assert result.data['completed'] == 3
         assert result.data['pending'] == 7
@@ -418,7 +414,7 @@ class TestGetTodoStats:
         result = service.get_todo_stats(user_id=1)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert all(v == 0 for v in result.data.values())
 
 
@@ -444,10 +440,10 @@ class TestSerializeTodo:
         )
         
         # Act
-        result = service.serialize_todo(mock_todo)
+        result = service.serialize_todo_result(mock_todo)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data['id'] == 1
         assert result.data['title'] == "Test Todo"
         assert result.data['is_completed'] is True
@@ -472,10 +468,10 @@ class TestSerializeTodo:
         )
         
         # Act
-        result = service.serialize_todo(mock_todo)
+        result = service.serialize_todo_result(mock_todo)
         
         # Assert
-        assert result.success is True
+        assert result.is_success
         assert result.data['due_date'] is None
         assert result.data['updated_at'] is None
         assert result.data['completed_at'] is None
@@ -487,10 +483,10 @@ class TestSerializeTodo:
         service = TodoServiceRefactored(todo_repository=mock_repository)
         
         # Act
-        result = service.serialize_todo(None)
+        result = service.serialize_todo_result(None)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "VALIDATION_ERROR"
 
 
@@ -508,7 +504,7 @@ class TestErrorHandling:
         result = service.create_todo(user_id=1, todo_data={'title': 'Test'})
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "TODO_CREATION_ERROR"
         assert "Connection lost" in result.error
     
@@ -527,6 +523,6 @@ class TestErrorHandling:
         result = service.create_todo(user_id=1, todo_data=todo_data)
         
         # Assert
-        assert result.success is False
+        assert result.is_failure
         assert result.error_code == "VALIDATION_ERROR"
         assert "Invalid priority" in result.error

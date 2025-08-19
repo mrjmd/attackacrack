@@ -387,8 +387,8 @@ class CampaignListServiceRefactored:
             # Create new list
             new_list = self.campaign_list_repository.create(
                 name=new_name,
-                description=f"Copy of {source_list.name}",
-                filter_criteria=source_list.filter_criteria,
+                description=f"Copy of {source_list.get('name', 'Unknown')}",
+                filter_criteria=source_list.get('filter_criteria'),
                 is_dynamic=False,  # Copies are static by default
                 created_by=created_by
             )
@@ -402,7 +402,7 @@ class CampaignListServiceRefactored:
             
             for contact_id in active_contact_ids:
                 self.member_repository.create(
-                    list_id=new_list.id,
+                    list_id=new_list.get('id'),
                     contact_id=contact_id,
                     added_by=created_by or 'system_duplicate'
                 )

@@ -1,19 +1,33 @@
 # tests/test_contact_service_improved.py
 """
-Improved comprehensive tests for ContactService following enterprise standards.
+Improved comprehensive tests for ContactService following enterprise standards with Result pattern.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, Mock
 from services.contact_service_refactored import ContactService
+from services.common.result import Result
 from crm_database import Contact
+from repositories.contact_repository import ContactRepository
+from repositories.campaign_repository import CampaignRepository
+from repositories.contact_flag_repository import ContactFlagRepository
 import time
 
 
 @pytest.fixture
-def contact_service():
-    """Fixture to provide ContactService instance"""
-    return ContactService()
+def contact_service(db_session):
+    """Fixture to provide ContactService instance with real repositories"""
+    from crm_database import Contact, Campaign, ContactFlag
+    
+    contact_repo = ContactRepository(session=db_session, model_class=Contact)
+    campaign_repo = CampaignRepository(session=db_session, model_class=Campaign)
+    contact_flag_repo = ContactFlagRepository(session=db_session, model_class=ContactFlag)
+    
+    return ContactService(
+        contact_repository=contact_repo,
+        campaign_repository=campaign_repo,
+        contact_flag_repository=contact_flag_repo
+    )
 
 
 @pytest.fixture
@@ -37,18 +51,22 @@ class TestContactCRUDOperations:
         contact_data = unique_contact_data
         
         # Act
-        new_contact = contact_service.add_contact(**contact_data)
+        result = contact_service.add_contact(**contact_data)
         
         # Assert
-        assert new_contact is not None
-        assert new_contact.id is not None
-        assert new_contact.first_name == contact_data['first_name']
-        assert new_contact.last_name == contact_data['last_name']
-        assert new_contact.email == contact_data['email']
-        assert new_contact.phone == contact_data['phone']
+        assert result.is_success
+        assert result.data is not None
+        
+        # Result.data contains the Contact model instance
+        contact = result.data
+        assert contact.id is not None
+        assert contact.first_name == contact_data['first_name']
+        assert contact.last_name == contact_data['last_name']
+        assert contact.email == contact_data['email']
+        assert contact.phone == contact_data['phone']
         
         # Verify database persistence
-        retrieved_contact = db_session.get(Contact, new_contact.id)
+        retrieved_contact = db_session.get(Contact, contact.id)
         assert retrieved_contact is not None
         assert retrieved_contact.email == contact_data['email']
     
@@ -57,45 +75,53 @@ class TestContactCRUDOperations:
         timestamp = str(int(time.time() * 1000000))[-6:]
         
         # Required fields per actual API
-        new_contact = contact_service.add_contact(
+        result = contact_service.add_contact(
             first_name=f'Minimal{timestamp}',
             last_name=f'Last{timestamp}',
             phone=f'+155501{timestamp}'
         )
         
-        assert new_contact is not None
-        assert new_contact.first_name == f'Minimal{timestamp}'
-        assert new_contact.last_name == f'Last{timestamp}'
-        assert new_contact.phone == f'+155501{timestamp}'
-        assert new_contact.email is None
+        assert result.is_success
+        contact = result.data
+        assert contact is not None
+        assert contact.first_name == f'Minimal{timestamp}'
+        assert contact.last_name == f'Last{timestamp}'
+        assert contact.phone == f'+155501{timestamp}'
+        assert contact.email is None
     
     def test_add_contact_duplicate_phone(self, contact_service, unique_contact_data):
         """Test that duplicate phone numbers are handled appropriately"""
         # Create first contact
-        contact_service.add_contact(**unique_contact_data)
+        first_result = contact_service.add_contact(**unique_contact_data)
+        assert first_result.is_success
         
         # Try to create another with same phone
-        # ContactService returns None on IntegrityError, doesn't raise
-        result = contact_service.add_contact(
+        second_result = contact_service.add_contact(
             first_name='Different',
             last_name='Name',
             email='different@example.com',
             phone=unique_contact_data['phone']  # Same phone
         )
         
-        # Should return None due to integrity constraint
-        assert result is None
+        # Should return failure with duplicate error
+        assert second_result.is_failure
+        assert second_result.error_code == "DUPLICATE_PHONE"
     
     def test_get_all_contacts(self, contact_service, unique_contact_data):
         """Test retrieving all contacts"""
         # Get initial count
-        initial_count = len(contact_service.get_all_contacts())
+        initial_result = contact_service.get_all_contacts()
+        assert initial_result.is_success
+        initial_count = len(initial_result.data)
         
         # Add known contact
-        contact_service.add_contact(**unique_contact_data)
+        add_result = contact_service.add_contact(**unique_contact_data)
+        assert add_result.is_success
         
         # Verify count increased
-        all_contacts = contact_service.get_all_contacts()
+        all_result = contact_service.get_all_contacts()
+        assert all_result.is_success
+        all_contacts = all_result.data
         assert len(all_contacts) == initial_count + 1
         
         # Verify our contact is in the list
@@ -105,11 +131,15 @@ class TestContactCRUDOperations:
     def test_get_contact_by_id_success(self, contact_service, unique_contact_data):
         """Test successful contact retrieval by ID"""
         # Create contact
-        created_contact = contact_service.add_contact(**unique_contact_data)
+        create_result = contact_service.add_contact(**unique_contact_data)
+        assert create_result.is_success
+        created_contact = create_result.data
         
         # Retrieve by ID
-        retrieved_contact = contact_service.get_contact_by_id(created_contact.id)
+        get_result = contact_service.get_contact_by_id(created_contact.id)
         
+        assert get_result.is_success
+        retrieved_contact = get_result.data
         assert retrieved_contact is not None
         assert retrieved_contact.id == created_contact.id
         assert retrieved_contact.email == unique_contact_data['email']
@@ -117,16 +147,20 @@ class TestContactCRUDOperations:
     def test_get_contact_by_id_not_found(self, contact_service):
         """Test contact retrieval with non-existent ID"""
         result = contact_service.get_contact_by_id(999999)
-        assert result is None
+        assert result.is_failure
+        assert result.error_code == "NOT_FOUND"
     
     def test_get_contact_by_phone_success(self, contact_service, unique_contact_data):
         """Test successful contact retrieval by phone"""
         # Create contact
-        contact_service.add_contact(**unique_contact_data)
+        create_result = contact_service.add_contact(**unique_contact_data)
+        assert create_result.is_success
         
         # Retrieve by phone
-        retrieved_contact = contact_service.get_contact_by_phone(unique_contact_data['phone'])
+        get_result = contact_service.get_contact_by_phone(unique_contact_data['phone'])
         
+        assert get_result.is_success
+        retrieved_contact = get_result.data
         assert retrieved_contact is not None
         assert retrieved_contact.phone == unique_contact_data['phone']
         assert retrieved_contact.email == unique_contact_data['email']
@@ -134,12 +168,15 @@ class TestContactCRUDOperations:
     def test_get_contact_by_phone_not_found(self, contact_service):
         """Test contact retrieval with non-existent phone"""
         result = contact_service.get_contact_by_phone('+1555999999')
-        assert result is None
+        assert result.is_failure
+        assert result.error_code == "NOT_FOUND"
     
     def test_update_contact_success(self, contact_service, unique_contact_data):
         """Test successful contact update"""
         # Create contact
-        contact = contact_service.add_contact(**unique_contact_data)
+        create_result = contact_service.add_contact(**unique_contact_data)
+        assert create_result.is_success
+        contact = create_result.data
         
         # Update data
         update_data = {
@@ -148,8 +185,10 @@ class TestContactCRUDOperations:
         }
         
         # Update contact
-        updated_contact = contact_service.update_contact(contact.id, **update_data)
+        update_result = contact_service.update_contact(contact.id, **update_data)
         
+        assert update_result.is_success
+        updated_contact = update_result.data
         assert updated_contact is not None
         assert updated_contact.first_name == 'UpdatedFirst'
         assert updated_contact.email == 'updated@example.com'
@@ -160,34 +199,51 @@ class TestContactCRUDOperations:
     def test_update_contact_not_found(self, contact_service):
         """Test updating non-existent contact"""
         result = contact_service.update_contact(999999, first_name='NotFound')
-        assert result is None
+        assert result.is_failure
+        assert result.error_code == "NOT_FOUND"
     
     def test_delete_contact_success(self, contact_service, unique_contact_data, db_session):
         """Test successful contact deletion"""
         # Create contact
-        contact = contact_service.add_contact(**unique_contact_data)
+        create_result = contact_service.add_contact(**unique_contact_data)
+        assert create_result.is_success
+        contact = create_result.data
         contact_id = contact.id
         
         # Get initial count
-        initial_count = len(contact_service.get_all_contacts())
+        initial_result = contact_service.get_all_contacts()
+        assert initial_result.is_success
+        initial_count = len(initial_result.data)
         
         # Delete contact
-        contact_service.delete_contact(contact_id)
+        delete_result = contact_service.delete_contact(contact_id)
+        assert delete_result.is_success
         
         # Verify deletion
-        assert len(contact_service.get_all_contacts()) == initial_count - 1
+        after_delete_result = contact_service.get_all_contacts()
+        assert after_delete_result.is_success
+        assert len(after_delete_result.data) == initial_count - 1
         assert db_session.get(Contact, contact_id) is None
-        assert contact_service.get_contact_by_id(contact_id) is None
+        
+        # Verify contact not found
+        get_result = contact_service.get_contact_by_id(contact_id)
+        assert get_result.is_failure
     
     def test_delete_contact_not_found(self, contact_service):
         """Test deleting non-existent contact"""
-        initial_count = len(contact_service.get_all_contacts())
+        initial_result = contact_service.get_all_contacts()
+        assert initial_result.is_success
+        initial_count = len(initial_result.data)
         
-        # Should handle gracefully
-        contact_service.delete_contact(999999)
+        # Should return failure for non-existent contact
+        delete_result = contact_service.delete_contact(999999)
+        assert delete_result.is_failure
+        assert delete_result.error_code == "NOT_FOUND"
         
         # Count should remain the same
-        assert len(contact_service.get_all_contacts()) == initial_count
+        after_result = contact_service.get_all_contacts()
+        assert after_result.is_success
+        assert len(after_result.data) == initial_count
 
 
 class TestContactValidation:
@@ -207,16 +263,18 @@ class TestContactValidation:
         
         contacts = []
         for i, phone in enumerate(phone_formats):
-            contact = contact_service.add_contact(
+            result = contact_service.add_contact(
                 first_name=f'Test{i}',
                 last_name=f'User{i}',
                 phone=phone
             )
-            contacts.append(contact)
+            contacts.append(result)
         
         # All should be stored (no validation currently, but documenting behavior)
         assert len(contacts) == 4
-        for contact in contacts:
+        for result in contacts:
+            assert result.is_success
+            contact = result.data
             assert contact.phone is not None
     
     def test_email_validation_behavior(self, contact_service):
@@ -232,12 +290,14 @@ class TestContactValidation:
         ]
         
         for i, email in enumerate(test_emails):
-            contact = contact_service.add_contact(
+            result = contact_service.add_contact(
                 first_name=f'EmailTest{i}',
                 last_name=f'TestUser{i}',
                 phone=f'+155502{timestamp}{i}',
                 email=email
             )
+            assert result.is_success
+            contact = result.data
             assert contact.email == email
 
 
@@ -246,30 +306,36 @@ class TestContactErrorHandling:
     
     def test_add_contact_database_error(self, contact_service):
         """Test handling of database errors during contact creation"""
-        # Mock database session to raise an error
-        with patch.object(contact_service, 'session') as mock_session:
-            mock_session.add.side_effect = Exception("Database error")
+        # Mock repository to raise an error
+        with patch.object(contact_service.contact_repository, 'create') as mock_create:
+            mock_create.side_effect = Exception("Database error")
             
-            with pytest.raises(Exception):
-                contact_service.add_contact(
-                    first_name='Error',
-                    last_name='Test',
-                    phone='+1555000000'
-                )
+            result = contact_service.add_contact(
+                first_name='Error',
+                last_name='Test',
+                phone='+1555000000'
+            )
+            
+            assert result.is_failure
+            assert "Database error" in result.error
     
     def test_update_contact_with_invalid_data(self, contact_service, unique_contact_data):
         """Test update with potentially invalid data"""
         # Create contact
-        contact = contact_service.add_contact(**unique_contact_data)
+        create_result = contact_service.add_contact(**unique_contact_data)
+        assert create_result.is_success
+        contact = create_result.data
         
         # Update with potentially problematic data
         # (Current implementation may not validate, but test documents behavior)
-        updated_contact = contact_service.update_contact(
+        update_result = contact_service.update_contact(
             contact.id,
             first_name='',  # Empty string
             email=None      # Explicit None
         )
         
+        assert update_result.is_success
+        updated_contact = update_result.data
         assert updated_contact is not None
         assert updated_contact.first_name == ''
         assert updated_contact.email is None
@@ -281,11 +347,15 @@ class TestContactBusinessLogic:
     def test_contact_relationship_integrity(self, contact_service, unique_contact_data, db_session):
         """Test that contact relationships are maintained properly"""
         # Create contact
-        contact = contact_service.add_contact(**unique_contact_data)
+        create_result = contact_service.add_contact(**unique_contact_data)
+        assert create_result.is_success
+        contact = create_result.data
         
         # This would test relationships with properties, appointments, etc.
         # For now, just verify the contact exists and can be queried
-        retrieved = contact_service.get_contact_by_id(contact.id)
+        get_result = contact_service.get_contact_by_id(contact.id)
+        assert get_result.is_success
+        retrieved = get_result.data
         assert retrieved is not None
         assert retrieved.id == contact.id
     
@@ -302,12 +372,15 @@ class TestContactBusinessLogic:
         
         created_contacts = []
         for contact_data in search_contacts:
-            contact = contact_service.add_contact(**contact_data)
-            created_contacts.append(contact)
+            result = contact_service.add_contact(**contact_data)
+            assert result.is_success
+            created_contacts.append(result.data)
         
         # Test searching by last name (if search functionality exists)
         # This documents current capabilities
-        all_contacts = contact_service.get_all_contacts()
+        all_result = contact_service.get_all_contacts()
+        assert all_result.is_success
+        all_contacts = all_result.data
         johnson_contacts = [c for c in all_contacts if c.last_name == 'Johnson']
         assert len(johnson_contacts) >= 2  # At least our test contacts
     
@@ -316,16 +389,23 @@ class TestContactBusinessLogic:
         timestamp = str(int(time.time() * 1000000))[-6:]
         
         # Create contact
-        contact = contact_service.add_contact(
+        create_result = contact_service.add_contact(
             first_name=f'Concurrent{timestamp}',
             last_name=f'User{timestamp}',
             phone=f'+155504{timestamp}'
         )
+        assert create_result.is_success
+        contact = create_result.data
         
         # Simulate concurrent read and update
-        retrieved = contact_service.get_contact_by_id(contact.id)
-        updated = contact_service.update_contact(contact.id, last_name='Updated')
+        get_result = contact_service.get_contact_by_id(contact.id)
+        update_result = contact_service.update_contact(contact.id, last_name='Updated')
         
+        assert get_result.is_success
+        retrieved = get_result.data
         assert retrieved is not None
+        
+        assert update_result.is_success
+        updated = update_result.data
         assert updated is not None
         assert updated.last_name == 'Updated'

@@ -254,31 +254,6 @@ class CSVImportService:
         Returns:
             Dict with import results and statistics
         """
-        # Save the uploaded file temporarily
-        filename = file.filename
-        temp_path = f"/tmp/{filename}"
-        file.save(temp_path)
-        
-        # Create import record using repository
-        csv_import = self.csv_import_repository.create(
-            filename=filename,
-            imported_at=datetime.utcnow(),
-            imported_by=imported_by,
-            import_type='contacts',
-            import_metadata={}
-        )
-        
-        # Create campaign list if requested using repository
-        campaign_list = None
-        if create_list:
-            list_name = list_name or f"Import: {filename} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            campaign_list = self.campaign_list_repository.create(
-                name=list_name,
-                description=f"Contacts imported from {filename}",
-                created_by=imported_by,
-                filter_criteria={'csv_import_id': csv_import.id}
-            )
-        
         # Process the CSV
         results = {
             'total_rows': 0,
@@ -289,7 +264,34 @@ class CSVImportService:
             'contacts_created': []
         }
         
+        csv_import = None
+        campaign_list = None
+        temp_path = None
+        
         try:
+            # Save the uploaded file temporarily
+            filename = file.filename
+            temp_path = f"/tmp/{filename}"
+            file.save(temp_path)
+            
+            # Create import record using repository
+            csv_import = self.csv_import_repository.create(
+                filename=filename,
+                imported_at=datetime.utcnow(),
+                imported_by=imported_by,
+                import_type='contacts',
+                import_metadata={}
+            )
+            
+            # Create campaign list if requested using repository
+            if create_list:
+                list_name = list_name or f"Import: {filename} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                campaign_list = self.campaign_list_repository.create(
+                    name=list_name,
+                    description=f"Contacts imported from {filename}",
+                    created_by=imported_by,
+                    filter_criteria={'csv_import_id': csv_import.id}
+                )
             with open(temp_path, mode='r', encoding='utf-8', errors='ignore') as csvfile:
                 # Try to detect delimiter
                 sample = csvfile.read(1024)
@@ -447,7 +449,7 @@ class CSVImportService:
         
         finally:
             # Clean up temp file
-            if os.path.exists(temp_path):
+            if temp_path and os.path.exists(temp_path):
                 os.remove(temp_path)
         
         # Update import record using repository
@@ -459,19 +461,20 @@ class CSVImportService:
         }
         
         # Final update with error handling
-        try:
-            self.csv_import_repository.update_import_status(
-                csv_import.id,
-                results['total_rows'],
-                results['successful'],
-                results['failed'],
-                metadata
-            )
-        except Exception as final_error:
-            results['errors'].append(f"Final update error: {str(final_error)}")
-            # Repository pattern handles error recovery
+        if csv_import:
+            try:
+                self.csv_import_repository.update_import_status(
+                    csv_import.id,
+                    results['total_rows'],
+                    results['successful'],
+                    results['failed'],
+                    metadata
+                )
+            except Exception as final_error:
+                results['errors'].append(f"Final update error: {str(final_error)}")
+                # Repository pattern handles error recovery
         
-        results['import_id'] = csv_import.id
+        results['import_id'] = csv_import.id if csv_import else None
         results['list_id'] = campaign_list.id if campaign_list else None
         
         return results

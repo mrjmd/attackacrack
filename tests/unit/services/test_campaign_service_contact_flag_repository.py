@@ -45,14 +45,12 @@ class TestCampaignServiceContactFlagIntegration:
     
     @pytest.fixture
     def campaign_service(self, mock_campaign_repository, mock_contact_repository, 
-                        mock_contact_flag_repository, mock_session):
+                        mock_contact_flag_repository):
         """Create CampaignService with mocked dependencies"""
-        # This will fail initially because CampaignService doesn't accept contact_flag_repository
         return CampaignService(
             campaign_repository=mock_campaign_repository,
             contact_repository=mock_contact_repository,
-            contact_flag_repository=mock_contact_flag_repository,
-            session=mock_session
+            contact_flag_repository=mock_contact_flag_repository
         )
     
     def test_campaign_service_has_contact_flag_repository_dependency(self, campaign_service):

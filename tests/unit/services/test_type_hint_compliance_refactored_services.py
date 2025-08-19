@@ -282,7 +282,7 @@ class TestCampaignServiceTypeHints:
         assert result['id'] == 2
         assert result['name'] == new_name
     
-    def test_get_eligible_contacts_returns_list_of_dicts(self, service, mock_contact_repository):
+    def test_get_eligible_contacts_returns_list_of_dicts(self, service, mock_contact_repository, mock_contact_flag_repository):
         """Test that get_eligible_contacts returns List[Dict] not List[Contact]"""
         # Arrange
         filters = {'has_phone': True, 'exclude_opted_out': True}
@@ -291,6 +291,7 @@ class TestCampaignServiceTypeHints:
             {'id': 2, 'phone': '+10987654321', 'first_name': 'Jane'}
         ]
         mock_contact_repository.get_all.return_value = mock_contacts
+        mock_contact_flag_repository.get_contact_ids_with_flag_type.return_value = []  # No opted out contacts
         
         # Act
         result = service.get_eligible_contacts(filters)

@@ -4,7 +4,7 @@ Unit tests for QuickBooksService using repository pattern
 
 import pytest
 import os
-import jwt
+# import jwt  # Commented out - not installed
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
 from services.quickbooks_service import QuickBooksService

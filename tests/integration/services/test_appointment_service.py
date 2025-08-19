@@ -8,14 +8,19 @@ import pytest
 from unittest.mock import MagicMock, patch
 from services.appointment_service_refactored import AppointmentService
 from crm_database import Appointment, Contact, Property
+from repositories.appointment_repository import AppointmentRepository
 from datetime import date, time
 import time as time_module
 
 
 @pytest.fixture
-def appointment_service():
-    """Fixture to provide AppointmentService instance"""
-    return AppointmentService()
+def appointment_service(db_session):
+    """Fixture to provide AppointmentService instance with repository"""
+    appointment_repo = AppointmentRepository(session=db_session, model_class=Appointment)
+    # Provide mock calendar service to enable calendar integration
+    from unittest.mock import Mock
+    mock_calendar_service = Mock()
+    return AppointmentService(repository=appointment_repo, calendar_service=mock_calendar_service)
 
 
 @pytest.fixture
@@ -45,13 +50,13 @@ def test_contact_with_property(app, db_session):
 class TestAppointmentService:
     """Test AppointmentService methods"""
     
-    @patch('services.appointment_service.create_google_calendar_event')
+    @patch('services.appointment_service_refactored.AppointmentService._sync_to_google_calendar')
     def test_add_appointment_success(self, mock_create_event, appointment_service, 
                                    test_contact_with_property):
         """Test successful appointment creation with Google Calendar integration"""
         # Arrange
         contact, property_obj = test_contact_with_property
-        mock_create_event.return_value = {'id': 'google_event_123', 'htmlLink': 'http://calendar.link'}
+        mock_create_event.return_value = 'google_event_123'
         
         appointment_data = {
             'title': 'Foundation Assessment',
@@ -77,7 +82,7 @@ class TestAppointmentService:
         # Verify Google Calendar API was called
         mock_create_event.assert_called_once()
     
-    @patch('services.appointment_service.create_google_calendar_event')
+    @patch('services.appointment_service_refactored.AppointmentService._sync_to_google_calendar')
     def test_add_appointment_google_calendar_failure(self, mock_create_event, 
                                                     appointment_service, 
                                                     test_contact_with_property):
@@ -106,7 +111,7 @@ class TestAppointmentService:
         
         mock_create_event.assert_called_once()
     
-    @patch('services.appointment_service.create_google_calendar_event')
+    @patch('services.appointment_service_refactored.AppointmentService._sync_to_google_calendar')
     def test_add_appointment_minimal_data(self, mock_create_event, appointment_service, 
                                         test_contact_with_property):
         """Test appointment creation with minimal required data"""
@@ -350,7 +355,7 @@ class TestAppointmentErrorHandling:
         assert appointment.contact_id == 999999
         assert appointment.google_calendar_event_id is None  # Failed to create event
     
-    @patch('services.appointment_service.create_google_calendar_event')
+    @patch('services.appointment_service_refactored.AppointmentService._sync_to_google_calendar')
     def test_add_appointment_database_error(self, mock_create_event, appointment_service):
         """Test handling of database errors during appointment creation"""
         # Arrange
@@ -367,7 +372,7 @@ class TestAppointmentErrorHandling:
                     contact_id=1
                 )
     
-    @patch('services.appointment_service.create_google_calendar_event')
+    @patch('services.appointment_service_refactored.AppointmentService._sync_to_google_calendar')
     def test_appointment_google_calendar_integration_resilience(self, mock_create_event, 
                                                                appointment_service, 
                                                                test_contact_with_property):
@@ -411,7 +416,7 @@ class TestAppointmentErrorHandling:
 class TestAppointmentBusinessLogic:
     """Test business logic and validation"""
     
-    @patch('services.appointment_service.create_google_calendar_event')
+    @patch('services.appointment_service_refactored.AppointmentService._sync_to_google_calendar')
     def test_appointment_date_validation(self, mock_create_event, appointment_service, 
                                         test_contact_with_property):
         """Test appointment date validation"""
@@ -431,7 +436,7 @@ class TestAppointmentBusinessLogic:
         assert past_appointment is not None
         assert past_appointment.date == date(2020, 1, 1)
     
-    @patch('services.appointment_service.create_google_calendar_event')
+    @patch('services.appointment_service_refactored.AppointmentService._sync_to_google_calendar')
     def test_appointment_contact_relationship(self, mock_create_event, appointment_service, 
                                             test_contact_with_property):
         """Test appointment-contact relationship integrity"""

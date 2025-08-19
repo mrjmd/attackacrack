@@ -127,7 +127,8 @@ class TodoServiceRefactored:
             Result containing created Todo object or error
         """
         # Validate required fields
-        if not todo_data.get('title'):
+        title = (todo_data.get('title') or '').strip()
+        if not title:
             return Result.failure('Title is required', code="VALIDATION_ERROR")
         
         if not user_id:
@@ -158,11 +159,13 @@ class TodoServiceRefactored:
         
         # Prepare data for repository
         create_data = {
-            'title': todo_data['title'],
+            'title': title,
             'description': todo_data.get('description', ''),
             'priority': priority,
             'user_id': user_id,
-            'due_date': due_date
+            'due_date': due_date,
+            'is_completed': False,
+            'completed_at': None
         }
         
         try:
@@ -236,7 +239,7 @@ class TodoServiceRefactored:
             update_data['updated_at'] = datetime.utcnow()
             
             # Perform update
-            updated_todo = self.todo_repository.update(todo_id, update_data)
+            updated_todo = self.todo_repository.update_by_id(todo_id, **update_data)
             return Result.success(updated_todo)
             
         except Exception as e:
@@ -269,21 +272,19 @@ class TodoServiceRefactored:
                 )
             
             # Toggle completion status
-            if todo.is_completed:
-                todo.mark_incomplete()
+            if todo.get('is_completed'):
                 update_data = {
                     'is_completed': False,
                     'completed_at': None
                 }
             else:
-                todo.mark_complete()
                 update_data = {
                     'is_completed': True,
-                    'completed_at': todo.completed_at
+                    'completed_at': datetime.utcnow()
                 }
             
             # Update in repository
-            updated_todo = self.todo_repository.update(todo_id, update_data)
+            updated_todo = self.todo_repository.update_by_id(todo_id, **update_data)
             return Result.success(updated_todo)
             
         except Exception as e:
@@ -316,7 +317,7 @@ class TodoServiceRefactored:
                 )
             
             # Delete the todo
-            success = self.todo_repository.delete(todo_id)
+            success = self.todo_repository.delete_by_id(todo_id)
             return Result.success(success)
             
         except Exception as e:

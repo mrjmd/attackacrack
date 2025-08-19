@@ -105,7 +105,14 @@ def verify_openphone_signature(f):
 @login_required
 def get_contacts():
     contact_service = current_app.services.get('contact')
-    contacts = contact_service.get_all_contacts()
+    result = contact_service.get_all_contacts()
+    
+    # Handle PagedResult properly
+    if result.is_failure:
+        return jsonify({'error': result.error}), 500
+    
+    # Access the data attribute which contains the list of contacts
+    contacts = result.data if result.data else []
     contact_list = [{'id': c.id, 'first_name': c.first_name, 'last_name': c.last_name, 'email': c.email, 'phone': c.phone} for c in contacts]
     return jsonify(contact_list)
 
@@ -191,7 +198,17 @@ def openphone_webhook():
     
     try:
         result = webhook_service.process_webhook(data)
-        return jsonify(result)
+        # Handle Result object properly
+        if hasattr(result, 'is_success'):
+            if result.is_success:
+                # Extract data from successful Result
+                return jsonify(result.data if result.data else {'status': 'success'})
+            else:
+                # Handle failure Result
+                return jsonify({'status': 'error', 'message': result.error}), 400
+        else:
+            # If it's not a Result object, return it directly (backward compatibility)
+            return jsonify(result)
     except Exception as e:
         current_app.logger.error(f"Error processing webhook: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': 'Internal server error'}), 500

@@ -14,8 +14,6 @@ from repositories.campaign_list_repository import CampaignListRepository
 from repositories.campaign_list_member_repository import CampaignListMemberRepository
 from repositories.contact_repository import ContactRepository
 from crm_database import CampaignList, CampaignListMember, Contact
-from tests.fixtures.factories.campaign_factory import CampaignListFactory, CampaignListMemberFactory
-from tests.fixtures.factories.contact_factory import ContactFactory
 
 
 class TestCampaignListServiceRefactored:
@@ -39,6 +37,32 @@ class TestCampaignListServiceRefactored:
     @pytest.fixture
     def service(self, mock_campaign_list_repository, mock_member_repository, mock_contact_repository):
         """Create service instance with mocked repositories"""
+        # Add required methods to mocks
+        mock_campaign_list_repository.create = Mock()
+        mock_campaign_list_repository.get_by_id = Mock()
+        mock_campaign_list_repository.get_all = Mock()
+        mock_campaign_list_repository.get_lists_ordered_by_created_desc = Mock()
+        mock_campaign_list_repository.update = Mock()
+        mock_campaign_list_repository.commit = Mock()
+        mock_campaign_list_repository.rollback = Mock()
+        mock_campaign_list_repository.flush = Mock()
+        
+        mock_member_repository.create = Mock()
+        mock_member_repository.find_one_by = Mock()
+        mock_member_repository.update = Mock()
+        mock_member_repository.get_contact_ids_in_list = Mock()
+        mock_member_repository.remove_contacts_from_list = Mock()
+        mock_member_repository.get_membership_stats = Mock()
+        mock_member_repository.commit = Mock()
+        mock_member_repository.rollback = Mock()
+        
+        mock_contact_repository.get_by_ids = Mock()
+        mock_contact_repository.find_by_csv_import = Mock()
+        mock_contact_repository.find_by_date_range = Mock()
+        mock_contact_repository.find_without_recent_activity = Mock()
+        mock_contact_repository.find_not_opted_out = Mock()
+        mock_contact_repository.find_by_metadata_keys = Mock()
+        
         return CampaignListServiceRefactored(
             campaign_list_repository=mock_campaign_list_repository,
             member_repository=mock_member_repository,
@@ -48,9 +72,10 @@ class TestCampaignListServiceRefactored:
     def test_create_list_success(self, service, mock_campaign_list_repository):
         """Test successful list creation"""
         # Arrange
-        expected_list = CampaignListFactory()
+        expected_list = Mock()
+        expected_list.id = 1
+        expected_list.name = 'Test List'
         mock_campaign_list_repository.create.return_value = expected_list
-        mock_campaign_list_repository.commit.return_value = None
         
         # Act
         result = service.create_list(
@@ -74,10 +99,11 @@ class TestCampaignListServiceRefactored:
     def test_create_dynamic_list_with_criteria(self, service, mock_campaign_list_repository):
         """Test creating dynamic list with filter criteria"""
         # Arrange
-        expected_list = CampaignListFactory(is_dynamic=True)
+        expected_list = Mock()
+        expected_list.id = 2
+        expected_list.is_dynamic = True
         filter_criteria = {'imported_after': datetime.utcnow()}
         mock_campaign_list_repository.create.return_value = expected_list
-        mock_campaign_list_repository.commit.return_value = None
         
         # Mock the refresh_dynamic_list call
         service.refresh_dynamic_list = Mock(return_value=Result.success({'added': 5, 'removed': 0}))
@@ -128,9 +154,8 @@ class TestCampaignListServiceRefactored:
         mock_member_repository.find_one_by.return_value = None
         
         # Mock member creation
-        created_members = [CampaignListMemberFactory() for _ in contact_ids]
+        created_members = [Mock() for _ in contact_ids]
         mock_member_repository.create.side_effect = created_members
-        mock_member_repository.commit.return_value = None
         
         # Act
         result = service.add_contacts_to_list(list_id, contact_ids, added_by)
@@ -153,13 +178,13 @@ class TestCampaignListServiceRefactored:
         contact_ids = [10, 11]
         
         # Mock first contact already exists as active
-        existing_member = CampaignListMemberFactory(status='active')
+        existing_member = Mock()
+        existing_member.status = 'active'
         mock_member_repository.find_one_by.side_effect = [existing_member, None]
         
         # Mock creation for second contact
-        new_member = CampaignListMemberFactory()
+        new_member = Mock()
         mock_member_repository.create.return_value = new_member
-        mock_member_repository.commit.return_value = None
         
         # Act
         result = service.add_contacts_to_list(list_id, contact_ids)
@@ -177,10 +202,10 @@ class TestCampaignListServiceRefactored:
         contact_ids = [10]
         
         # Mock existing removed member
-        removed_member = CampaignListMemberFactory(status='removed')
+        removed_member = Mock()
+        removed_member.status = 'removed'
         mock_member_repository.find_one_by.return_value = removed_member
         mock_member_repository.update.return_value = removed_member
-        mock_member_repository.commit.return_value = None
         
         # Act
         result = service.add_contacts_to_list(list_id, contact_ids, 'test-user')
@@ -221,7 +246,7 @@ class TestCampaignListServiceRefactored:
         # Arrange
         list_id = 1
         contact_ids = [10, 11, 12]
-        expected_contacts = [ContactFactory() for _ in contact_ids]
+        expected_contacts = [Mock(id=cid) for cid in contact_ids]
         
         mock_member_repository.get_contact_ids_in_list.return_value = contact_ids
         mock_contact_repository.get_by_ids.return_value = expected_contacts
@@ -241,9 +266,9 @@ class TestCampaignListServiceRefactored:
         list_id = 1
         mock_stats = {'total': 10, 'active': 8, 'removed': 2}
         contacts = [
-            ContactFactory(email='test1@example.com', phone='+1234567890'),
-            ContactFactory(email=None, phone='+1234567891'),
-            ContactFactory(email='test3@example.com', phone=None)
+            Mock(email='test1@example.com', phone='+1234567890'),
+            Mock(email=None, phone='+1234567891'),
+            Mock(email='test3@example.com', phone=None)
         ]
         
         mock_member_repository.get_membership_stats.return_value = mock_stats
@@ -265,7 +290,7 @@ class TestCampaignListServiceRefactored:
         """Test finding contacts by CSV import criteria"""
         # Arrange
         criteria = {'csv_import_id': 123}
-        expected_contacts = [ContactFactory() for _ in range(3)]
+        expected_contacts = [Mock() for _ in range(3)]
         mock_contact_repository.find_by_csv_import.return_value = expected_contacts
         
         # Act
@@ -285,7 +310,7 @@ class TestCampaignListServiceRefactored:
             'imported_after': start_date.isoformat(),
             'imported_before': end_date.isoformat()
         }
-        expected_contacts = [ContactFactory() for _ in range(5)]
+        expected_contacts = [Mock() for _ in range(5)]
         mock_contact_repository.find_by_date_range.return_value = expected_contacts
         
         # Act
@@ -303,7 +328,7 @@ class TestCampaignListServiceRefactored:
         """Test finding contacts with no recent contact"""
         # Arrange
         criteria = {'no_recent_contact': True, 'days_since_contact': 60}
-        expected_contacts = [ContactFactory() for _ in range(10)]
+        expected_contacts = [Mock() for _ in range(10)]
         mock_contact_repository.find_without_recent_activity.return_value = expected_contacts
         
         # Act
@@ -318,7 +343,7 @@ class TestCampaignListServiceRefactored:
         """Test finding contacts excluding opted out"""
         # Arrange
         criteria = {'exclude_opted_out': True}
-        expected_contacts = [ContactFactory() for _ in range(15)]
+        expected_contacts = [Mock() for _ in range(15)]
         mock_contact_repository.find_not_opted_out.return_value = expected_contacts
         
         # Act
@@ -333,28 +358,25 @@ class TestCampaignListServiceRefactored:
         """Test refreshing a dynamic list"""
         # Arrange
         list_id = 1
-        dynamic_list = CampaignListFactory(
-            id=list_id,
-            is_dynamic=True,
-            filter_criteria={'source': 'test'}
-        )
+        dynamic_list = Mock()
+        dynamic_list.id = list_id
+        dynamic_list.is_dynamic = True
+        dynamic_list.filter_criteria = {'source': 'test'}
         
         # Mock current members
         current_contact_ids = [10, 11, 12]
         # Mock matching contacts from criteria
-        matching_contacts = [ContactFactory(id=11), ContactFactory(id=12), ContactFactory(id=13)]
-        matching_ids = [11, 12, 13]
+        matching_contacts = [Mock(id=11), Mock(id=12), Mock(id=13)]
         
         mock_campaign_list_repository.get_by_id.return_value = dynamic_list
         mock_member_repository.get_contact_ids_in_list.return_value = current_contact_ids
         service.find_contacts_by_criteria = Mock(return_value=Result.success(matching_contacts))
         
         # Mock member operations
-        created_member = CampaignListMemberFactory()
+        created_member = Mock()
         mock_member_repository.create.return_value = created_member
         mock_member_repository.remove_contacts_from_list.return_value = 1
         mock_campaign_list_repository.update.return_value = dynamic_list
-        mock_campaign_list_repository.commit.return_value = None
         
         # Act
         result = service.refresh_dynamic_list(list_id)
@@ -378,7 +400,9 @@ class TestCampaignListServiceRefactored:
         """Test refreshing a non-dynamic list (should fail)"""
         # Arrange
         list_id = 1
-        static_list = CampaignListFactory(id=list_id, is_dynamic=False)
+        static_list = Mock()
+        static_list.id = list_id
+        static_list.is_dynamic = False
         mock_campaign_list_repository.get_by_id.return_value = static_list
         
         # Act
@@ -391,8 +415,8 @@ class TestCampaignListServiceRefactored:
     def test_get_all_lists(self, service, mock_campaign_list_repository):
         """Test getting all campaign lists"""
         # Arrange
-        expected_lists = [CampaignListFactory() for _ in range(3)]
-        mock_campaign_list_repository.get_all.return_value = expected_lists
+        expected_lists = [Mock() for _ in range(3)]
+        mock_campaign_list_repository.get_lists_ordered_by_created_desc.return_value = expected_lists
         
         # Act
         result = service.get_all_lists()
@@ -400,10 +424,7 @@ class TestCampaignListServiceRefactored:
         # Assert
         assert result.is_success
         assert result.data == expected_lists
-        mock_campaign_list_repository.get_all.assert_called_once_with(
-            order_by='created_at',
-            order=mock_campaign_list_repository.get_all.call_args[1]['order']
-        )
+        mock_campaign_list_repository.get_lists_ordered_by_created_desc.assert_called_once()
     
     def test_duplicate_list(self, service, mock_campaign_list_repository, mock_member_repository):
         """Test duplicating a campaign list"""
@@ -412,26 +433,25 @@ class TestCampaignListServiceRefactored:
         new_name = 'Duplicated List'
         created_by = 'test-user'
         
-        source_list = CampaignListFactory(
-            id=source_list_id,
-            name='Original List',
-            description='Original description',
-            filter_criteria={'source': 'test'}
-        )
+        source_list = Mock()
+        source_list.id = source_list_id
+        source_list.name = 'Original List'
+        source_list.description = 'Original description'
+        source_list.filter_criteria = {'source': 'test'}
         
         # Mock active members
         active_contact_ids = [10, 11, 12]
         
         # Mock new list creation
-        new_list = CampaignListFactory(id=2, name=new_name)
-        created_members = [CampaignListMemberFactory() for _ in active_contact_ids]
+        new_list = Mock()
+        new_list.id = 2
+        new_list.name = new_name
+        created_members = [Mock() for _ in active_contact_ids]
         
         mock_campaign_list_repository.get_by_id.return_value = source_list
         mock_campaign_list_repository.create.return_value = new_list
-        mock_campaign_list_repository.flush.return_value = None
         mock_member_repository.get_contact_ids_in_list.return_value = active_contact_ids
         mock_member_repository.create.side_effect = created_members
-        mock_campaign_list_repository.commit.return_value = None
         
         # Act
         result = service.duplicate_list(source_list_id, new_name, created_by)
@@ -468,7 +488,8 @@ class TestCampaignListServiceRefactored:
         """Test getting campaign list by ID"""
         # Arrange
         list_id = 1
-        expected_list = CampaignListFactory(id=list_id)
+        expected_list = Mock()
+        expected_list.id = list_id
         mock_campaign_list_repository.get_by_id.return_value = expected_list
         
         # Act

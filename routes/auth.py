@@ -36,12 +36,12 @@ def login():
         # Authenticate user and handle Result
         auth_result = auth_service.authenticate_user(email, password)
         
-        if auth_result.success:
+        if auth_result.is_success:
             user = auth_result.data
             # Login user with Flask-Login
             login_result = auth_service.login_user(user, remember=remember)
             
-            if login_result.success:
+            if login_result.is_success:
                 next_page = request.args.get('next')
                 if next_page:
                     return redirect(next_page)
@@ -83,13 +83,13 @@ def invite_user():
         # Create invite
         invite_result = auth_service.create_invite(email, role, invited_by_id=current_user.id)
         
-        if invite_result.success:
+        if invite_result.is_success:
             invite = invite_result.data
             # Send invite email
             base_url = request.url_root.rstrip('/')
             email_result = auth_service.send_invite_email(invite, base_url)
             
-            if email_result.success:
+            if email_result.is_success:
                 flash(f'Invitation sent to {email}', 'success')
             else:
                 flash(f'Invitation created but email failed: {email_result.error}', 'warning')
@@ -112,7 +112,7 @@ def accept_invite(token):
     # Validate token
     invite_result = auth_service.validate_invite(token)
     
-    if not invite_result.success:
+    if not invite_result.is_success:
         flash(invite_result.error or 'Invalid or expired invite', 'error')
         return redirect(url_for('auth.login'))
     
@@ -133,7 +133,7 @@ def accept_invite(token):
             # Create user
             user_result = auth_service.use_invite(token, password, first_name, last_name)
             
-            if user_result.success:
+            if user_result.is_success:
                 flash('Account created successfully! Please log in.', 'success')
                 return redirect(url_for('auth.login'))
             else:
@@ -162,7 +162,7 @@ def profile():
                                                    first_name=first_name, 
                                                    last_name=last_name)
             
-            if update_result.success:
+            if update_result.is_success:
                 flash('Profile updated successfully', 'success')
             else:
                 flash(update_result.error or 'Failed to update profile', 'error')
@@ -178,7 +178,7 @@ def profile():
             else:
                 password_result = auth_service.change_password(current_user.id, current_password, new_password)
                 
-                if password_result.success:
+                if password_result.is_success:
                     flash('Password changed successfully', 'success')
                 else:
                     flash(password_result.error or 'Failed to change password', 'error')
@@ -199,7 +199,7 @@ def manage_users():
     # Get users with pagination
     users_result = auth_service.get_all_users(page=page, per_page=per_page)
     
-    if users_result.success:
+    if users_result.is_success:
         users = users_result.data
     else:
         users = []
@@ -208,14 +208,14 @@ def manage_users():
     # Get pending invites
     invites_result = auth_service.get_pending_invites()
     
-    if invites_result.success:
+    if invites_result.is_success:
         invites = invites_result.data
     else:
         invites = []
     
     # Create pagination object from PagedResult metadata
     pagination = None
-    if users_result.success:
+    if users_result.is_success:
         pagination = {
             'total': users_result.total,
             'page': users_result.page,
@@ -243,7 +243,7 @@ def toggle_user_status(user_id):
         
         toggle_result = auth_service.toggle_user_status(user_id)
         
-        if toggle_result.success:
+        if toggle_result.is_success:
             flash('User status updated successfully', 'success')
         else:
             flash(toggle_result.error or 'Failed to update user status', 'error')

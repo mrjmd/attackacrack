@@ -81,6 +81,12 @@ def create_app(config_name=None, test_config=None):
     )
     
     registry.register_factory(
+        'contact_flag_repository',
+        lambda db_session: _create_contact_flag_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
         'activity_repository',
         lambda db_session: _create_activity_repository(db_session),
         dependencies=['db_session']
@@ -110,11 +116,46 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    registry.register_factory(
+        'webhook_event_repository',
+        lambda db_session: _create_webhook_event_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'invoice_repository',
+        lambda db_session: _create_invoice_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'quote_repository',
+        lambda db_session: _create_quote_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'job_repository',
+        lambda db_session: _create_job_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Register services with lazy loading factories
     # These won't be instantiated until first use
     
     # Basic services without dependencies
-    registry.register_singleton('contact', lambda: _create_contact_service())
+    registry.register_factory(
+        'job',
+        lambda job_repository: _create_job_service(job_repository),
+        dependencies=['job_repository']
+    )
+    registry.register_singleton(
+        'contact',
+        lambda contact_repository, campaign_repository, contact_flag_repository: _create_contact_service(
+            contact_repository, campaign_repository, contact_flag_repository
+        ),
+        dependencies=['contact_repository', 'campaign_repository', 'contact_flag_repository']
+    )
     
     # Setting service with repository dependency
     registry.register_factory(
@@ -147,7 +188,13 @@ def create_app(config_name=None, test_config=None):
         dependencies=['job_repository']
     )
     registry.register_singleton('quote', lambda: _create_quote_service())
-    registry.register_singleton('invoice', lambda: _create_invoice_service())
+    registry.register_factory(
+        'invoice',
+        lambda invoice_repository, quote_repository: _create_invoice_service(
+            invoice_repository, quote_repository
+        ),
+        dependencies=['invoice_repository', 'quote_repository']
+    )
     registry.register_singleton(
         'sms_metrics',
         lambda activity_repository, contact_repository, campaign_repository: _create_sms_metrics_service(
@@ -199,6 +246,14 @@ def create_app(config_name=None, test_config=None):
         'campaign_list',
         lambda db_session: _create_campaign_list_service(db_session),
         dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'openphone_webhook',
+        lambda activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics: _create_openphone_webhook_service(
+            activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics
+        ),
+        dependencies=['activity_repository', 'conversation_repository', 'webhook_event_repository', 'contact', 'sms_metrics']
     )
     
     registry.register_factory(
@@ -429,11 +484,15 @@ def create_app(config_name=None, test_config=None):
 # Service Factory Functions
 # These are only called when the service is first requested
 
-def _create_contact_service():
-    """Create ContactService instance"""
+def _create_contact_service(contact_repository, campaign_repository, contact_flag_repository):
+    """Create ContactService instance with repositories"""
     from services.contact_service_refactored import ContactService
     logger.info("Initializing ContactService")
-    return ContactService()
+    return ContactService(
+        contact_repository=contact_repository,
+        campaign_repository=campaign_repository,
+        contact_flag_repository=contact_flag_repository
+    )
 
 def _create_message_service():
     """Create MessageService instance"""
@@ -528,16 +587,14 @@ def _create_quote_service():
         line_item_repository=line_item_repo
     )
 
-def _create_invoice_service():
-    """Create InvoiceService instance"""
+def _create_invoice_service(invoice_repository, quote_repository):
+    """Create InvoiceService instance with injected repositories"""
     from services.invoice_service_refactored import InvoiceService
-    from repositories.invoice_repository import InvoiceRepository
-    from repositories.quote_repository import QuoteRepository
-    from crm_database import Invoice, Quote, db
     logger.info("Initializing InvoiceService")
-    invoice_repo = InvoiceRepository(db.session, Invoice)
-    quote_repo = QuoteRepository(db.session, Quote)
-    return InvoiceService(invoice_repository=invoice_repo, quote_repository=quote_repo)
+    return InvoiceService(
+        invoice_repository=invoice_repository,
+        quote_repository=quote_repository
+    )
 
 def _create_sms_metrics_service(activity_repository, contact_repository, campaign_repository):
     """Create SMSMetricsService with repository dependencies"""
@@ -559,6 +616,18 @@ def _create_openphone_service():
         logger.warning("OpenPhone API key not configured")
         return None
     return OpenPhoneService()  # Uses env vars internally
+
+def _create_openphone_webhook_service(activity_repository, conversation_repository, webhook_event_repository, contact_service, sms_metrics_service):
+    """Create OpenPhoneWebhookServiceRefactored instance with all dependencies"""
+    from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
+    logger.info("Initializing OpenPhoneWebhookServiceRefactored")
+    return OpenPhoneWebhookServiceRefactored(
+        activity_repository=activity_repository,
+        conversation_repository=conversation_repository, 
+        webhook_event_repository=webhook_event_repository,
+        contact_service=contact_service,
+        sms_metrics_service=sms_metrics_service
+    )
 
 def _create_google_calendar_service():
     """Create GoogleCalendarService instance - expensive due to OAuth"""
@@ -662,6 +731,12 @@ def _create_campaign_repository(db_session):
     from crm_database import Campaign
     return CampaignRepository(session=db_session, model_class=Campaign)
 
+def _create_contact_flag_repository(db_session):
+    """Create ContactFlagRepository instance"""
+    from repositories.contact_flag_repository import ContactFlagRepository
+    from crm_database import ContactFlag
+    return ContactFlagRepository(session=db_session, model_class=ContactFlag)
+
 def _create_activity_repository(db_session):
     """Create ActivityRepository instance"""
     from repositories.activity_repository import ActivityRepository
@@ -691,6 +766,24 @@ def _create_appointment_repository(db_session):
     from repositories.appointment_repository import AppointmentRepository
     from crm_database import Appointment
     return AppointmentRepository(session=db_session, model_class=Appointment)
+
+def _create_webhook_event_repository(db_session):
+    """Create WebhookEventRepository instance"""
+    from repositories.webhook_event_repository import WebhookEventRepository
+    from crm_database import WebhookEvent
+    return WebhookEventRepository(session=db_session, model_class=WebhookEvent)
+
+def _create_invoice_repository(db_session):
+    """Create InvoiceRepository instance"""
+    from repositories.invoice_repository import InvoiceRepository
+    from crm_database import Invoice
+    return InvoiceRepository(session=db_session, model_class=Invoice)
+
+def _create_quote_repository(db_session):
+    """Create QuoteRepository instance"""
+    from repositories.quote_repository import QuoteRepository
+    from crm_database import Quote
+    return QuoteRepository(session=db_session, model_class=Quote)
 
 def _create_setting_service(setting_repository):
     """Create SettingService instance"""

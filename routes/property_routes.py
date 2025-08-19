@@ -48,7 +48,7 @@ def add_property():
     # Get contacts and extract data from PagedResult for template iteration
     contacts_result = contact_service.get_all_contacts()
     
-    if contacts_result.success:
+    if contacts_result.is_success:
         contacts = contacts_result.data
     else:
         contacts = []
@@ -73,7 +73,7 @@ def edit_property(property_id):
     # Get contacts and extract data from PagedResult for template iteration
     contacts_result = contact_service.get_all_contacts()
     
-    if contacts_result.success:
+    if contacts_result.is_success:
         contacts = contacts_result.data
     else:
         contacts = []
