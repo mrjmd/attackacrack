@@ -623,6 +623,43 @@ class CampaignService:
                 'ab_test': None
             }
     
+    def get_recent_sends(self, campaign_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get recent sends for a campaign.
+        
+        Args:
+            campaign_id: Campaign ID
+            limit: Maximum number of sends to return
+            
+        Returns:
+            List of recent send information
+        """
+        try:
+            # Get recent campaign memberships that have been sent
+            memberships = self.campaign_repository.get_campaign_memberships(campaign_id)
+            recent_sent = [m for m in memberships if m.status == 'sent'][:limit]
+            
+            # Convert to dict format for template with contact data
+            sends = []
+            for membership in recent_sent:
+                # Get the contact information
+                contact = None
+                if self.contact_repository:
+                    contact = self.contact_repository.get_by_id(membership.contact_id)
+                
+                sends.append({
+                    'contact_id': membership.contact_id,
+                    'contact': contact,  # Full contact object for template
+                    'sent_at': membership.sent_at,
+                    'status': membership.status,
+                    'variant_sent': getattr(membership, 'variant_sent', 'A')
+                })
+            
+            return sends
+        except Exception as e:
+            logger.error(f"Error getting recent sends for campaign {campaign_id}: {e}")
+            return []
+    
     def get_all_campaigns_with_analytics(self) -> List[Dict[str, Any]]:
         """
         Get all campaigns with their analytics data.
@@ -649,7 +686,11 @@ class CampaignService:
                     'analytics': {
                         'sent_count': analytics.get('sent_count', 0),
                         'response_count': analytics.get('response_count', 0),
-                        'response_rate': analytics.get('response_rate', 0)
+                        'response_rate': analytics.get('response_rate', 0),
+                        'total_recipients': analytics.get('total_recipients', 0),
+                        'sends_today': analytics.get('sends_today', 0),
+                        'daily_limit': analytics.get('daily_limit', 125),
+                        'ab_test': analytics.get('ab_test', None)
                     }
                 }
                 campaign_data.append(campaign_item)
