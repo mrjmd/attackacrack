@@ -139,9 +139,10 @@ class TestJobRepository:
         completed_jobs = job_repository.find_by(status='Completed')
         active_jobs = job_repository.find_by(status='Active')
         
-        # Assert
-        assert len(completed_jobs) == 3  # Three completed jobs
-        assert len(active_jobs) == 1     # One active job
+        # Assert - Account for seed data from conftest.py
+        # The app fixture creates 1 Active job ("Test Job") + sample_jobs creates 1 Active job
+        assert len(completed_jobs) == 3  # Three completed jobs from sample_jobs
+        assert len(active_jobs) == 2     # One from seed data + one from sample_jobs
         
         for job in completed_jobs:
             assert job.status == 'Completed'
@@ -167,8 +168,8 @@ class TestJobRepository:
         # Act
         all_jobs = job_repository.get_all()
         
-        # Assert
-        assert len(all_jobs) == 4
+        # Assert - Account for seed data (1 job) + sample_jobs (4 jobs)
+        assert len(all_jobs) == 5
         descriptions = [j.description for j in all_jobs]
         assert 'Completed job from yesterday' in descriptions
         assert 'Active job' in descriptions
@@ -212,9 +213,9 @@ class TestJobRepository:
         completed_count = job_repository.count(status='Completed')
         active_count = job_repository.count(status='Active')
         
-        # Assert
+        # Assert - Account for seed data (1 Active job) + sample_jobs (1 Active, 3 Completed)
         assert completed_count == 3
-        assert active_count == 1
+        assert active_count == 2
     
     def test_search_jobs(self, job_repository, sample_jobs):
         """Test searching jobs by description"""
