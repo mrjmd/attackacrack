@@ -83,7 +83,7 @@ class TestActivityRepository:
         
         # Assert
         assert result == mock_activities
-        mock_query.filter_by.assert_called_once_with(type="sms")
+        mock_query.filter_by.assert_called_once_with(activity_type="sms")
     
     def test_find_by_openphone_id(self, repository, mock_session):
         """Test finding activity by OpenPhone ID"""
@@ -131,7 +131,7 @@ class TestActivityRepository:
         
         # Assert
         assert result == 42
-        mock_query.filter_by.assert_called_once_with(type="call")
+        mock_query.filter_by.assert_called_once_with(activity_type="call")
     
     def test_update_activity_summary(self, repository, mock_session):
         """Test updating activity summary"""

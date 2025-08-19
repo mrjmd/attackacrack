@@ -116,9 +116,20 @@ Bob,Johnson,+15555551234,bob@example.com"""
         service.contact_repository.find_by_phone.return_value = None  # No existing contacts
         service.contact_repository.create.return_value = Mock(id=1)
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         mock_csv_import_repo.create.assert_called_once()
@@ -179,15 +190,29 @@ Bob,Johnson,+15555551234,bob@example.com"""
         existing_contact.first_name = 'John'
         existing_contact.last_name = None
         existing_contact.email = None
+        existing_contact.contact_metadata = {}
         mock_contact_repo.find_by_phone.return_value = existing_contact
         
         # Mock dependencies
         service.csv_import_repository.create.return_value = Mock(id=1)
         service.csv_import_repository.update_import_status.return_value = Mock()
+        service.contact_csv_import_repository.exists_for_contact_and_import.return_value = False
+        service.contact_csv_import_repository.create.return_value = Mock()
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):        
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         mock_contact_repo.find_by_phone.assert_called()
@@ -206,10 +231,23 @@ Bob,Johnson,+15555551234,bob@example.com"""
         # Mock dependencies
         service.csv_import_repository.create.return_value = Mock(id=1)
         service.csv_import_repository.update_import_status.return_value = Mock()
+        service.contact_csv_import_repository.exists_for_contact_and_import.return_value = False
+        service.contact_csv_import_repository.create.return_value = Mock()
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):        
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         mock_contact_repo.find_by_phone.assert_called()
@@ -227,9 +265,20 @@ Bob,Johnson,+15555551234,bob@example.com"""
         service.contact_repository.create.return_value = Mock(id=456)
         mock_contact_csv_import_repo.exists_for_contact_and_import.return_value = False
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         mock_contact_csv_import_repo.exists_for_contact_and_import.assert_called()
@@ -244,11 +293,27 @@ Bob,Johnson,+15555551234,bob@example.com"""
         # Mock dependencies
         service.csv_import_repository.create.return_value = Mock(id=1)
         service.csv_import_repository.update_import_status.return_value = Mock()
-        service.contact_repository.find_by_phone.return_value = Mock(id=456)
+        existing_contact = Mock(id=456)
+        existing_contact.first_name = 'Existing'
+        existing_contact.last_name = 'Contact'
+        existing_contact.email = None
+        existing_contact.contact_metadata = {}
+        service.contact_repository.find_by_phone.return_value = existing_contact
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         mock_contact_csv_import_repo.exists_for_contact_and_import.assert_called()
@@ -267,10 +332,23 @@ Bob,Johnson,+15555551234,bob@example.com"""
         service.campaign_list_repository.create.return_value = Mock(id=1)
         service.contact_repository.find_by_phone.return_value = None
         service.contact_repository.create.return_value = Mock(id=456)
+        service.contact_csv_import_repository.exists_for_contact_and_import.return_value = False
+        service.contact_csv_import_repository.create.return_value = Mock()
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file, create_list=True)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file, create_list=True)
         
         # Assert
         mock_campaign_list_member_repo.find_by_list_and_contact.assert_called()
@@ -290,10 +368,23 @@ Bob,Johnson,+15555551234,bob@example.com"""
         service.campaign_list_repository.create.return_value = Mock(id=1)
         service.contact_repository.find_by_phone.return_value = None
         service.contact_repository.create.return_value = Mock(id=456)
+        service.contact_csv_import_repository.exists_for_contact_and_import.return_value = False
+        service.contact_csv_import_repository.create.return_value = Mock()
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file, create_list=True)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file, create_list=True)
         
         # Assert
         mock_campaign_list_member_repo.update.assert_called()
@@ -312,9 +403,20 @@ Bob,Johnson,+15555551234,bob@example.com"""
         service.contact_repository.find_by_phone.return_value = None
         service.contact_repository.create.return_value = Mock(id=456)
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         mock_csv_import_repo.update_import_status.assert_called_once()
@@ -335,9 +437,20 @@ Bob,Johnson,+15555551234,bob@example.com"""
         mock_csv_import_repo.create.return_value = Mock(id=1)
         service.contact_repository.find_by_phone.return_value = None
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         # Should still update import record with error information
@@ -357,17 +470,24 @@ Bob,Johnson,+15555551234,bob@example.com"""
         # Mock dependencies
         service.csv_import_repository.create.return_value = Mock(id=1)
         service.csv_import_repository.update_import_status.return_value = Mock()
+        service.contact_csv_import_repository.exists_for_contact_and_import.return_value = False
+        service.contact_csv_import_repository.create.return_value = Mock()
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            # Patch DictReader to return multiple rows
-            with patch('csv.DictReader') as mock_reader:
-                mock_reader.return_value = [
-                    {'first_name': 'John', 'phone': '+11234567890'},
-                    {'first_name': 'Jane', 'phone': '+19876543210'}
-                ]
-                mock_reader.return_value.fieldnames = ['first_name', 'phone']
-                result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'phone']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'phone': '+11234567890'},
+                        {'first_name': 'Jane', 'phone': '+19876543210'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         # Should call repositories multiple times for multiple contacts
@@ -436,9 +556,20 @@ Bob,Johnson,+15555551234,bob@example.com"""
         service.contact_repository.find_by_phone.return_value = None
         service.contact_repository.create.return_value = Mock(id=456)
         
-        # Act
-        with patch('builtins.open'), patch('csv.DictReader'), patch('os.remove'):
-            result = service.import_contacts(file)
+        # Mock service methods
+        with patch.object(service, 'normalize_phone', return_value='+11234567890'), \
+             patch.object(service, 'detect_format', return_value='standard'), \
+             patch.object(service, '_extract_metadata_from_mapped', return_value={}):
+            # Act
+            with patch('builtins.open'), patch('os.remove'):
+                with patch('csv.DictReader') as mock_csv_reader:
+                    mock_reader_instance = Mock()
+                    mock_reader_instance.fieldnames = ['first_name', 'last_name', 'phone', 'email']
+                    mock_reader_instance.__iter__ = Mock(return_value=iter([
+                        {'first_name': 'John', 'last_name': 'Doe', 'phone': '+11234567890', 'email': 'john@example.com'}
+                    ]))
+                    mock_csv_reader.return_value = mock_reader_instance
+                    result = service.import_contacts(file)
         
         # Assert
         # Repositories should handle their own transactions

@@ -7,16 +7,14 @@ import json
 import random
 import statistics
 from datetime import datetime, time, timedelta
-from typing import List, Dict, Optional, Tuple, Any, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from crm_database import Campaign
+from typing import List, Dict, Optional, Tuple, Any
 from scipy import stats
 # Session import removed - using repositories only
 
 from repositories.campaign_repository import CampaignRepository
 from repositories.contact_repository import ContactRepository
 from repositories.contact_flag_repository import ContactFlagRepository
+from repositories.activity_repository import ActivityRepository
 from repositories.base_repository import PaginationParams
 from services.common.result import Result
 # Model imports removed - using repositories only
@@ -32,6 +30,7 @@ class CampaignService:
                  campaign_repository: Optional[CampaignRepository] = None,
                  contact_repository: Optional[ContactRepository] = None,
                  contact_flag_repository: Optional[ContactFlagRepository] = None,
+                 activity_repository: Optional[ActivityRepository] = None,
                  openphone_service=None,
                  list_service=None,
 ):
@@ -42,6 +41,7 @@ class CampaignService:
             campaign_repository: CampaignRepository for campaign data access
             contact_repository: ContactRepository for contact data access
             contact_flag_repository: ContactFlagRepository for flag management
+            activity_repository: ActivityRepository for activity tracking
             openphone_service: OpenPhoneService for SMS sending
             list_service: CampaignListService for list management
         """
@@ -49,6 +49,7 @@ class CampaignService:
         self.campaign_repository = campaign_repository
         self.contact_repository = contact_repository
         self.contact_flag_repository = contact_flag_repository
+        self.activity_repository = activity_repository
         self.openphone_service = openphone_service
         self.list_service = list_service
         
@@ -65,7 +66,7 @@ class CampaignService:
                        template_a: str = '',
                        template_b: str = None,
                        daily_limit: int = 125,
-                       business_hours_only: bool = True) -> 'Result[Campaign]':
+                       business_hours_only: bool = True) -> 'Result[Dict]':
         """
         Create a new marketing campaign.
         
@@ -686,3 +687,221 @@ class CampaignService:
         self.contact_flag_repository.commit()
         logger.info(f"Cleaned up {count} expired contact flags")
         return count
+    
+    def process_campaign_queue(self) -> 'Result[Dict[str, Any]]':
+        """
+        Process pending campaign messages and send them via OpenPhone.
+        
+        Returns:
+            Dict with statistics: messages_sent, messages_skipped, errors, daily_limits_reached
+        """
+        logger.info("Processing campaign queue")
+        
+        stats = {
+            'messages_sent': 0,
+            'messages_skipped': 0,
+            'errors': [],
+            'daily_limits_reached': []
+        }
+        
+        try:
+            # Find active campaigns that need to send messages
+            active_campaigns = self.campaign_repository.get_active_campaigns()
+            
+            for campaign in active_campaigns:
+                campaign_id = campaign.id
+                campaign_name = campaign.name
+                
+                # Check if campaign can send today (daily limit)
+                can_send, remaining = self.can_send_today(campaign_id)
+                if not can_send:
+                    logger.info(f"Campaign {campaign_name} has reached daily limit")
+                    stats['daily_limits_reached'].append(campaign_name)
+                    continue
+                
+                # Check business hours if required
+                if campaign.business_hours_only and not self.is_business_hours():
+                    logger.info(f"Skipping campaign {campaign_name} - outside business hours")
+                    continue
+                
+                # Get pending members for this campaign
+                pending_members = self.campaign_repository.get_pending_members(campaign_id, limit=remaining)
+                
+                logger.info(f"Processing {len(pending_members)} pending messages for campaign {campaign_name}")
+                
+                for member in pending_members:
+                    try:
+                        # Get contact info (should be already loaded via joinedload)
+                        contact = member.contact if hasattr(member, 'contact') else self.contact_repository.get_by_id(member.contact_id)
+                        if not contact or not contact.phone:
+                            logger.warning(f"Skipping member {member.id} - no phone number")
+                            self.campaign_repository.update_member_status(
+                                campaign_id, member.contact_id, 'skipped'
+                            )
+                            stats['messages_skipped'] += 1
+                            continue
+                        
+                        # Check for opt-out flags
+                        if self.contact_flag_repository.check_contact_has_flag_type(contact.id, 'opted_out'):
+                            logger.info(f"Skipping contact {contact.phone} - opted out")
+                            self.campaign_repository.update_member_status(
+                                campaign_id, member.contact_id, 'skipped'
+                            )
+                            stats['messages_skipped'] += 1
+                            continue
+                        
+                        # Assign A/B variant if needed
+                        variant = member.variant_sent
+                        if not variant and campaign.campaign_type == 'ab_test':
+                            variant = self.assign_ab_variant(campaign_id, member.contact_id)
+                        
+                        # Get message template
+                        if variant == 'B' and campaign.template_b:
+                            template = campaign.template_b
+                        else:
+                            template = campaign.template_a
+                            variant = 'A'  # Default to A if not A/B test
+                        
+                        # Personalize message
+                        message = self._personalize_message(template, contact)
+                        
+                        # Send message via OpenPhone
+                        if self.openphone_service:
+                            send_result = self.openphone_service.send_message(contact.phone, message)
+                            
+                            if send_result.get('success'):
+                                # Update membership status
+                                self.campaign_repository.update_member_status(
+                                    campaign_id, member.contact_id, 'sent'
+                                )
+                                
+                                # Update variant for A/B test
+                                if variant:
+                                    membership = self.campaign_repository.get_member_by_contact(campaign_id, member.contact_id)
+                                    if membership:
+                                        membership.variant_sent = variant
+                                        self.campaign_repository.session.flush()
+                                
+                                # TODO: Create activity record (Activity model needs campaign_id field)
+                                # For now, skip activity creation to focus on message sending
+                                
+                                stats['messages_sent'] += 1
+                                logger.info(f"Sent message to {contact.phone}")
+                                
+                            else:
+                                # Handle send failure
+                                error_msg = send_result.get('error', 'Unknown error')
+                                self.campaign_repository.update_member_status(
+                                    campaign_id, member.contact_id, 'failed'
+                                )
+                                stats['messages_skipped'] += 1
+                                stats['errors'].append(f"Failed to send to {contact.phone}: {error_msg}")
+                                logger.error(f"Failed to send message to {contact.phone}: {error_msg}")
+                        else:
+                            # No OpenPhone service configured
+                            logger.warning("No OpenPhone service configured - cannot send messages")
+                            stats['messages_skipped'] += 1
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing member {member.id}: {e}")
+                        stats['errors'].append(f"Error processing member {member.id}: {str(e)}")
+                        stats['messages_skipped'] += 1
+                        
+                        # Mark as failed
+                        try:
+                            self.campaign_repository.update_member_status(
+                                campaign_id, member.contact_id, 'failed'
+                            )
+                        except Exception as update_error:
+                            logger.error(f"Failed to update member status: {update_error}")
+            
+            # Commit all changes
+            self.campaign_repository.commit()
+            
+            logger.info(f"Campaign queue processing complete. Sent: {stats['messages_sent']}, Skipped: {stats['messages_skipped']}")
+            
+        except Exception as e:
+            logger.error(f"Error processing campaign queue: {e}")
+            stats['errors'].append(f"Queue processing error: {str(e)}")
+            
+        from services.common.result import Result
+        return Result.success(stats)
+    
+    def handle_opt_out(self, phone: str, message: str) -> bool:
+        """
+        Handle opt-out request from incoming message.
+        
+        Args:
+            phone: Phone number of the contact
+            message: Message content to check for opt-out keywords
+            
+        Returns:
+            True if opt-out was processed, False if not an opt-out
+        """
+        # Opt-out keywords (case-insensitive substring match)
+        opt_out_keywords = [
+            'stop', 'unsubscribe', 'opt out', 'opt-out', 'remove me', 
+            'cancel', 'quit', 'end', 'leave me alone'
+        ]
+        
+        message_lower = message.lower().strip()
+        
+        # Check if message contains any opt-out keywords
+        is_opt_out = any(keyword in message_lower for keyword in opt_out_keywords)
+        
+        if is_opt_out:
+            logger.info(f"Processing opt-out request from {phone}: {message}")
+            
+            try:
+                # Find contact by phone
+                contact = self.contact_repository.find_by_phone(phone)
+                
+                if contact:
+                    # Create opt-out flag
+                    self.contact_flag_repository.create_flag_for_contact(
+                        contact_id=contact.id,
+                        flag_type='opted_out',
+                        flag_reason=f'STOP received: {message[:50]}',
+                        applies_to='sms'
+                    )
+                    self.contact_flag_repository.commit()
+                    
+                    logger.info(f"Created opt-out flag for contact {contact.id} ({phone})")
+                    return True
+                else:
+                    logger.warning(f"Could not find contact with phone {phone} for opt-out")
+                    return False
+                    
+            except Exception as e:
+                logger.error(f"Error processing opt-out for {phone}: {e}")
+                return False
+        
+        return False
+    
+    def _personalize_message(self, template: str, contact) -> str:
+        """
+        Personalize message template with contact data.
+        
+        Args:
+            template: Message template with placeholders
+            contact: Contact object with data
+            
+        Returns:
+            Personalized message
+        """
+        try:
+            # Replace common placeholders
+            message = template
+            if hasattr(contact, 'first_name') and contact.first_name:
+                message = message.replace('{first_name}', contact.first_name)
+            if hasattr(contact, 'last_name') and contact.last_name:
+                message = message.replace('{last_name}', contact.last_name)
+            if hasattr(contact, 'name') and contact.name:
+                message = message.replace('{name}', contact.name)
+            if hasattr(contact, 'company_name') and contact.company_name:
+                message = message.replace('{company}', contact.company_name)
+                
+            return message
+        except Exception as e:
+            logger.error(f"Error personalizing message: {e}")
+            return template

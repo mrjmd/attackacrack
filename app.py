@@ -291,10 +291,10 @@ def create_app(config_name=None, test_config=None):
     # Services with multiple dependencies
     registry.register_factory(
         'campaign',
-        lambda openphone, campaign_list, campaign_repository, contact_repository: _create_campaign_service(
-            openphone, campaign_list, campaign_repository, contact_repository
+        lambda openphone, campaign_list, campaign_repository, contact_repository, activity_repository: _create_campaign_service(
+            openphone, campaign_list, campaign_repository, contact_repository, activity_repository
         ),
-        dependencies=['openphone', 'campaign_list', 'campaign_repository', 'contact_repository']
+        dependencies=['openphone', 'campaign_list', 'campaign_repository', 'contact_repository', 'activity_repository']
     )
     
     registry.register_factory(
@@ -832,7 +832,7 @@ def _create_sync_health_service(db_session):
     logger.info("Initializing SyncHealthService")
     return SyncHealthService()
 
-def _create_campaign_service(openphone, campaign_list, campaign_repository, contact_repository):
+def _create_campaign_service(openphone, campaign_list, campaign_repository, contact_repository, activity_repository):
     """Create CampaignService with dependencies"""
     from services.campaign_service_refactored import CampaignService
     from repositories.contact_flag_repository import ContactFlagRepository
@@ -847,6 +847,7 @@ def _create_campaign_service(openphone, campaign_list, campaign_repository, cont
         campaign_repository=campaign_repository,
         contact_repository=contact_repository,
         contact_flag_repository=contact_flag_repo,
+        activity_repository=activity_repository,
         openphone_service=openphone,
         list_service=campaign_list
     )

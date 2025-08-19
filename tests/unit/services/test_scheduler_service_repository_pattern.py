@@ -9,8 +9,7 @@ exact scheduling functionality.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import date, datetime, timedelta
-# from services.scheduler_service import SchedulerService  # Commented out - celery not installed
-SchedulerService = None  # Mock placeholder
+from services.scheduler_service import SchedulerService
 from repositories.setting_repository import SettingRepository
 from repositories.job_repository import JobRepository
 from repositories.quote_repository import QuoteRepository
