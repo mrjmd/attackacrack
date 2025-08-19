@@ -105,8 +105,7 @@ def campaign_detail(campaign_id):
     analytics = campaign_service.get_campaign_analytics(campaign_id)
     
     # Get bounce metrics for this campaign
-    from services.sms_metrics_service import SMSMetricsService
-    metrics_service = SMSMetricsService()
+    metrics_service = current_app.services.get('sms_metrics')
     bounce_metrics = metrics_service.get_campaign_metrics(campaign_id)
     
     # Get recent sends for activity feed
