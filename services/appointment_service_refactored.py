@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, date
 # Model and db imports removed - using repositories only
 from services.google_calendar_service import GoogleCalendarService
 from repositories.appointment_repository import AppointmentRepository
+from services.common.result import Result
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -17,25 +18,23 @@ class AppointmentService:
     """Service for managing appointments with Google Calendar integration"""
     
     def __init__(self, 
-                 calendar_service: Optional[GoogleCalendarService] = None,
-                 repository: Optional[AppointmentRepository] = None,
-):
+                 appointment_repository: AppointmentRepository,
+                 google_calendar_service: Optional[GoogleCalendarService] = None
+    ):
         """
         Initialize AppointmentService with dependencies
         
         Args:
-            calendar_service: GoogleCalendarService instance for calendar integration
-            repository: AppointmentRepository for data access (preferred over session)
+            appointment_repository: AppointmentRepository for data access
+            google_calendar_service: GoogleCalendarService instance for calendar integration
         """
-        self.calendar_service = calendar_service
-        
-        # Repository must be injected
-        if repository:
-            self.repository = repository
-        else:
+        if not appointment_repository:
             raise ValueError("AppointmentRepository must be provided via dependency injection")
+        
+        self.repository = appointment_repository
+        self.calendar_service = google_calendar_service
     
-    def add_appointment(self, **kwargs) -> Dict:
+    def add_appointment(self, **kwargs) -> Result[Dict]:
         """
         Add a new appointment with optional Google Calendar sync
         
@@ -49,34 +48,39 @@ class AppointmentService:
             sync_to_calendar: Whether to sync to Google Calendar (default: True)
             
         Returns:
-            Created Appointment instance
+            Result containing created Appointment instance
         """
-        # Create the appointment using repository
-        appointment_data = {
-            'title': kwargs.get('title'),
-            'description': kwargs.get('description'),
-            'date': kwargs.get('date'),
-            'time': kwargs.get('time'),
-            'contact_id': kwargs.get('contact_id')
-        }
-        new_appointment = self.repository.create(**appointment_data)
-        # Commit to get ID before calendar sync
-        self.repository.commit()
-        
-        # Sync to Google Calendar if service available and not disabled
-        sync_to_calendar = kwargs.get('sync_to_calendar', True)
-        if self.calendar_service and sync_to_calendar:
-            calendar_event_id = self._sync_to_google_calendar(new_appointment, kwargs)
-            if calendar_event_id:
-                self.repository.update(new_appointment, google_calendar_event_id=calendar_event_id)
-                self.repository.commit()
-        elif not self.calendar_service and sync_to_calendar:
-            logger.warning(
-                "Google Calendar sync requested but calendar service not available",
-                appointment_id=new_appointment.id
-            )
-        
-        return new_appointment
+        try:
+            # Create the appointment using repository
+            appointment_data = {
+                'title': kwargs.get('title'),
+                'description': kwargs.get('description'),
+                'date': kwargs.get('date'),
+                'time': kwargs.get('time'),
+                'contact_id': kwargs.get('contact_id')
+            }
+            new_appointment = self.repository.create(**appointment_data)
+            # Commit to get ID before calendar sync
+            self.repository.commit()
+            
+            # Sync to Google Calendar if service available and not disabled
+            sync_to_calendar = kwargs.get('sync_to_calendar', True)
+            if self.calendar_service and sync_to_calendar:
+                calendar_event_id = self._sync_to_google_calendar(new_appointment, kwargs)
+                if calendar_event_id:
+                    self.repository.update(new_appointment, google_calendar_event_id=calendar_event_id)
+                    self.repository.commit()
+            elif not self.calendar_service and sync_to_calendar:
+                logger.warning(
+                    "Google Calendar sync requested but calendar service not available",
+                    appointment_id=new_appointment.id
+                )
+            
+            return Result.success(new_appointment)
+        except Exception as e:
+            logger.error(f"Failed to add appointment: {str(e)}")
+            self.repository.rollback()
+            return Result.failure(f"Failed to add appointment: {str(e)}", code="APPOINTMENT_CREATE_ERROR")
     
     def _sync_to_google_calendar(self, appointment: Dict, options: Dict) -> Optional[str]:
         """
@@ -219,16 +223,21 @@ class AppointmentService:
             return first_property.address
         return None
     
-    def get_all_appointments(self) -> List[Dict]:
+    def get_all_appointments(self) -> Result[List[Dict]]:
         """
         Get all appointments
         
         Returns:
-            List of all Appointment instances
+            Result containing list of all Appointment instances
         """
-        return self.repository.get_all()
+        try:
+            appointments = self.repository.get_all()
+            return Result.success(appointments)
+        except Exception as e:
+            logger.error(f"Failed to get all appointments: {str(e)}")
+            return Result.failure(f"Failed to get all appointments: {str(e)}", code="APPOINTMENT_FETCH_ERROR")
     
-    def get_appointment_by_id(self, appointment_id: int) -> Optional[Dict]:
+    def get_appointment_by_id(self, appointment_id: int) -> Result[Optional[Dict]]:
         """
         Get appointment by ID
         
@@ -236,11 +245,18 @@ class AppointmentService:
             appointment_id: ID of the appointment
             
         Returns:
-            Appointment instance or None
+            Result containing Appointment instance or None
         """
-        return self.repository.get_by_id(appointment_id)
+        try:
+            appointment = self.repository.get_by_id(appointment_id)
+            if appointment:
+                return Result.success(appointment)
+            return Result.failure(f"Appointment with ID {appointment_id} not found", code="APPOINTMENT_NOT_FOUND")
+        except Exception as e:
+            logger.error(f"Failed to get appointment by ID: {str(e)}")
+            return Result.failure(f"Failed to get appointment: {str(e)}", code="APPOINTMENT_FETCH_ERROR")
     
-    def get_appointments_for_contact(self, contact_id: int) -> List[Dict]:
+    def get_appointments_for_contact(self, contact_id: int) -> Result[List[Dict]]:
         """
         Get all appointments for a specific contact
         
@@ -248,11 +264,16 @@ class AppointmentService:
             contact_id: ID of the contact
             
         Returns:
-            List of Appointment instances for the contact
+            Result containing list of Appointment instances for the contact
         """
-        return self.repository.find_by_contact_id(contact_id)
+        try:
+            appointments = self.repository.find_by_contact_id(contact_id)
+            return Result.success(appointments)
+        except Exception as e:
+            logger.error(f"Failed to get appointments for contact: {str(e)}")
+            return Result.failure(f"Failed to get appointments for contact: {str(e)}", code="APPOINTMENT_FETCH_ERROR")
     
-    def get_upcoming_appointments(self, days: int = 7) -> List[Dict]:
+    def get_upcoming_appointments(self, days: int = 7) -> Result[List[Dict]]:
         """
         Get upcoming appointments within specified days
         
@@ -260,14 +281,18 @@ class AppointmentService:
             days: Number of days to look ahead (default: 7)
             
         Returns:
-            List of upcoming Appointment instances
+            Result containing list of upcoming Appointment instances
         """
-        today = date.today()
-        end_date = today + timedelta(days=days)
-        
-        return self.repository.find_by_date_range(today, end_date)
+        try:
+            today = date.today()
+            end_date = today + timedelta(days=days)
+            appointments = self.repository.find_by_date_range(today, end_date)
+            return Result.success(appointments)
+        except Exception as e:
+            logger.error(f"Failed to get upcoming appointments: {str(e)}")
+            return Result.failure(f"Failed to get upcoming appointments: {str(e)}", code="APPOINTMENT_FETCH_ERROR")
     
-    def update_appointment(self, appointment: Dict, **kwargs) -> Dict:
+    def update_appointment(self, appointment: Dict, **kwargs) -> Result[Dict]:
         """
         Update an existing appointment
         
@@ -276,29 +301,35 @@ class AppointmentService:
             **kwargs: Fields to update
             
         Returns:
-            Updated Appointment instance
+            Result containing updated Appointment instance
         """
-        # Track if calendar sync is needed
-        calendar_fields_changed = False
-        calendar_fields = {'title', 'description', 'date', 'time'}
-        
-        # Check which fields are changing
-        for key in kwargs:
-            if key in calendar_fields:
-                calendar_fields_changed = True
-                break
-        
-        # Update using repository
-        appointment = self.repository.update(appointment, **kwargs)
-        self.repository.commit()
-        
-        # Update Google Calendar if needed
-        if (self.calendar_service and 
-            appointment.google_calendar_event_id and 
-            calendar_fields_changed):
-            self._update_google_calendar_event(appointment)
-        
-        return appointment
+        try:
+            # Track if calendar sync is needed
+            calendar_fields_changed = False
+            calendar_fields = {'title', 'description', 'date', 'time'}
+            
+            # Check which fields are changing
+            for key in kwargs:
+                if key in calendar_fields:
+                    calendar_fields_changed = True
+                    break
+            
+            # Update using repository
+            appointment = self.repository.update(appointment, **kwargs)
+            self.repository.commit()
+            
+            # Update Google Calendar if needed
+            if (self.calendar_service and 
+                hasattr(appointment, 'google_calendar_event_id') and
+                appointment.google_calendar_event_id and 
+                calendar_fields_changed):
+                self._update_google_calendar_event(appointment)
+            
+            return Result.success(appointment)
+        except Exception as e:
+            logger.error(f"Failed to update appointment: {str(e)}")
+            self.repository.rollback()
+            return Result.failure(f"Failed to update appointment: {str(e)}", code="APPOINTMENT_UPDATE_ERROR")
     
     def _update_google_calendar_event(self, appointment: Dict) -> bool:
         """
@@ -354,7 +385,7 @@ class AppointmentService:
         
         return False
     
-    def delete_appointment(self, appointment: Dict) -> bool:
+    def delete_appointment(self, appointment: Dict) -> Result[bool]:
         """
         Delete an appointment and its Google Calendar event
         
@@ -362,15 +393,15 @@ class AppointmentService:
             appointment: Dict instance to delete
             
         Returns:
-            True if successful, False otherwise
+            Result containing True if successful, False otherwise
         """
         try:
             # Delete Google Calendar event first if it exists
-            if self.calendar_service and appointment.google_calendar_event_id:
+            if self.calendar_service and hasattr(appointment, 'google_calendar_event_id') and appointment.google_calendar_event_id:
                 logger.info(
                     "Deleting Google Calendar event",
                     event_id=appointment.google_calendar_event_id,
-                    appointment_id=appointment.id
+                    appointment_id=appointment.id if hasattr(appointment, 'id') else 'unknown'
                 )
                 calendar_deleted = self.calendar_service.delete_event(
                     appointment.google_calendar_event_id
@@ -385,22 +416,23 @@ class AppointmentService:
             result = self.repository.delete(appointment)
             if result:
                 self.repository.commit()
-                logger.info("Successfully deleted appointment", appointment_id=appointment.id)
-            return result
+                logger.info("Successfully deleted appointment", appointment_id=appointment.id if hasattr(appointment, 'id') else 'unknown')
+                return Result.success(True)
+            return Result.failure("Failed to delete appointment from database", code="APPOINTMENT_DELETE_ERROR")
             
         except Exception as e:
             logger.error(
                 "Error deleting appointment",
-                appointment_id=appointment.id,
+                appointment_id=appointment.id if hasattr(appointment, 'id') else 'unknown',
                 error=str(e)
             )
             self.repository.rollback()
-            return False
+            return Result.failure(f"Failed to delete appointment: {str(e)}", code="APPOINTMENT_DELETE_ERROR")
     
     def reschedule_appointment(self, 
                               appointment: Dict,
                               new_date: Any,
-                              new_time: Any) -> Dict:
+                              new_time: Any) -> Result[Dict]:
         """
         Reschedule an appointment to a new date/time
         
@@ -410,7 +442,7 @@ class AppointmentService:
             new_time: New time for the appointment
             
         Returns:
-            Updated Appointment instance
+            Result containing updated Appointment instance
         """
         return self.update_appointment(
             appointment,
@@ -418,7 +450,7 @@ class AppointmentService:
             time=new_time
         )
     
-    def cancel_appointment(self, appointment: Dict) -> Dict:
+    def cancel_appointment(self, appointment: Dict) -> Result[Dict]:
         """
         Cancel an appointment (mark as cancelled rather than delete)
         
@@ -426,17 +458,22 @@ class AppointmentService:
             appointment: Dict to cancel
             
         Returns:
-            Updated Appointment instance
+            Result containing updated Appointment instance
         """
-        # Add a status field to track cancellation
-        appointment = self.repository.update(appointment, is_cancelled=True)
-        self.repository.commit()
-        
-        # Remove from Google Calendar if synced
-        if self.calendar_service and appointment.google_calendar_event_id:
-            self.calendar_service.delete_event(appointment.google_calendar_event_id)
-            appointment = self.repository.update(appointment, google_calendar_event_id=None)
+        try:
+            # Add a status field to track cancellation
+            appointment = self.repository.update(appointment, is_cancelled=True)
             self.repository.commit()
-        
-        logger.info("Appointment cancelled", appointment_id=appointment.id)
-        return appointment
+            
+            # Remove from Google Calendar if synced
+            if self.calendar_service and hasattr(appointment, 'google_calendar_event_id') and appointment.google_calendar_event_id:
+                self.calendar_service.delete_event(appointment.google_calendar_event_id)
+                appointment = self.repository.update(appointment, google_calendar_event_id=None)
+                self.repository.commit()
+            
+            logger.info("Appointment cancelled", appointment_id=appointment.id if hasattr(appointment, 'id') else 'unknown')
+            return Result.success(appointment)
+        except Exception as e:
+            logger.error(f"Failed to cancel appointment: {str(e)}")
+            self.repository.rollback()
+            return Result.failure(f"Failed to cancel appointment: {str(e)}", code="APPOINTMENT_CANCEL_ERROR")

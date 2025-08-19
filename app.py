@@ -972,8 +972,8 @@ def _create_appointment_service(google_calendar, db_session):
     from crm_database import Appointment
     logger.info("Initializing AppointmentService with repository")
     return AppointmentService(
-        calendar_service=google_calendar, 
-        repository=AppointmentRepository(db_session, Appointment)
+        appointment_repository=AppointmentRepository(db_session, Appointment),
+        google_calendar_service=google_calendar
     )
 
 

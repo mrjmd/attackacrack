@@ -54,8 +54,8 @@ class TestAppointmentServiceRepositoryEnforcement:
     def service_with_repository(self, mock_repository, mock_calendar_service):
         """Create AppointmentService with injected repository (proper pattern)"""
         return AppointmentService(
-            repository=mock_repository,
-            calendar_service=mock_calendar_service
+            appointment_repository=mock_repository,
+            google_calendar_service=mock_calendar_service
         )
     
     @pytest.fixture
@@ -63,7 +63,7 @@ class TestAppointmentServiceRepositoryEnforcement:
         """Create AppointmentService without repository (violation pattern)"""
         # This will raise an error - that's expected
         with pytest.raises(ValueError):
-            return AppointmentService(calendar_service=mock_calendar_service)
+            return AppointmentService(google_calendar_service=mock_calendar_service)
     
     def test_service_accepts_repository_dependency_injection(self, mock_repository, mock_calendar_service):
         """
@@ -71,8 +71,8 @@ class TestAppointmentServiceRepositoryEnforcement:
         MUST PASS: Service should have repository attribute when injected
         """
         service = AppointmentService(
-            repository=mock_repository,
-            calendar_service=mock_calendar_service
+            appointment_repository=mock_repository,
+            google_calendar_service=mock_calendar_service
         )
         
         # Verify repository is properly injected
@@ -288,7 +288,7 @@ class TestAppointmentServiceLegacyPatternDetection:
         """
         # Create service with mock repository
         mock_repository = Mock(spec=AppointmentRepository)
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         
         # Verify service now uses repository pattern
         assert hasattr(service, 'repository'), "Service should have repository after fix"
@@ -326,7 +326,7 @@ class TestAppointmentServiceLegacyPatternDetection:
         """
         # Create service with mock repository
         mock_repository = Mock(spec=AppointmentRepository)
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         
         # SUCCESS: Service should not have session attribute anymore
         assert not hasattr(service, 'session'), \
@@ -346,7 +346,7 @@ class TestAppointmentServiceLegacyPatternDetection:
         """
         # Create service with mock repository to test real implementation
         mock_repository = Mock(spec=AppointmentRepository)
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         
         # Check if service has session attribute (indicates legacy pattern)
         if hasattr(service, 'session'):
@@ -364,8 +364,8 @@ class TestAppointmentServiceLegacyPatternDetection:
         mock_calendar = Mock()
         
         service = AppointmentService(
-            repository=mock_repository,
-            calendar_service=mock_calendar
+            appointment_repository=mock_repository,
+            google_calendar_service=mock_calendar
         )
         
         # Verify dependencies are properly stored
@@ -383,7 +383,7 @@ class TestAppointmentServiceLegacyPatternDetection:
         
         # SUCCESS: Service works with proper repository injection
         mock_repository = Mock(spec=AppointmentRepository)
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         assert service.repository is mock_repository
     
     def test_repository_interface_compliance(self):
@@ -418,7 +418,7 @@ class TestAppointmentServiceRefactoringSuccess:
         mock_repository = Mock(spec=AppointmentRepository)
         mock_repository.get_all.return_value = []
         
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         
         # SUCCESS: Service should not have session attribute anymore
         assert not hasattr(service, 'session'), \
@@ -436,7 +436,7 @@ class TestAppointmentServiceRefactoringSuccess:
         mock_repository = Mock(spec=AppointmentRepository)
         mock_repository.find_by_contact_id.return_value = []
         
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         
         # SUCCESS: Service should use repository method
         service.get_appointments_for_contact(123)
@@ -454,7 +454,7 @@ class TestAppointmentServiceRefactoringSuccess:
         mock_repository = Mock(spec=AppointmentRepository)
         mock_repository.find_by_date_range.return_value = []
         
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         
         # SUCCESS: Service should use repository method
         service.get_upcoming_appointments(7)
@@ -473,7 +473,7 @@ class TestAppointmentServiceRefactoringSuccess:
         mock_repository = Mock(spec=AppointmentRepository)
         
         # Service should accept repository parameter
-        service = AppointmentService(repository=mock_repository)
+        service = AppointmentService(appointment_repository=mock_repository)
         # Service should store repository when provided
         assert hasattr(service, 'repository'), "Service must store repository when provided"
         assert service.repository is mock_repository, "Service must use provided repository"

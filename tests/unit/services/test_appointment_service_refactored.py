@@ -76,8 +76,8 @@ class TestAppointmentServiceRefactored:
     def service(self, mock_calendar_service, mock_repository):
         """Create AppointmentService with mocked dependencies"""
         return AppointmentService(
-            calendar_service=mock_calendar_service,
-            repository=mock_repository
+            appointment_repository=mock_repository,
+            google_calendar_service=mock_calendar_service
         )
     
     
@@ -90,8 +90,8 @@ class TestAppointmentServiceRefactored:
     def test_init_with_dependencies(self, mock_calendar_service, mock_repository):
         """Test initialization with dependencies"""
         service = AppointmentService(
-            calendar_service=mock_calendar_service,
-            repository=mock_repository
+            appointment_repository=mock_repository,
+            google_calendar_service=mock_calendar_service
         )
         assert service.calendar_service == mock_calendar_service
         assert service.repository == mock_repository
@@ -120,7 +120,8 @@ class TestAppointmentServiceRefactored:
         )
         
         # Verify appointment was created through repository
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         mock_repository.create.assert_called_once()
         mock_repository.commit.assert_called()
         
@@ -144,7 +145,8 @@ class TestAppointmentServiceRefactored:
         )
         
         # Verify appointment was created but not synced
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         mock_repository.create.assert_called_once()
         service.calendar_service.create_event.assert_not_called()
     
@@ -161,7 +163,8 @@ class TestAppointmentServiceRefactored:
             contact_id=1
         )
         
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         mock_repository.create.assert_called_once()
     
     def test_add_appointment_calendar_sync_failure(self, service, mock_repository, mock_contact):
@@ -185,7 +188,8 @@ class TestAppointmentServiceRefactored:
         )
         
         # Appointment should still be created
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         mock_repository.create.assert_called_once()
         # Calendar sync should have been attempted but no update called since it failed
         service.calendar_service.create_event.assert_called_once()
@@ -248,7 +252,8 @@ class TestAppointmentServiceRefactored:
         
         result = service.get_all_appointments()
         
-        assert result == mock_appointments
+        assert result.is_success
+        assert result.data == mock_appointments
         mock_repository.get_all.assert_called_once()
     
     def test_get_appointment_by_id(self, service, mock_repository, mock_appointment):
@@ -257,7 +262,8 @@ class TestAppointmentServiceRefactored:
         
         result = service.get_appointment_by_id(1)
         
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         mock_repository.get_by_id.assert_called_once_with(1)
     
     def test_get_appointments_for_contact(self, service, mock_repository):
@@ -267,7 +273,8 @@ class TestAppointmentServiceRefactored:
         
         result = service.get_appointments_for_contact(1)
         
-        assert result == mock_appointments
+        assert result.is_success
+        assert result.data == mock_appointments
         mock_repository.find_by_contact_id.assert_called_once_with(1)
     
     def test_get_upcoming_appointments(self, service, mock_repository):
@@ -277,7 +284,8 @@ class TestAppointmentServiceRefactored:
         
         result = service.get_upcoming_appointments(days=7)
         
-        assert result == mock_appointments
+        assert result.is_success
+        assert result.data == mock_appointments
         # Verify the date range was calculated correctly
         mock_repository.find_by_date_range.assert_called_once()
         call_args = mock_repository.find_by_date_range.call_args[0]
@@ -295,7 +303,8 @@ class TestAppointmentServiceRefactored:
             description="Updated Description"
         )
         
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         mock_repository.update.assert_called_once_with(
             mock_appointment,
             title="Updated Title",
@@ -316,7 +325,8 @@ class TestAppointmentServiceRefactored:
             some_other_field="new_value"  # Non-calendar field
         )
         
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         mock_repository.update.assert_called_once()
         # Calendar should not be updated for non-calendar fields
         service.calendar_service.update_event.assert_not_called()
@@ -328,7 +338,8 @@ class TestAppointmentServiceRefactored:
         
         result = service.delete_appointment(mock_appointment)
         
-        assert result is True
+        assert result.is_success
+        assert result.data is True
         service.calendar_service.delete_event.assert_called_once_with('google_123')
         mock_repository.delete.assert_called_once_with(mock_appointment)
         mock_repository.commit.assert_called_once()
@@ -340,7 +351,8 @@ class TestAppointmentServiceRefactored:
         
         result = service.delete_appointment(mock_appointment)
         
-        assert result is True
+        assert result.is_success
+        assert result.data is True
         service.calendar_service.delete_event.assert_not_called()
         mock_repository.delete.assert_called_once_with(mock_appointment)
     
@@ -353,7 +365,8 @@ class TestAppointmentServiceRefactored:
         result = service.delete_appointment(mock_appointment)
         
         # Should still delete from database
-        assert result is True
+        assert result.is_success
+        assert result.data is True
         mock_repository.delete.assert_called_once()
     
     def test_delete_appointment_database_error(self, service, mock_appointment, mock_repository):
@@ -362,7 +375,7 @@ class TestAppointmentServiceRefactored:
         
         result = service.delete_appointment(mock_appointment)
         
-        assert result is False
+        assert result.is_failure
         mock_repository.rollback.assert_called_once()
     
     def test_reschedule_appointment(self, service, mock_appointment):
@@ -384,7 +397,7 @@ class TestAppointmentServiceRefactored:
                 date=new_date,
                 time=new_time
             )
-            assert result == mock_appointment
+            assert result.data == mock_appointment
     
     def test_cancel_appointment(self, service, mock_appointment, mock_repository):
         """Test cancelling appointment"""
@@ -394,7 +407,8 @@ class TestAppointmentServiceRefactored:
         
         result = service.cancel_appointment(mock_appointment)
         
-        assert result == mock_appointment
+        assert result.is_success
+        assert result.data == mock_appointment
         # Should call update twice: once to set is_cancelled, once to clear google_calendar_event_id
         assert mock_repository.update.call_count == 2
         service.calendar_service.delete_event.assert_called_once_with('google_123')

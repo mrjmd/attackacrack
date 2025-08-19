@@ -11,9 +11,18 @@ import time
 
 
 @pytest.fixture
-def contact_service():
-    """Fixture to provide ContactService instance"""
-    return ContactService()
+def contact_service(db_session):
+    """Fixture to provide ContactService instance with repositories"""
+    from repositories.contact_repository import ContactRepository
+    from repositories.campaign_repository import CampaignRepository
+    from repositories.contact_flag_repository import ContactFlagRepository
+    from crm_database import Contact, Campaign, ContactFlag
+    
+    return ContactService(
+        contact_repository=ContactRepository(db_session, Contact),
+        campaign_repository=CampaignRepository(db_session, Campaign),
+        contact_flag_repository=ContactFlagRepository(db_session, ContactFlag)
+    )
 
 
 @pytest.fixture
@@ -202,17 +211,19 @@ class TestCampaignMembership:
         result = contact_service.add_to_campaign(test_contact.id, test_campaign.id)
         
         assert result.is_success
-        success, message = result.data
-        assert success is True
-        assert 'added to campaign' in message.lower()
+        membership = result.data  # Returns the CampaignMembership object
+        assert membership is not None
+        assert membership.contact_id == test_contact.id
+        assert membership.campaign_id == test_campaign.id
+        assert membership.status == 'pending'
         
-        # Verify membership was created
-        membership = CampaignMembership.query.filter_by(
+        # Verify membership was created in database
+        db_membership = CampaignMembership.query.filter_by(
             contact_id=test_contact.id,
             campaign_id=test_campaign.id
         ).first()
-        assert membership is not None
-        assert membership.status == 'pending'
+        assert db_membership is not None
+        assert db_membership.id == membership.id
     
     def test_add_to_campaign_duplicate(self, contact_service, test_contact, test_campaign):
         """Test adding contact to campaign they're already in"""
@@ -223,10 +234,10 @@ class TestCampaignMembership:
         # Try to add again
         result = contact_service.add_to_campaign(test_contact.id, test_campaign.id)
         
-        assert result.is_success
-        success, message = result.data
-        assert success is False
-        assert 'already in campaign' in message.lower()
+        # Should fail with "already in campaign" error
+        assert result.is_failure
+        assert result.code == "ALREADY_MEMBER"
+        assert 'already in campaign' in result.error.lower()
     
     def test_add_to_campaign_invalid_campaign(self, contact_service, test_contact):
         """Test adding contact to non-existent campaign"""
@@ -257,10 +268,10 @@ class TestCampaignMembership:
         result = contact_service.bulk_add_to_campaign(contact_ids, test_campaign.id)
         
         assert result.is_success
-        count, message = result.data
-        assert count == 3
-        assert '3 contacts' in message
-        assert test_campaign.name in message
+        data = result.data  # Returns a dictionary with results
+        assert data['added'] == 3
+        assert data['skipped'] == 0
+        assert len(data['errors']) == 0
         
         # Verify all were added
         memberships = CampaignMembership.query.filter(

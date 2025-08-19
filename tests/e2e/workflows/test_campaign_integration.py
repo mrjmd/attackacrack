@@ -106,21 +106,25 @@ class TestFullCampaignLifecycle:
         # Get updated campaign from database
         from crm_database import Campaign
         campaign = db_session.query(Campaign).get(campaign.id)
-        assert campaign.status == 'active'
+        assert campaign.status == 'running'  # Campaign status is 'running' not 'active'
         
-        # Step 6: Verify campaign memberships were created correctly
-        # (Skipping process_campaign_queue as it's not implemented in this service)
-        pending_members = CampaignMembership.query.filter_by(
+        # Step 6: Process the campaign queue to send messages
+        process_result = campaign_service.process_campaign_queue()
+        assert process_result.is_success
+        stats = process_result.data
+        assert stats['messages_sent'] == 10  # All 10 messages should be sent
+        
+        # Step 7: Verify campaign memberships were processed correctly
+        sent_members = CampaignMembership.query.filter_by(
             campaign_id=campaign.id,
-            status='pending'
+            status='sent'
         ).count()
-        assert pending_members == 10  # All should be pending initially
+        assert sent_members == 10  # All should be sent after processing
         
         # Campaign should still be running (can be manually stopped)
         # Get updated campaign from database
-        from crm_database import Campaign
         campaign = db_session.query(Campaign).get(campaign.id)
-        assert campaign.status == 'active'
+        assert campaign.status == 'running'
     
     def test_ab_test_campaign_lifecycle(self, campaign_service, list_service,
                                        test_contacts_batch, db_session):
@@ -154,6 +158,8 @@ class TestFullCampaignLifecycle:
         # Add recipients and start
         add_recipients_result = campaign_service.add_recipients_from_list(campaign.id, campaign_list.id)
         assert add_recipients_result.is_success
+        assert add_recipients_result.data == 20  # All 20 contacts added
+        
         start_result = campaign_service.activate_campaign(campaign.id)
         assert start_result is True
         

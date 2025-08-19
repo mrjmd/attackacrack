@@ -52,7 +52,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         Returns:
             List of active campaigns
         """
-        return self.find_by(status='active')
+        return self.find_by(status='running')
     
     def get_draft_campaigns(self) -> List[Campaign]:
         """
@@ -268,7 +268,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         membership = CampaignMembership(
             campaign_id=campaign_id,
             contact_id=contact_id,
-            variant=variant,
+            variant_sent=variant,
             status=status
         )
         

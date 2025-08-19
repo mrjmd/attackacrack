@@ -201,7 +201,7 @@ class TestCampaignServiceRefactored:
         # Arrange
         campaign_id = 1
         mock_campaign = Mock()
-        mock_campaign.status = 'active'
+        mock_campaign.status = 'running'  # Campaign should be 'running' not 'active'
         mock_campaign_repo.get_by_id.return_value = mock_campaign
         mock_campaign_repo.commit = Mock()
         
@@ -218,7 +218,7 @@ class TestCampaignServiceRefactored:
         # Arrange
         campaign_id = 1
         mock_campaign = Mock()
-        mock_campaign.status = 'active'
+        mock_campaign.status = 'running'  # Campaign should be 'running' not 'active'
         mock_campaign_repo.get_by_id.return_value = mock_campaign
         mock_campaign_repo.commit = Mock()
         
