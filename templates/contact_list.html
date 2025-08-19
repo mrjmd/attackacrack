@@ -110,8 +110,7 @@
             
             <!-- Contact Items -->
             <div class="divide-y divide-gray-600">
-                {% for item in contacts %}
-                {% set contact = item.contact %}
+                {% for contact in contacts %}
                 <div class="p-4 hover:bg-gray-600 transition-colors contact-item">
                     <div class="flex items-center gap-3">
                         <!-- Checkbox -->
@@ -141,17 +140,17 @@
                                     </div>
                                     
                                     <div class="text-right">
-                                        {% if item.last_activity %}
+                                        {% if contact.last_activity is defined and contact.last_activity %}
                                         <div class="text-xs text-gray-400">
-                                            Last activity: {{ item.last_activity.strftime('%b %d, %Y') }}
+                                            Last activity: {{ contact.last_activity.strftime('%b %d, %Y') }}
                                         </div>
                                         {% endif %}
-                                        {% if item.message_count > 0 %}
+                                        {% if contact.message_count is defined and contact.message_count > 0 %}
                                         <div class="text-xs text-gray-500">
-                                            {{ item.message_count }} messages
+                                            {{ contact.message_count }} messages
                                         </div>
                                         {% endif %}
-                                        {% if 'opted_out' in item.flags %}
+                                        {% if contact.flags is defined and 'opted_out' in contact.flags %}
                                         <span class="inline-block px-2 py-1 text-xs bg-red-900 text-red-300 rounded mt-1">
                                             Opted Out
                                         </span>
@@ -163,7 +162,7 @@
                         
                         <!-- Quick Actions -->
                         <div class="flex gap-2">
-                            {% if item.has_conversation %}
+                            {% if contact.has_conversation is defined and contact.has_conversation %}
                             <a href="{{ url_for('contact.conversation', contact_id=contact.id) }}" 
                                class="text-gray-400 hover:text-white p-1" title="View conversation">
                                 💬
