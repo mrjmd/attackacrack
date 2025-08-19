@@ -119,7 +119,8 @@ class TestCampaignServiceUnit:
         result = campaign_service.create_campaign(**sample_campaign_data)
         
         # Assert
-        assert result == created_campaign
+        assert result.is_success
+        assert result.data == created_campaign
         mock_campaign_repository.create.assert_called_once_with(
             name=sample_campaign_data['name'],
             campaign_type=sample_campaign_data['campaign_type'],
@@ -184,7 +185,8 @@ class TestCampaignServiceUnit:
         result = campaign_service.create_campaign(**sample_campaign_data)
         
         # Assert
-        assert result == created_campaign
+        assert result.is_success
+        assert result.data == created_campaign
         
         # Verify A/B config was created
         call_args = mock_campaign_repository.create.call_args
@@ -217,7 +219,9 @@ class TestCampaignServiceUnit:
         contacts = [sample_contact]
         contact_ids = [sample_contact.id]
         
-        mock_list_service.get_list_contacts.return_value = contacts
+        # Mock the list service to return a Result.success
+        from services.common.result import Result
+        mock_list_service.get_list_contacts.return_value = Result.success(contacts)
         mock_campaign_repository.add_members_bulk.return_value = 1
         mock_campaign_repository.get_by_id.return_value = Mock(spec=Campaign)
         
@@ -225,7 +229,8 @@ class TestCampaignServiceUnit:
         result = campaign_service.add_recipients_from_list(campaign_id, list_id)
         
         # Assert
-        assert result == 1
+        assert result.is_success
+        assert result.data == 1
         mock_list_service.get_list_contacts.assert_called_once_with(list_id)
         mock_campaign_repository.add_members_bulk.assert_called_once_with(campaign_id, contact_ids)
         mock_campaign_repository.get_by_id.assert_called_once_with(campaign_id)
@@ -236,9 +241,12 @@ class TestCampaignServiceUnit:
         # Arrange
         campaign_service.list_service = None
         
-        # Act & Assert
-        with pytest.raises(ValueError, match="CampaignListService not provided"):
-            campaign_service.add_recipients_from_list(1, 1)
+        # Act
+        result = campaign_service.add_recipients_from_list(1, 1)
+        
+        # Assert
+        assert result.is_failure
+        assert "CampaignListService not provided" in result.error
     
     def test_add_recipients_with_filters_success(self, campaign_service, mock_campaign_repository, 
                                                mock_contact_repository, sample_contact):

@@ -175,7 +175,7 @@ class TestJobServiceDICompliance:
         # This test should FAIL initially because JobService has fallback logic
         
         # Act & Assert - Constructor should require JobRepository
-        with pytest.raises(TypeError, match="missing.*required.*argument"):
+        with pytest.raises(ValueError, match="JobRepository must be provided"):
             # This should fail if constructor allows None or has fallback logic
             JobService()
     

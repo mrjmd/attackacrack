@@ -385,10 +385,20 @@ class CampaignListServiceRefactored:
                 return Result.failure("Source campaign list not found")
             
             # Create new list
+            # Handle both dict and object types for source_list
+            if isinstance(source_list, dict):
+                # Dictionary-like access
+                source_name = source_list.get('name', 'Unknown')
+                source_criteria = source_list.get('filter_criteria')
+            else:
+                # Object attribute access (including SQLAlchemy models and Mocks)
+                source_name = getattr(source_list, 'name', 'Unknown')
+                source_criteria = getattr(source_list, 'filter_criteria', None)
+            
             new_list = self.campaign_list_repository.create(
                 name=new_name,
-                description=f"Copy of {source_list.get('name', 'Unknown')}",
-                filter_criteria=source_list.get('filter_criteria'),
+                description=f"Copy of {source_name}",
+                filter_criteria=source_criteria,
                 is_dynamic=False,  # Copies are static by default
                 created_by=created_by
             )
@@ -402,7 +412,7 @@ class CampaignListServiceRefactored:
             
             for contact_id in active_contact_ids:
                 self.member_repository.create(
-                    list_id=new_list.get('id'),
+                    list_id=new_list.get('id') if isinstance(new_list, dict) else new_list.id,
                     contact_id=contact_id,
                     added_by=created_by or 'system_duplicate'
                 )

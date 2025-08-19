@@ -308,7 +308,7 @@ class CampaignRepository(BaseRepository[Campaign]):
             CampaignMembership(
                 campaign_id=campaign_id,
                 contact_id=contact_id,
-                variant=variant,
+                variant_sent=variant,
                 status='pending'
             )
             for contact_id in new_ids

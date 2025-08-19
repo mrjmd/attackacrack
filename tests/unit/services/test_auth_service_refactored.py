@@ -10,20 +10,42 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from services.auth_service_refactored import AuthService
 from services.common.result import Result, PagedResult
 from crm_database import User, InviteToken
+from repositories.user_repository import UserRepository
+from repositories.invite_token_repository import InviteTokenRepository
 
 
 class TestAuthServiceRefactored:
     """Test suite for refactored AuthService"""
     
     @pytest.fixture
-    def mock_session(self):
-        """Mock database session"""
-        session = Mock()
-        session.add = Mock()
-        session.commit = Mock()
-        session.rollback = Mock()
-        session.delete = Mock()
-        return session
+    def mock_user_repository(self):
+        """Mock user repository"""
+        repo = Mock(spec=UserRepository)
+        # Set default returns
+        repo.find_by_email.return_value = None
+        repo.get_by_id.return_value = None
+        repo.create.return_value = Mock()
+        repo.update.return_value = Mock()
+        repo.update_last_login = Mock()
+        repo.commit = Mock()
+        repo.rollback = Mock()
+        repo.delete = Mock()
+        repo.get_paginated.return_value = Mock()
+        return repo
+    
+    @pytest.fixture
+    def mock_invite_repository(self):
+        """Mock invite token repository"""
+        repo = Mock(spec=InviteTokenRepository)
+        # Set default returns
+        repo.find_valid_invite_by_email.return_value = None
+        repo.find_by_token.return_value = None
+        repo.create.return_value = Mock()
+        repo.mark_as_used = Mock()
+        repo.get_pending_invites.return_value = Mock()
+        repo.commit = Mock()
+        repo.rollback = Mock()
+        return repo
     
     @pytest.fixture
     def mock_email_service(self):
@@ -33,11 +55,12 @@ class TestAuthServiceRefactored:
         return service
     
     @pytest.fixture
-    def auth_service(self, mock_session, mock_email_service):
+    def auth_service(self, mock_user_repository, mock_invite_repository, mock_email_service):
         """Create AuthService with mocked dependencies"""
         return AuthService(
             email_service=mock_email_service,
-            session=mock_session
+            user_repository=mock_user_repository,
+            invite_repository=mock_invite_repository
         )
     
     def test_validate_password_success(self, auth_service):
@@ -69,11 +92,14 @@ class TestAuthServiceRefactored:
         assert result.is_failure == True
         assert result.error_code == "PASSWORD_NO_SPECIAL"
     
-    @patch('services.auth_service_refactored.User')
-    def test_create_user_success(self, mock_user_class, auth_service, mock_session):
+    def test_create_user_success(self, auth_service, mock_user_repository):
         """Test successful user creation"""
         # Setup
-        mock_user_class.query.filter_by.return_value.first.return_value = None
+        mock_user = Mock()
+        mock_user.id = 1
+        mock_user.email = "test@example.com"
+        mock_user_repository.find_by_email.return_value = None
+        mock_user_repository.create.return_value = mock_user
         
         # Act
         result = auth_service.create_user(
@@ -86,21 +112,22 @@ class TestAuthServiceRefactored:
         
         # Assert
         assert result.is_success == True
-        assert mock_session.add.called
-        assert mock_session.commit.called
+        assert result.data == mock_user
+        mock_user_repository.create.assert_called_once()
+        mock_user_repository.commit.assert_called_once()
     
-    @patch('services.auth_service_refactored.User')
-    def test_create_user_already_exists(self, mock_user_class, auth_service):
+    def test_create_user_already_exists(self, auth_service, mock_user_repository):
         """Test user creation when user already exists"""
         # Setup
         existing_user = Mock()
-        mock_user_class.query.filter_by.return_value.first.return_value = existing_user
+        mock_user_repository.find_by_email.return_value = existing_user
         
         # Act
         result = auth_service.create_user(
             email="test@example.com",
             password="StrongP@ss123",
-            name="Test User"
+            first_name="Test",
+            last_name="User"
         )
         
         # Assert
@@ -108,16 +135,16 @@ class TestAuthServiceRefactored:
         assert result.error == "User with this email already exists"
         assert result.error_code == "USER_EXISTS"
     
-    @patch('services.auth_service_refactored.User')
     @patch('services.auth_service_refactored.check_password_hash')
-    def test_authenticate_user_success(self, mock_check_password, mock_user_class, 
-                                      auth_service, mock_session):
+    def test_authenticate_user_success(self, mock_check_password, auth_service, 
+                                      mock_user_repository):
         """Test successful user authentication"""
         # Setup
         mock_user = Mock()
+        mock_user.id = 1
         mock_user.is_active = True
         mock_user.password_hash = "hashed"
-        mock_user_class.query.filter_by.return_value.first.return_value = mock_user
+        mock_user_repository.find_by_email.return_value = mock_user
         mock_check_password.return_value = True
         
         # Act
@@ -126,14 +153,13 @@ class TestAuthServiceRefactored:
         # Assert
         assert result.is_success == True
         assert result.data == mock_user
-        assert mock_user.last_login is not None
-        assert mock_session.commit.called
+        mock_user_repository.update_last_login.assert_called_once_with(mock_user.id, result.metadata["last_login"])
+        mock_user_repository.commit.assert_called_once()
     
-    @patch('services.auth_service_refactored.User')
-    def test_authenticate_user_invalid_email(self, mock_user_class, auth_service):
+    def test_authenticate_user_invalid_email(self, auth_service, mock_user_repository):
         """Test authentication with invalid email"""
         # Setup
-        mock_user_class.query.filter_by.return_value.first.return_value = None
+        mock_user_repository.find_by_email.return_value = None
         
         # Act
         result = auth_service.authenticate_user("invalid@example.com", "password")
@@ -142,13 +168,12 @@ class TestAuthServiceRefactored:
         assert result.is_failure == True
         assert result.error_code == "INVALID_CREDENTIALS"
     
-    @patch('services.auth_service_refactored.User')
-    def test_authenticate_user_deactivated(self, mock_user_class, auth_service):
+    def test_authenticate_user_deactivated(self, auth_service, mock_user_repository):
         """Test authentication with deactivated account"""
         # Setup
         mock_user = Mock()
         mock_user.is_active = False
-        mock_user_class.query.filter_by.return_value.first.return_value = mock_user
+        mock_user_repository.find_by_email.return_value = mock_user
         
         # Act
         result = auth_service.authenticate_user("test@example.com", "password")
@@ -182,12 +207,11 @@ class TestAuthServiceRefactored:
         assert result.is_success == True
         mock_flask_logout.assert_called_once()
     
-    @patch('services.auth_service_refactored.User')
-    def test_get_user_by_id_found(self, mock_user_class, auth_service):
+    def test_get_user_by_id_found(self, auth_service, mock_user_repository):
         """Test getting user by ID - found"""
         # Setup
         mock_user = Mock()
-        mock_user_class.query.get.return_value = mock_user
+        mock_user_repository.get_by_id.return_value = mock_user
         
         # Act
         result = auth_service.get_user_by_id(1)
@@ -196,11 +220,10 @@ class TestAuthServiceRefactored:
         assert result.is_success == True
         assert result.data == mock_user
     
-    @patch('services.auth_service_refactored.User')
-    def test_get_user_by_id_not_found(self, mock_user_class, auth_service):
+    def test_get_user_by_id_not_found(self, auth_service, mock_user_repository):
         """Test getting user by ID - not found"""
         # Setup
-        mock_user_class.query.get.return_value = None
+        mock_user_repository.get_by_id.return_value = None
         
         # Act
         result = auth_service.get_user_by_id(999)
@@ -209,14 +232,13 @@ class TestAuthServiceRefactored:
         assert result.is_failure == True
         assert result.error_code == "USER_NOT_FOUND"
     
-    @patch('services.auth_service_refactored.User')
-    def test_get_all_users_paginated(self, mock_user_class, auth_service):
+    def test_get_all_users_paginated(self, auth_service, mock_user_repository):
         """Test getting all users with pagination"""
         # Setup
         mock_paginated = Mock()
         mock_paginated.items = [Mock(), Mock()]
         mock_paginated.total = 10
-        mock_user_class.query.paginate.return_value = mock_paginated
+        mock_user_repository.get_paginated.return_value = mock_paginated
         
         # Act
         result = auth_service.get_all_users(page=1, per_page=2)
@@ -228,29 +250,30 @@ class TestAuthServiceRefactored:
         assert result.page == 1
         assert result.per_page == 2
     
-    @patch('services.auth_service_refactored.InviteToken')
-    @patch('services.auth_service_refactored.User')
-    def test_create_invite_success(self, mock_user_class, mock_invite_class, 
-                                  auth_service, mock_session):
+    def test_create_invite_success(self, auth_service, mock_user_repository, mock_invite_repository):
         """Test successful invite creation"""
         # Setup
-        mock_user_class.query.filter_by.return_value.first.return_value = None
-        mock_invite_class.query.filter_by.return_value.first.return_value = None
+        mock_user_repository.find_by_email.return_value = None
+        mock_invite_repository.find_valid_invite_by_email.return_value = None
+        mock_invite = Mock()
+        mock_invite.id = 1
+        mock_invite.email = "new@example.com"
+        mock_invite_repository.create.return_value = mock_invite
         
         # Act
         result = auth_service.create_invite("new@example.com", "user", 1)
         
         # Assert
         assert result.is_success == True
-        assert mock_session.add.called
-        assert mock_session.commit.called
+        assert result.data == mock_invite
+        mock_invite_repository.create.assert_called_once()
+        mock_invite_repository.commit.assert_called_once()
     
-    @patch('services.auth_service_refactored.User')
-    def test_create_invite_user_exists(self, mock_user_class, auth_service):
+    def test_create_invite_user_exists(self, auth_service, mock_user_repository):
         """Test invite creation when user already exists"""
         # Setup
         existing_user = Mock()
-        mock_user_class.query.filter_by.return_value.first.return_value = existing_user
+        mock_user_repository.find_by_email.return_value = existing_user
         
         # Act
         result = auth_service.create_invite("existing@example.com", "user")
@@ -274,10 +297,14 @@ class TestAuthServiceRefactored:
         assert result.is_success == True
         mock_email_service.send_invite.assert_called_once()
     
-    def test_send_invite_email_no_service(self, mock_session):
+    def test_send_invite_email_no_service(self, mock_user_repository, mock_invite_repository):
         """Test invite email when email service not configured"""
         # Setup
-        auth_service = AuthService(email_service=None, session=mock_session)
+        auth_service = AuthService(
+            email_service=None,
+            user_repository=mock_user_repository,
+            invite_repository=mock_invite_repository
+        )
         mock_invite = Mock()
         
         # Act

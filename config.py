@@ -102,6 +102,9 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file upload
     JSON_SORT_KEYS = False
     
+    # Bcrypt settings
+    BCRYPT_LOG_ROUNDS = 12  # Production default
+    
     # Session configuration - Use Redis for session storage to support multiple workers
     SESSION_TYPE = 'redis'
     SESSION_PERMANENT = False
@@ -178,6 +181,9 @@ class DevelopmentConfig(Config):
     # Allow non-secure cookies in development
     SESSION_COOKIE_SECURE = False
     
+    # Faster bcrypt rounds for development
+    BCRYPT_LOG_ROUNDS = 8
+    
     @classmethod
     def init_app(cls, app):
         """Development-specific initialization"""
@@ -205,6 +211,9 @@ class TestingConfig(Config):
     # Use test Redis database
     CELERY_BROKER_URL = 'redis://localhost:6379/1'
     CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+    
+    # Fast bcrypt rounds for testing
+    BCRYPT_LOG_ROUNDS = 4
     
     @classmethod
     def init_app(cls, app):
@@ -236,6 +245,9 @@ class ProductionConfig(Config):
     # Security settings for production
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_NAME = 'attackacrack_session'
+    
+    # Secure bcrypt rounds for production
+    BCRYPT_LOG_ROUNDS = 14
     
     # Production Redis - set immediately for Flask-Session
     REDIS_URL = os.environ.get('REDIS_URL', '')

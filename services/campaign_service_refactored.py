@@ -7,7 +7,10 @@ import json
 import random
 import statistics
 from datetime import datetime, time, timedelta
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from crm_database import Campaign
 from scipy import stats
 # Session import removed - using repositories only
 
@@ -15,6 +18,7 @@ from repositories.campaign_repository import CampaignRepository
 from repositories.contact_repository import ContactRepository
 from repositories.contact_flag_repository import ContactFlagRepository
 from repositories.base_repository import PaginationParams
+from services.common.result import Result
 # Model imports removed - using repositories only
 import logging
 
@@ -61,7 +65,7 @@ class CampaignService:
                        template_a: str = '',
                        template_b: str = None,
                        daily_limit: int = 125,
-                       business_hours_only: bool = True) -> Dict[str, Any]:
+                       business_hours_only: bool = True) -> 'Result[Campaign]':
         """
         Create a new marketing campaign.
         
@@ -76,7 +80,7 @@ class CampaignService:
             business_hours_only: Restrict to business hours
             
         Returns:
-            Created Campaign
+            Result[Campaign]: Success with created campaign or failure with error
         """
         # Validate campaign type
         if campaign_type not in ['blast', 'automated', 'ab_test']:
@@ -123,11 +127,11 @@ class CampaignService:
         )
         
         self.campaign_repository.commit()
-        logger.info(f"Created campaign: {campaign.get('id')} - {name}")
+        logger.info(f"Created campaign: {campaign.id} - {name}")
         
-        return campaign
+        return Result.success(campaign)
     
-    def add_recipients_from_list(self, campaign_id: int, list_id: int) -> int:
+    def add_recipients_from_list(self, campaign_id: int, list_id: int) -> 'Result[int]':
         """
         Add recipients from a campaign list.
         
@@ -136,26 +140,35 @@ class CampaignService:
             list_id: List ID
             
         Returns:
-            Number of recipients added
+            Result[int]: Success with number of recipients added or failure with error
         """
-        if not self.list_service:
-            raise ValueError("CampaignListService not provided")
-        
-        # Get all active contacts from the list
-        contacts = self.list_service.get_list_contacts(list_id)
-        contact_ids = [c.get('id') for c in contacts]
-        
-        # Add contacts to campaign
-        added = self.campaign_repository.add_members_bulk(campaign_id, contact_ids)
-        
-        # Update campaign list reference
-        campaign = self.campaign_repository.get_by_id(campaign_id)
-        if campaign:
-            campaign.list_id = list_id
-            self.campaign_repository.commit()
-        
-        logger.info(f"Added {added} recipients to campaign {campaign_id} from list {list_id}")
-        return added
+        try:
+            if not self.list_service:
+                return Result.failure("CampaignListService not provided")
+            
+            # Get all active contacts from the list
+            contacts_result = self.list_service.get_list_contacts(list_id)
+            if contacts_result.is_failure:
+                return Result.failure(f"Failed to get list contacts: {contacts_result.error}")
+            
+            contacts = contacts_result.data
+            contact_ids = [c.get('id') if isinstance(c, dict) else c.id for c in contacts]
+            
+            # Add contacts to campaign
+            added = self.campaign_repository.add_members_bulk(campaign_id, contact_ids)
+            
+            # Update campaign list reference
+            campaign = self.campaign_repository.get_by_id(campaign_id)
+            if campaign:
+                campaign.list_id = list_id
+                self.campaign_repository.commit()
+            
+            logger.info(f"Added {added} recipients to campaign {campaign_id} from list {list_id}")
+            return Result.success(added)
+            
+        except Exception as e:
+            logger.error(f"Failed to add recipients from list {list_id} to campaign {campaign_id}: {e}")
+            return Result.failure(f"Failed to add recipients from list: {str(e)}")
     
     def add_recipients(self, campaign_id: int, contact_filters: Dict) -> int:
         """
@@ -174,7 +187,7 @@ class CampaignService:
         
         # Get contacts based on filters
         contacts = self._get_filtered_contacts(contact_filters)
-        contact_ids = [c.get('id') for c in contacts]
+        contact_ids = [c.id if hasattr(c, 'id') else c.get('id') for c in contacts]
         
         # Add to campaign
         added = self.campaign_repository.add_members_bulk(campaign_id, contact_ids)
@@ -202,31 +215,31 @@ class CampaignService:
             # Get all contacts and filter in memory for complex logic
             contacts = self.contact_repository.get_all()
             # Only contacts with real names (not phone numbers)
-            contacts = [c for c in contacts if not (c.get('first_name') and c.get('first_name', '').startswith('+1'))]
+            contacts = [c for c in contacts if not (hasattr(c, 'first_name') and c.first_name and c.first_name.startswith('+1'))]
         else:
             contacts = self.contact_repository.get_all()
         
         if filters.get('has_email'):
-            contacts = [c for c in contacts if c.get('email')]
+            contacts = [c for c in contacts if hasattr(c, 'email') and c.email]
         
         if filters.get('exclude_office_numbers'):
             # Exclude contacts flagged as office numbers
             office_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('office_number')
-            contacts = [c for c in contacts if c.get('id') not in office_ids]
+            contacts = [c for c in contacts if hasattr(c, 'id') and c.id not in office_ids]
         
         if filters.get('exclude_opted_out'):
             opted_out_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('opted_out')
-            contacts = [c for c in contacts if c.get('id') not in opted_out_ids]
+            contacts = [c for c in contacts if hasattr(c, 'id') and c.id not in opted_out_ids]
         
         if filters.get('exclude_do_not_contact'):
             # Exclude contacts flagged as do not contact
             do_not_contact_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('do_not_contact')
-            contacts = [c for c in contacts if c.get('id') not in do_not_contact_ids]
+            contacts = [c for c in contacts if hasattr(c, 'id') and c.id not in do_not_contact_ids]
         
         if filters.get('exclude_recently_contacted'):
             # Exclude contacts that were recently texted
             recently_contacted_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('recently_texted')
-            contacts = [c for c in contacts if c.get('id') not in recently_contacted_ids]
+            contacts = [c for c in contacts if hasattr(c, 'id') and c.id not in recently_contacted_ids]
         
         if filters.get('exclude_current_campaign'):
             # Exclude contacts already in any active campaign
@@ -234,7 +247,7 @@ class CampaignService:
             for active_campaign in active_campaigns:
                 members = self.campaign_repository.get_campaign_members(active_campaign.id)
                 member_ids = {m.contact_id for m in members.items}
-                contacts = [c for c in contacts if c.get('id') not in member_ids]
+                contacts = [c for c in contacts if hasattr(c, 'id') and c.id not in member_ids]
         
         return contacts
     
@@ -531,7 +544,7 @@ class CampaignService:
         """
         cloned = self.campaign_repository.clone_campaign(campaign_id, new_name)
         self.campaign_repository.commit()
-        logger.info(f"Cloned campaign {campaign_id} as {cloned.get('id')}")
+        logger.info(f"Cloned campaign {campaign_id} as {cloned.id if hasattr(cloned, 'id') else cloned.get('id')}")
         return cloned
     
     def get_campaign_timeline(self, campaign_id: int) -> List[Dict]:

@@ -211,9 +211,10 @@ class TestCampaignServiceContactFlagIntegration:
     def test_campaign_service_no_direct_session_queries_for_contact_flags(self, campaign_service):
         """Test that CampaignService doesn't make direct session queries for ContactFlag"""
         # This test enforces that NO direct queries to ContactFlag are made
+        # The refactored service correctly doesn't have a session attribute
         
-        # Arrange
-        mock_session = campaign_service.session
+        # Arrange - Verify service has no direct session access
+        assert not hasattr(campaign_service, 'session'), "CampaignService should not have direct session access"
         
         # Mock contacts
         contacts = [Mock(id=601), Mock(id=602)]
@@ -225,19 +226,15 @@ class TestCampaignServiceContactFlagIntegration:
         filters = {'exclude_office_numbers': True}
         
         # Act
-        campaign_service.get_eligible_contacts(filters)
+        result = campaign_service.get_eligible_contacts(filters)
         
-        # Assert - session.query should NOT be called with ContactFlag
-        # This will fail if direct queries are still present
-        if hasattr(mock_session, 'query'):
-            # Check that ContactFlag was not queried directly
-            for call in mock_session.query.call_args_list:
-                args, kwargs = call
-                if args and len(args) > 0:
-                    # The argument should not be ContactFlag or ContactFlag.contact_id
-                    assert args[0] != ContactFlag
-                    if hasattr(args[0], '__name__'):
-                        assert 'ContactFlag' not in str(args[0])
+        # Assert - Service uses repository pattern correctly
+        assert result is not None
+        campaign_service.contact_flag_repository.get_contact_ids_with_flag_type.assert_called_once_with('office_number')
+        
+        # Assert - The service correctly doesn't have direct database access
+        # This confirms the repository pattern is being used properly
+        assert not hasattr(campaign_service, 'session'), "Service should use repositories, not direct session access"
     
     def test_create_campaign_flags_recently_contacted(self, campaign_service, 
                                                       mock_contact_flag_repository):

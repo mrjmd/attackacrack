@@ -71,13 +71,13 @@ class TestCampaignServiceRefactored:
         assert service.business_hours_end == time(18, 0)
     
     def test_init_without_dependencies(self):
-        """Test CampaignService creates default repositories if not provided"""
-        with patch('services.campaign_service_refactored.CampaignRepository') as MockCampaignRepo:
-            with patch('services.campaign_service_refactored.ContactRepository') as MockContactRepo:
-                service = CampaignService()
-                
-                MockCampaignRepo.assert_called_once()
-                MockContactRepo.assert_called_once()
+        """Test CampaignService initialization without dependencies"""
+        service = CampaignService()
+        
+        # Repositories should be None when not provided (dependency injection pattern)
+        assert service.campaign_repository is None
+        assert service.contact_repository is None
+        assert service.contact_flag_repository is None
     
     def test_create_campaign(self, campaign_service, mock_campaign_repo):
         """Test creating a new campaign"""
@@ -98,7 +98,8 @@ class TestCampaignServiceRefactored:
         )
         
         # Assert
-        assert result == mock_campaign
+        assert result.is_success
+        assert result.data == mock_campaign
         mock_campaign_repo.create.assert_called_once()
         # Check the kwargs passed to create
         call_kwargs = mock_campaign_repo.create.call_args.kwargs
@@ -139,15 +140,18 @@ class TestCampaignServiceRefactored:
             Mock(id=3, phone=None)  # Contact without phone
         ]
         
-        mock_list_service.get_list_contacts.return_value = mock_contacts
+        from services.common.result import Result
+        mock_list_service.get_list_contacts.return_value = Result.success(mock_contacts)
         mock_campaign_repo.find_membership = Mock(return_value=None)  # No existing membership
         mock_campaign_repo.add_members_bulk = Mock(return_value=2)  # Returns count of added
+        mock_campaign_repo.get_by_id = Mock(return_value=Mock())  # Mock campaign exists
         
         # Act
-        count = campaign_service.add_recipients_from_list(campaign_id, list_id)
+        result = campaign_service.add_recipients_from_list(campaign_id, list_id)
         
         # Assert
-        assert count == 2  # Only contacts with phones
+        assert result.is_success
+        assert result.data == 2  # Only contacts with phones
         mock_campaign_repo.add_members_bulk.assert_called_once()
         mock_list_service.get_list_contacts.assert_called_once_with(list_id)
     

@@ -13,18 +13,10 @@ from scipy import stats
 
 
 @pytest.fixture
-def campaign_service():
-    """Fixture providing campaign service instance with dependencies"""
-    from services.openphone_service import OpenPhoneService
-    from services.campaign_list_service import CampaignListService
-    
-    openphone_service = OpenPhoneService()
-    list_service = CampaignListService()
-    
-    return CampaignService(
-        openphone_service=openphone_service,
-        list_service=list_service
-    )
+def campaign_service(app):
+    """Fixture providing campaign service instance through service registry"""
+    with app.app_context():
+        return app.services.get('campaign')
 
 
 @pytest.fixture
@@ -68,7 +60,7 @@ class TestCampaignCreation:
     
     def test_create_basic_campaign(self, campaign_service, db_session):
         """Test creating a basic SMS blast campaign"""
-        campaign = campaign_service.create_campaign(
+        result = campaign_service.create_campaign(
             name='Summer Sale Campaign',
             campaign_type='blast',
             audience_type='mixed',
@@ -78,6 +70,8 @@ class TestCampaignCreation:
             business_hours_only=True
         )
         
+        assert result.is_success
+        campaign = result.data
         assert campaign.id is not None
         assert campaign.name == 'Summer Sale Campaign'
         assert campaign.campaign_type == 'blast'
@@ -89,7 +83,7 @@ class TestCampaignCreation:
     
     def test_create_ab_test_campaign(self, campaign_service, db_session):
         """Test creating an A/B test campaign"""
-        campaign = campaign_service.create_campaign(
+        result = campaign_service.create_campaign(
             name='A/B Test Campaign',
             campaign_type='ab_test',
             audience_type='customer',
@@ -99,6 +93,8 @@ class TestCampaignCreation:
             daily_limit=150
         )
         
+        assert result.is_success
+        campaign = result.data
         assert campaign.campaign_type == 'ab_test'
         assert campaign.template_a is not None
         assert campaign.template_b is not None
@@ -193,7 +189,9 @@ class TestRecipientManagement:
         db_session.commit()
         
         # Add recipients from list
-        added = campaign_service.add_recipients_from_list(test_campaign.id, campaign_list.id)
+        add_result = campaign_service.add_recipients_from_list(test_campaign.id, campaign_list.id)
+        assert add_result.is_success
+        added = add_result.data
         
         assert added == 5
         

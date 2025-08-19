@@ -10,6 +10,7 @@ from services.contact_service_refactored import ContactService
 from services.common.result import Result, PagedResult
 from repositories.contact_repository import ContactRepository
 from repositories.campaign_repository import CampaignRepository
+from repositories.contact_flag_repository import ContactFlagRepository
 from crm_database import Contact, ContactFlag, Campaign, CampaignMembership
 
 
@@ -26,7 +27,13 @@ class TestContactServiceResult:
         repo.find_by_email = Mock(return_value=None)
         repo.create = Mock()
         repo.delete = Mock()
+        repo.update = Mock()
         repo.find_all = Mock()
+        repo.get_paginated = Mock()
+        repo.search = Mock(return_value=[])
+        repo.get_by_ids = Mock(return_value=[])
+        repo.get_statistics = Mock(return_value={})
+        repo.get_contact_stats = Mock(return_value={})
         return repo
     
     @pytest.fixture
@@ -40,6 +47,13 @@ class TestContactServiceResult:
         return repo
     
     @pytest.fixture
+    def mock_contact_flag_repo(self):
+        """Mock ContactFlagRepository"""
+        repo = Mock(spec=ContactFlagRepository)
+        repo.get_flag_statistics = Mock(return_value={'opted_out': 5})
+        return repo
+    
+    @pytest.fixture
     def mock_session(self):
         """Mock database session"""
         session = Mock()
@@ -50,12 +64,12 @@ class TestContactServiceResult:
         return session
     
     @pytest.fixture
-    def contact_service(self, mock_contact_repo, mock_campaign_repo, mock_session):
+    def contact_service(self, mock_contact_repo, mock_campaign_repo, mock_contact_flag_repo):
         """Create ContactService with mocked dependencies"""
         service = ContactService(
             contact_repository=mock_contact_repo,
             campaign_repository=mock_campaign_repo,
-            session=mock_session
+            contact_flag_repository=mock_contact_flag_repo
         )
         return service
     
@@ -123,7 +137,7 @@ class TestContactServiceResult:
         """Test getting contact by ID - found"""
         # Arrange
         mock_contact = Mock()
-        mock_contact_repo.find_by_id.return_value = mock_contact
+        mock_contact_repo.get_by_id.return_value = mock_contact
         
         # Act
         result = contact_service.get_contact_by_id(1)
@@ -135,7 +149,7 @@ class TestContactServiceResult:
     def test_get_contact_by_id_not_found(self, contact_service, mock_contact_repo):
         """Test getting contact by ID - not found"""
         # Arrange
-        mock_contact_repo.find_by_id.return_value = None
+        mock_contact_repo.get_by_id.return_value = None
         
         # Act
         result = contact_service.get_contact_by_id(999)
@@ -161,10 +175,10 @@ class TestContactServiceResult:
         """Test getting all contacts with pagination"""
         # Arrange
         mock_contacts = [Mock(), Mock()]
-        mock_contact_repo.find_all.return_value = {
-            'items': mock_contacts,
-            'total': 10
-        }
+        mock_result = Mock()
+        mock_result.items = mock_contacts
+        mock_result.total = 10
+        mock_contact_repo.get_paginated.return_value = mock_result
         
         # Act
         result = contact_service.get_all_contacts(page=1, per_page=2)
@@ -176,20 +190,11 @@ class TestContactServiceResult:
         assert result.page == 1
         assert result.per_page == 2
     
-    @patch('services.contact_service_refactored.or_')
-    @patch('services.contact_service_refactored.Contact')
-    def test_search_contacts(self, mock_contact_class, mock_or, contact_service, mock_session):
+    def test_search_contacts(self, contact_service, mock_contact_repo):
         """Test searching contacts"""
         # Arrange
         mock_contacts = [Mock(), Mock()]
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = mock_contacts
-        mock_session.query.return_value = mock_query
-        
-        # Mock the or_ function to return a valid filter
-        mock_or.return_value = Mock()
+        mock_contact_repo.search.return_value = mock_contacts
         
         # Act
         result = contact_service.search_contacts("john", limit=10)
@@ -197,6 +202,7 @@ class TestContactServiceResult:
         # Assert
         assert result.is_success == True
         assert len(result.data) == 2
+        mock_contact_repo.search.assert_called_once_with("john", fields=['first_name', 'last_name', 'email', 'phone'], limit=10)
     
     def test_search_contacts_empty_query(self, contact_service):
         """Test searching with empty query"""
@@ -207,12 +213,13 @@ class TestContactServiceResult:
         assert result.is_success == True
         assert result.data == []
     
-    def test_update_contact_success(self, contact_service, mock_contact_repo, mock_session):
+    def test_update_contact_success(self, contact_service, mock_contact_repo):
         """Test successful contact update"""
         # Arrange
         mock_contact = Mock()
         mock_contact.first_name = "John"
-        mock_contact_repo.find_by_id.return_value = mock_contact
+        mock_contact_repo.get_by_id.return_value = mock_contact  # Contact exists for update (get_by_id, not find_by_id)
+        mock_contact_repo.update.return_value = mock_contact
         
         # Act
         result = contact_service.update_contact(
@@ -226,7 +233,6 @@ class TestContactServiceResult:
         assert result.data == mock_contact
         assert mock_contact.first_name == "Jane"
         assert mock_contact.email == "jane@example.com"
-        mock_session.commit.assert_called_once()
     
     def test_update_contact_not_found(self, contact_service, mock_contact_repo):
         """Test updating non-existent contact"""
@@ -244,7 +250,7 @@ class TestContactServiceResult:
         """Test successful contact deletion"""
         # Arrange
         mock_contact = Mock()
-        mock_contact_repo.find_by_id.return_value = mock_contact
+        mock_contact_repo.get_by_id.return_value = mock_contact
         
         # Act
         result = contact_service.delete_contact(1)
@@ -258,7 +264,7 @@ class TestContactServiceResult:
         """Test bulk delete action"""
         # Arrange
         mock_contact = Mock()
-        mock_contact_repo.find_by_id.return_value = mock_contact
+        mock_contact_repo.get_by_id.return_value = mock_contact
         
         # Act
         result = contact_service.bulk_action("delete", [1, 2, 3])
@@ -269,12 +275,13 @@ class TestContactServiceResult:
         assert result.data["failed"] == 0
         assert mock_contact_repo.delete.call_count == 3
     
-    def test_bulk_action_tag(self, contact_service, mock_contact_repo, mock_session):
+    def test_bulk_action_tag(self, contact_service, mock_contact_repo):
         """Test bulk tag action"""
         # Arrange
         mock_contact = Mock()
         mock_contact.tags = []
-        mock_contact_repo.find_by_id.return_value = mock_contact
+        mock_contact_repo.get_by_id.return_value = mock_contact
+        mock_contact_repo.update.return_value = mock_contact
         
         # Act
         result = contact_service.bulk_action("tag", [1, 2], tag="hot_lead")
@@ -283,8 +290,6 @@ class TestContactServiceResult:
         assert result.is_success == True
         assert result.data["successful"] == 2
         assert "hot_lead" in mock_contact.tags
-        # Session is committed once per iteration in the loop
-        assert mock_session.commit.called
     
     def test_bulk_action_no_contacts(self, contact_service):
         """Test bulk action with no contacts"""
@@ -295,7 +300,7 @@ class TestContactServiceResult:
         assert result.is_failure == True
         assert result.error_code == "NO_CONTACTS"
     
-    def test_add_to_campaign_success_with_repository_pattern(self, contact_service, mock_contact_repo, mock_session):
+    def test_add_to_campaign_success_with_repository_pattern(self, contact_service, mock_contact_repo):
         """
         Test adding contact to campaign using repository pattern.
         
@@ -328,7 +333,6 @@ class TestContactServiceResult:
             contact_id=1, 
             status='pending'
         )
-        mock_session.commit.assert_called_once()
     
     def test_add_to_campaign_contact_not_found(self, contact_service, mock_contact_repo):
         """Test adding to campaign when contact doesn't exist"""
@@ -401,7 +405,7 @@ class TestContactServiceResult:
         contact_service.campaign_repository.get_member_by_contact.assert_called_once_with(1, 1)
         contact_service.campaign_repository.add_member.assert_not_called()
     
-    def test_bulk_add_to_campaign_success_with_repository_pattern(self, contact_service, mock_contact_repo, mock_session):
+    def test_bulk_add_to_campaign_success_with_repository_pattern(self, contact_service, mock_contact_repo):
         """
         Test bulk adding contacts to campaign using repository pattern.
         
@@ -437,9 +441,6 @@ class TestContactServiceResult:
         # Verify campaign repository was used (implementation calls it once for bulk check + once per individual add)
         assert contact_service.campaign_repository.get_by_id.call_count > 0
         contact_service.campaign_repository.get_by_id.assert_called_with(1)
-        # Verify commit was called (once per successful contact addition)
-        assert mock_session.commit.call_count == 3  # One per contact
-        mock_session.commit.assert_called()
     
     def test_bulk_add_to_campaign_no_contacts(self, contact_service):
         """Test bulk add with empty contact list"""
@@ -472,7 +473,7 @@ class TestContactServiceResult:
         assert "Campaign not found: 999" in result.error
         contact_service.campaign_repository.get_by_id.assert_called_once_with(999)
     
-    def test_bulk_add_to_campaign_partial_success(self, contact_service, mock_session):
+    def test_bulk_add_to_campaign_partial_success(self, contact_service):
         """
         Test bulk add with some successes and some failures.
         
@@ -509,7 +510,7 @@ class TestContactServiceResult:
         assert contact_service.campaign_repository.get_by_id.call_count > 0
         contact_service.campaign_repository.get_by_id.assert_called_with(1)
     
-    def test_export_contacts_success(self, contact_service, mock_session):
+    def test_export_contacts_success(self, contact_service, mock_contact_repo):
         """Test successful contact export"""
         # Arrange
         mock_contacts = [
@@ -518,10 +519,7 @@ class TestContactServiceResult:
                  city="Boston", state="MA", zip_code="02101", tags=["lead"],
                  created_at=datetime.now())
         ]
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.all.return_value = mock_contacts
-        mock_session.query.return_value = mock_query
+        mock_contact_repo.get_by_ids.return_value = mock_contacts
         
         # Act
         result = contact_service.export_contacts([1])
@@ -530,24 +528,26 @@ class TestContactServiceResult:
         assert result.is_success == True
         assert "John,Doe" in result.data
         assert result.metadata["count"] == 1
+        mock_contact_repo.get_by_ids.assert_called_once_with([1])
     
-    def test_get_contact_statistics(self, contact_service, mock_session):
+    def test_get_contact_statistics(self, contact_service, mock_contact_repo, mock_contact_flag_repo):
         """Test getting contact statistics"""
         # Arrange
-        mock_query = Mock()
-        mock_query.count.return_value = 100
-        mock_query.filter.return_value = mock_query
-        mock_query.join.return_value = mock_query
-        mock_query.distinct.return_value = mock_query
-        mock_session.query.return_value = mock_query
+        # Set up the mock return values to match what the service expects
+        mock_contact_repo.get_contact_stats.return_value = {
+            'total': 100,
+            'with_phone': 80,
+            'with_email': 90,
+            'with_conversation': 50
+        }
+        mock_contact_flag_repo.get_flag_statistics.return_value = {'opted_out': 5}
         
-        with patch('services.contact_service_refactored.ContactFlag') as mock_flag:
-            mock_flag.query.filter_by.return_value.distinct.return_value.count.return_value = 5
-            
-            # Act
-            result = contact_service.get_contact_statistics()
-            
-            # Assert
-            assert result.is_success == True
-            assert result.data["total_contacts"] == 100
-            assert result.data["opted_out"] == 5
+        # Act
+        result = contact_service.get_contact_statistics()
+        
+        # Assert
+        assert result.is_success == True
+        assert result.data["total_contacts"] == 100
+        assert result.data["opted_out"] == 5
+        mock_contact_repo.get_contact_stats.assert_called_once()
+        mock_contact_flag_repo.get_flag_statistics.assert_called_once()

@@ -39,13 +39,13 @@ class TestAuthServiceWithRepositories:
         return Mock()
     
     @pytest.fixture
-    def auth_service(self, mock_session, mock_user_repository, mock_invite_repository, mock_email_service):
+    def auth_service(self, mock_user_repository, mock_invite_repository, mock_email_service):
         """Create AuthService instance with mocked dependencies"""
-        service = AuthService(email_service=mock_email_service, session=mock_session)
-        # Inject repositories
-        service.user_repository = mock_user_repository
-        service.invite_repository = mock_invite_repository
-        return service
+        return AuthService(
+            email_service=mock_email_service,
+            user_repository=mock_user_repository,
+            invite_repository=mock_invite_repository
+        )
     
     @pytest.fixture
     def sample_user(self):
@@ -346,15 +346,21 @@ class TestAuthServiceWithRepositories:
         mock_invite_repository.mark_as_used.assert_called_once()
     
     # Integration tests - testing that methods work together
-    def test_auth_service_should_inject_repositories_properly(self, mock_session, mock_email_service):
+    def test_auth_service_should_inject_repositories_properly(self, mock_user_repository, mock_invite_repository, mock_email_service):
         """Test that AuthService properly initializes with repositories"""
         # Act
-        service = AuthService(email_service=mock_email_service, session=mock_session)
+        service = AuthService(
+            email_service=mock_email_service,
+            user_repository=mock_user_repository,
+            invite_repository=mock_invite_repository
+        )
         
-        # Assert that repositories will be injected
-        # This test verifies the structure is ready for dependency injection
-        assert hasattr(service, 'session')
+        # Assert that repositories are properly injected
+        assert hasattr(service, 'user_repository')
+        assert hasattr(service, 'invite_repository')
         assert service.email_service == mock_email_service
+        assert service.user_repository == mock_user_repository
+        assert service.invite_repository == mock_invite_repository
     
     def test_repositories_should_be_accessible_from_auth_service(self, auth_service):
         """Test that repositories are accessible from auth service"""

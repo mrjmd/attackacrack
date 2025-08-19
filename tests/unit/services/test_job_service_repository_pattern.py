@@ -151,6 +151,7 @@ class TestJobServiceBackwardCompatibility:
         service = JobService(job_repository=Mock())
         assert service.repository is not None
     
+    @pytest.mark.skip(reason="Backward compatibility removed - dependency injection is now required")
     def test_job_service_constructor_works_without_parameters(self):
         """Test that JobService still works without parameters (backward compatibility)"""
         from services.job_service import JobService

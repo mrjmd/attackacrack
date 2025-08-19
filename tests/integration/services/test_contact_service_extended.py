@@ -89,9 +89,10 @@ class TestContactFlags:
         """Test getting flags for contact with no flags"""
         result = contact_service.get_contact_flags(test_contact.id)
         
-        assert result['has_office_flag'] is False
-        assert result['has_opted_out'] is False
-        assert result['flags'] == []
+        assert result.is_success
+        assert result.data['has_office_flag'] is False
+        assert result.data['has_opted_out'] is False
+        assert result.data['flags'] == []
     
     def test_get_contact_flags_with_flags(self, contact_service, test_contact, db_session):
         """Test getting flags for contact with multiple flags"""
@@ -111,10 +112,11 @@ class TestContactFlags:
         
         result = contact_service.get_contact_flags(test_contact.id)
         
-        assert result['has_office_flag'] is True
-        assert result['has_opted_out'] is True
-        assert 'office_number' in result['flags']
-        assert 'opted_out' in result['flags']
+        assert result.is_success
+        assert result.data['has_office_flag'] is True
+        assert result.data['has_opted_out'] is True
+        assert 'office_number' in result.data['flags']
+        assert 'opted_out' in result.data['flags']
     
     def test_add_contact_flag_success(self, contact_service, test_contact, db_session):
         """Test adding a flag to a contact"""
@@ -125,7 +127,8 @@ class TestContactFlags:
             'test_user'
         )
         
-        assert result is True
+        assert result.is_success
+        assert result.data is True
         
         # Verify flag was added
         flag = ContactFlag.query.filter_by(
@@ -139,22 +142,26 @@ class TestContactFlags:
     def test_add_contact_flag_duplicate(self, contact_service, test_contact, db_session):
         """Test adding duplicate flag returns False"""
         # Add initial flag
-        contact_service.add_contact_flag(test_contact.id, 'opted_out')
+        initial_result = contact_service.add_contact_flag(test_contact.id, 'opted_out')
+        assert initial_result.is_success
         
         # Try to add duplicate
         result = contact_service.add_contact_flag(test_contact.id, 'opted_out')
         
-        assert result is False
+        assert result.is_success
+        assert result.data is False
     
     def test_remove_contact_flag_success(self, contact_service, test_contact, db_session):
         """Test removing a flag from a contact"""
         # Add a flag first
-        contact_service.add_contact_flag(test_contact.id, 'office_number')
+        add_result = contact_service.add_contact_flag(test_contact.id, 'office_number')
+        assert add_result.is_success
         
         # Remove it
         result = contact_service.remove_contact_flag(test_contact.id, 'office_number')
         
-        assert result is True
+        assert result.is_success
+        assert result.data is True
         
         # Verify flag was removed
         flag = ContactFlag.query.filter_by(
@@ -192,8 +199,10 @@ class TestCampaignMembership:
     
     def test_add_to_campaign_success(self, contact_service, test_contact, test_campaign):
         """Test adding contact to campaign"""
-        success, message = contact_service.add_to_campaign(test_contact.id, test_campaign.id)
+        result = contact_service.add_to_campaign(test_contact.id, test_campaign.id)
         
+        assert result.is_success
+        success, message = result.data
         assert success is True
         assert 'added to campaign' in message.lower()
         
@@ -208,20 +217,24 @@ class TestCampaignMembership:
     def test_add_to_campaign_duplicate(self, contact_service, test_contact, test_campaign):
         """Test adding contact to campaign they're already in"""
         # Add initially
-        contact_service.add_to_campaign(test_contact.id, test_campaign.id)
+        initial_result = contact_service.add_to_campaign(test_contact.id, test_campaign.id)
+        assert initial_result.is_success
         
         # Try to add again
-        success, message = contact_service.add_to_campaign(test_contact.id, test_campaign.id)
+        result = contact_service.add_to_campaign(test_contact.id, test_campaign.id)
         
+        assert result.is_success
+        success, message = result.data
         assert success is False
         assert 'already in campaign' in message.lower()
     
     def test_add_to_campaign_invalid_campaign(self, contact_service, test_contact):
         """Test adding contact to non-existent campaign"""
-        success, message = contact_service.add_to_campaign(test_contact.id, 99999)
+        result = contact_service.add_to_campaign(test_contact.id, 99999)
         
-        assert success is False
-        assert 'campaign not found' in message.lower()
+        # This should return a failure result due to invalid campaign
+        assert result.is_failure
+        assert 'campaign not found' in result.error.lower() or 'not found' in result.error.lower()
     
     def test_bulk_add_to_campaign_success(self, contact_service, test_campaign, db_session):
         """Test bulk adding contacts to campaign"""
@@ -241,8 +254,10 @@ class TestCampaignMembership:
         contact_ids = [c.id for c in contacts]
         
         # Bulk add to campaign
-        count, message = contact_service.bulk_add_to_campaign(contact_ids, test_campaign.id)
+        result = contact_service.bulk_add_to_campaign(contact_ids, test_campaign.id)
         
+        assert result.is_success
+        count, message = result.data
         assert count == 3
         assert '3 contacts' in message
         assert test_campaign.name in message
@@ -278,8 +293,10 @@ class TestContactExport:
         contact_ids = [c.id for c in contacts]
         
         # Export to CSV
-        csv_data = contact_service.export_contacts(contact_ids)
+        result = contact_service.export_contacts(contact_ids)
         
+        assert result.is_success
+        csv_data = result.data
         assert csv_data is not None
         lines = csv_data.strip().split('\n')
         assert len(lines) == 3  # Header + 2 contacts
@@ -336,8 +353,10 @@ class TestContactStatistics:
         db_session.commit()
         
         # Get statistics
-        stats = contact_service.get_contact_statistics()
+        result = contact_service.get_contact_statistics()
         
+        assert result.is_success
+        stats = result.data
         assert stats['total_contacts'] >= 3
         assert stats['with_phone'] >= 2
         assert stats['with_email'] >= 2

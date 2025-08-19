@@ -319,34 +319,25 @@ class TestAppointmentServiceLegacyPatternDetection:
             
             # SUCCESS: All methods now use repository pattern instead of direct queries
     
-    def test_repository_pattern_enforcement_fails(self):
+    def test_repository_pattern_enforcement_success(self):
         """
-        TEST ENFORCEMENT: This test MUST FAIL until repository pattern is implemented
-        WILL FAIL: Because service uses direct session queries instead of repository
+        TEST SUCCESS: Repository pattern is properly implemented
+        SUCCESS: Service no longer has session attribute and uses repository pattern
         """
         # Create service with mock repository
         mock_repository = Mock(spec=AppointmentRepository)
         service = AppointmentService(repository=mock_repository)
         
-        # This test FAILS if service uses session directly (which it currently does)
-        with patch.object(service, 'session') as mock_session:
-            mock_query = Mock()
-            mock_session.query.return_value = mock_query
-            mock_query.all.return_value = []
-            mock_query.filter_by.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.order_by.return_value = mock_query
-            
-            # Call methods that should use repository
-            service.get_all_appointments()
-            service.get_appointments_for_contact(1)
-            service.get_upcoming_appointments(7)
-            
-            # ENFORCE: session.query should NEVER be called if repository pattern is properly implemented
-            # This assertion will FAIL until the service is refactored to use repository
-            assert mock_session.query.call_count == 0, \
-                f"REPOSITORY PATTERN VIOLATION: Service made {mock_session.query.call_count} direct session.query() calls. " + \
-                "Service must use repository methods instead of direct database queries."
+        # SUCCESS: Service should not have session attribute anymore
+        assert not hasattr(service, 'session'), \
+            "REPOSITORY PATTERN SUCCESS: Service correctly has no 'session' attribute"
+        
+        # SUCCESS: Service should have repository attribute
+        assert hasattr(service, 'repository'), \
+            "REPOSITORY PATTERN SUCCESS: Service correctly uses repository"
+        
+        assert service.repository is mock_repository, \
+            "REPOSITORY PATTERN SUCCESS: Service correctly uses injected repository"
     
     def test_detect_direct_session_usage(self):
         """
@@ -381,23 +372,19 @@ class TestAppointmentServiceLegacyPatternDetection:
         assert service.repository is mock_repository
         assert service.calendar_service is mock_calendar
     
-    @patch('services.appointment_service_refactored.db')
-    def test_default_constructor_creates_repository(self, mock_db):
+    def test_refactored_service_requires_repository_injection(self):
         """
-        TEST 14: Default constructor should create repository, not use session directly
+        TEST 14: Refactored service properly requires repository injection
+        SUCCESS: Service no longer accepts empty constructor
         """
-        mock_session = Mock()
-        mock_db.session = mock_session
-        
-        with patch('services.appointment_service_refactored.AppointmentRepository') as MockRepo:
-            mock_repo = Mock(spec=AppointmentRepository)
-            MockRepo.return_value = mock_repo
-            
+        # SUCCESS: Service now correctly requires repository injection
+        with pytest.raises(ValueError, match="AppointmentRepository must be provided via dependency injection"):
             service = AppointmentService()
-            
-            # Verify repository was created
-            MockRepo.assert_called_once_with(mock_session, Appointment)
-            assert service.repository is mock_repo
+        
+        # SUCCESS: Service works with proper repository injection
+        mock_repository = Mock(spec=AppointmentRepository)
+        service = AppointmentService(repository=mock_repository)
+        assert service.repository is mock_repository
     
     def test_repository_interface_compliance(self):
         """
@@ -417,80 +404,65 @@ class TestAppointmentServiceLegacyPatternDetection:
                 f"Repository must have {method_name} method"
 
 
-class TestAppointmentServiceMustFailUntilFixed:
+class TestAppointmentServiceRefactoringSuccess:
     """
-    Critical tests that MUST FAIL until repository pattern violations are fixed
-    These tests enforce TDD RED phase by failing on current implementation
+    SUCCESS: Repository pattern refactoring completed successfully
+    These tests validate that the service properly uses repository pattern
     """
     
-    def test_get_all_appointments_must_not_use_session_query(self):
+    def test_service_no_longer_has_session_attribute(self):
         """
-        CRITICAL FAILING TEST: get_all_appointments() uses session.query() - MUST FAIL
-        This test will PASS only after implementing repository pattern
+        SUCCESS: Service correctly removed session attribute
+        Validates repository pattern implementation
         """
         mock_repository = Mock(spec=AppointmentRepository)
+        mock_repository.get_all.return_value = []
+        
         service = AppointmentService(repository=mock_repository)
         
-        # Mock the session to track calls
-        with patch.object(service, 'session') as mock_session:
-            mock_query = Mock()
-            mock_session.query.return_value = mock_query
-            mock_query.all.return_value = []
-            
-            # Call the method
-            service.get_all_appointments()
-            
-            # MUST FAIL: Service should NOT call session.query
-            assert mock_session.query.call_count == 0, \
-                "VIOLATION: get_all_appointments() calls session.query(Appointment) on line ~238. " + \
-                "Must use repository.get_all() instead."
+        # SUCCESS: Service should not have session attribute anymore
+        assert not hasattr(service, 'session'), \
+            "SUCCESS: Service correctly has no 'session' attribute"
+        
+        # SUCCESS: Service should use repository methods
+        service.get_all_appointments()
+        mock_repository.get_all.assert_called_once()
     
-    def test_get_appointments_for_contact_must_not_use_session_query(self):
+    def test_service_uses_repository_for_contact_appointments(self):
         """
-        CRITICAL FAILING TEST: get_appointments_for_contact() uses session.query() - MUST FAIL
-        This test will PASS only after implementing repository pattern
+        SUCCESS: Service correctly uses repository for contact appointments
+        Validates proper repository method usage
         """
         mock_repository = Mock(spec=AppointmentRepository)
+        mock_repository.find_by_contact_id.return_value = []
+        
         service = AppointmentService(repository=mock_repository)
         
-        # Mock the session to track calls
-        with patch.object(service, 'session') as mock_session:
-            mock_query = Mock()
-            mock_session.query.return_value = mock_query
-            mock_query.filter_by.return_value = mock_query
-            mock_query.all.return_value = []
-            
-            # Call the method
-            service.get_appointments_for_contact(123)
-            
-            # MUST FAIL: Service should NOT call session.query
-            assert mock_session.query.call_count == 0, \
-                "VIOLATION: get_appointments_for_contact() calls session.query(Appointment).filter_by() on line ~262. " + \
-                "Must use repository.find_by_contact_id() instead."
+        # SUCCESS: Service should use repository method
+        service.get_appointments_for_contact(123)
+        mock_repository.find_by_contact_id.assert_called_once_with(123)
+        
+        # SUCCESS: Service should not have session attribute
+        assert not hasattr(service, 'session'), \
+            "SUCCESS: Service correctly uses repository pattern"
     
-    def test_get_upcoming_appointments_must_not_use_session_query(self):
+    def test_service_uses_repository_for_upcoming_appointments(self):
         """
-        CRITICAL FAILING TEST: get_upcoming_appointments() uses session.query() - MUST FAIL
-        This test will PASS only after implementing repository pattern
+        SUCCESS: Service correctly uses repository for upcoming appointments
+        Validates proper repository method usage
         """
         mock_repository = Mock(spec=AppointmentRepository)
+        mock_repository.find_by_date_range.return_value = []
+        
         service = AppointmentService(repository=mock_repository)
         
-        # Mock the session to track calls
-        with patch.object(service, 'session') as mock_session:
-            mock_query = Mock()
-            mock_session.query.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.order_by.return_value = mock_query
-            mock_query.all.return_value = []
-            
-            # Call the method
-            service.get_upcoming_appointments(7)
-            
-            # MUST FAIL: Service should NOT call session.query
-            assert mock_session.query.call_count == 0, \
-                "VIOLATION: get_upcoming_appointments() calls session.query(Appointment).filter() on line ~278. " + \
-                "Must use repository.find_by_date_range() instead."
+        # SUCCESS: Service should use repository method
+        service.get_upcoming_appointments(7)
+        mock_repository.find_by_date_range.assert_called_once()
+        
+        # SUCCESS: Service should not have session attribute
+        assert not hasattr(service, 'session'), \
+            "SUCCESS: Service correctly uses repository pattern"
     
     def test_service_accepts_repository_parameter(self):
         """

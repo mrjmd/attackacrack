@@ -4,15 +4,61 @@ Tests for JobService matching the actual implementation.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, Mock
 from services.job_service import JobService
 from crm_database import Job, Property, Contact
 
 
 @pytest.fixture
-def job_service():
-    """Fixture to provide JobService instance"""
-    return JobService()
+def job_service(db_session):
+    """Fixture to provide JobService instance with mocked repository"""
+    mock_repository = Mock()
+    
+    # Maintain state for the mock repository
+    jobs = []
+    next_id = [1]  # Use list to maintain mutable state in closures
+    
+    # Configure mock repository to return Job instances
+    def create_job(**kwargs):
+        job = Job(**kwargs)
+        job.id = next_id[0]
+        next_id[0] += 1
+        jobs.append(job)
+        return job
+    
+    def get_all_jobs():
+        return jobs
+    
+    def get_job_by_id(job_id):
+        for job in jobs:
+            if job.id == job_id:
+                return job
+        return None
+    
+    def update_job(job, **kwargs):
+        for key, value in kwargs.items():
+            setattr(job, key, value)
+        return job
+    
+    def delete_job(job):
+        if job in jobs:
+            jobs.remove(job)
+        return None
+    
+    def find_active_job_by_property_id(property_id):
+        for job in jobs:
+            if job.property_id == property_id and job.status == 'Active':
+                return job
+        return None
+    
+    mock_repository.create.side_effect = create_job
+    mock_repository.get_all.side_effect = get_all_jobs
+    mock_repository.get_by_id.side_effect = get_job_by_id
+    mock_repository.update.side_effect = update_job
+    mock_repository.delete.side_effect = delete_job
+    mock_repository.find_active_job_by_property_id.side_effect = find_active_job_by_property_id
+    
+    return JobService(job_repository=mock_repository)
 
 
 @pytest.fixture
@@ -178,7 +224,7 @@ class TestJobService:
         assert result_job is not None
         assert result_job.property_id == property_obj.id
         assert result_job.status == 'Active'
-        assert f'New job for {property_obj.address}' in result_job.description
+        assert f'New job for property {property_obj.id}' in result_job.description
     
     def test_get_or_create_active_job_ignores_inactive(self, job_service, test_contact_with_property):
         """Test get_or_create_active_job ignores inactive jobs"""

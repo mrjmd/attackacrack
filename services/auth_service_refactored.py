@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from flask_login import login_user as flask_login_user, logout_user as flask_logout_user
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_bcrypt import generate_password_hash, check_password_hash
 # Model and Session imports removed - using repositories only
 from services.common.result import Result, PagedResult
 from repositories.user_repository import UserRepository
@@ -95,10 +95,13 @@ class AuthService:
             return Result.failure("User with this email already exists", code="USER_EXISTS")
         
         try:
-            # Create user using repository
+            # Create user using repository  
+            password_hash = generate_password_hash(password)
+            if hasattr(password_hash, 'decode'):
+                password_hash = password_hash.decode('utf-8')
             user = self.user_repository.create(
                 email=email,
-                password_hash=generate_password_hash(password),
+                password_hash=password_hash,
                 first_name=first_name,
                 last_name=last_name,
                 role=role,
@@ -292,6 +295,8 @@ class AuthService:
         
         # Update password using repository
         new_password_hash = generate_password_hash(new_password)
+        if hasattr(new_password_hash, 'decode'):
+            new_password_hash = new_password_hash.decode('utf-8')
         
         try:
             self.user_repository.update(user_id, password_hash=new_password_hash)

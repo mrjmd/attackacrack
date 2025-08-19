@@ -68,10 +68,10 @@ def app():
         
         # Create test user for authentication
         from crm_database import User
-        from werkzeug.security import generate_password_hash
+        from flask_bcrypt import generate_password_hash
         test_user = User(
             email='test@example.com',
-            password_hash=generate_password_hash('testpassword'),
+            password_hash=generate_password_hash('testpassword').decode('utf-8'),
             first_name='Test',
             last_name='User',
             role='admin',
@@ -124,50 +124,117 @@ def db_session(app):
     """
     A fixture that provides a clean database session for each test function.
     This ensures that tests are isolated from each other by rolling back any changes.
+    Uses nested transactions (savepoints) for proper isolation.
     """
     with app.app_context():
-        # For SQLite (used in CI), we need different transaction handling
+        # Start a database connection and transaction
+        connection = db.engine.connect()
+        transaction = connection.begin()
+        
+        # Configure the session to use this specific connection
+        # This ensures all database operations in the test use the same transaction
+        from sqlalchemy.orm import scoped_session, sessionmaker
+        
+        # Create a new session factory bound to our connection
+        session_factory = sessionmaker(bind=connection)
+        session = scoped_session(session_factory)
+        
+        # Save the original session to restore later
+        old_session = db.session
+        db.session = session
+        
+        # For SQLite, we need simpler transaction handling
         if 'sqlite' in str(db.engine.url):
-            # SQLite doesn't support nested transactions well
-            # Just use the session directly and clean up after
-            yield db.session
-            db.session.rollback()
-            db.session.remove()
+            # SQLite has issues with nested transactions
+            # We'll use a simpler approach: just flush instead of commit
+            original_commit = session.commit
+            
+            def fake_commit():
+                """Replace commit with flush to keep changes in transaction"""
+                session.flush()
+            
+            session.commit = fake_commit
+            nested = None  # No nested transactions for SQLite
         else:
-            # For PostgreSQL, use nested transactions
-            connection = db.engine.connect()
-            transaction = connection.begin()
+            # For PostgreSQL and other databases with proper savepoint support
+            nested = connection.begin_nested()
             
-            # Configure session to use this connection
-            session = db.session
-            session.configure(bind=connection)
-            
+            # Listen for session events to restart savepoints after commits
+            @db.event.listens_for(session, "after_transaction_end")
+            def restart_savepoint(sess, trans):
+                nonlocal nested
+                if trans.nested and not trans._parent.nested:
+                    # Application code committed/rolled back the savepoint
+                    # Start a new savepoint to maintain isolation
+                    if connection.in_transaction():
+                        nested = connection.begin_nested()
+        
+        try:
             yield session
+        finally:
+            # Clean up: rollback all changes
+            try:
+                session.close()
+            except Exception:
+                pass  # Ignore close errors
             
-            # Rollback the transaction to ensure clean state
-            session.close()
-            transaction.rollback()
-            connection.close()
+            # Rollback the savepoint if it exists and is active
+            if nested:
+                try:
+                    if nested.is_active:
+                        nested.rollback()
+                except Exception:
+                    pass  # Ignore savepoint errors
+            
+            # Rollback the main transaction
+            try:
+                if transaction.is_active:
+                    transaction.rollback()
+            except Exception:
+                pass  # Ignore rollback errors
+            
+            # Close the connection
+            try:
+                connection.close()
+            except Exception:
+                pass  # Ignore close errors
+            
+            # Restore the original session
+            db.session = old_session
+            
+            # Clear the session registry
+            try:
+                session.remove()
+            except Exception:
+                pass  # Ignore removal errors
 
 @pytest.fixture(autouse=True)
 def clean_campaign_data(db_session):
     """
     Automatically clean up campaign-related data after each test.
     This ensures tests don't interfere with each other.
+    Note: With proper transaction isolation, this cleanup is often unnecessary
+    as all changes are rolled back automatically. This is kept for extra safety.
     """
     yield
     # Clean up after test - be selective about what we delete
+    # This only runs if the test doesn't use transaction isolation
     from crm_database import Campaign, CampaignMembership, CampaignList, CampaignListMember, ContactFlag
     try:
+        # Check if we need to clean up (only if not using transaction isolation)
+        if db_session.get_bind().in_transaction():
+            # We're in a transaction that will be rolled back, no need to clean
+            return
+            
         # Only delete campaign-specific data, not all activities/conversations
-        db_session.query(ContactFlag).filter_by(flag_type='recently_texted').delete()
-        db_session.query(CampaignListMember).delete()
-        db_session.query(CampaignMembership).delete()
-        db_session.query(CampaignList).delete()
-        db_session.query(Campaign).delete()
+        db_session.query(ContactFlag).filter_by(flag_type='recently_texted').delete(synchronize_session=False)
+        db_session.query(CampaignListMember).delete(synchronize_session=False)
+        db_session.query(CampaignMembership).delete(synchronize_session=False)
+        db_session.query(CampaignList).delete(synchronize_session=False)
+        db_session.query(Campaign).delete(synchronize_session=False)
         db_session.commit()
     except Exception as e:
-        print(f"Error cleaning campaign data: {e}")
+        # Silently ignore cleanup errors in transaction-isolated tests
         db_session.rollback()
 
 # ADDED THIS FIXTURE: To globally mock get_google_creds for application_pages tests

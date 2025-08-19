@@ -11,9 +11,10 @@ from crm_database import Contact, CampaignList, CampaignListMember, CSVImport, C
 
 
 @pytest.fixture
-def list_service():
-    """Fixture providing campaign list service instance"""
-    return CampaignListServiceRefactored()
+def list_service(app):
+    """Fixture providing campaign list service instance through service registry"""
+    with app.app_context():
+        return app.services.get('campaign_list')
 
 
 @pytest.fixture
@@ -86,13 +87,15 @@ class TestListCreation:
     
     def test_create_static_list(self, list_service, db_session):
         """Test creating a static campaign list"""
-        campaign_list = list_service.create_list(
+        result = list_service.create_list(
             name='Summer Campaign List',
             description='Contacts for summer promotion',
             is_dynamic=False,
             created_by='admin@example.com'
         )
         
+        assert result.is_success
+        campaign_list = result.data
         assert campaign_list.id is not None
         assert campaign_list.name == 'Summer Campaign List'
         assert campaign_list.description == 'Contacts for summer promotion'
@@ -107,13 +110,15 @@ class TestListCreation:
             'imported_after': imported_after
         }
         
-        campaign_list = list_service.create_list(
+        result = list_service.create_list(
             name='Recent Email Contacts',
             description='Contacts with email imported in last 7 days',
             filter_criteria=criteria,
             is_dynamic=True
         )
         
+        assert result.is_success
+        campaign_list = result.data
         assert campaign_list.is_dynamic is True
         # Check that datetime was serialized to ISO string
         assert campaign_list.filter_criteria['has_email'] is True
@@ -136,12 +141,14 @@ class TestContactManagement:
         """Test adding multiple contacts to a list"""
         contact_ids = [c.id for c in test_contacts[:3]]
         
-        results = list_service.add_contacts_to_list(
+        result = list_service.add_contacts_to_list(
             test_list.id,
             contact_ids,
             added_by='user@example.com'
         )
         
+        assert result.is_success
+        results = result.data
         assert results['added'] == 3
         assert results['already_exists'] == 0
         assert results['errors'] == 0
@@ -157,11 +164,15 @@ class TestContactManagement:
         contact_ids = [test_contacts[0].id]
         
         # Add first time
-        results1 = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        result1 = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        assert result1.is_success
+        results1 = result1.data
         assert results1['added'] == 1
         
         # Add again
-        results2 = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        result2 = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        assert result2.is_success
+        results2 = result2.data
         assert results2['added'] == 0
         assert results2['already_exists'] == 1
     
@@ -170,10 +181,12 @@ class TestContactManagement:
         contact_id = test_contacts[0].id
         
         # Add contact
-        list_service.add_contacts_to_list(test_list.id, [contact_id])
+        add_result = list_service.add_contacts_to_list(test_list.id, [contact_id])
+        assert add_result.is_success
         
         # Remove contact
-        list_service.remove_contacts_from_list(test_list.id, [contact_id])
+        remove_result = list_service.remove_contacts_from_list(test_list.id, [contact_id])
+        assert remove_result.is_success
         
         # Verify removed
         member = CampaignListMember.query.filter_by(
@@ -183,7 +196,9 @@ class TestContactManagement:
         assert member.status == 'removed'
         
         # Add again
-        results = list_service.add_contacts_to_list(test_list.id, [contact_id])
+        readd_result = list_service.add_contacts_to_list(test_list.id, [contact_id])
+        assert readd_result.is_success
+        results = readd_result.data
         assert results['added'] == 1
         
         # Verify reactivated
@@ -194,14 +209,17 @@ class TestContactManagement:
         """Test removing contacts from list (soft delete)"""
         # Add all contacts
         contact_ids = [c.id for c in test_contacts]
-        list_service.add_contacts_to_list(test_list.id, contact_ids)
+        add_result = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        assert add_result.is_success
         
         # Remove first two
-        removed_count = list_service.remove_contacts_from_list(
+        remove_result = list_service.remove_contacts_from_list(
             test_list.id,
             contact_ids[:2]
         )
         
+        assert remove_result.is_success
+        removed_count = remove_result.data
         assert removed_count == 2
         
         # Verify soft deleted
@@ -226,10 +244,13 @@ class TestListRetrieval:
         """Test retrieving contacts from a list"""
         # Add some contacts
         contact_ids = [c.id for c in test_contacts[:3]]
-        list_service.add_contacts_to_list(test_list.id, contact_ids)
+        add_result = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        assert add_result.is_success
         
         # Get contacts
-        contacts = list_service.get_list_contacts(test_list.id)
+        result = list_service.get_list_contacts(test_list.id)
+        assert result.is_success
+        contacts = result.data
         
         assert len(contacts) == 3
         assert all(isinstance(c, Contact) for c in contacts)
@@ -238,29 +259,39 @@ class TestListRetrieval:
         """Test that removed contacts are excluded by default"""
         # Add all contacts
         contact_ids = [c.id for c in test_contacts]
-        list_service.add_contacts_to_list(test_list.id, contact_ids)
+        add_result = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        assert add_result.is_success
         
         # Remove one
-        list_service.remove_contacts_from_list(test_list.id, [contact_ids[0]])
+        remove_result = list_service.remove_contacts_from_list(test_list.id, [contact_ids[0]])
+        assert remove_result.is_success
         
         # Get contacts (should exclude removed)
-        contacts = list_service.get_list_contacts(test_list.id, include_removed=False)
+        contacts_result = list_service.get_list_contacts(test_list.id, include_removed=False)
+        assert contacts_result.is_success
+        contacts = contacts_result.data
         assert len(contacts) == 3
         
         # Get all including removed
-        all_contacts = list_service.get_list_contacts(test_list.id, include_removed=True)
+        all_result = list_service.get_list_contacts(test_list.id, include_removed=True)
+        assert all_result.is_success
+        all_contacts = all_result.data
         assert len(all_contacts) == 4
     
     def test_get_list_stats(self, list_service, test_list, test_contacts, db_session):
         """Test getting list statistics"""
         # Add contacts with different attributes
         contact_ids = [c.id for c in test_contacts]
-        list_service.add_contacts_to_list(test_list.id, contact_ids)
+        add_result = list_service.add_contacts_to_list(test_list.id, contact_ids)
+        assert add_result.is_success
         
         # Remove one
-        list_service.remove_contacts_from_list(test_list.id, [contact_ids[0]])
+        remove_result = list_service.remove_contacts_from_list(test_list.id, [contact_ids[0]])
+        assert remove_result.is_success
         
-        stats = list_service.get_list_stats(test_list.id)
+        stats_result = list_service.get_list_stats(test_list.id)
+        assert stats_result.is_success
+        stats = stats_result.data
         
         assert stats['total_members'] == 4
         assert stats['active_members'] == 3
@@ -294,7 +325,9 @@ class TestContactFiltering:
         
         # Find contacts by CSV import
         criteria = {'csv_import_id': csv_import.id}
-        found_contacts = list_service.find_contacts_by_criteria(criteria)
+        result = list_service.find_contacts_by_criteria(criteria)
+        assert result.is_success
+        found_contacts = result.data
         
         assert len(found_contacts) == 2
         assert test_contacts[0] in found_contacts
@@ -308,7 +341,9 @@ class TestContactFiltering:
             'imported_before': datetime.utcnow()
         }
         
-        found_contacts = list_service.find_contacts_by_criteria(criteria)
+        result = list_service.find_contacts_by_criteria(criteria)
+        assert result.is_success
+        found_contacts = result.data
         
         # Should find c2 (5 days) and c4 (2 days), not c1 (10 days ago) or c3 (30 days ago)
         # Check that our expected contacts are in the results
@@ -339,7 +374,9 @@ class TestContactFiltering:
             'days_since_contact': 7
         }
         
-        found_contacts = list_service.find_contacts_by_criteria(criteria)
+        result = list_service.find_contacts_by_criteria(criteria)
+        assert result.is_success
+        found_contacts = result.data
         
         # Should exclude first contact (has recent activity)
         assert test_contacts[0] not in found_contacts
@@ -361,7 +398,9 @@ class TestContactFiltering:
         
         # Filter excluding opted out
         criteria = {'exclude_opted_out': True}
-        found_contacts = list_service.find_contacts_by_criteria(criteria)
+        result = list_service.find_contacts_by_criteria(criteria)
+        assert result.is_success
+        found_contacts = result.data
         
         # Should exclude first contact (opted out)
         assert test_contacts[0] not in found_contacts
@@ -374,7 +413,9 @@ class TestContactFiltering:
         """Test filtering contacts by metadata keys"""
         # Filter for contacts with 'source' metadata
         criteria = {'has_metadata': ['source']}
-        found_contacts = list_service.find_contacts_by_criteria(criteria)
+        result = list_service.find_contacts_by_criteria(criteria)
+        assert result.is_success
+        found_contacts = result.data
         
         # Only c4 has metadata with 'source' key
         assert test_contacts[3] in found_contacts  # Alice has 'source' metadata
@@ -385,7 +426,9 @@ class TestContactFiltering:
         
         # Filter for multiple metadata keys
         criteria = {'has_metadata': ['source', 'lead_score']}
-        found_contacts = list_service.find_contacts_by_criteria(criteria)
+        result = list_service.find_contacts_by_criteria(criteria)
+        assert result.is_success
+        found_contacts = result.data
         
         # Still only c4 matches (has both source and lead_score)
         assert test_contacts[3] in found_contacts
@@ -398,11 +441,13 @@ class TestDynamicLists:
         """Test refreshing dynamic list adds new matching contacts"""
         # Create dynamic list for contacts with email
         criteria = {'has_email': True}
-        dynamic_list = list_service.create_list(
+        result = list_service.create_list(
             name='Email Contacts',
             filter_criteria=criteria,
             is_dynamic=True
         )
+        assert result.is_success
+        dynamic_list = result.data
         
         # Get initial members - should include our test contacts with email (c1, c3, c4)
         initial_members = db_session.query(Contact).join(CampaignListMember).filter(
@@ -432,7 +477,9 @@ class TestDynamicLists:
         db_session.commit()
         
         # Refresh list
-        results = list_service.refresh_dynamic_list(dynamic_list.id)
+        refresh_result = list_service.refresh_dynamic_list(dynamic_list.id)
+        assert refresh_result.is_success
+        results = refresh_result.data
         
         # Should now have one more member
         updated_members = db_session.query(Contact).join(CampaignListMember).filter(
@@ -448,14 +495,18 @@ class TestDynamicLists:
         """Test refreshing dynamic list removes non-matching contacts"""
         # Create dynamic list for recent imports (last 7 days)
         criteria = {'imported_after': datetime.utcnow() - timedelta(days=7)}
-        dynamic_list = list_service.create_list(
+        result = list_service.create_list(
             name='Recent Imports',
             filter_criteria=criteria,
             is_dynamic=True
         )
+        assert result.is_success
+        dynamic_list = result.data
         
         # Should initially have contacts imported in last 7 days (c2 and c4)
-        initial_contacts = list_service.get_list_contacts(dynamic_list.id)
+        contacts_result = list_service.get_list_contacts(dynamic_list.id)
+        assert contacts_result.is_success
+        initial_contacts = contacts_result.data
         # Check our expected recent imports are included
         assert test_contacts[1] in initial_contacts  # Jane (5 days ago)
         assert test_contacts[3] in initial_contacts  # Alice (2 days ago)
@@ -473,14 +524,17 @@ class TestDynamicLists:
         db_session.commit()
         
         # Refresh list
-        list_service.refresh_dynamic_list(dynamic_list.id)
+        refresh_result = list_service.refresh_dynamic_list(dynamic_list.id)
+        assert refresh_result.is_success
         
         # Old contact should be removed
         db_session.refresh(old_contact_member)
         assert old_contact_member.status == 'removed'
         
         # Active contacts should still only include recent imports
-        active_contacts = list_service.get_list_contacts(dynamic_list.id)
+        active_result = list_service.get_list_contacts(dynamic_list.id)
+        assert active_result.is_success
+        active_contacts = active_result.data
         assert test_contacts[1] in active_contacts  # Jane still included
         assert test_contacts[3] in active_contacts  # Alice still included
         assert test_contacts[2] not in active_contacts  # Bob removed (old import)
@@ -488,10 +542,10 @@ class TestDynamicLists:
     def test_refresh_static_list_no_effect(self, list_service, test_list, db_session):
         """Test that refreshing a static list has no effect"""
         # Try to refresh static list
-        results = list_service.refresh_dynamic_list(test_list.id)
+        result = list_service.refresh_dynamic_list(test_list.id)
         
-        assert 'error' in results
-        assert 'not dynamic' in results['error']
+        assert result.is_failure
+        assert 'not dynamic' in result.error
 
 
 class TestErrorHandling:
