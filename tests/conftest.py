@@ -131,6 +131,35 @@ def client(app):
     return app.test_client()
 
 @pytest.fixture(scope='function')
+def authenticated_client_with_clean_db(app, client, clean_db):
+    """
+    A fixture that provides an authenticated test client with a completely clean database.
+    Use this for E2E tests that need strong isolation.
+    """
+    with app.app_context():
+        # Ensure the app uses our clean session
+        if hasattr(app, 'services') and app.services:
+            # Update the service registry to use our clean session
+            try:
+                app.services._descriptors['db_session'].instance = clean_db
+            except (KeyError, AttributeError):
+                pass  # Service registry may not be fully initialized in tests
+        
+        # Login the test user
+        response = client.post('/auth/login', data={
+            'email': 'test@example.com',
+            'password': 'testpassword'
+        }, follow_redirects=True)
+        
+        yield client
+        
+        # Logout after test
+        try:
+            client.get('/auth/logout')
+        except Exception:
+            pass  # Ignore logout errors during test cleanup
+
+@pytest.fixture(scope='function')
 def authenticated_client(app, client, db_session):
     """
     A fixture that provides an authenticated test client.
@@ -160,6 +189,91 @@ def authenticated_client(app, client, db_session):
             client.get('/auth/logout')
         except Exception:
             pass  # Ignore logout errors during test cleanup
+
+@pytest.fixture(scope='function')
+def clean_db(app):
+    """
+    Fixture to ensure a completely clean database for each test function.
+    This provides stronger isolation than transaction rollback for E2E tests
+    that make HTTP requests and might bypass transaction boundaries.
+    
+    Use this fixture for:
+    - E2E/integration tests that make HTTP requests
+    - Tests that need absolute database isolation
+    - Tests experiencing unique constraint violations
+    - Tests that modify global state or settings
+    - Tests running in parallel that might conflict
+    
+    How it works:
+    1. Clears ALL tables (except alembic_version) before each test
+    2. Re-seeds essential test data (user, settings)
+    3. Provides a clean session for the test
+    4. No rollback needed - next test gets fresh database
+    
+    Usage:
+        def test_e2e_workflow(clean_db, authenticated_client_with_clean_db, app):
+            db_session = clean_db
+            client = authenticated_client_with_clean_db
+            # Your test code here
+    
+    Note: This is slower than db_session fixture (which uses transactions),
+    so only use when necessary for complete isolation.
+    """
+    with app.app_context():
+        # Import all models to ensure metadata is complete
+        from crm_database import (
+            Contact, Property, Job, Quote, Invoice, Appointment, Setting,
+            Campaign, CampaignMembership, CampaignList, CampaignListMember,
+            Activity, Conversation, ContactFlag, User, InviteToken,
+            WebhookEvent, Todo, CSVImport, ContactCSVImport, QuickBooksSync
+        )
+        
+        # Clear all tables before test (respecting foreign key constraints)
+        # Use reversed order to handle dependencies
+        for table in reversed(db.metadata.sorted_tables):
+            # Skip certain system tables if needed
+            if table.name not in ['alembic_version']:  # Don't clear migration tracking
+                try:
+                    db.session.execute(table.delete())
+                except Exception as e:
+                    # Some tables might not exist or have issues, continue
+                    print(f"Warning: Could not clear table {table.name}: {e}")
+                    db.session.rollback()
+        
+        db.session.commit()
+        
+        # Re-seed essential test data
+        # Add test user for authentication
+        from flask_bcrypt import generate_password_hash
+        test_user = User(
+            email='test@example.com',
+            password_hash=generate_password_hash('testpassword').decode('utf-8'),
+            first_name='Test',
+            last_name='User',
+            role='admin',
+            is_active=True
+        )
+        
+        # Add common settings templates
+        reminder_template = Setting(
+            key='appointment_reminder_template',
+            value='Hi {first_name}, reminder for {appointment_date} at {appointment_time}.'
+        )
+        review_template = Setting(
+            key='review_request_template',
+            value='Hi {first_name}, please leave a review!'
+        )
+        
+        db.session.add_all([test_user, reminder_template, review_template])
+        db.session.commit()
+        
+        yield db.session
+        
+        # Cleanup after test (optional, since next test will clear anyway)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
 
 @pytest.fixture(scope='function')
 def db_session(app):
@@ -393,5 +507,7 @@ __all__ = [
     'todo_repository',
     'campaign_repository',
     'activity_repository',
-    'conversation_repository'
+    'conversation_repository',
+    'clean_db',
+    'authenticated_client_with_clean_db'
 ]

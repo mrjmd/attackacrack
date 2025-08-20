@@ -9,6 +9,7 @@ from datetime import date, time, datetime, timedelta
 from services.appointment_service_refactored import AppointmentService
 from services.google_calendar_service import GoogleCalendarService
 from repositories.appointment_repository import AppointmentRepository
+from services.common.result import Result
 from crm_database import Appointment, Contact, Property
 
 
@@ -83,8 +84,8 @@ class TestAppointmentServiceRefactored:
     
     def test_init_without_dependencies(self):
         """Test initialization without dependencies"""
-        # Repository is now required
-        with pytest.raises(ValueError, match="AppointmentRepository must be provided"):
+        # Repository is now required - check for TypeError since it's a required parameter
+        with pytest.raises(TypeError):
             AppointmentService()
     
     def test_init_with_dependencies(self, mock_calendar_service, mock_repository):
@@ -152,7 +153,7 @@ class TestAppointmentServiceRefactored:
     
     def test_add_appointment_no_calendar_service(self, mock_repository):
         """Test adding appointment without calendar service"""
-        service = AppointmentService(repository=mock_repository)  # No calendar service
+        service = AppointmentService(appointment_repository=mock_repository)  # No calendar service
         mock_appointment = Mock(spec=Appointment)
         mock_repository.create.return_value = mock_appointment
         
@@ -384,7 +385,8 @@ class TestAppointmentServiceRefactored:
         new_time = time(14, 0)
         
         with patch.object(service, 'update_appointment') as mock_update:
-            mock_update.return_value = mock_appointment
+            # Mock should return a Result object, not just the appointment
+            mock_update.return_value = Result.success(mock_appointment)
             
             result = service.reschedule_appointment(
                 mock_appointment,
@@ -397,6 +399,7 @@ class TestAppointmentServiceRefactored:
                 date=new_date,
                 time=new_time
             )
+            assert result.is_success
             assert result.data == mock_appointment
     
     def test_cancel_appointment(self, service, mock_appointment, mock_repository):

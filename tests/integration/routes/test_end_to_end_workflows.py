@@ -105,10 +105,16 @@ class TestFactories:
 
 
 class TestCampaignWorkflowIntegration:
-    """Test complete campaign workflow from CSV import to message sending"""
+    """Test complete campaign workflow from CSV import to message sending
     
-    def test_csv_import_to_campaign_creation_workflow(self, authenticated_client, db_session, app):
+    Uses clean_db fixture for complete database isolation to prevent
+    unique constraint violations from previous test runs.
+    """
+    
+    def test_csv_import_to_campaign_creation_workflow(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: CSV import → Campaign creation → Message scheduling workflow"""
+        authenticated_client = authenticated_client_with_clean_db
+        db_session = clean_db
         with app.app_context():
             # Step 1: Import contacts via CSV
             csv_file = TestFactories.create_csv_file()
@@ -162,8 +168,10 @@ class TestCampaignWorkflowIntegration:
             assert campaign.daily_limit == 50
             assert campaign.business_hours_only is True
     
-    def test_ab_test_campaign_lifecycle(self, authenticated_client, db_session, app):
+    def test_ab_test_campaign_lifecycle(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: A/B test campaign creation → Variant assignment → Analytics tracking"""
+        authenticated_client = authenticated_client_with_clean_db
+        db_session = clean_db
         with app.app_context():
             # Create test contacts
             contacts = [
@@ -202,8 +210,10 @@ class TestCampaignWorkflowIntegration:
             assert b'Version A:' in response.data
             assert b'Version B:' in response.data
     
-    def test_campaign_start_and_pause_workflow(self, authenticated_client, db_session, app):
+    def test_campaign_start_and_pause_workflow(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: Campaign start → Pause → Resume workflow"""
+        authenticated_client = authenticated_client_with_clean_db
+        db_session = clean_db
         with app.app_context():
             # Create test campaign
             campaign = Campaign(
@@ -229,8 +239,10 @@ class TestCampaignWorkflowIntegration:
             assert response.status_code == 200
             assert b'Campaign paused' in response.data or b'Campaign is not running' in response.data
     
-    def test_daily_limit_enforcement_workflow(self, authenticated_client, db_session, app):
+    def test_daily_limit_enforcement_workflow(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: Daily limit enforcement across multiple campaign executions"""
+        authenticated_client = authenticated_client_with_clean_db
+        db_session = clean_db
         with app.app_context():
             # Create campaign with low daily limit
             campaign = Campaign(
@@ -271,8 +283,10 @@ class TestCampaignWorkflowIntegration:
 class TestContactManagementWorkflows:
     """Test complete contact management workflows"""
     
-    def test_contact_creation_through_routes(self, authenticated_client, db_session, app):
+    def test_contact_creation_through_routes(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: Contact creation via different routes (manual, CSV, webhook)"""
+        authenticated_client = authenticated_client_with_clean_db
+        db_session = clean_db
         with app.app_context():
             # Test manual contact creation
             response = authenticated_client.post('/contacts/add', data={
@@ -291,8 +305,10 @@ class TestContactManagementWorkflows:
             assert contact.first_name == 'Manual'
             assert contact.last_name == 'Contact'
     
-    def test_contact_search_and_filtering_workflow(self, authenticated_client, db_session, app):
+    def test_contact_search_and_filtering_workflow(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: Contact search, filtering, and pagination workflows"""
+        db_session = clean_db
+        authenticated_client = authenticated_client_with_clean_db
         with app.app_context():
             # Create diverse test contacts
             contacts = [
@@ -324,8 +340,10 @@ class TestContactManagementWorkflows:
             assert response.status_code == 200
             # Should limit results
     
-    def test_contact_conversation_workflow(self, authenticated_client, db_session, app):
+    def test_contact_conversation_workflow(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: Contact conversation view → Message sending → Activity tracking"""
+        db_session = clean_db
+        authenticated_client = authenticated_client_with_clean_db
         with app.app_context():
             # Create contact and conversation
             contact = TestFactories.create_contact(db_session)
@@ -381,8 +399,10 @@ class TestContactManagementWorkflows:
                     body='Thank you for contacting us!'
                 )
     
-    def test_contact_flagging_workflow(self, authenticated_client, db_session, app):
+    def test_contact_flagging_workflow(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: Contact flagging → Opt-out handling → Campaign exclusion"""
+        db_session = clean_db
+        authenticated_client = authenticated_client_with_clean_db
         with app.app_context():
             contact = TestFactories.create_contact(db_session)
             
@@ -494,8 +514,10 @@ class TestWebhookProcessingWorkflows:
                 
                 assert response.status_code == 200
     
-    def test_webhook_event_logging_workflow(self, authenticated_client, db_session, app):
+    def test_webhook_event_logging_workflow(self, authenticated_client_with_clean_db, clean_db, app):
         """Test: Webhook events are properly logged for debugging"""
+        db_session = clean_db
+        authenticated_client = authenticated_client_with_clean_db
         with app.app_context():
             payload = TestFactories.create_webhook_payload()
             

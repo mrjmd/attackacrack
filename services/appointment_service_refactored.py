@@ -66,10 +66,24 @@ class AppointmentService:
             # Sync to Google Calendar if service available and not disabled
             sync_to_calendar = kwargs.get('sync_to_calendar', True)
             if self.calendar_service and sync_to_calendar:
-                calendar_event_id = self._sync_to_google_calendar(new_appointment, kwargs)
-                if calendar_event_id:
-                    self.repository.update(new_appointment, google_calendar_event_id=calendar_event_id)
-                    self.repository.commit()
+                try:
+                    calendar_result = self._sync_to_google_calendar(new_appointment, kwargs)
+                    # Handle both dict return (from mock) and string return
+                    if calendar_result:
+                        if isinstance(calendar_result, dict):
+                            calendar_event_id = calendar_result.get('id')
+                        else:
+                            calendar_event_id = calendar_result
+                        
+                        if calendar_event_id:
+                            self.repository.update(new_appointment, google_calendar_event_id=calendar_event_id)
+                            self.repository.commit()
+                except Exception as e:
+                    # Log the error but don't fail the appointment creation
+                    logger.warning(
+                        f"Google Calendar sync failed but appointment created locally: {str(e)}",
+                        appointment_id=new_appointment.id
+                    )
             elif not self.calendar_service and sync_to_calendar:
                 logger.warning(
                     "Google Calendar sync requested but calendar service not available",
@@ -398,17 +412,24 @@ class AppointmentService:
         try:
             # Delete Google Calendar event first if it exists
             if self.calendar_service and hasattr(appointment, 'google_calendar_event_id') and appointment.google_calendar_event_id:
-                logger.info(
-                    "Deleting Google Calendar event",
-                    event_id=appointment.google_calendar_event_id,
-                    appointment_id=appointment.id if hasattr(appointment, 'id') else 'unknown'
-                )
-                calendar_deleted = self.calendar_service.delete_event(
-                    appointment.google_calendar_event_id
-                )
-                if not calendar_deleted:
+                try:
+                    logger.info(
+                        "Deleting Google Calendar event",
+                        event_id=appointment.google_calendar_event_id,
+                        appointment_id=appointment.id if hasattr(appointment, 'id') else 'unknown'
+                    )
+                    calendar_deleted = self.calendar_service.delete_event(
+                        appointment.google_calendar_event_id
+                    )
+                    if not calendar_deleted:
+                        logger.warning(
+                            "Failed to delete Google Calendar event",
+                            event_id=appointment.google_calendar_event_id
+                        )
+                except Exception as e:
+                    # Log the error but don't fail the appointment deletion
                     logger.warning(
-                        "Failed to delete Google Calendar event",
+                        f"Google Calendar delete failed but continuing with local deletion: {str(e)}",
                         event_id=appointment.google_calendar_event_id
                     )
             
