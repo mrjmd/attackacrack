@@ -47,15 +47,18 @@ def verify_openphone_signature(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         signing_key = current_app.config.get('OPENPHONE_WEBHOOK_SIGNING_KEY')
-        if not signing_key:
-            current_app.logger.error("Webhook signing key is not configured.")
-            abort(500)
-
+        
         # OpenPhone uses 'openphone-signature' header with format: hmac;version;timestamp;signature
         signature_header = request.headers.get('openphone-signature')
         if not signature_header:
             current_app.logger.error("No openphone-signature header found")
             abort(403)
+        
+        # If signing key is not configured, we should reject the webhook
+        # This is a security measure - we can't verify without the key
+        if not signing_key:
+            current_app.logger.error("Webhook signing key is not configured.")
+            abort(403)  # Return 403 for security reasons, not 500
 
         # Parse OpenPhone signature format: hmac;version;timestamp;signature
         try:

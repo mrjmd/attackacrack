@@ -127,6 +127,7 @@ jobs:
         CELERY_RESULT_BACKEND: redis://localhost:6379/0
         SECRET_KEY: test-secret-key
         OPENPHONE_API_KEY: ${{ secrets.OPENPHONE_API_KEY || 'test-api-key' }}
+        OPENPHONE_WEBHOOK_SIGNING_KEY: ${{ secrets.OPENPHONE_WEBHOOK_SIGNING_KEY || 'test-webhook-key' }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-gemini-key' }}
         FLASK_ENV: testing
         FLASK_APP: app.py
