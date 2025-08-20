@@ -15,7 +15,7 @@ def list_all():
     
     # Get paginated properties using PropertyService
     property_service = current_app.services.get('property')
-    properties_paginated = property_service.get_paginated(
+    properties_paginated = property_service.get_paginated_properties(
         page=page, 
         per_page=per_page, 
         search=search

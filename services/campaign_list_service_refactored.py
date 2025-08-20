@@ -281,6 +281,11 @@ class CampaignListServiceRefactored:
                 contacts = self.contact_repository.find_by_metadata_keys(criteria['has_metadata'])
                 return Result.success(contacts)
             
+            # Has email filter
+            if 'has_email' in criteria and criteria['has_email']:
+                contacts = self.contact_repository.find_with_email()
+                return Result.success(contacts)
+            
             # If no specific criteria, return empty list
             return Result.success([])
             

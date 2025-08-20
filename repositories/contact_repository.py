@@ -1153,3 +1153,14 @@ class ContactRepository(BaseRepository[Contact]):
         
         self.session.flush()
         return updated_count
+    
+    def find_with_email(self) -> List[Contact]:
+        """Find all contacts that have an email address.
+        
+        Returns:
+            List of contacts with non-empty email addresses
+        """
+        return self.session.query(Contact).filter(
+            Contact.email.isnot(None),
+            Contact.email != ''
+        ).all()

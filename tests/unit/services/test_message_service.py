@@ -34,45 +34,59 @@ def test_process_incoming_message_webhook_new_contact(app, db_session):
     WHEN the webhook service processes the message
     THEN it should create a new Contact, a new Conversation, and a new Activity record.
     """
-    # 1. Setup
-    webhook_service = create_webhook_service_with_mocks()
-    webhook_data = {
-        "type": "message.received",  # Updated to actual webhook type
-        "data": {
-            "object": {
-                "id": "msg_new_contact_123",
-                "conversationId": "convo_new_contact_456",
-                "direction": "incoming",
-                "from": "+15559876543",
-                "text": "Hi, I'm a new customer.",  # Updated field name
-                "media": []  # Add media field
+    with app.app_context():
+        # 1. Setup - Use real repositories for integration test
+        activity_repo = app.services.get('activity_repository')
+        conversation_repo = app.services.get('conversation_repository')
+        webhook_repo = app.services.get('webhook_event_repository')
+        contact_service = app.services.get('contact')
+        sms_metrics_service = app.services.get('sms_metrics')
+        
+        webhook_service = OpenPhoneWebhookServiceRefactored(
+            activity_repository=activity_repo,
+            conversation_repository=conversation_repo,
+            webhook_event_repository=webhook_repo,
+            contact_service=contact_service,
+            sms_metrics_service=sms_metrics_service
+        )
+        
+        webhook_data = {
+            "type": "message.received",  # Updated to actual webhook type
+            "data": {
+                "object": {
+                    "id": "msg_new_contact_123",
+                    "conversationId": "convo_new_contact_456",
+                    "direction": "incoming",
+                    "from": "+15559876543",
+                    "text": "Hi, I'm a new customer.",  # Updated field name
+                    "media": []  # Add media field
+                }
             }
         }
-    }
 
-    # 2. Execution
-    result = webhook_service.process_webhook(webhook_data)
+        # 2. Execution
+        result = webhook_service.process_webhook(webhook_data)
 
-    # 3. Assertions
-    # Check that webhook processing succeeded
-    assert result.is_success
-    assert 'activity_id' in result.data
+        # 3. Assertions
+        # Check that webhook processing succeeded
+        assert result.is_success
+        assert 'activity_id' in result.data
 
-    # Get the created activity
-    activity_id = result.data['activity_id']
-    new_activity = db_session.query(Activity).get(activity_id)
-    assert new_activity is not None
-    assert new_activity.openphone_id == "msg_new_contact_123"
-    assert new_activity.body == "Hi, I'm a new customer."
+        # Get the created activity
+        activity_id = result.data['activity_id']
+        new_activity = db_session.query(Activity).get(activity_id)
+        assert new_activity is not None
+        assert new_activity.openphone_id == "msg_new_contact_123"
+        assert new_activity.body == "Hi, I'm a new customer."
 
-    # Check that a new contact was created
-    new_contact = db_session.query(Contact).filter_by(phone="+15559876543").one_or_none()
-    assert new_contact is not None
-    assert new_contact.first_name == "+15559876543"  # Defaults to phone number
+        # Check that a new contact was created
+        new_contact = db_session.query(Contact).filter_by(phone="+15559876543").one_or_none()
+        assert new_contact is not None
+        assert new_contact.first_name == "+15559876543"  # Defaults to phone number
 
-    # Check that a conversation was created and linked
-    assert new_activity.conversation_id is not None
-    assert new_activity.conversation.contact_id == new_contact.id
+        # Check that a conversation was created and linked
+        assert new_activity.conversation_id is not None
+        assert new_activity.conversation.contact_id == new_contact.id
 
 # TODO: Add a test for an incoming message from an existing contact.
 # TODO: Add a test for get_latest_conversations_from_db to ensure it returns data in the correct order.
