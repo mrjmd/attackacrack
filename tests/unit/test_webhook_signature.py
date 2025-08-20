@@ -219,8 +219,9 @@ class TestWebhookSignatureVerification:
                 }
             )
             
-            # Should return 500 (server error)
-            assert response.status_code == 500
+            # Should return 403 (Forbidden) for security consistency
+            # We treat missing signing key as an unauthorized request
+            assert response.status_code == 403
     
     def test_invalid_base64_signing_key(self, client, app, webhook_payload):
         """Test behavior with invalid base64 signing key"""
