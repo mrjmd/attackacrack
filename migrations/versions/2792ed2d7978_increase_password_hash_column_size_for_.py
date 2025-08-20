@@ -44,7 +44,7 @@ def downgrade():
     connection = op.get_bind()
     
     # Note: todos table was created without foreign key, so no constraint to create
-    op.drop_constraint(None, 'campaign_membership', type_='foreignkey')
+    # Also: campaign_membership foreign key doesn't need to be dropped (constraint name is None)
     op.drop_column('campaign_membership', 'membership_metadata')
     op.drop_column('campaign_membership', 'sent_activity_id')
     op.drop_column('activity', 'activity_metadata')
