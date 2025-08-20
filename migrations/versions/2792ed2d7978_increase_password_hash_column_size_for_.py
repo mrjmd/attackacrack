@@ -7,6 +7,7 @@ Create Date: 2025-08-18 18:28:49.670151
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -30,10 +31,28 @@ def upgrade():
                         type_=sa.String(length=256),
                         existing_nullable=False)
     
-    op.add_column('activity', sa.Column('activity_metadata', sa.JSON(), nullable=True))
-    op.add_column('campaign_membership', sa.Column('sent_activity_id', sa.Integer(), nullable=True))
-    op.add_column('campaign_membership', sa.Column('membership_metadata', sa.JSON(), nullable=True))
-    op.create_foreign_key(None, 'campaign_membership', 'activity', ['sent_activity_id'], ['id'])
+    # Add columns to activity and campaign_membership tables
+    # Check if tables exist first (they might not in test environments)
+    inspector = sa.inspect(connection)
+    tables = inspector.get_table_names()
+    
+    if 'activity' in tables:
+        columns = [col['name'] for col in inspector.get_columns('activity')]
+        if 'activity_metadata' not in columns:
+            op.add_column('activity', sa.Column('activity_metadata', sa.JSON(), nullable=True))
+    
+    if 'campaign_membership' in tables:
+        columns = [col['name'] for col in inspector.get_columns('campaign_membership')]
+        if 'sent_activity_id' not in columns:
+            op.add_column('campaign_membership', sa.Column('sent_activity_id', sa.Integer(), nullable=True))
+        if 'membership_metadata' not in columns:
+            op.add_column('campaign_membership', sa.Column('membership_metadata', sa.JSON(), nullable=True))
+        
+        # Only create foreign key for non-SQLite databases
+        # SQLite doesn't support ALTER TABLE for constraints
+        if connection.dialect.name != 'sqlite' and 'sent_activity_id' not in columns:
+            op.create_foreign_key(None, 'campaign_membership', 'activity', ['sent_activity_id'], ['id'])
+    
     # Note: todos table was created without foreign key, so no constraint to drop
     # ### end Alembic commands ###
 
@@ -43,16 +62,29 @@ def downgrade():
     # Get database connection to check dialect
     connection = op.get_bind()
     
+    # Check if tables exist before trying to drop columns
+    inspector = sa.inspect(connection)
+    tables = inspector.get_table_names()
+    
     # Note: todos table was created without foreign key, so no constraint to create
     # Also: campaign_membership foreign key doesn't need to be dropped (constraint name is None)
-    op.drop_column('campaign_membership', 'membership_metadata')
-    op.drop_column('campaign_membership', 'sent_activity_id')
-    op.drop_column('activity', 'activity_metadata')
+    
+    if 'campaign_membership' in tables:
+        columns = [col['name'] for col in inspector.get_columns('campaign_membership')]
+        if 'membership_metadata' in columns:
+            op.drop_column('campaign_membership', 'membership_metadata')
+        if 'sent_activity_id' in columns:
+            op.drop_column('campaign_membership', 'sent_activity_id')
+    
+    if 'activity' in tables:
+        columns = [col['name'] for col in inspector.get_columns('activity')]
+        if 'activity_metadata' in columns:
+            op.drop_column('activity', 'activity_metadata')
     
     # Revert password_hash column size
     # SQLite doesn't support ALTER COLUMN, but also doesn't enforce VARCHAR length
     # so we can safely skip this operation for SQLite
-    if connection.dialect.name != 'sqlite':
+    if connection.dialect.name != 'sqlite' and 'user' in tables:
         op.alter_column('user', 'password_hash',
                         existing_type=sa.String(length=256),
                         type_=sa.String(length=128),
