@@ -572,13 +572,16 @@ class TestErrorHandling:
     
     def test_remove_from_invalid_list(self, list_service, db_session):
         """Test removing contacts from non-existent list"""
-        count = list_service.remove_contacts_from_list(99999, [1, 2, 3])
-        assert count == 0
+        result = list_service.remove_contacts_from_list(99999, [1, 2, 3])
+        assert result.is_success
+        assert result.data == 0
     
     def test_get_stats_for_empty_list(self, list_service, test_list, db_session):
         """Test getting stats for empty list"""
-        stats = list_service.get_list_stats(test_list.id)
+        result = list_service.get_list_stats(test_list.id)
         
+        assert result.is_success
+        stats = result.data
         assert stats['total_members'] == 0
         assert stats['active_members'] == 0
         assert stats['removed_members'] == 0

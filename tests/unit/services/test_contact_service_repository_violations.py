@@ -128,7 +128,8 @@ class TestContactServiceRepositoryViolations:
             'with_email': 70,
             'with_conversations': 45,
             'opted_out': 5,
-            'invalid_phone': 3
+            'invalid_phone': 3,
+            'office_numbers': 0
         }
         assert result.data == expected_stats
     

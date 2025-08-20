@@ -193,7 +193,7 @@ class TestCampaignServiceRefactored:
         
         # Assert
         assert result == True
-        assert mock_campaign.status == 'active'
+        assert mock_campaign.status == 'running'
         mock_campaign_repo.commit.assert_called_once()
     
     def test_pause_campaign(self, campaign_service, mock_campaign_repo):
