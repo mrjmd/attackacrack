@@ -20,7 +20,7 @@ endpoints = [
     '/jobs/job/add',
     '/jobs/job/1', # Detail page for seeded job
     '/quotes/',
-    '/quotes/quote/add',
+    '/quotes/add',
     '/quotes/quote/1', # Detail page for seeded quote
     '/invoices/',
     '/invoices/add',

@@ -294,7 +294,7 @@ class TestPropertyRoutesNoDatabaseViolations:
         mock_paginated_result.pages = 0
         mock_paginated_result.page = 1
         mock_paginated_result.per_page = 10
-        mock_property_service.get_paginated.return_value = mock_paginated_result
+        mock_property_service.get_paginated_properties.return_value = mock_paginated_result
         
         with app.app_context():
             # Replace the service registry get method
@@ -306,7 +306,7 @@ class TestPropertyRoutesNoDatabaseViolations:
                 
                 # Assert service was used instead of Property.query
                 app.services.get.assert_called_with('property')
-                mock_property_service.get_paginated.assert_called_once()
+                mock_property_service.get_paginated_properties.assert_called_once()
             finally:
                 # Restore original get method
                 app.services.get = original_get
@@ -324,9 +324,6 @@ class TestAPIRoutesNoDatabaseViolations:
         mock_webhook_service = MagicMock()
         mock_webhook_service.process_webhook.return_value = {'status': 'success'}
         
-        # Mock the signature verification to always pass
-        mocker.patch('routes.api_routes.verify_openphone_signature', return_value=True)
-        
         # Mock other services that might be called
         mock_sms_metrics_service = MagicMock()
         
@@ -338,6 +335,11 @@ class TestAPIRoutesNoDatabaseViolations:
             return services.get(service_name)
         
         with app.app_context():
+            # Set a test webhook signing key (base64 encoded) to make signature verification work
+            import base64
+            test_key = base64.b64encode(b'test-signing-key-secret').decode('utf-8')
+            app.config['OPENPHONE_WEBHOOK_SIGNING_KEY'] = test_key
+            
             # Replace the service registry get method
             original_get = app.services.get
             app.services.get = MagicMock(side_effect=mock_get_service)
@@ -352,13 +354,34 @@ class TestAPIRoutesNoDatabaseViolations:
                     }
                 }
                 
-                # Use a valid signature format for the header
+                # Generate a valid signature
+                import hmac
+                import hashlib
+                import json
                 import time
-                timestamp = str(int(time.time()))
-                signature_header = f'hmac;1;{timestamp};test-signature'
                 
+                timestamp = str(int(time.time()))
+                
+                # Create the raw payload bytes exactly as Flask will receive it
+                payload_str = json.dumps(webhook_payload, separators=(',', ':'))
+                payload_bytes = payload_str.encode('utf-8')
+                signed_data_bytes = timestamp.encode('utf-8') + b'.' + payload_bytes
+                
+                # Use the same key for signing as configured
+                signing_key_bytes = base64.b64decode(test_key)
+                signature = base64.b64encode(
+                    hmac.new(
+                        signing_key_bytes,
+                        signed_data_bytes,
+                        hashlib.sha256
+                    ).digest()
+                ).decode('utf-8')
+                
+                signature_header = f'hmac;1;{timestamp};{signature}'
+                
+                # Send the raw data instead of JSON to control exactly what request.data contains
                 response = client.post('/api/webhooks/openphone', 
-                                     json=webhook_payload,
+                                     data=payload_bytes,
                                      headers={
                                          'Content-Type': 'application/json',
                                          'openphone-signature': signature_header
@@ -369,7 +392,7 @@ class TestAPIRoutesNoDatabaseViolations:
                 mock_webhook_service.process_webhook.assert_called_once()
                 
                 # Response should be successful (no db.session.expire_all() blocking it)
-                assert response.status_code in [200, 201, 204, 403]  # 403 is OK if signature fails
+                assert response.status_code in [200, 201, 204]
             finally:
                 # Restore original get method
                 app.services.get = original_get
