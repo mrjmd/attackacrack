@@ -34,7 +34,7 @@ def upgrade():
     op.add_column('campaign_membership', sa.Column('sent_activity_id', sa.Integer(), nullable=True))
     op.add_column('campaign_membership', sa.Column('membership_metadata', sa.JSON(), nullable=True))
     op.create_foreign_key(None, 'campaign_membership', 'activity', ['sent_activity_id'], ['id'])
-    op.drop_constraint(op.f('todos_user_id_fkey'), 'todos', type_='foreignkey')
+    # Note: todos table was created without foreign key, so no constraint to drop
     # ### end Alembic commands ###
 
 
@@ -43,7 +43,7 @@ def downgrade():
     # Get database connection to check dialect
     connection = op.get_bind()
     
-    op.create_foreign_key(op.f('todos_user_id_fkey'), 'todos', 'user', ['user_id'], ['id'])
+    # Note: todos table was created without foreign key, so no constraint to create
     op.drop_constraint(None, 'campaign_membership', type_='foreignkey')
     op.drop_column('campaign_membership', 'membership_metadata')
     op.drop_column('campaign_membership', 'sent_activity_id')
