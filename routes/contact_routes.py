@@ -329,12 +329,16 @@ def bulk_contact_action():
     
     if action == 'export':
         # Export contacts to CSV
-        csv_data = contact_service.export_contacts(contact_ids)
+        result = contact_service.export_contacts(contact_ids)
         
-        response = make_response(csv_data)
-        response.headers['Content-Disposition'] = 'attachment; filename=contacts_export.csv'
-        response.headers['Content-Type'] = 'text/csv'
-        return response
+        if result.is_success:
+            response = make_response(result.data)
+            response.headers['Content-Disposition'] = 'attachment; filename=contacts_export.csv'
+            response.headers['Content-Type'] = 'text/csv'
+            return response
+        else:
+            flash(result.error or 'Export failed', 'error')
+            return redirect(url_for('contact.list_all'))
     else:
         # Use bulk_action for other operations
         form_data = request.form.to_dict()
@@ -351,7 +355,7 @@ def bulk_contact_action():
         if result.is_success:
             flash(result.data or 'Bulk action completed successfully', 'success')
         else:
-            flash(result.message or 'Bulk action failed', 'error')
+            flash(result.error or 'Bulk action failed', 'error')
     
     return redirect(url_for('contact.list_all'))
 
