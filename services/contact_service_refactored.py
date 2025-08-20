@@ -466,21 +466,231 @@ class ContactService:
             if not contacts:
                 return Result.failure("No contacts found", code="NO_CONTACTS_FOUND")
             
-            # Create CSV
+            # Create CSV with specific format expected by tests
             output = io.StringIO()
-            writer = csv.DictWriter(output, fieldnames=[
-                'id', 'first_name', 'last_name', 'email', 'phone', 'imported_at'
-            ])
+            fieldnames = [
+                'First Name', 'Last Name', 'Phone', 'Email', 
+                'Import Source', 'Customer Type', 'Imported At'
+            ]
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
             
             writer.writeheader()
             for contact in contacts:
                 writer.writerow({
-                    'id': contact.id,
-                    'first_name': contact.first_name,
-                    'last_name': contact.last_name,
-                    'email': contact.email,
-                    'phone': contact.phone,
-                    'imported_at': contact.imported_at.isoformat() if contact.imported_at else ''
+                    'First Name': contact.first_name or '',
+                    'Last Name': contact.last_name or '',
+                    'Phone': contact.phone or '',
+                    'Email': contact.email or '',
+                    'Import Source': getattr(contact, 'import_source', ''),
+                    'Customer Type': getattr(contact, 'customer_type', ''),
+                    'Imported At': contact.imported_at.isoformat() if hasattr(contact, 'imported_at') and contact.imported_at else ''
+                })
+            
+            csv_data = output.getvalue()
+            return Result.success(csv_data, metadata={"count": len(contacts)})
+            
+        except Exception as e:
+            logger.error(f"Export failed: {str(e)}")
+            return Result.failure(f"Export failed: {str(e)}", code="EXPORT_ERROR")
+    
+    def get_contact_with_relations(self, contact_id: int):
+        """
+        Get contact with eager loaded properties and jobs.
+        
+        Args:
+            contact_id: Contact ID
+            
+        Returns:
+            Contact object with relations or None if not found
+        """
+        try:
+            from crm_database import Contact, Property, Job
+            from sqlalchemy.orm import joinedload
+            
+            contact = Contact.query.options(
+                joinedload(Contact.properties).joinedload(Property.jobs)
+            ).filter_by(id=contact_id).first()
+            
+            return contact
+            
+        except Exception as e:
+            logger.error(f"Failed to get contact with relations: {str(e)}")
+            return None
+    
+    def get_contact_flags(self, contact_id: int) -> Result[Dict]:
+        """
+        Get all flags for a contact.
+        
+        Args:
+            contact_id: Contact ID
+            
+        Returns:
+            Result[Dict]: Success with flag data or failure
+        """
+        try:
+            from crm_database import ContactFlag
+            
+            flags = ContactFlag.query.filter_by(contact_id=contact_id).all()
+            flag_types = [flag.flag_type for flag in flags]
+            
+            return Result.success({
+                'has_office_flag': 'office_number' in flag_types,
+                'has_opted_out': 'opted_out' in flag_types,
+                'flags': flag_types
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to get contact flags: {str(e)}")
+            return Result.failure(f"Failed to get contact flags: {str(e)}", code="FLAGS_ERROR")
+    
+    def add_contact_flag(self, contact_id: int, flag_type: str, 
+                        flag_reason: Optional[str] = None, 
+                        created_by: Optional[str] = None) -> Result[bool]:
+        """
+        Add a flag to a contact.
+        
+        Args:
+            contact_id: Contact ID
+            flag_type: Type of flag ('opted_out', 'office_number', etc.)
+            flag_reason: Optional reason for the flag
+            created_by: Optional username who created the flag
+            
+        Returns:
+            Result[bool]: Success(True) if added, Success(False) if already exists
+        """
+        try:
+            from crm_database import ContactFlag
+            
+            # Check if flag already exists
+            existing = ContactFlag.query.filter_by(
+                contact_id=contact_id,
+                flag_type=flag_type
+            ).first()
+            
+            if existing:
+                return Result.success(False)  # Flag already exists
+            
+            # Create new flag
+            flag = ContactFlag(
+                contact_id=contact_id,
+                flag_type=flag_type,
+                flag_reason=flag_reason,
+                created_by=created_by
+            )
+            
+            from crm_database import db
+            db.session.add(flag)
+            db.session.commit()
+            
+            logger.info(f"Added {flag_type} flag to contact {contact_id}")
+            return Result.success(True)
+            
+        except Exception as e:
+            logger.error(f"Failed to add contact flag: {str(e)}")
+            return Result.failure(f"Failed to add contact flag: {str(e)}", code="FLAG_ERROR")
+    
+    def remove_contact_flag(self, contact_id: int, flag_type: str) -> Result[bool]:
+        """
+        Remove a flag from a contact.
+        
+        Args:
+            contact_id: Contact ID
+            flag_type: Type of flag to remove
+            
+        Returns:
+            Result[bool]: Success(True) if removed, Success(False) if not found
+        """
+        try:
+            from crm_database import ContactFlag, db
+            
+            flag = ContactFlag.query.filter_by(
+                contact_id=contact_id,
+                flag_type=flag_type
+            ).first()
+            
+            if not flag:
+                return Result.success(False)  # Flag not found
+            
+            db.session.delete(flag)
+            db.session.commit()
+            
+            logger.info(f"Removed {flag_type} flag from contact {contact_id}")
+            return Result.success(True)
+            
+        except Exception as e:
+            logger.error(f"Failed to remove contact flag: {str(e)}")
+            return Result.failure(f"Failed to remove contact flag: {str(e)}", code="FLAG_ERROR")
+    
+    def get_campaign_memberships(self, contact_id: int) -> List:
+        """
+        Get all campaign memberships for a contact.
+        
+        Args:
+            contact_id: Contact ID
+            
+        Returns:
+            List of CampaignMembership objects (empty list if none found)
+        """
+        try:
+            # Import here to avoid circular imports
+            from crm_database import CampaignMembership
+            
+            # Get memberships with campaign data
+            memberships = CampaignMembership.query.filter_by(
+                contact_id=contact_id
+            ).join(CampaignMembership.campaign).all()
+            
+            return memberships
+            
+        except Exception as e:
+            logger.error(f"Failed to get campaign memberships: {str(e)}")
+            return []
+    
+    def export_contacts_csv(self, filters: Optional[Dict] = None) -> Result[str]:
+        """
+        Export contacts to CSV format based on filters.
+        
+        Args:
+            filters: Optional filters dictionary (contact_ids, etc.)
+            
+        Returns:
+            Result[str]: Success with CSV data or failure
+        """
+        try:
+            # Handle filters
+            if filters and 'contact_ids' in filters:
+                contact_ids = filters['contact_ids']
+            else:
+                # Export all contacts if no filters
+                contacts = self.contact_repository.get_all()
+                contact_ids = [c.id for c in contacts]
+            
+            if not contact_ids:
+                return Result.failure("No contacts to export", code="NO_CONTACTS")
+            
+            contacts = self.contact_repository.get_by_ids(contact_ids)
+            
+            if not contacts:
+                return Result.failure("No contacts found", code="NO_CONTACTS_FOUND")
+            
+            # Create CSV with specific format expected by tests
+            output = io.StringIO()
+            fieldnames = [
+                'First Name', 'Last Name', 'Phone', 'Email', 
+                'Import Source', 'Customer Type', 'Imported At'
+            ]
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            
+            writer.writeheader()
+            for contact in contacts:
+                writer.writerow({
+                    'First Name': contact.first_name or '',
+                    'Last Name': contact.last_name or '',
+                    'Phone': contact.phone or '',
+                    'Email': contact.email or '',
+                    'Import Source': getattr(contact, 'import_source', ''),
+                    'Customer Type': getattr(contact, 'customer_type', ''),
+                    'Imported At': contact.imported_at.isoformat() if hasattr(contact, 'imported_at') and contact.imported_at else ''
                 })
             
             csv_data = output.getvalue()
@@ -504,13 +714,14 @@ class ContactService:
             # Get flag stats from repository
             flag_stats = self.contact_flag_repository.get_flag_statistics()
             
-            # Combine stats in expected format
+            # Combine stats in expected format - include office_numbers field
             stats = {
                 'total_contacts': contact_stats.get('total', 0),
                 'with_phone': contact_stats.get('with_phone', 0),
                 'with_email': contact_stats.get('with_email', 0),
                 'with_conversations': contact_stats.get('with_conversation', 0),
                 'opted_out': flag_stats.get('opted_out', 0),
+                'office_numbers': flag_stats.get('office_number', 0),  # Add office_numbers
                 'invalid_phone': flag_stats.get('invalid_phone', 0)
             }
             

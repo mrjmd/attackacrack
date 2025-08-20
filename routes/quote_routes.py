@@ -18,6 +18,7 @@ def view(quote_id):
     quote = quote_service.get_quote_by_id(quote_id)
     return render_template('quote_detail.html', quote=quote)
 
+@quote_bp.route('/quotes/new', methods=['GET', 'POST'])
 @quote_bp.route('/quote/add', methods=['GET', 'POST'])
 @quote_bp.route('/quote/<int:quote_id>/edit', methods=['GET', 'POST'])
 @login_required

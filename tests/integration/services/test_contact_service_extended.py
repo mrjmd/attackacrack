@@ -236,7 +236,7 @@ class TestCampaignMembership:
         
         # Should fail with "already in campaign" error
         assert result.is_failure
-        assert result.code == "ALREADY_MEMBER"
+        assert result.error_code == "ALREADY_MEMBER"
         assert 'already in campaign' in result.error.lower()
     
     def test_add_to_campaign_invalid_campaign(self, contact_service, test_contact):

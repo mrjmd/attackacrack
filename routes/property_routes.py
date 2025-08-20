@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, flash
 from flask_login import login_required
-from crm_database import Property
+# Direct model imports removed - use services only
 from extensions import db
 
 property_bp = Blueprint('property', __name__)
@@ -15,7 +15,7 @@ def list_all():
     
     # Get paginated properties using PropertyService
     property_service = current_app.services.get('property')
-    properties_paginated = property_service.get_paginated_properties(
+    properties_paginated = property_service.get_paginated(
         page=page, 
         per_page=per_page, 
         search=search

@@ -526,7 +526,8 @@ class ContactRepository(BaseRepository[Contact]):
             Dictionary with various contact counts
         """
         total = self.count()
-        with_phone = self.count(phone=lambda x: x.isnot(None))
+        # Count contacts with phone numbers (not null/empty)
+        with_phone = self.session.query(Contact).filter(Contact.phone.isnot(None)).count()
         with_email = self.session.query(Contact).filter(Contact.email.isnot(None)).count()
         with_conversation = self.session.query(Contact).filter(
             exists().where(Conversation.contact_id == Contact.id)

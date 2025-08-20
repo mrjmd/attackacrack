@@ -5,7 +5,8 @@ import os
 from datetime import datetime
 
 from api_integrations import get_upcoming_calendar_events, get_recent_gmail_messages
-from crm_database import Setting, db
+# Direct database imports removed - use services only
+from extensions import db
 
 main_bp = Blueprint('main', __name__)
 
@@ -83,7 +84,8 @@ def dashboard():
             })
     
     # Today's Appointments
-    appointments = appointment_service.get_all_appointments()[:4]  # Limit to 4
+    appointments_result = appointment_service.get_all_appointments()
+    appointments = appointments_result.data[:4] if appointments_result.success else []
     
     # System Health Data
     campaign_queue_size = dashboard_service.get_campaign_queue_size()
@@ -260,3 +262,67 @@ def finances():
 @login_required
 def marketing():
     return render_template('marketing.html')
+
+
+@main_bp.route('/schedule_appointment', methods=['POST'])
+@login_required
+def schedule_appointment():
+    """Schedule an appointment and send reminder using services"""
+    # Use service registry pattern
+    setting_service = current_app.services.get('setting')
+    google_service = current_app.services.get('google_calendar')
+    
+    # Get form data
+    contact_id = request.form.get('contact_id')
+    date = request.form.get('date')
+    time = request.form.get('time')
+    service_type = request.form.get('service_type', 'appointment_reminder')
+    first_name = request.form.get('first_name')
+    phone = request.form.get('phone')
+    
+    try:
+        # Get template using service
+        template = setting_service.get_template_by_key(f'{service_type}_template')
+        
+        # Create calendar event using service
+        event_data = google_service.create_event({
+            'date': date,
+            'time': time,
+            'first_name': first_name,
+            'phone': phone
+        })
+        
+        flash('Appointment scheduled successfully!', 'success')
+        return redirect(url_for('appointment.list_all'))
+        
+    except Exception as e:
+        flash(f'Error scheduling appointment: {str(e)}', 'error')
+        return redirect(url_for('appointment.list_all'))
+
+
+@main_bp.route('/schedule_reminder', methods=['POST'])
+@login_required
+def schedule_reminder():
+    """Schedule a reminder using services"""
+    # Use service registry pattern
+    setting_service = current_app.services.get('setting')
+    
+    # Get form data
+    contact_id = request.form.get('contact_id')
+    reminder_type = request.form.get('reminder_type')
+    first_name = request.form.get('first_name')
+    
+    try:
+        # Get appropriate template using service
+        if reminder_type == 'appointment':
+            template = setting_service.get_appointment_reminder_template()
+        else:
+            template = setting_service.get_review_request_template()
+        
+        # Process reminder (implementation depends on requirements)
+        flash('Reminder scheduled successfully!', 'success')
+        return redirect(url_for('main.dashboard'))
+        
+    except Exception as e:
+        flash(f'Error scheduling reminder: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))

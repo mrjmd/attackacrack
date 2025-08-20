@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify, render_template, redirect, url_fo
 from flask_login import login_required
 from datetime import datetime
 from extensions import db
-from crm_database import Campaign, Contact, ContactFlag, CampaignMembership, CampaignList, CSVImport
+# Direct model imports removed - use services only
 
 campaigns_bp = Blueprint('campaigns', __name__)
 
@@ -116,6 +116,34 @@ def campaign_detail(campaign_id):
                          analytics=analytics,
                          bounce_metrics=bounce_metrics,
                          recent_sends=recent_sends)
+
+
+@campaigns_bp.route('/campaigns/<int:campaign_id>/edit')
+@login_required
+def edit_campaign(campaign_id):
+    """Show campaign edit form"""
+    campaign_service = current_app.services.get('campaign')
+    campaign = campaign_service.get_by_id(campaign_id)
+    if not campaign:
+        abort(404)
+    
+    return render_template('campaigns/edit.html', campaign=campaign)
+
+
+@campaigns_bp.route('/campaigns/<int:campaign_id>/members')
+@login_required
+def campaign_members(campaign_id):
+    """Show campaign members"""
+    campaign_service = current_app.services.get('campaign')
+    campaign = campaign_service.get_by_id(campaign_id)
+    if not campaign:
+        abort(404)
+    
+    members = campaign_service.get_campaign_members(campaign_id)
+    
+    return render_template('campaigns/members.html', 
+                         campaign=campaign,
+                         members=members)
 
 
 @campaigns_bp.route('/campaigns/<int:campaign_id>/start', methods=['POST'])
