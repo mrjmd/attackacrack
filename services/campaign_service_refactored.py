@@ -114,26 +114,30 @@ class CampaignService:
                 'winner_variant': None
             }
         
-        campaign = self.campaign_repository.create(
-            name=name,
-            campaign_type=campaign_type,
-            audience_type=audience_type,
-            channel=channel,
-            template_a=template_a,
-            template_b=template_b,
-            daily_limit=daily_limit,
-            business_hours_only=business_hours_only,
-            ab_config=ab_config,
-            status='draft'
-        )
-        
-        self.campaign_repository.commit()
-        
-        # Handle both dict and object returns from repository
-        campaign_id = campaign['id'] if isinstance(campaign, dict) else campaign.id
-        logger.info(f"Created campaign: {campaign_id} - {name}")
-        
-        return Result.success(campaign)
+        try:
+            campaign = self.campaign_repository.create(
+                name=name,
+                campaign_type=campaign_type,
+                audience_type=audience_type,
+                channel=channel,
+                template_a=template_a,
+                template_b=template_b,
+                daily_limit=daily_limit,
+                business_hours_only=business_hours_only,
+                ab_config=ab_config,
+                status='draft'
+            )
+            
+            self.campaign_repository.commit()
+            
+            # Handle both dict and object returns from repository
+            campaign_id = campaign['id'] if isinstance(campaign, dict) else campaign.id
+            logger.info(f"Created campaign: {campaign_id} - {name}")
+            
+            return Result.success(campaign)
+        except Exception as e:
+            logger.error(f"Failed to create campaign: {str(e)}")
+            return Result.failure(f"Failed to create campaign: {str(e)}", code="CREATE_ERROR")
     
     def add_recipients_from_list(self, campaign_id: int, list_id: int) -> 'Result[int]':
         """
@@ -999,19 +1003,38 @@ class CampaignService:
         Returns:
             Personalized message
         """
+        # Handle None/empty templates
+        if not template:
+            return ""
+            
         try:
             # Replace common placeholders
             message = template
+            
+            # Helper function to check if a name is actually a phone number
+            def is_phone_number(name):
+                return name and (name.startswith('+1') or name.startswith('('))
+            
             if hasattr(contact, 'first_name') and contact.first_name:
-                message = message.replace('{first_name}', contact.first_name)
+                # Don't use phone numbers as names in personalization
+                replacement = '' if is_phone_number(contact.first_name) else contact.first_name
+                message = message.replace('{first_name}', replacement)
+                
             if hasattr(contact, 'last_name') and contact.last_name:
-                message = message.replace('{last_name}', contact.last_name)
+                # Skip last names that look like "(from OpenPhone)" or phone numbers
+                if not (contact.last_name.startswith('(') or is_phone_number(contact.last_name)):
+                    message = message.replace('{last_name}', contact.last_name)
+                else:
+                    message = message.replace('{last_name}', '')
+                    
             if hasattr(contact, 'name') and contact.name:
-                message = message.replace('{name}', contact.name)
+                replacement = '' if is_phone_number(contact.name) else contact.name
+                message = message.replace('{name}', replacement)
+                
             if hasattr(contact, 'company_name') and contact.company_name:
                 message = message.replace('{company}', contact.company_name)
                 
             return message
         except Exception as e:
             logger.error(f"Error personalizing message: {e}")
-            return template
+            return template or ""

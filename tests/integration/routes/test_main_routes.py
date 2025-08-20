@@ -16,10 +16,18 @@ def test_dashboard_route_with_mocking(authenticated_client, mocker, app):
     
     # Mock database calls that populate the dashboard
     # This is the crucial mock to ensure no internal appointments are found
-    mocker.patch('services.appointment_service.AppointmentService.get_all_appointments', return_value=[])
+    # Mock Result object for AppointmentService
+    mock_appointment_result = mocker.Mock()
+    mock_appointment_result.success = True
+    mock_appointment_result.data = []
+    mocker.patch('services.appointment_service_refactored.AppointmentService.get_all_appointments', return_value=mock_appointment_result)
     
     # Mock the database call for latest conversations
-    mocker.patch('services.message_service.MessageService.get_latest_conversations_from_db', return_value=[])
+    # Mock Result object for MessageService  
+    mock_message_result = mocker.Mock()
+    mock_message_result.is_success = True
+    mock_message_result.data = []
+    mocker.patch('services.message_service_refactored.MessageService.get_latest_conversations_from_db', return_value=mock_message_result)
     
     with app.test_request_context():
         response = authenticated_client.get(url_for('main.dashboard'))

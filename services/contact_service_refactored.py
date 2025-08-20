@@ -615,15 +615,8 @@ class ContactService:
             List of CampaignMembership objects (empty list if none found)
         """
         try:
-            # Use repository to get memberships
-            # Note: We need to get all campaigns and check membership for each
-            # This is a simplified approach - ideally the campaign repository
-            # should have a method to get all memberships for a contact
-            memberships = []
-            
-            # For now, return empty list as we don't have a direct method
-            # The campaign repository can be extended with a method like:
-            # get_memberships_by_contact_id(contact_id)
+            # Use campaign repository to get memberships for this contact
+            memberships = self.campaign_repository.get_memberships_by_contact(contact_id)
             return memberships
             
         except Exception as e:

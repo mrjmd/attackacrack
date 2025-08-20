@@ -742,6 +742,24 @@ class CampaignRepository(BaseRepository[Campaign]):
             logger.error(f"Error getting campaign memberships: {e}")
             return []
     
+    def get_memberships_by_contact(self, contact_id: int) -> List[CampaignMembership]:
+        """
+        Get all campaign memberships for a specific contact.
+        
+        Args:
+            contact_id: Contact ID
+            
+        Returns:
+            List of campaign memberships with eagerly loaded campaigns
+        """
+        try:
+            return self.session.query(CampaignMembership).options(
+                joinedload(CampaignMembership.campaign)
+            ).filter_by(contact_id=contact_id).all()
+        except Exception as e:
+            logger.error(f"Error getting memberships for contact {contact_id}: {e}")
+            return []
+    
     def find_memberships_with_activity_ids(self, campaign_id: int) -> List[CampaignMembership]:
         """
         Find memberships that have sent activity IDs.

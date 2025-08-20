@@ -97,7 +97,8 @@ class TestAppointmentServiceRepositoryEnforcement:
         mock_repository.get_all.assert_called_once()
         
         # Verify result is from repository
-        assert result == expected_appointments
+        assert result.is_success
+        assert result.data == expected_appointments
         
         # CRITICAL: Verify NO direct database queries were made
         # This will fail if service uses self.session.query(Appointment).all()
@@ -119,7 +120,8 @@ class TestAppointmentServiceRepositoryEnforcement:
         mock_repository.find_by_contact_id.assert_called_once_with(contact_id)
         
         # Verify result is from repository
-        assert result == expected_appointments
+        assert result.is_success
+        assert result.data == expected_appointments
         
         # CRITICAL: Verify NO direct database queries were made
         # This will fail if service uses self.session.query(Appointment).filter_by(contact_id=contact_id).all()
@@ -145,7 +147,8 @@ class TestAppointmentServiceRepositoryEnforcement:
         mock_repository.find_by_date_range.assert_called_once_with(today, end_date)
         
         # Verify result is from repository
-        assert result == expected_appointments
+        assert result.is_success
+        assert result.data == expected_appointments
         
         # CRITICAL: Verify NO direct database queries were made
         # This will fail if service uses self.session.query(Appointment).filter(...)
@@ -157,7 +160,7 @@ class TestAppointmentServiceRepositoryEnforcement:
         EDGE CASE: Verify service enforces dependency injection
         """
         # Act & Assert - creating service without repository should raise error
-        with pytest.raises(ValueError, match="AppointmentRepository must be provided"):
+        with pytest.raises(TypeError):
             AppointmentService()
     
     def test_add_appointment_uses_repository_create(self, service_with_repository, mock_repository):
@@ -186,7 +189,8 @@ class TestAppointmentServiceRepositoryEnforcement:
         mock_repository.commit.assert_called()
         
         # Verify result
-        assert result is mock_appointment
+        assert result.is_success
+        assert result.data is mock_appointment
     
     def test_update_appointment_uses_repository_update(self, service_with_repository, mock_repository):
         """
@@ -208,7 +212,8 @@ class TestAppointmentServiceRepositoryEnforcement:
         mock_repository.commit.assert_called_once()
         
         # Verify result
-        assert result is mock_appointment
+        assert result.is_success
+        assert result.data is mock_appointment
     
     def test_delete_appointment_uses_repository_delete(self, service_with_repository, mock_repository):
         """
@@ -227,7 +232,8 @@ class TestAppointmentServiceRepositoryEnforcement:
         mock_repository.commit.assert_called_once()
         
         # Verify result
-        assert result is True
+        assert result.is_success
+        assert result.data is True
     
     def test_service_does_not_store_session_when_repository_provided(self, service_with_repository):
         """
@@ -265,11 +271,12 @@ class TestAppointmentServiceRepositoryEnforcement:
         # Mock repository to raise exception
         mock_repository.get_all.side_effect = Exception("Database error")
         
-        # Service should handle the error (not let it bubble up unhandled)
-        with pytest.raises(Exception) as exc_info:
-            service_with_repository.get_all_appointments()
+        # Service should handle the error and return Result.failure
+        result = service_with_repository.get_all_appointments()
+        assert result.is_failure
+        assert "Database error" in result.error
         
-        assert "Database error" in str(exc_info.value)
+        # Error was handled properly and returned in Result.failure
         
         # Verify repository method was called despite error
         mock_repository.get_all.assert_called_once()
@@ -378,7 +385,7 @@ class TestAppointmentServiceLegacyPatternDetection:
         SUCCESS: Service no longer accepts empty constructor
         """
         # SUCCESS: Service now correctly requires repository injection
-        with pytest.raises(ValueError, match="AppointmentRepository must be provided via dependency injection"):
+        with pytest.raises(TypeError):
             service = AppointmentService()
         
         # SUCCESS: Service works with proper repository injection

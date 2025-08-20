@@ -182,7 +182,8 @@ def conversation(contact_id):
         flash('Contact not found', 'error')
         return redirect(url_for('contact.list_all'))
     
-    activities = message_service.get_activities_for_contact(contact_id)
+    activities_result = message_service.get_activities_for_contact(contact_id)
+    activities = activities_result.data if activities_result.is_success else []
     
     # Get recent jobs from pre-loaded properties
     recent_jobs = []
@@ -192,15 +193,23 @@ def conversation(contact_id):
     recent_jobs = sorted(recent_jobs, key=lambda x: x.completed_at if x.completed_at else datetime.min, reverse=True)[:3]
     
     # Get contact flags
-    flags = contact_service.get_contact_flags(contact_id)
-    has_office_flag = flags['has_office_flag']
-    has_opted_out = flags['has_opted_out']
+    flags_result = contact_service.get_contact_flags(contact_id)
+    if flags_result.is_success:
+        flags = flags_result.data
+        has_office_flag = flags.get('has_office_flag', False)
+        has_opted_out = flags.get('has_opted_out', False)
+    else:
+        has_office_flag = False
+        has_opted_out = False
     
     # Get campaign memberships
-    campaign_memberships = contact_service.get_campaign_memberships(contact_id, limit=3)
+    campaign_memberships = contact_service.get_campaign_memberships(contact_id)
+    # Limit to 3 most recent
+    if campaign_memberships:
+        campaign_memberships = campaign_memberships[:3]
     
     # Calculate statistics
-    call_count = sum(1 for a in activities if a.activity_type == 'call')
+    call_count = sum(1 for a in activities if hasattr(a, 'activity_type') and a.activity_type == 'call')
     last_activity = max(activities, key=lambda a: a.created_at) if activities else None
     last_activity_date = last_activity.created_at.strftime('%b %d, %Y') if last_activity else None
     
@@ -221,11 +230,13 @@ def send_message(contact_id):
     contact_service = current_app.services.get('contact')
     openphone_service = current_app.services.get('openphone')
     
-    contact = contact_service.get_contact_by_id(contact_id)
+    contact_result = contact_service.get_contact_by_id(contact_id)
     
-    if not contact:
+    if not contact_result.is_success or not contact_result.data:
         flash('Contact not found', 'error')
         return redirect(url_for('contact.conversation_list'))
+    
+    contact = contact_result.data
     
     message_body = request.form.get('body', '').strip()
     
@@ -266,17 +277,18 @@ def flag_contact(contact_id):
         flash('Flag type is required', 'error')
         return redirect(url_for('contact.conversation', contact_id=contact_id))
     
-    success = contact_service.add_contact_flag(
+    result = contact_service.add_contact_flag(
         contact_id=contact_id,
         flag_type=flag_type,
-        reason=reason,
+        flag_reason=reason,
         created_by=str(current_user.id) if current_user.is_authenticated else 'system'
     )
+    success = result.is_success
     
     if success:
         flash(f'Contact flagged as {flag_type}', 'success')
     else:
-        flash('Flag already exists or error occurred', 'warning')
+        flash(f'Failed to flag contact: {result.error_message}', 'warning')
     
     return redirect(url_for('contact.conversation', contact_id=contact_id))
 
@@ -292,12 +304,13 @@ def unflag_contact(contact_id):
         flash('Flag type is required', 'error')
         return redirect(url_for('contact.conversation', contact_id=contact_id))
     
-    success = contact_service.remove_contact_flag(contact_id, flag_type)
+    result = contact_service.remove_contact_flag(contact_id, flag_type)
+    success = result.is_success
     
     if success:
         flash(f'Removed {flag_type} flag', 'success')
     else:
-        flash('Error removing flag', 'error')
+        flash(f'Error removing flag: {result.error_message}', 'error')
     
     return redirect(url_for('contact.conversation', contact_id=contact_id))
 
@@ -324,13 +337,21 @@ def bulk_contact_action():
         return response
     else:
         # Use bulk_action for other operations
-        success, message = contact_service.bulk_action(
+        form_data = request.form.to_dict()
+        # Remove duplicate action and contact_ids from form data
+        form_data.pop('action', None)
+        form_data.pop('contact_ids', None)
+        
+        result = contact_service.bulk_action(
             action=action,
             contact_ids=contact_ids,
-            **request.form.to_dict()
+            **form_data
         )
         
-        flash(message, 'success' if success else 'error')
+        if result.is_success:
+            flash(result.data or 'Bulk action completed successfully', 'success')
+        else:
+            flash(result.message or 'Bulk action failed', 'error')
     
     return redirect(url_for('contact.list_all'))
 

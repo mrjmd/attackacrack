@@ -168,7 +168,11 @@ def create_app(config_name=None, test_config=None):
         lambda setting_repository: _create_setting_service(setting_repository),
         dependencies=['setting_repository']
     )
-    registry.register_singleton('message', lambda: _create_message_service())
+    registry.register_factory(
+        'message',
+        lambda conversation_repository, activity_repository, contact, property, openphone, ai: _create_message_service(conversation_repository, activity_repository, contact, property, openphone, ai),
+        dependencies=['conversation_repository', 'activity_repository', 'contact', 'property', 'openphone', 'ai']
+    )
     registry.register_factory(
         'todo',
         lambda todo_repository: _create_todo_service(todo_repository),
@@ -499,11 +503,18 @@ def _create_contact_service(contact_repository, campaign_repository, contact_fla
         contact_flag_repository=contact_flag_repository
     )
 
-def _create_message_service():
-    """Create MessageService instance"""
-    from services.message_service_refactored import MessageService
+def _create_message_service(conversation_repository, activity_repository, contact, property, openphone, ai):
+    """Create MessageService instance with dependencies"""
+    from services.message_service_refactored import MessageServiceRefactored
     logger.info("Initializing MessageService")
-    return MessageService()
+    return MessageServiceRefactored(
+        conversation_repository=conversation_repository,
+        activity_repository=activity_repository,
+        contact_service=contact,
+        property_service=property,
+        openphone_service=openphone,
+        ai_service=ai
+    )
 
 def _create_todo_service(todo_repository):
     """Create TodoService instance with repository dependency"""
