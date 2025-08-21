@@ -27,11 +27,6 @@ celery.conf.beat_schedule = {
         # 'schedule': crontab(hour=8, minute=0),
         'schedule': 3600.0 * 24,
     },
-    'process-campaign-queue': {
-        'task': 'tasks.campaign_tasks.process_campaign_queue',
-        # Executes every 60 seconds for near real-time campaign processing
-        'schedule': 60.0,
-    },
 }
 celery.conf.timezone = 'UTC'
 
