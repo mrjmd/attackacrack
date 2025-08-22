@@ -85,12 +85,7 @@ def upgrade():
             "DROP INDEX IF EXISTS idx_conversation_phone_number_id",
             "DROP INDEX IF EXISTS ix_conversation_contact_id",
             
-            # Failed webhook queue indexes
-            "DROP INDEX IF EXISTS idx_failed_webhook_queue_created_at",
-            "DROP INDEX IF EXISTS idx_failed_webhook_queue_event_id",
-            "DROP INDEX IF EXISTS idx_failed_webhook_queue_event_type",
-            "DROP INDEX IF EXISTS idx_failed_webhook_queue_next_retry",
-            "DROP INDEX IF EXISTS idx_failed_webhook_queue_resolved",
+            # Don't drop failed_webhook_queue indexes - they belong to migration 5bf30755a98d
             
             # Invoice indexes
             "DROP INDEX IF EXISTS idx_invoice_status_due",
