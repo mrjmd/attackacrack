@@ -92,21 +92,24 @@ class TestActivityRepositoryDashboardEnhancements:
         db_session.add(contact)
         db_session.commit()
         
-        today = datetime.utcnow()
-        yesterday = today - timedelta(days=1)
+        # Use fixed times to avoid flaky tests based on when they run
+        from datetime import time
+        today_noon = datetime.combine(datetime.utcnow().date(), time(12, 0, 0))
+        today_morning = datetime.combine(datetime.utcnow().date(), time(10, 0, 0))
+        yesterday = today_noon - timedelta(days=1)
         
         # Today's outgoing messages (should be counted)
         outgoing_today1 = Activity(
             contact_id=contact.id,
             activity_type='message',
             direction='outgoing',
-            created_at=today
+            created_at=today_noon
         )
         outgoing_today2 = Activity(
             contact_id=contact.id,
             activity_type='message',
             direction='outgoing', 
-            created_at=today - timedelta(hours=2)
+            created_at=today_morning
         )
         
         # Today's incoming message (should not be counted)
@@ -114,7 +117,7 @@ class TestActivityRepositoryDashboardEnhancements:
             contact_id=contact.id,
             activity_type='message',
             direction='incoming',
-            created_at=today
+            created_at=today_noon
         )
         
         # Yesterday's outgoing message (should not be counted)
@@ -130,7 +133,7 @@ class TestActivityRepositoryDashboardEnhancements:
             contact_id=contact.id,
             activity_type='call',
             direction='outgoing',
-            created_at=today
+            created_at=today_noon
         )
         
         db_session.add_all([

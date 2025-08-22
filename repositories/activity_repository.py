@@ -258,13 +258,17 @@ class ActivityRepository(BaseRepository):
         Returns:
             Number of outgoing messages sent today
         """
-        from datetime import datetime
+        from datetime import datetime, time
         
-        today = datetime.utcnow().date()
+        # Get start and end of today in UTC
+        today_start = datetime.combine(datetime.utcnow().date(), time.min)
+        today_end = datetime.combine(datetime.utcnow().date(), time.max)
+        
         return self.session.query(self.model_class).filter(
             self.model_class.activity_type == 'message',
             self.model_class.direction == 'outgoing',
-            func.date(self.model_class.created_at) == today
+            self.model_class.created_at >= today_start,
+            self.model_class.created_at <= today_end
         ).count()
     
     def calculate_overall_response_rate(self) -> float:
