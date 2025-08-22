@@ -52,6 +52,8 @@ class TestCampaignServiceUnit:
         mock_repo.bulk_create_flags.return_value = []
         mock_repo.cleanup_expired_flags.return_value = 0
         mock_repo.commit.return_value = None
+        # Add filter_campaign_eligible_contacts to return all contacts by default
+        mock_repo.filter_campaign_eligible_contacts = Mock(side_effect=lambda contact_ids, channel='sms': contact_ids)
         return mock_repo
     
     @pytest.fixture

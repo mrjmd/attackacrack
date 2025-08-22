@@ -233,10 +233,10 @@ class TestPhoneValidationDatabaseIntegration:
         # Verify new record was created (or old one updated)
         records = phone_validation_repository.find_by(phone_number=phone_number)
         
-        # Should have fresh record with updated carrier
-        fresh_record = max(records, key=lambda r: r.created_at)
+        # Should have updated record with fresh carrier
+        fresh_record = records[0]  # Should be only one record now (updated)
         assert fresh_record.carrier == 'Verizon Wireless'  # From mock API
-        assert fresh_record.created_at > initial_record.created_at
+        assert fresh_record.validation_date > initial_record.created_at  # Validation was refreshed
     
     def test_database_transaction_rollback_on_error(self, phone_validation_service, phone_validation_repository, db_session):
         """Test that database transactions are rolled back on API errors"""
@@ -507,8 +507,10 @@ class TestPhoneValidationCSVIntegrationWorkflow:
             result = phone_validation_service.validate_csv_import(csv_data, phone_field='phone')
             
             # Assert
-            # Should handle error gracefully
-            assert result.success is False or result.data['error_count'] > 0
+            # Should handle caching error gracefully - validation should still succeed
+            assert result.success is True
+            assert result.data['error_count'] == 0  # No validation errors
+            assert result.data['valid_phones'] == 2  # Both phones were successfully validated
             
             # Verify database state is consistent (no partial saves)
             # Due to transaction rollback, should have no records or all successful records

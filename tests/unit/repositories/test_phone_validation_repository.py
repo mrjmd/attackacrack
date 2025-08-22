@@ -16,7 +16,7 @@ import pytest
 from datetime import datetime, timedelta
 from repositories.phone_validation_repository import PhoneValidationRepository
 from crm_database import PhoneValidation
-from repositories.base_repository import PaginationParams
+from repositories.base_repository import PaginationParams, SortOrder
 
 
 @pytest.fixture
@@ -382,7 +382,7 @@ class TestPhoneValidationRepositoryPagination:
         result = phone_validation_repository.get_paginated(
             pagination=pagination,
             order_by='created_at',
-            order='desc'
+            order=SortOrder.DESC
         )
         
         # Assert

@@ -231,8 +231,8 @@ class TestPhoneValidationServiceValidation:
             # Verify API was called despite cache hit
             mock_get.assert_called_once()
             
-            # Verify new result was cached
-            mock_validation_repository.create.assert_called_once()
+            # Verify existing record was updated (since expired cache exists)
+            mock_validation_repository.update.assert_called_once()
     
     def test_validate_phone_api_error_500(self, phone_validation_service, mock_validation_repository):
         """Test handling of NumVerify API server errors"""
@@ -578,15 +578,21 @@ class TestPhoneValidationServiceUtilities:
     def test_get_validation_stats(self, phone_validation_service, mock_validation_repository):
         """Test getting validation statistics"""
         # Arrange - Mock repository to return stats
-        mock_validation_repository.count.side_effect = lambda **kwargs: {
-            # Total validations
-            (): 1000,
-            # Valid numbers  
-            ('is_valid', True): 850,
-            # Mobile numbers
-            ('is_valid', True, 'line_type', 'mobile'): 600,
-            # Recent validations (last 24 hours)
-        }.get(tuple(kwargs.values()), 0)
+        def mock_count(**kwargs):
+            if not kwargs:  # Total validations
+                return 1000
+            elif kwargs == {'is_valid': True}:  # Valid numbers
+                return 850
+            elif kwargs == {'is_valid': True, 'line_type': 'mobile'}:  # Mobile numbers
+                return 600
+            elif kwargs == {'is_valid': True, 'line_type': 'landline'}:  # Landline numbers
+                return 250
+            elif kwargs == {'is_valid': False}:  # Invalid numbers
+                return 150
+            else:
+                return 0
+        
+        mock_validation_repository.count.side_effect = mock_count
         
         # Mock recent validations count
         def mock_count_recent(**kwargs):
@@ -611,7 +617,7 @@ class TestPhoneValidationServiceUtilities:
     def test_clear_expired_cache(self, phone_validation_service, mock_validation_repository):
         """Test clearing expired cache entries"""
         # Arrange
-        mock_validation_repository.delete_many.return_value = 25
+        mock_validation_repository.bulk_delete_expired.return_value = 25
         
         # Act
         result = phone_validation_service.clear_expired_cache(days=30)
@@ -621,9 +627,9 @@ class TestPhoneValidationServiceUtilities:
         assert result.data['deleted_count'] == 25
         
         # Verify repository was called with correct filter
-        mock_validation_repository.delete_many.assert_called_once()
-        call_args = mock_validation_repository.delete_many.call_args[0][0]
-        assert 'created_at__lt' in str(call_args)  # Should filter by creation date
+        mock_validation_repository.bulk_delete_expired.assert_called_once()
+        call_args = mock_validation_repository.bulk_delete_expired.call_args[0][0]
+        assert isinstance(call_args, datetime)  # Should be called with cutoff date
 
 
 class TestPhoneValidationServiceCSVIntegration:

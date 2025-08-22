@@ -195,3 +195,26 @@ class PhoneValidationRepository(BaseRepository[PhoneValidation]):
                 query = query.filter(getattr(PhoneValidation, key) == value)
         
         return query.scalar() or 0
+    
+    def count_with_date_filter(self, cutoff_date: datetime, **filters) -> int:
+        """
+        Count validations created after cutoff date with optional filters.
+        
+        Args:
+            cutoff_date: Only count records created after this date
+            **filters: Additional filters (is_valid, line_type, etc.)
+            
+        Returns:
+            Count of matching records
+        """
+        from sqlalchemy import func
+        
+        query = self.session.query(func.count(PhoneValidation.id))
+        query = query.filter(PhoneValidation.created_at >= cutoff_date)
+        
+        # Apply additional filters
+        for key, value in filters.items():
+            if hasattr(PhoneValidation, key):
+                query = query.filter(getattr(PhoneValidation, key) == value)
+        
+        return query.scalar() or 0
