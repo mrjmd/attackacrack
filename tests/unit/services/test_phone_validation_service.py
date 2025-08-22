@@ -124,7 +124,7 @@ class TestPhoneValidationServiceValidation:
             # Verify API was called with correct parameters
             mock_get.assert_called_once()
             call_args = mock_get.call_args
-            assert 'access_key=test_api_key' in call_args[1]['params']
+            assert call_args[1]['params']['access_key'] == 'test_api_key'
             assert call_args[1]['params']['number'] == phone_number
             
             # Verify result was cached
@@ -251,7 +251,7 @@ class TestPhoneValidationServiceValidation:
             # Assert
             assert result.success is False
             assert 'API error' in result.error
-            assert result.error_code == 'API_ERROR'
+            assert result.code == 'API_ERROR'
             assert '500' in result.error
     
     def test_validate_phone_api_rate_limit(self, phone_validation_service, mock_validation_repository):
@@ -277,7 +277,7 @@ class TestPhoneValidationServiceValidation:
             # Assert
             assert result.success is False
             assert 'rate limit' in result.error.lower()
-            assert result.error_code == 'RATE_LIMIT_EXCEEDED'
+            assert result.code == 'RATE_LIMIT_EXCEEDED'
     
     def test_validate_phone_network_error(self, phone_validation_service, mock_validation_repository):
         """Test handling of network connectivity issues"""
@@ -293,7 +293,7 @@ class TestPhoneValidationServiceValidation:
             # Assert
             assert result.success is False
             assert 'network error' in result.error.lower()
-            assert result.error_code == 'NETWORK_ERROR'
+            assert result.code == 'NETWORK_ERROR'
     
     def test_validate_phone_timeout(self, phone_validation_service, mock_validation_repository):
         """Test handling of API timeout"""
@@ -309,7 +309,7 @@ class TestPhoneValidationServiceValidation:
             # Assert
             assert result.success is False
             assert 'timeout' in result.error.lower()
-            assert result.error_code == 'TIMEOUT_ERROR'
+            assert result.code == 'TIMEOUT_ERROR'
     
     def test_validate_phone_invalid_format(self, phone_validation_service, mock_validation_repository):
         """Test validation of invalid phone number format"""
@@ -329,7 +329,7 @@ class TestPhoneValidationServiceValidation:
             # Assert
             assert result.success is False
             assert 'invalid format' in result.error.lower()
-            assert result.error_code == 'INVALID_FORMAT'
+            assert result.code == 'INVALID_FORMAT'
     
     def test_validate_phone_missing_api_key(self, mock_validation_repository):
         """Test behavior when NumVerify API key is not configured"""

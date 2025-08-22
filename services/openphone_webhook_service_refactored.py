@@ -21,6 +21,7 @@ from repositories.conversation_repository import ConversationRepository
 from repositories.webhook_event_repository import WebhookEventRepository
 from services.contact_service_refactored import ContactService
 from services.sms_metrics_service import SMSMetricsService
+from services.opt_out_service import OptOutService
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ class OpenPhoneWebhookServiceRefactored:
                  conversation_repository: ConversationRepository,
                  webhook_event_repository: WebhookEventRepository,
                  contact_service: ContactService,
-                 sms_metrics_service: SMSMetricsService):
+                 sms_metrics_service: SMSMetricsService,
+                 opt_out_service: Optional['OptOutService'] = None):
         """
         Initialize with injected dependencies.
         
@@ -43,12 +45,14 @@ class OpenPhoneWebhookServiceRefactored:
             webhook_event_repository: Repository for WebhookEvent data access
             contact_service: Service for contact management (returns Result objects)
             sms_metrics_service: Service for SMS metrics tracking
+            opt_out_service: Service for opt-out processing (optional)
         """
         self.activity_repository = activity_repository
         self.conversation_repository = conversation_repository
         self.webhook_event_repository = webhook_event_repository
         self.contact_service = contact_service
         self.sms_metrics_service = sms_metrics_service
+        self.opt_out_service = opt_out_service
     
     def process_webhook(self, webhook_data: Dict[str, Any]) -> Result[Dict[str, Any]]:
         """
@@ -285,6 +289,18 @@ class OpenPhoneWebhookServiceRefactored:
                     self.sms_metrics_service.track_message_status(new_activity.id, status)
                     logger.info(f"New message {openphone_id} delivered")
             
+            # Process opt-out/opt-in for incoming messages
+            if db_direction == 'incoming' and self.opt_out_service and body:
+                opt_result = self.opt_out_service.process_incoming_message(
+                    contact=contact,
+                    message_body=body,
+                    webhook_data={'id': openphone_id, 'direction': 'incoming'}
+                )
+                if opt_result.is_success:
+                    action = opt_result.data.get('action', 'none')
+                    if action in ['opted_out', 'opted_in']:
+                        logger.info(f"Processed {action} for contact {contact.id} from message {openphone_id}")
+            
             # Log if media was included
             if media_urls:
                 logger.info(f"Message {openphone_id} includes {len(media_urls)} media attachments")
@@ -292,7 +308,8 @@ class OpenPhoneWebhookServiceRefactored:
             return Result.success({
                 'status': 'created', 
                 'activity_id': new_activity.id, 
-                'media_count': len(media_urls)
+                'media_count': len(media_urls),
+                'opt_out_processed': db_direction == 'incoming' and self.opt_out_service is not None
             })
             
         except Exception as e:

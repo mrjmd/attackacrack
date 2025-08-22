@@ -92,6 +92,12 @@ def create_app(config_name=None, test_config=None):
     )
     
     registry.register_factory(
+        'opt_out_audit_repository',
+        lambda db_session: _create_opt_out_audit_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
         'activity_repository',
         lambda db_session: _create_activity_repository(db_session),
         dependencies=['db_session']
@@ -148,6 +154,12 @@ def create_app(config_name=None, test_config=None):
     registry.register_factory(
         'job_repository',
         lambda db_session: _create_job_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'phone_validation_repository',
+        lambda db_session: _create_phone_validation_repository(db_session),
         dependencies=['db_session']
     )
     
@@ -263,12 +275,29 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    # Phone validation service
+    registry.register_factory(
+        'phone_validation',
+        lambda phone_validation_repository: _create_phone_validation_service(phone_validation_repository),
+        dependencies=['phone_validation_repository'],
+        tags={'validation', 'api', 'external'}
+    )
+    
+    # Opt-out service
+    registry.register_factory(
+        'opt_out',
+        lambda contact_flag_repository, opt_out_audit_repository, openphone, contact_repository: _create_opt_out_service(
+            contact_flag_repository, opt_out_audit_repository, openphone, contact_repository
+        ),
+        dependencies=['contact_flag_repository', 'opt_out_audit_repository', 'openphone', 'contact_repository']
+    )
+    
     registry.register_factory(
         'openphone_webhook',
-        lambda activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics: _create_openphone_webhook_service(
-            activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics
+        lambda activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics, opt_out: _create_openphone_webhook_service(
+            activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics, opt_out
         ),
-        dependencies=['activity_repository', 'conversation_repository', 'webhook_event_repository', 'contact', 'sms_metrics']
+        dependencies=['activity_repository', 'conversation_repository', 'webhook_event_repository', 'contact', 'sms_metrics', 'opt_out']
     )
     
     registry.register_factory(
@@ -348,12 +377,6 @@ def create_app(config_name=None, test_config=None):
         'openphone_sync',
         lambda openphone, db_session: _create_openphone_sync_service(openphone, db_session),
         dependencies=['openphone', 'db_session']
-    )
-    
-    registry.register_factory(
-        'openphone_webhook',
-        lambda contact, sms_metrics, db_session: _create_openphone_webhook_service(contact, sms_metrics, db_session),
-        dependencies=['contact', 'sms_metrics', 'db_session']
     )
     
     registry.register_factory(
@@ -667,7 +690,7 @@ def _create_openphone_service():
         return None
     return OpenPhoneService()  # Uses env vars internally
 
-def _create_openphone_webhook_service(activity_repository, conversation_repository, webhook_event_repository, contact_service, sms_metrics_service):
+def _create_openphone_webhook_service(activity_repository, conversation_repository, webhook_event_repository, contact_service, sms_metrics_service, opt_out_service=None):
     """Create OpenPhoneWebhookServiceRefactored instance with all dependencies"""
     from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
     logger.info("Initializing OpenPhoneWebhookServiceRefactored")
@@ -676,7 +699,8 @@ def _create_openphone_webhook_service(activity_repository, conversation_reposito
         conversation_repository=conversation_repository, 
         webhook_event_repository=webhook_event_repository,
         contact_service=contact_service,
-        sms_metrics_service=sms_metrics_service
+        sms_metrics_service=sms_metrics_service,
+        opt_out_service=opt_out_service
     )
 
 def _create_webhook_error_recovery_service(failed_webhook_repository, webhook_service, webhook_event_repository):
@@ -796,6 +820,41 @@ def _create_contact_flag_repository(db_session):
     from repositories.contact_flag_repository import ContactFlagRepository
     from crm_database import ContactFlag
     return ContactFlagRepository(session=db_session, model_class=ContactFlag)
+
+def _create_opt_out_audit_repository(db_session):
+    """Create OptOutAuditRepository instance"""
+    from repositories.opt_out_audit_repository import OptOutAuditRepository
+    return OptOutAuditRepository(session=db_session)
+
+def _create_opt_out_service(contact_flag_repository, opt_out_audit_repository, openphone_service, contact_repository):
+    """Create OptOutService instance with dependencies"""
+    from services.opt_out_service import OptOutService
+    logger.info("Initializing OptOutService")
+    return OptOutService(
+        contact_flag_repository=contact_flag_repository,
+        opt_out_audit_repository=opt_out_audit_repository,
+        sms_service=openphone_service,
+        contact_repository=contact_repository
+    )
+
+def _create_phone_validation_repository(db_session):
+    """Create PhoneValidationRepository instance"""
+    from repositories.phone_validation_repository import PhoneValidationRepository
+    from crm_database import PhoneValidation
+    return PhoneValidationRepository(session=db_session, model_class=PhoneValidation)
+
+def _create_phone_validation_service(phone_validation_repository):
+    """Create PhoneValidationService with repository dependency"""
+    from services.phone_validation_service import PhoneValidationService
+    import os
+    
+    logger.info("Initializing PhoneValidationService with repository")
+    
+    # Set a test API key if not configured (for testing)
+    if not os.environ.get('NUMVERIFY_API_KEY'):
+        os.environ['NUMVERIFY_API_KEY'] = 'test_api_key'
+    
+    return PhoneValidationService(validation_repository=phone_validation_repository)
 
 def _create_activity_repository(db_session):
     """Create ActivityRepository instance"""
@@ -962,29 +1021,6 @@ def _create_openphone_sync_service(openphone, db_session):
     return OpenPhoneSyncService(
         contact_repository=contact_repo,
         activity_repository=activity_repo
-    )
-
-def _create_openphone_webhook_service(contact, sms_metrics, db_session):
-    """Create OpenPhoneWebhookServiceRefactored with repository dependencies"""
-    from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
-    from repositories.activity_repository import ActivityRepository
-    from repositories.conversation_repository import ConversationRepository
-    from repositories.webhook_event_repository import WebhookEventRepository
-    from crm_database import Activity, Conversation, WebhookEvent
-    
-    logger.info("Initializing OpenPhoneWebhookServiceRefactored with repository pattern")
-    
-    # Create repository instances
-    activity_repository = ActivityRepository(session=db_session, model_class=Activity)
-    conversation_repository = ConversationRepository(session=db_session, model_class=Conversation)
-    webhook_event_repository = WebhookEventRepository(session=db_session, model_class=WebhookEvent)
-    
-    return OpenPhoneWebhookServiceRefactored(
-        activity_repository=activity_repository,
-        conversation_repository=conversation_repository,
-        webhook_event_repository=webhook_event_repository,
-        contact_service=contact,
-        sms_metrics_service=sms_metrics
     )
 
 def _create_quickbooks_sync_service(quickbooks, db_session):

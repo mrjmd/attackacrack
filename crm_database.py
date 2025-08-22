@@ -597,3 +597,71 @@ class FailedWebhookQueue(db.Model):
         if self.next_retry_at is None:
             return True
         return datetime.utcnow() >= self.next_retry_at
+
+
+# --- Opt-Out Management ---
+class OptOutAudit(db.Model):
+    """Audit trail for all opt-out and opt-in events"""
+    __tablename__ = 'opt_out_audit'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False)  # Store for reference even if contact deleted
+    contact_name = db.Column(db.String(100), nullable=True)  # Store for reference
+    
+    # Event details
+    opt_out_method = db.Column(db.String(50), nullable=False)  # 'sms_keyword', 'sms_opt_in', 'manual', 'web_form'
+    keyword_used = db.Column(db.String(50), nullable=True)  # The actual keyword that triggered it
+    source = db.Column(db.String(100), nullable=True)  # 'webhook', 'api', 'admin_ui', etc.
+    
+    # Related entities
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=True)  # If triggered by campaign response
+    message_id = db.Column(db.String(100), nullable=True)  # OpenPhone message ID if applicable
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationships
+    contact = db.relationship('Contact', backref='opt_out_audits')
+    campaign = db.relationship('Campaign', backref='opt_out_events')
+    
+    # Indexes for reporting
+    __table_args__ = (
+        db.Index('idx_opt_out_audit_contact', 'contact_id'),
+        db.Index('idx_opt_out_audit_created', 'created_at'),
+        db.Index('idx_opt_out_audit_method', 'opt_out_method'),
+        db.Index('idx_opt_out_audit_phone', 'phone_number'),
+    )
+
+
+# --- NEW: PhoneValidation Model ---
+class PhoneValidation(db.Model):
+    """Cache for phone number validation results from NumVerify API"""
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Phone number and validation result
+    phone_number = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    is_valid = db.Column(db.Boolean, nullable=False, default=False)
+    
+    # Line type information
+    line_type = db.Column(db.String(20), nullable=True)  # mobile, landline, voip, etc.
+    carrier = db.Column(db.String(100), nullable=True)
+    
+    # Location information
+    country_code = db.Column(db.String(5), nullable=True, index=True)
+    country_name = db.Column(db.String(100), nullable=True)
+    location = db.Column(db.String(100), nullable=True)
+    
+    # Caching metadata
+    validation_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    cached_until = db.Column(db.DateTime, nullable=False, index=True, default=lambda: datetime.utcnow() + timedelta(days=30))  # When cache expires
+    
+    # Raw API response for debugging
+    raw_response = db.Column(db.JSON, nullable=True)
+    
+    # Legacy support (some tests reference these fields)
+    api_response = db.Column(db.JSON, nullable=True)  # Alias for raw_response
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)  # Alias for validation_date
+    
+    def __repr__(self):
+        return f'<PhoneValidation {self.phone_number}: {"valid" if self.is_valid else "invalid"}>'

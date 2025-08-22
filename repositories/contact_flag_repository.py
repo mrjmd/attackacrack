@@ -160,9 +160,12 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
     
     def get_contacts_excluded_from_campaigns(self, channel: str = 'sms', 
                                            exclusion_flags: List[str] = None) -> Set[int]:
-        """Get contacts that should be excluded from campaigns"""
+        """Get contacts that should be excluded from campaigns based on active flags"""
         if exclusion_flags is None:
-            exclusion_flags = ['opted_out', 'do_not_contact', 'office_number']
+            exclusion_flags = ['opted_out', 'do_not_contact', 'office_number', 'recently_texted']
+        
+        from datetime import datetime
+        now = datetime.utcnow()
         
         results = self.session.query(ContactFlag.contact_id).filter(
             and_(
@@ -170,6 +173,11 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
                 or_(
                     ContactFlag.applies_to == channel,
                     ContactFlag.applies_to == 'both'
+                ),
+                # Only include active flags (not expired)
+                or_(
+                    ContactFlag.expires_at.is_(None),  # Never expires
+                    ContactFlag.expires_at > now       # Expires in the future
                 )
             )
         ).distinct().all()
@@ -239,6 +247,66 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
         ).delete(synchronize_session=False)
         self.session.flush()
         return count
+    
+    def find_active_flags(self, contact_id: int, flag_type: Optional[str] = None) -> List[ContactFlag]:
+        """Find active (non-expired) flags for a contact, optionally filtered by type"""
+        now = datetime.utcnow()
+        query = self.session.query(ContactFlag).filter(
+            and_(
+                ContactFlag.contact_id == contact_id,
+                or_(
+                    ContactFlag.expires_at.is_(None),
+                    ContactFlag.expires_at > now
+                )
+            )
+        )
+        
+        if flag_type:
+            query = query.filter(ContactFlag.flag_type == flag_type)
+        
+        return query.all()
+    
+    def find_by_flag_type(self, flag_type: str, active_only: bool = False) -> List[ContactFlag]:
+        """Find all flags of a specific type"""
+        query = self.session.query(ContactFlag).filter(
+            ContactFlag.flag_type == flag_type
+        )
+        
+        if active_only:
+            now = datetime.utcnow()
+            query = query.filter(
+                or_(
+                    ContactFlag.expires_at.is_(None),
+                    ContactFlag.expires_at > now
+                )
+            )
+        
+        return query.all()
+    
+    def expire_flag(self, flag_id: int) -> Optional[ContactFlag]:
+        """Expire a flag by setting its expiration date to now"""
+        flag = self.get_by_id(flag_id)
+        if flag:
+            flag.expires_at = datetime.utcnow()
+            self.session.flush()
+        return flag
+    
+    def count_by_flag_type(self, flag_type: str, active_only: bool = True) -> int:
+        """Count flags of a specific type"""
+        query = self.session.query(ContactFlag).filter(
+            ContactFlag.flag_type == flag_type
+        )
+        
+        if active_only:
+            now = datetime.utcnow()
+            query = query.filter(
+                or_(
+                    ContactFlag.expires_at.is_(None),
+                    ContactFlag.expires_at > now
+                )
+            )
+        
+        return query.count()
     
     def create_flag_for_contact_if_not_exists(self, contact_id: int, flag_type: str, 
                                             flag_reason: str = None) -> ContactFlag:

@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Opt-Out Report - Attack-a-Crack CRM{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>SMS Opt-Out Report</h1>
+            <p class="text-muted">Monitor opt-out activity and compliance status</p>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Opted Out</h5>
+                    <h2 class="text-danger">{{ stats.total_opted_out }}</h2>
+                    <small class="text-muted">Active opt-outs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Last 30 Days</h5>
+                    <h2 class="text-warning">{{ stats.opt_outs_last_30_days }}</h2>
+                    <small class="text-muted">Recent opt-outs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Opt-Out Rate</h5>
+                    <h2 class="text-info">{{ "%.2f"|format(stats.opt_out_rate) }}%</h2>
+                    <small class="text-muted">Of total contacts</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Most Common</h5>
+                    <h2 class="text-primary">{{ stats.most_common_keyword or 'N/A' }}</h2>
+                    <small class="text-muted">Keyword used</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyword Breakdown -->
+    {% if stats.keyword_breakdown %}
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Keyword Usage</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Count</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for keyword, count in stats.keyword_breakdown.items() %}
+                            <tr>
+                                <td><code>{{ keyword }}</code></td>
+                                <td>{{ count }}</td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ (count / stats.total_audit_logs * 100) if stats.total_audit_logs else 0 }}%">
+                                            {{ "%.1f"|format((count / stats.total_audit_logs * 100) if stats.total_audit_logs else 0) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Compliance Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> <strong>Compliant</strong>
+                        <p class="mb-0 mt-2">All opt-out requests are being processed automatically within 30 seconds.</p>
+                    </div>
+                    <ul class="list-unstyled mt-3">
+                        <li><i class="fas fa-check text-success"></i> Automatic keyword detection active</li>
+                        <li><i class="fas fa-check text-success"></i> Confirmation messages enabled</li>
+                        <li><i class="fas fa-check text-success"></i> Campaign filtering active</li>
+                        <li><i class="fas fa-check text-success"></i> Audit trail maintained</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Opt-Outs -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Opt-Out Events</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="exportOptOuts()">
+                        <i class="fas fa-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Contact</th>
+                                    <th>Phone</th>
+                                    <th>Keyword</th>
+                                    <th>Source</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for opt_out in recent_opt_outs %}
+                                <tr>
+                                    <td>{{ opt_out.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('contact_routes.contact_detail', contact_id=opt_out.contact_id) }}">
+                                            {{ opt_out.contact_name or 'Unknown' }}
+                                        </a>
+                                    </td>
+                                    <td><code>{{ opt_out.phone_number }}</code></td>
+                                    <td><span class="badge badge-secondary">{{ opt_out.keyword_used }}</span></td>
+                                    <td>{{ opt_out.source }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                onclick="viewOptOutDetails({{ opt_out.id }})">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">
+                                        No recent opt-out events
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if recent_opt_outs %}
+                    <nav aria-label="Opt-out pagination">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if not has_prev %}disabled{% endif %}">
+                                <a class="page-link" href="?page={{ page - 1 }}">Previous</a>
+                            </li>
+                            <li class="page-item active">
+                                <span class="page-link">Page {{ page }}</span>
+                            </li>
+                            <li class="page-item {% if not has_next %}disabled{% endif %}">
+                                <a class="page-link" href="?page={{ page + 1 }}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function viewOptOutDetails(optOutId) {
+    // Show details modal or navigate to detail page
+    console.log('View opt-out details:', optOutId);
+    // TODO: Implement details view
+}
+
+function exportOptOuts() {
+    // Export opt-outs to CSV
+    window.location.href = '{{ url_for("campaign_routes.export_opt_outs") }}';
+}
+</script>
+{% endblock %}

@@ -3,10 +3,15 @@ Campaign routes for creating and managing text campaigns
 Refactored to use service registry pattern
 """
 
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app, abort
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app, abort, Response
 from flask_login import login_required
-from datetime import datetime
+from datetime import datetime, timedelta
 from extensions import db
+import csv
+import io
+import logging
+
+logger = logging.getLogger(__name__)
 # Direct model imports removed - use services only
 
 campaigns_bp = Blueprint('campaigns', __name__)
@@ -455,3 +460,113 @@ def import_csv():
         recent_imports = csv_service.get_import_history(limit=10)
     
     return render_template('campaigns/import_csv.html', recent_imports=recent_imports)
+
+
+@campaigns_bp.route('/opt-out-report')
+@login_required
+def opt_out_report():
+    """Display opt-out report and statistics"""
+    try:
+        # Get opt-out service
+        opt_out_service = current_app.services.get('opt_out')
+        if not opt_out_service:
+            flash('Opt-out service not available', 'warning')
+            return redirect(url_for('campaigns.campaign_list'))
+        
+        # Get statistics
+        stats = opt_out_service.get_opt_out_statistics()
+        
+        # Calculate opt-out rate
+        contact_service = current_app.services.get('contact')
+        total_contacts_result = contact_service.count_all_contacts()
+        total_contacts = total_contacts_result.data if total_contacts_result.is_success else 0
+        
+        if total_contacts > 0:
+            stats['opt_out_rate'] = (stats['total_opted_out'] / total_contacts) * 100
+        else:
+            stats['opt_out_rate'] = 0
+        
+        # Get recent opt-outs with pagination
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        # Get opt-outs from last 30 days
+        since_date = datetime.utcnow() - timedelta(days=30)
+        recent_opt_outs = opt_out_service.get_recent_opt_outs(since=since_date)
+        
+        # Manual pagination
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_opt_outs = recent_opt_outs[start:end]
+        
+        has_prev = page > 1
+        has_next = end < len(recent_opt_outs)
+        
+        return render_template(
+            'campaigns/opt_out_report.html',
+            stats=stats,
+            recent_opt_outs=paginated_opt_outs,
+            page=page,
+            has_prev=has_prev,
+            has_next=has_next
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating opt-out report: {e}")
+        flash('Error generating opt-out report', 'danger')
+        return redirect(url_for('campaigns.campaign_list'))
+
+
+@campaigns_bp.route('/opt-out-report/export')
+@login_required
+def export_opt_outs():
+    """Export opt-out data to CSV"""
+    try:
+        opt_out_service = current_app.services.get('opt_out')
+        if not opt_out_service:
+            flash('Opt-out service not available', 'warning')
+            return redirect(url_for('campaigns.opt_out_report'))
+        
+        # Get all opt-outs from last year
+        since_date = datetime.utcnow() - timedelta(days=365)
+        opt_outs = opt_out_service.get_recent_opt_outs(since=since_date)
+        
+        # Create CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Date/Time',
+            'Contact ID',
+            'Contact Name',
+            'Phone Number',
+            'Keyword Used',
+            'Source'
+        ])
+        
+        # Write data
+        for opt_out in opt_outs:
+            writer.writerow([
+                opt_out.get('created_at'),
+                opt_out.get('contact_id'),
+                opt_out.get('contact_name', ''),
+                opt_out.get('phone_number'),
+                opt_out.get('keyword_used'),
+                opt_out.get('source', '')
+            ])
+        
+        # Create response
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=opt_outs_{datetime.now().strftime("%Y%m%d")}.csv'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting opt-outs: {e}")
+        flash('Error exporting opt-out data', 'danger')
+        return redirect(url_for('campaigns.opt_out_report'))

@@ -162,6 +162,14 @@ class CampaignService:
             contacts = contacts_result.data
             contact_ids = [c.get('id') if isinstance(c, dict) else c.id for c in contacts]
             
+            # Filter out contacts with active exclusion flags (opted out, do not contact, etc.)
+            if self.contact_flag_repository:
+                eligible_contact_ids = self.contact_flag_repository.filter_campaign_eligible_contacts(
+                    contact_ids, channel='sms'
+                )
+                logger.info(f"Filtered {len(contact_ids)} contacts down to {len(eligible_contact_ids)} eligible for campaign")
+                contact_ids = eligible_contact_ids
+            
             # Add contacts to campaign
             added = self.campaign_repository.add_members_bulk(campaign_id, contact_ids)
             
