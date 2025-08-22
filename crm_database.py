@@ -665,3 +665,59 @@ class PhoneValidation(db.Model):
     
     def __repr__(self):
         return f'<PhoneValidation {self.phone_number}: {"valid" if self.is_valid else "invalid"}>'
+
+
+# --- A/B Testing Models ---
+class ABTestResult(db.Model):
+    """Track A/B test variant assignments and performance metrics"""
+    __tablename__ = 'ab_test_result'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core assignment data
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False, index=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False, index=True)
+    variant = db.Column(db.String(1), nullable=False, index=True)  # 'A' or 'B'
+    assigned_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    
+    # Message sending tracking
+    message_sent = db.Column(db.Boolean, default=False, index=True)
+    sent_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)
+    sent_at = db.Column(db.DateTime, nullable=True)
+    
+    # Engagement tracking
+    message_opened = db.Column(db.Boolean, default=False, index=True)
+    opened_at = db.Column(db.DateTime, nullable=True)
+    
+    # Click tracking
+    link_clicked = db.Column(db.Boolean, default=False, index=True)
+    clicked_link_url = db.Column(db.String(500), nullable=True)
+    clicked_at = db.Column(db.DateTime, nullable=True)
+    
+    # Response tracking
+    response_received = db.Column(db.Boolean, default=False, index=True)
+    response_type = db.Column(db.String(20), nullable=True)  # 'positive', 'negative', 'neutral'
+    response_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)
+    responded_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    campaign = db.relationship('Campaign', backref='ab_test_results')
+    contact = db.relationship('Contact', backref='ab_test_assignments')
+    sent_activity = db.relationship('Activity', foreign_keys=[sent_activity_id], backref='ab_test_sent_messages')
+    response_activity = db.relationship('Activity', foreign_keys=[response_activity_id], backref='ab_test_responses')
+    
+    # Constraints and indexes
+    __table_args__ = (
+        db.UniqueConstraint('campaign_id', 'contact_id', name='unique_campaign_contact_assignment'),
+        db.Index('idx_ab_test_campaign_variant', 'campaign_id', 'variant'),
+        db.Index('idx_ab_test_performance', 'campaign_id', 'variant', 'message_sent', 'response_received'),
+        db.Index('idx_ab_test_assigned_at', 'assigned_at'),
+    )
+    
+    def __repr__(self):
+        return f'<ABTestResult Campaign:{self.campaign_id} Contact:{self.contact_id} Variant:{self.variant}>'
+    
+    @property
+    def conversion_achieved(self) -> bool:
+        """Check if this assignment resulted in a positive conversion"""
+        return self.response_received and self.response_type == 'positive'
