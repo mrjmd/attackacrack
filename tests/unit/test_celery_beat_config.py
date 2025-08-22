@@ -59,8 +59,8 @@ class TestCeleryBeatConfiguration:
             # Verify timezone is set to UTC
             assert celery_worker.celery.conf.timezone == 'UTC'
     
-    def test_beat_schedule_contains_both_tasks(self):
-        """Test that beat schedule contains exactly the expected tasks"""
+    def test_beat_schedule_contains_all_expected_tasks(self):
+        """Test that beat schedule contains all expected tasks"""
         # Import after mocking to ensure clean state
         with patch('app.create_app') as mock_create_app:
             mock_app = MagicMock()
@@ -71,11 +71,57 @@ class TestCeleryBeatConfiguration:
             
             beat_schedule = celery_worker.celery.conf.beat_schedule
             
-            # Should have exactly these two tasks
-            expected_tasks = {'run-daily-tasks', 'process-campaign-queue'}
+            # Should have these tasks
+            expected_tasks = {
+                'run-daily-tasks', 
+                'process-campaign-queue',
+                'webhook-health-check',
+                'cleanup-old-health-checks',
+                'openphone-reconciliation',
+                'openphone-data-integrity',
+                'webhook-retry-processing',
+                'cleanup-old-failed-webhooks',
+                'webhook-failure-alerts'
+            }
             actual_tasks = set(beat_schedule.keys())
             
             assert actual_tasks == expected_tasks
+    
+    def test_webhook_health_check_schedule(self):
+        """Test that webhook health check runs every hour"""
+        # Import after mocking to ensure clean state
+        with patch('app.create_app') as mock_create_app:
+            mock_app = MagicMock()
+            mock_create_app.return_value = mock_app
+            
+            # Import celery_worker to get the configuration
+            import celery_worker
+            
+            # Verify webhook health check is scheduled
+            assert 'webhook-health-check' in celery_worker.celery.conf.beat_schedule
+            
+            health_check_config = celery_worker.celery.conf.beat_schedule['webhook-health-check']
+            assert health_check_config['task'] == 'tasks.webhook_health_tasks.run_webhook_health_check'
+            # Should run every hour (3600 seconds)
+            assert health_check_config['schedule'] == 3600.0
+    
+    def test_cleanup_old_health_checks_schedule(self):
+        """Test that cleanup of old health checks runs daily"""
+        # Import after mocking to ensure clean state
+        with patch('app.create_app') as mock_create_app:
+            mock_app = MagicMock()
+            mock_create_app.return_value = mock_app
+            
+            # Import celery_worker to get the configuration
+            import celery_worker
+            
+            # Verify cleanup task is scheduled
+            assert 'cleanup-old-health-checks' in celery_worker.celery.conf.beat_schedule
+            
+            cleanup_config = celery_worker.celery.conf.beat_schedule['cleanup-old-health-checks']
+            assert cleanup_config['task'] == 'tasks.webhook_health_tasks.cleanup_old_health_checks'
+            # Should run every 24 hours (86400 seconds)
+            assert cleanup_config['schedule'] == 3600.0 * 24
     
     def test_campaign_queue_task_interval_is_60_seconds(self):
         """Test that campaign queue processing runs every 60 seconds"""

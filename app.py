@@ -128,6 +128,12 @@ def create_app(config_name=None, test_config=None):
     )
     
     registry.register_factory(
+        'failed_webhook_queue_repository',
+        lambda db_session: _create_failed_webhook_queue_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
         'invoice_repository',
         lambda db_session: _create_invoice_repository(db_session),
         dependencies=['db_session']
@@ -266,6 +272,14 @@ def create_app(config_name=None, test_config=None):
     )
     
     registry.register_factory(
+        'webhook_error_recovery',
+        lambda failed_webhook_queue_repository, openphone_webhook, webhook_event_repository: _create_webhook_error_recovery_service(
+            failed_webhook_queue_repository, openphone_webhook, webhook_event_repository
+        ),
+        dependencies=['failed_webhook_queue_repository', 'openphone_webhook', 'webhook_event_repository']
+    )
+    
+    registry.register_factory(
         'dashboard',
         lambda contact_repository, campaign_repository, activity_repository, conversation_repository, sms_metrics: _create_dashboard_service_with_repositories(
             contact_repository, campaign_repository, activity_repository, conversation_repository, sms_metrics
@@ -295,6 +309,24 @@ def create_app(config_name=None, test_config=None):
         'sync_health',
         lambda db_session: _create_sync_health_service(db_session),
         dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'webhook_health_check',
+        lambda webhook_event_repository, openphone, email: _create_webhook_health_check_service(
+            webhook_event_repository, openphone, email
+        ),
+        dependencies=['webhook_event_repository', 'openphone', 'email']
+    )
+    
+    # OpenPhone Reconciliation Service
+    registry.register_factory(
+        'openphone_reconciliation',
+        lambda activity_repository, conversation_repository, contact: _create_openphone_reconciliation_service(
+            activity_repository, conversation_repository, contact
+        ),
+        dependencies=['activity_repository', 'conversation_repository', 'contact'],
+        tags={'reconciliation', 'openphone', 'sync'}
     )
     
     # Services with multiple dependencies
@@ -465,6 +497,7 @@ def create_app(config_name=None, test_config=None):
     from routes.settings_routes import settings_bp
     from routes.auth import auth_bp
     from routes.todo_routes import todo_bp
+    from routes.reconciliation_routes import bp as reconciliation_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(contact_bp, url_prefix='/contacts')
@@ -479,6 +512,7 @@ def create_app(config_name=None, test_config=None):
     app.register_blueprint(settings_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(todo_bp)
+    app.register_blueprint(reconciliation_bp)
     
     # --- REMOVED APScheduler ---
     # The background task scheduling is now handled by Celery Beat.
@@ -645,6 +679,16 @@ def _create_openphone_webhook_service(activity_repository, conversation_reposito
         sms_metrics_service=sms_metrics_service
     )
 
+def _create_webhook_error_recovery_service(failed_webhook_repository, webhook_service, webhook_event_repository):
+    """Create WebhookErrorRecoveryService instance with dependencies"""
+    from services.webhook_error_recovery_service import WebhookErrorRecoveryService
+    logger.info("Initializing WebhookErrorRecoveryService")
+    return WebhookErrorRecoveryService(
+        failed_webhook_repository=failed_webhook_repository,
+        webhook_service=webhook_service,
+        webhook_event_repository=webhook_event_repository
+    )
+
 def _create_google_calendar_service():
     """Create GoogleCalendarService instance - expensive due to OAuth"""
     from services.google_calendar_service import GoogleCalendarService
@@ -800,6 +844,12 @@ def _create_quote_repository(db_session):
     from repositories.quote_repository import QuoteRepository
     from crm_database import Quote
     return QuoteRepository(session=db_session, model_class=Quote)
+
+def _create_failed_webhook_queue_repository(db_session):
+    """Create FailedWebhookQueueRepository instance"""
+    from repositories.failed_webhook_queue_repository import FailedWebhookQueueRepository
+    from crm_database import FailedWebhookQueue
+    return FailedWebhookQueueRepository(session=db_session, model_class=FailedWebhookQueue)
 
 def _create_setting_service(setting_repository):
     """Create SettingService instance"""
@@ -987,6 +1037,43 @@ def _create_appointment_service(google_calendar, db_session):
         google_calendar_service=google_calendar
     )
 
+
+def _create_webhook_health_check_service(webhook_event_repository, openphone_service, email_service):
+    """Create WebhookHealthCheckService with dependencies"""
+    from services.webhook_health_check_service import WebhookHealthCheckService
+    import os
+    
+    # Get configuration from environment or use defaults
+    test_phone_number = os.environ.get('WEBHOOK_HEALTH_CHECK_PHONE', os.environ.get('OPENPHONE_PHONE_NUMBER', '+15551234567'))
+    alert_email = os.environ.get('WEBHOOK_HEALTH_CHECK_EMAIL', os.environ.get('ADMIN_EMAIL', 'alerts@example.com'))
+    timeout = int(os.environ.get('WEBHOOK_HEALTH_CHECK_TIMEOUT', '120'))  # 2 minutes default
+    
+    logger.info("Initializing WebhookHealthCheckService", test_phone=test_phone_number, alert_email=alert_email)
+    return WebhookHealthCheckService(
+        webhook_repository=webhook_event_repository,
+        openphone_service=openphone_service,
+        email_service=email_service,
+        test_phone_number=test_phone_number,
+        alert_email=alert_email,
+        health_check_timeout=timeout
+    )
+
+def _create_openphone_reconciliation_service(activity_repository, conversation_repository, contact_service):
+    """Create OpenPhoneReconciliationService with dependencies"""
+    from services.openphone_reconciliation_service import OpenPhoneReconciliationService
+    from services.openphone_api_client import OpenPhoneAPIClient
+    
+    logger.info("Initializing OpenPhoneReconciliationService")
+    
+    # Create API client
+    api_client = OpenPhoneAPIClient()
+    
+    return OpenPhoneReconciliationService(
+        activity_repository=activity_repository,
+        conversation_repository=conversation_repository,
+        contact_service=contact_service,
+        openphone_api_client=api_client
+    )
 
 def _create_scheduler_service(openphone, invoice, db_session):
     """Create SchedulerService with repository dependencies"""

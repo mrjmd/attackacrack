@@ -89,6 +89,16 @@ class Result(Generic[T]):
         """Check if the result represents a failure."""
         return not self.success
     
+    @property
+    def value(self) -> Optional[T]:
+        """Alias for data property for backward compatibility."""
+        return self.data
+    
+    @property
+    def code(self) -> Optional[str]:
+        """Alias for error_code property for backward compatibility."""
+        return self.error_code
+    
     def unwrap(self) -> T:
         """
         Get the data from a successful result.

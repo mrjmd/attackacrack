@@ -19,6 +19,8 @@ celery.Task = ContextTask
 
 # --- Celery Beat Schedule ---
 # This is where we define the periodic tasks that Celery should run.
+from celery.schedules import crontab
+
 celery.conf.beat_schedule = {
     'run-daily-tasks': {
         'task': 'services.scheduler_service.run_daily_tasks',
@@ -32,6 +34,44 @@ celery.conf.beat_schedule = {
         # Executes every 60 seconds to process pending campaign sends
         'schedule': 60.0,
     },
+    'webhook-health-check': {
+        'task': 'tasks.webhook_health_tasks.run_webhook_health_check',
+        # Executes every hour to check webhook health
+        'schedule': 3600.0,  # 1 hour
+    },
+    'cleanup-old-health-checks': {
+        'task': 'tasks.webhook_health_tasks.cleanup_old_health_checks',
+        # Executes daily to clean up old health check records
+        'schedule': 3600.0 * 24,  # 24 hours
+    },
+    'openphone-reconciliation': {
+        'task': 'tasks.reconciliation_tasks.run_daily_reconciliation',
+        # Executes daily at 2 AM UTC to reconcile OpenPhone messages
+        'schedule': crontab(hour=2, minute=0),
+        'kwargs': {'hours_back': 48}  # Look back 48 hours to catch any delayed webhooks
+    },
+    'openphone-data-integrity': {
+        'task': 'tasks.reconciliation_tasks.validate_data_integrity',
+        # Executes weekly on Sunday at 3 AM UTC
+        'schedule': crontab(hour=3, minute=0, day_of_week=0),
+    },
+    'webhook-retry-processing': {
+        'task': 'tasks.webhook_retry_tasks.process_webhook_retries',
+        # Executes every 5 minutes to process pending webhook retries
+        'schedule': 300.0,  # 5 minutes
+        'kwargs': {'limit': 50}
+    },
+    'webhook-failure-alerts': {
+        'task': 'tasks.webhook_retry_tasks.webhook_failure_alerts',
+        # Executes every hour to check for webhook failure alerts
+        'schedule': 3600.0,  # 1 hour
+    },
+    'cleanup-old-failed-webhooks': {
+        'task': 'tasks.webhook_retry_tasks.cleanup_old_failed_webhooks',
+        # Executes weekly on Sunday at 4 AM UTC to clean up old failed webhooks
+        'schedule': crontab(hour=4, minute=0, day_of_week=0),
+        'kwargs': {'days_old': 30}
+    },
 }
 celery.conf.timezone = 'UTC'
 
@@ -42,6 +82,9 @@ try:
         import services.scheduler_service
         import tasks.campaign_tasks
         import tasks.sync_tasks
+        import tasks.webhook_health_tasks
+        import tasks.webhook_retry_tasks
+        import tasks.reconciliation_tasks
         print("Successfully imported tasks")
         print(f"Registered tasks: {list(celery.tasks.keys())}")
 except Exception as e:

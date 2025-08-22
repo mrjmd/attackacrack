@@ -1,7 +1,7 @@
 # crm_database.py
 
 from extensions import db
-from datetime import datetime, time, date
+from datetime import datetime, time, date, timedelta
 
 # --- NEW: User Model ---
 class User(db.Model):
@@ -546,3 +546,54 @@ class Todo(db.Model):
         """Mark todo as incomplete"""
         self.is_completed = False
         self.completed_at = None
+
+
+class FailedWebhookQueue(db.Model):
+    """Failed webhook queue for error recovery and retry management (P1-16)"""
+    __tablename__ = 'failed_webhook_queue'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.String(100), nullable=False, index=True)
+    event_type = db.Column(db.String(50), nullable=False, index=True)
+    original_payload = db.Column(db.JSON, nullable=False)
+    error_message = db.Column(db.Text, nullable=False)
+    
+    # Retry configuration
+    retry_count = db.Column(db.Integer, nullable=False, default=0)
+    max_retries = db.Column(db.Integer, nullable=False, default=5)
+    backoff_multiplier = db.Column(db.DECIMAL(precision=3, scale=1), nullable=False, default=2.0)
+    base_delay_seconds = db.Column(db.Integer, nullable=False, default=60)
+    
+    # Retry timing
+    next_retry_at = db.Column(db.DateTime, nullable=True, index=True)
+    last_retry_at = db.Column(db.DateTime, nullable=True)
+    
+    # Resolution tracking
+    resolved = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    resolution_note = db.Column(db.Text, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<FailedWebhookQueue {self.id}: {self.event_id} ({self.retry_count}/{self.max_retries})>'
+    
+    def calculate_next_retry_time(self) -> datetime:
+        """Calculate next retry time using exponential backoff"""
+        from decimal import Decimal
+        delay_seconds = self.base_delay_seconds * (Decimal(str(self.backoff_multiplier)) ** self.retry_count)
+        return datetime.utcnow() + timedelta(seconds=int(delay_seconds))
+    
+    def is_retry_exhausted(self) -> bool:
+        """Check if retry attempts are exhausted"""
+        return self.retry_count >= self.max_retries
+    
+    def can_retry_now(self) -> bool:
+        """Check if webhook can be retried now"""
+        if self.resolved or self.is_retry_exhausted():
+            return False
+        if self.next_retry_at is None:
+            return True
+        return datetime.utcnow() >= self.next_retry_at

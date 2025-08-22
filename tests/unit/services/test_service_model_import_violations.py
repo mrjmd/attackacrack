@@ -81,6 +81,9 @@ class TestServiceModelImportViolations:
         """
         Parse Python file and extract all imports from crm_database
         
+        Excludes imports that are inside TYPE_CHECKING blocks, as these are
+        acceptable for type hints and don't violate the repository pattern.
+        
         Returns:
             Dict with 'models' and 'db' keys containing imported items
         """
@@ -91,9 +94,23 @@ class TestServiceModelImportViolations:
             tree = ast.parse(content)
             imports = {'models': [], 'db': [], 'all_crm_imports': []}
             
+            # Track if we're inside a TYPE_CHECKING block
+            type_checking_nodes = set()
+            
+            # First pass: identify all nodes inside TYPE_CHECKING blocks
+            for node in ast.walk(tree):
+                if isinstance(node, ast.If):
+                    # Check if this is "if TYPE_CHECKING:"
+                    if (isinstance(node.test, ast.Name) and 
+                        node.test.id == 'TYPE_CHECKING'):
+                        # Mark all nodes in this block as TYPE_CHECKING
+                        for child in ast.walk(node):
+                            type_checking_nodes.add(child)
+            
+            # Second pass: find imports, excluding TYPE_CHECKING ones
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom):
-                    if node.module == 'crm_database':
+                    if node.module == 'crm_database' and node not in type_checking_nodes:
                         for alias in node.names:
                             import_name = alias.name
                             imports['all_crm_imports'].append(import_name)
@@ -303,9 +320,16 @@ class TestServiceModelImportViolations:
                 
                 violations = []
                 
-                # Check for direct model imports
+                # Check for direct model imports (excluding TYPE_CHECKING)
+                # Simple heuristic: if TYPE_CHECKING is in file, check more carefully
                 if 'from crm_database import' in content:
-                    violations.append("Contains 'from crm_database import' statements")
+                    if 'TYPE_CHECKING' in content:
+                        # Parse to check if import is outside TYPE_CHECKING
+                        imports = self.parse_imports_from_file(service_file)
+                        if imports['all_crm_imports']:
+                            violations.append("Contains 'from crm_database import' statements")
+                    else:
+                        violations.append("Contains 'from crm_database import' statements")
                 
                 # Check for direct db usage patterns (beyond imports)
                 if 'db.session' in content:
@@ -364,6 +388,7 @@ class TestServiceArchitectureEnforcement:
             'registry.py',  # Service registry infrastructure
             'service_registry_enhanced.py',  # Enhanced service registry
             'registry_examples.py',  # Registry usage examples
+            'openphone_api_client.py',  # API client, not a service
         }
         
         for service_file in service_files:
