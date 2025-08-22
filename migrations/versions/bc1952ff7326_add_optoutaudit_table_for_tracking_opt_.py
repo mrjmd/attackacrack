@@ -106,23 +106,8 @@ def upgrade():
         for cmd in drop_index_commands:
             op.execute(cmd)
     
-    # Create new indexes for failed webhook queue (using IF NOT EXISTS for PostgreSQL)
-    if is_postgresql:
-        op.execute("CREATE INDEX IF NOT EXISTS ix_failed_webhook_queue_created_at ON failed_webhook_queue (created_at)")
-        op.execute("CREATE INDEX IF NOT EXISTS ix_failed_webhook_queue_event_id ON failed_webhook_queue (event_id)")
-        op.execute("CREATE INDEX IF NOT EXISTS ix_failed_webhook_queue_event_type ON failed_webhook_queue (event_type)")
-        op.execute("CREATE INDEX IF NOT EXISTS ix_failed_webhook_queue_next_retry_at ON failed_webhook_queue (next_retry_at)")
-        op.execute("CREATE INDEX IF NOT EXISTS ix_failed_webhook_queue_resolved ON failed_webhook_queue (resolved)")
-    else:
-        # For non-PostgreSQL databases, try to create but ignore errors
-        try:
-            op.create_index('ix_failed_webhook_queue_created_at', 'failed_webhook_queue', ['created_at'], unique=False)
-            op.create_index('ix_failed_webhook_queue_event_id', 'failed_webhook_queue', ['event_id'], unique=False)
-            op.create_index('ix_failed_webhook_queue_event_type', 'failed_webhook_queue', ['event_type'], unique=False)
-            op.create_index('ix_failed_webhook_queue_next_retry_at', 'failed_webhook_queue', ['next_retry_at'], unique=False)
-            op.create_index('ix_failed_webhook_queue_resolved', 'failed_webhook_queue', ['resolved'], unique=False)
-        except:
-            pass
+    # Note: The failed_webhook_queue indexes are already created in migration 5bf30755a98d
+    # They use idx_ prefix not ix_ prefix, so we don't need to recreate them
     
     print("✅ Performance indexes created successfully")
 
@@ -137,9 +122,4 @@ def downgrade():
     # Drop OptOutAudit table
     op.drop_table('opt_out_audit')
     
-    # Drop failed webhook queue indexes
-    op.drop_index('ix_failed_webhook_queue_resolved', table_name='failed_webhook_queue')
-    op.drop_index('ix_failed_webhook_queue_next_retry_at', table_name='failed_webhook_queue')
-    op.drop_index('ix_failed_webhook_queue_event_type', table_name='failed_webhook_queue')
-    op.drop_index('ix_failed_webhook_queue_event_id', table_name='failed_webhook_queue')
-    op.drop_index('ix_failed_webhook_queue_created_at', table_name='failed_webhook_queue')
+    # Note: Don't drop failed_webhook_queue indexes as they belong to migration 5bf30755a98d
