@@ -5,7 +5,7 @@ Follows existing API patterns from api_routes.py.
 """
 
 from flask import Blueprint, jsonify, request, current_app
-from flask_login import login_required, current_user
+from auth_utils import login_required, current_user
 from services.enums import TemplateCategory, TemplateStatus
 from services.campaign_template_service import (
     TemplateValidationError,

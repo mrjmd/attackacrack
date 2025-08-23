@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, abort
-from flask_login import login_required
+from auth_utils import login_required
 from datetime import datetime
 
 invoice_bp = Blueprint('invoice', __name__)

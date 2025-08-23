@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, jsonify, flash, make_response
-from flask_login import login_required, current_user
+from auth_utils import login_required, current_user
 from datetime import datetime
 from services.contact_service_refactored import ContactService
 from services.message_service_refactored import MessageService

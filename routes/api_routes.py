@@ -4,7 +4,7 @@ import base64
 import os
 from functools import wraps
 from flask import Blueprint, jsonify, request, current_app, abort
-from flask_login import login_required
+from auth_utils import login_required
 
 api_bp = Blueprint('api', __name__)
 

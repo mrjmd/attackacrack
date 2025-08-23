@@ -4,7 +4,7 @@ Refactored to use service registry pattern
 """
 
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app, abort, Response
-from flask_login import login_required
+from auth_utils import login_required
 from datetime import datetime, timedelta
 from extensions import db
 import csv

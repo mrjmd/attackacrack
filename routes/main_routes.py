@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app
-from flask_login import login_required
+from auth_utils import login_required, get_current_user
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
@@ -13,7 +13,7 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route('/')
 def index():
     """Root route - redirect to dashboard if logged in, else to login"""
-    from flask_login import current_user
+    current_user = get_current_user()
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     else:
@@ -26,7 +26,7 @@ def dashboard():
     from sqlalchemy import func
     from sqlalchemy.orm import selectinload, joinedload
     from flask import current_app
-    from flask_login import current_user
+    current_user = get_current_user()
     
     # Get services from registry
     dashboard_service = current_app.services.get('dashboard')

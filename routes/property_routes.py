@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, flash
-from flask_login import login_required
+from auth_utils import login_required
 # Direct model imports removed - use services only
 from extensions import db
 

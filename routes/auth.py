@@ -1,22 +1,10 @@
 # routes/auth.py
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
-from flask_login import login_required, current_user, logout_user
-from functools import wraps
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, g
+from flask_login import current_user, logout_user
+from auth_utils import login_required, admin_required, get_current_user
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
-
-
-def admin_required(f):
-    """Decorator to require admin role"""
-    @wraps(f)
-    @login_required
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_admin:
-            flash('Admin access required', 'error')
-            return redirect(url_for('main.dashboard'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])

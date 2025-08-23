@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
-from flask_login import login_required
+from auth_utils import login_required
 # ProductService now accessed via service registry
 
 quote_bp = Blueprint('quote', __name__)

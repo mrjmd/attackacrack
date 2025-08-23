@@ -473,6 +473,27 @@ def create_app(config_name=None, test_config=None):
                    request_id=g.request_id,
                    method=request.method if hasattr(request, 'method') else None,
                    path=request.path if hasattr(request, 'path') else None)
+        
+        # In testing mode with LOGIN_DISABLED, provide a mock user for current_user
+        if app.config.get('LOGIN_DISABLED', False):
+            from flask_login import login_user
+            from unittest.mock import Mock
+            
+            # Create a mock user object that behaves like a real user
+            mock_user = Mock()
+            mock_user.id = 1
+            mock_user.email = 'test@example.com'
+            mock_user.first_name = 'Test'
+            mock_user.last_name = 'User'
+            mock_user.role = 'admin'
+            mock_user.is_admin = True
+            mock_user.is_active = True
+            mock_user.is_authenticated = True
+            mock_user.is_anonymous = False
+            mock_user.get_id.return_value = '1'
+            
+            # Store in flask.g for access in routes
+            g.mock_user = mock_user
     
     @app.after_request
     def after_request(response):

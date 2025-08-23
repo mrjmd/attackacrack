@@ -3,7 +3,7 @@ Growth routes for financials and business development
 """
 
 from flask import Blueprint, render_template
-from flask_login import login_required
+from auth_utils import login_required
 
 growth_bp = Blueprint('growth', __name__)
 

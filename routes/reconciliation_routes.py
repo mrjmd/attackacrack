@@ -5,7 +5,7 @@ Admin routes for managing OpenPhone data reconciliation.
 """
 
 from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for, current_app
-from flask_login import login_required, current_user
+from auth_utils import login_required, current_user
 import logging
 from datetime import datetime
 
