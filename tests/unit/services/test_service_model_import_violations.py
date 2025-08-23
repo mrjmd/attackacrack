@@ -389,6 +389,7 @@ class TestServiceArchitectureEnforcement:
             'service_registry_enhanced.py',  # Enhanced service registry
             'registry_examples.py',  # Registry usage examples
             'openphone_api_client.py',  # API client, not a service
+            'enums.py',  # Shared enums for service layer
         }
         
         for service_file in service_files:

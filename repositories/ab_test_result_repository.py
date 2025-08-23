@@ -27,9 +27,9 @@ class ABTestResultRepository(BaseRepository[ABTestResult]):
     and statistical analysis of A/B test results.
     """
     
-    def __init__(self, session: Session, model_class=ABTestResult):
+    def __init__(self, session: Session):
         """Initialize repository with session and ABTestResult model."""
-        super().__init__(session, model_class)
+        super().__init__(session, ABTestResult)
     
     def _validate_variant(self, variant: Any) -> bool:
         """Validate that variant is either 'A' or 'B'."""

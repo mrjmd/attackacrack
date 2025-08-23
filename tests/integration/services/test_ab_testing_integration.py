@@ -23,17 +23,17 @@ class TestABTestingServiceIntegration:
     @pytest.fixture
     def campaign_repo(self, db_session):
         """Create real campaign repository"""
-        return CampaignRepository(session=db_session, model_class=Campaign)
+        return CampaignRepository(session=db_session)
     
     @pytest.fixture
     def contact_repo(self, db_session):
         """Create real contact repository"""
-        return ContactRepository(session=db_session, model_class=Contact)
+        return ContactRepository(session=db_session)
     
     @pytest.fixture
     def ab_result_repo(self, db_session):
         """Create real A/B test result repository"""
-        return ABTestResultRepository(session=db_session, model_class=ABTestResult)
+        return ABTestResultRepository(session=db_session)
     
     @pytest.fixture
     def service(self, campaign_repo, contact_repo, ab_result_repo):

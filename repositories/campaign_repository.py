@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 class CampaignRepository(BaseRepository[Campaign]):
     """Repository for Campaign data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Campaign)
+    
     def search(self, query: str, fields: Optional[List[str]] = None) -> List[Campaign]:
         """
         Search campaigns by text query.

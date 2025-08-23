@@ -28,7 +28,7 @@ class TestABTestResultRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create ABTestResultRepository with mocked session"""
-        return ABTestResultRepository(session=mock_session, model_class=ABTestResult)
+        return ABTestResultRepository(session=mock_session)
     
     @pytest.fixture
     def sample_ab_result(self):

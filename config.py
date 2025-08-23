@@ -208,6 +208,9 @@ class TestingConfig(Config):
     # Disable CSRF for testing
     WTF_CSRF_ENABLED = False
     
+    # Disable login requirement for testing
+    LOGIN_DISABLED = True
+    
     # Use test Redis database
     CELERY_BROKER_URL = 'redis://localhost:6379/1'
     CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'

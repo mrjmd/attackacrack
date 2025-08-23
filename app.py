@@ -169,6 +169,12 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    registry.register_factory(
+        'campaign_template_repository',
+        lambda db_session: _create_campaign_template_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Register services with lazy loading factories
     # These won't be instantiated until first use
     
@@ -330,6 +336,14 @@ def create_app(config_name=None, test_config=None):
             contact_repository, campaign_repository, activity_repository, conversation_repository, sms_metrics
         ),
         dependencies=['contact_repository', 'campaign_repository', 'activity_repository', 'conversation_repository', 'sms_metrics']
+    )
+    
+    registry.register_factory(
+        'campaign_template',
+        lambda campaign_template_repository, contact_repository: _create_campaign_template_service(
+            campaign_template_repository, contact_repository
+        ),
+        dependencies=['campaign_template_repository', 'contact_repository']
     )
     
     registry.register_factory(
@@ -537,6 +551,7 @@ def create_app(config_name=None, test_config=None):
     from routes.auth import auth_bp
     from routes.todo_routes import todo_bp
     from routes.reconciliation_routes import bp as reconciliation_bp
+    from routes.templates_api import templates_api_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(contact_bp, url_prefix='/contacts')
@@ -552,6 +567,7 @@ def create_app(config_name=None, test_config=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(todo_bp)
     app.register_blueprint(reconciliation_bp)
+    app.register_blueprint(templates_api_bp)
     
     # --- REMOVED APScheduler ---
     # The background task scheduling is now handled by Celery Beat.
@@ -822,8 +838,7 @@ def _create_dashboard_service_with_repositories(contact_repository, campaign_rep
 def _create_contact_repository(db_session):
     """Create ContactRepository instance"""
     from repositories.contact_repository import ContactRepository
-    from crm_database import Contact
-    return ContactRepository(session=db_session, model_class=Contact)
+    return ContactRepository(session=db_session)
 
 def _create_campaign_repository(db_session):
     """Create CampaignRepository instance"""
@@ -864,6 +879,22 @@ def _create_ab_test_result_repository(db_session):
     from repositories.ab_test_result_repository import ABTestResultRepository
     from crm_database import ABTestResult
     return ABTestResultRepository(session=db_session, model_class=ABTestResult)
+
+def _create_campaign_template_repository(db_session):
+    """Create CampaignTemplateRepository instance"""
+    from repositories.campaign_template_repository import CampaignTemplateRepository
+    return CampaignTemplateRepository(session=db_session)
+
+def _create_campaign_template_service(campaign_template_repository, contact_repository):
+    """Create CampaignTemplateService with repository dependencies"""
+    from services.campaign_template_service import CampaignTemplateService
+    
+    logger.info("Initializing CampaignTemplateService with repositories")
+    
+    return CampaignTemplateService(
+        template_repository=campaign_template_repository,
+        contact_repository=contact_repository
+    )
 
 def _create_phone_validation_service(phone_validation_repository):
     """Create PhoneValidationService with repository dependency"""

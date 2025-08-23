@@ -2,6 +2,8 @@
 
 from extensions import db
 from datetime import datetime, time, date, timedelta
+from enum import Enum
+import json
 
 # --- NEW: User Model ---
 class User(db.Model):
@@ -547,6 +549,86 @@ class Todo(db.Model):
         self.is_completed = False
         self.completed_at = None
 
+
+# --- Campaign Template Models ---
+
+class TemplateCategory(str, Enum):
+    """Categories for campaign templates"""
+    PROMOTIONAL = 'promotional'
+    REMINDER = 'reminder'
+    FOLLOW_UP = 'follow_up'
+    NOTIFICATION = 'notification'
+    CUSTOM = 'custom'
+
+
+class TemplateStatus(str, Enum):
+    """Status options for campaign templates"""
+    DRAFT = 'draft'
+    APPROVED = 'approved'
+    ACTIVE = 'active'
+    ARCHIVED = 'archived'
+
+
+class CampaignTemplate(db.Model):
+    """Campaign template for SMS messages"""
+    __tablename__ = 'campaign_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
+    content = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text)
+    category = db.Column(db.String(50), nullable=False, default=TemplateCategory.CUSTOM)
+    
+    # Variables stored as JSON array
+    variables = db.Column(db.JSON, default=list)
+    
+    # Status management
+    status = db.Column(db.String(20), nullable=False, default=TemplateStatus.DRAFT)
+    
+    # Version management
+    version = db.Column(db.Integer, default=1, nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('campaign_templates.id'), nullable=True)
+    
+    # Usage tracking
+    is_active = db.Column(db.Boolean, default=True)
+    usage_count = db.Column(db.Integer, default=0)
+    last_used_at = db.Column(db.DateTime)
+    
+    # Approval tracking
+    approved_by = db.Column(db.String(100))
+    approved_at = db.Column(db.DateTime)
+    archived_at = db.Column(db.DateTime)
+    activated_at = db.Column(db.DateTime)
+    
+    # Audit fields
+    created_by = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    parent_template = db.relationship('CampaignTemplate', remote_side=[id], backref='versions')
+    
+    def __repr__(self):
+        return f'<CampaignTemplate {self.id}: {self.name} v{self.version}>'
+    
+    def to_dict(self):
+        """Convert template to dictionary"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'content': self.content,
+            'description': self.description,
+            'category': self.category,
+            'variables': self.variables or [],
+            'status': self.status,
+            'version': self.version,
+            'parent_id': self.parent_id,
+            'is_active': self.is_active,
+            'usage_count': self.usage_count,
+            'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
 
 class FailedWebhookQueue(db.Model):
     """Failed webhook queue for error recovery and retry management (P1-16)"""
