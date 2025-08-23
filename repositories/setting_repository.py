@@ -5,10 +5,15 @@ SettingRepository - Data access layer for Setting model
 from typing import List, Optional
 from repositories.base_repository import BaseRepository
 from sqlalchemy import or_
+from crm_database import Setting
 
 
 class SettingRepository(BaseRepository):
     """Repository for Setting data access"""
+    
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Setting)
     
     def search(self, query: str, fields: Optional[List[str]] = None) -> List:
         """

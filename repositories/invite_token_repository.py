@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class InviteTokenRepository(BaseRepository[InviteToken]):
     """Repository for InviteToken data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, InviteToken)
+    
     def search(self, query: str, fields: Optional[List[str]] = None) -> List[InviteToken]:
         """
         Search invite tokens by text query across multiple fields.

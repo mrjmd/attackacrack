@@ -16,7 +16,7 @@ class TestCampaignRepositoryDashboardEnhancements:
     @pytest.fixture
     def repository(self, db_session):
         """Create CampaignRepository instance"""
-        return CampaignRepository(session=db_session, model_class=Campaign)
+        return CampaignRepository(session=db_session)
     
     def test_get_active_campaigns_count(self, repository, db_session):
         """Test getting count of running/active campaigns"""

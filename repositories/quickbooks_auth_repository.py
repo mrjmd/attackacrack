@@ -12,6 +12,10 @@ from crm_database import QuickBooksAuth
 class QuickBooksAuthRepository(BaseRepository):
     """Repository for QuickBooksAuth data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, QuickBooksAuth)
+    
     def find_by_company_id(self, company_id: str) -> Optional[QuickBooksAuth]:
         """
         Find authentication record by QuickBooks company ID.

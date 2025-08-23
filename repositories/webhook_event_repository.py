@@ -6,10 +6,15 @@ from typing import List, Optional
 from datetime import datetime
 from sqlalchemy import desc, or_, and_
 from repositories.base_repository import BaseRepository, PaginatedResult
+from crm_database import WebhookEvent
 
 
 class WebhookEventRepository(BaseRepository):
     """Repository for WebhookEvent data access"""
+    
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, WebhookEvent)
     
     def find_by_event_id(self, event_id: str) -> Optional:
         """

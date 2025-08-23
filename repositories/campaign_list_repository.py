@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 class CampaignListRepository(BaseRepository[CampaignList]):
     """Repository for CampaignList data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, CampaignList)
+    
     def search(self, query: str, fields: Optional[List[str]] = None, limit: Optional[int] = None) -> List[CampaignList]:
         """
         Search campaign lists by text query across multiple fields.

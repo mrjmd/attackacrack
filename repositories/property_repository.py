@@ -28,14 +28,13 @@ class PropertyRepository(BaseRepository[Property]):
     - Business logic operations (properties with jobs, type counts)
     """
 
-    def __init__(self, session: Session, model_class=Property):
+    def __init__(self, session: Session):
         """Initialize PropertyRepository with database session
         
         Args:
             session: SQLAlchemy database session
-            model_class: Property model class (defaults to Property)
         """
-        super().__init__(session, model_class)
+        super().__init__(session, Property)
     
     def create(self, **kwargs) -> Property:
         """Create a new property with validation

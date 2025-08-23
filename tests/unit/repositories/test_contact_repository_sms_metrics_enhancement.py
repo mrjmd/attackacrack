@@ -16,7 +16,7 @@ class TestContactRepositorySMSMetricsEnhancement:
     @pytest.fixture
     def repository(self, db_session):
         """Create ContactRepository instance"""
-        return ContactRepository(session=db_session, model_class=Contact)
+        return ContactRepository(session=db_session)
     
     @pytest.fixture
     def sample_contacts(self, db_session):

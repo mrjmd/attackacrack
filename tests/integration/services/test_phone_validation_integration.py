@@ -26,7 +26,7 @@ import time
 @pytest.fixture
 def phone_validation_repository(db_session):
     """Create real PhoneValidationRepository with test database"""
-    return PhoneValidationRepository(session=db_session, model_class=PhoneValidation)
+    return PhoneValidationRepository(session=db_session)
 
 
 @pytest.fixture

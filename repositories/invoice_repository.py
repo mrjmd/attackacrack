@@ -12,6 +12,10 @@ from crm_database import Invoice, Job, Property
 class InvoiceRepository(BaseRepository):
     """Repository for Invoice data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Invoice)
+    
     def find_by_job_id(self, job_id: int) -> List:
         """
         Find all invoices for a job.

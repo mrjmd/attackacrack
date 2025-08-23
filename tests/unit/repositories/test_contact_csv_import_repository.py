@@ -24,7 +24,7 @@ class TestContactCSVImportRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create repository instance with mocked dependencies"""
-        return ContactCSVImportRepository(session=mock_session, model_class=ContactCSVImport)
+        return ContactCSVImportRepository(session=mock_session)
     
     @pytest.fixture
     def sample_association_data(self):

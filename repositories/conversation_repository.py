@@ -13,6 +13,10 @@ from crm_database import Conversation, Contact, Activity, ContactFlag
 class ConversationRepository(BaseRepository):
     """Repository for Conversation data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Conversation)
+    
     def find_by_contact_id(self, contact_id: int) -> List:
         """
         Find all conversations for a contact.

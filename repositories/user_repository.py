@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class UserRepository(BaseRepository[User]):
     """Repository for User data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, User)
+    
     def search(self, query: str, fields: Optional[List[str]] = None) -> List[User]:
         """
         Search users by text query across multiple fields.

@@ -25,7 +25,7 @@ class TestUserRepository:
     @pytest.fixture
     def user_repository(self, mock_session):
         """Create UserRepository instance with mocked session"""
-        return UserRepository(session=mock_session, model_class=User)
+        return UserRepository(session=mock_session)
     
     @pytest.fixture
     def sample_user_data(self):

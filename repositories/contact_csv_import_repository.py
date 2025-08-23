@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class ContactCSVImportRepository(BaseRepository[ContactCSVImport]):
     """Repository for ContactCSVImport association data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, ContactCSVImport)
+    
     def search(self, query: str, fields: Optional[List[str]] = None, limit: Optional[int] = None) -> List[ContactCSVImport]:
         """
         Search contact-CSV import associations by contact information.

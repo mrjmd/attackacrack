@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class CSVImportRepository(BaseRepository[CSVImport]):
     """Repository for CSVImport data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, CSVImport)
+    
     def search(self, query: str, fields: Optional[List[str]] = None, limit: Optional[int] = None) -> List[CSVImport]:
         """
         Search CSV imports by text query across multiple fields.

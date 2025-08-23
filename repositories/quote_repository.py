@@ -12,6 +12,10 @@ from crm_database import Quote, Job
 class QuoteRepository(BaseRepository):
     """Repository for Quote data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Quote)
+    
     def find_all_ordered_by_id_desc(self) -> List:
         """
         Find all quotes ordered by ID descending.

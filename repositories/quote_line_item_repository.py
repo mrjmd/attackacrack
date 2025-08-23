@@ -10,6 +10,10 @@ from crm_database import QuoteLineItem
 class QuoteLineItemRepository(BaseRepository):
     """Repository for QuoteLineItem data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, QuoteLineItem)
+    
     def find_by_quote_id(self, quote_id: int) -> List:
         """
         Find all line items for a quote.

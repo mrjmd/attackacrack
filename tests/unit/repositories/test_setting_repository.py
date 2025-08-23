@@ -17,7 +17,7 @@ class TestSettingRepository:
     @pytest.fixture
     def setting_repository(self, db_session):
         """Create SettingRepository instance with test database session"""
-        return SettingRepository(session=db_session, model_class=Setting)
+        return SettingRepository(session=db_session)
     
     @pytest.fixture
     def sample_settings(self, db_session):
@@ -229,7 +229,7 @@ class TestSettingRepositorySpecializedMethods:
     @pytest.fixture
     def setting_repository(self, db_session):
         """Create SettingRepository instance"""
-        return SettingRepository(session=db_session, model_class=Setting)
+        return SettingRepository(session=db_session)
     
     @pytest.fixture
     def scheduler_settings(self, db_session):

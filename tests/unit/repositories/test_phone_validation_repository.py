@@ -22,7 +22,7 @@ from repositories.base_repository import PaginationParams, SortOrder
 @pytest.fixture
 def phone_validation_repository(db_session):
     """Create PhoneValidationRepository with test database session"""
-    return PhoneValidationRepository(session=db_session, model_class=PhoneValidation)
+    return PhoneValidationRepository(session=db_session)
 
 
 @pytest.fixture

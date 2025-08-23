@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 class ProductRepository(BaseRepository[Product]):
     """Repository for Product data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Product)
+    
     def search(self, query: str, fields: Optional[List[str]] = None) -> List[Product]:
         """
         Search products by text query across multiple fields.

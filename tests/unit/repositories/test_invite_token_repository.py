@@ -25,7 +25,7 @@ class TestInviteTokenRepository:
     @pytest.fixture
     def invite_repository(self, mock_session):
         """Create InviteTokenRepository instance with mocked session"""
-        return InviteTokenRepository(session=mock_session, model_class=InviteToken)
+        return InviteTokenRepository(session=mock_session)
     
     @pytest.fixture
     def sample_invite_data(self):

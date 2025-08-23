@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 class PhoneValidationRepository(BaseRepository[PhoneValidation]):
     """Repository for PhoneValidation data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, PhoneValidation)
+    
     def find_expired(self, days: int = 30) -> List[PhoneValidation]:
         """
         Find validation records older than specified days.

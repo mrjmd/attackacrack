@@ -6,10 +6,15 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy import desc, func
 from repositories.base_repository import BaseRepository, PaginatedResult
+from crm_database import Activity
 
 
 class ActivityRepository(BaseRepository):
     """Repository for Activity data access"""
+    
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Activity)
     
     def find_by_conversation_id(self, conversation_id: int) -> List:
         """

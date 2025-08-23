@@ -52,7 +52,7 @@ class TestJobRepository:
     @pytest.fixture
     def job_repository(self, db_session):
         """Create JobRepository instance with test database session"""
-        return JobRepository(session=db_session, model_class=Job)
+        return JobRepository(session=db_session)
     
     
     @pytest.fixture
@@ -234,7 +234,7 @@ class TestJobRepositorySchedulerMethods:
     @pytest.fixture
     def job_repository(self, db_session):
         """Create JobRepository instance"""
-        return JobRepository(session=db_session, model_class=Job)
+        return JobRepository(session=db_session)
     
     @pytest.fixture
     def scheduler_test_jobs(self, db_session, test_contact_and_property):
@@ -376,7 +376,7 @@ class TestJobRepositoryServiceMethods:
     @pytest.fixture
     def job_repository(self, db_session):
         """Create JobRepository instance"""
-        return JobRepository(session=db_session, model_class=Job)
+        return JobRepository(session=db_session)
     
     def test_find_active_job_by_property_id(self, job_repository, test_contact_and_property, db_session):
         """Test finding active job for a specific property - JobService line 18-21"""

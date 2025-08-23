@@ -19,9 +19,9 @@ def contact_service(db_session):
     """Fixture to provide ContactService instance with real repositories"""
     from crm_database import Contact, Campaign, ContactFlag
     
-    contact_repo = ContactRepository(session=db_session, model_class=Contact)
-    campaign_repo = CampaignRepository(session=db_session, model_class=Campaign)
-    contact_flag_repo = ContactFlagRepository(session=db_session, model_class=ContactFlag)
+    contact_repo = ContactRepository(session=db_session)
+    campaign_repo = CampaignRepository(session=db_session)
+    contact_flag_repo = ContactFlagRepository(session=db_session)
     
     return ContactService(
         contact_repository=contact_repo,

@@ -20,6 +20,10 @@ from crm_database import FailedWebhookQueue
 class FailedWebhookQueueRepository(BaseRepository):
     """Repository for FailedWebhookQueue data access and retry management"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, FailedWebhookQueue)
+    
     def find_pending_retries(self, limit: int = 50) -> List[FailedWebhookQueue]:
         """
         Find failed webhooks that are ready for retry.

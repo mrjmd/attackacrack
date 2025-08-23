@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 class ContactFlagRepository(BaseRepository[ContactFlag]):
     """Repository for ContactFlag data access"""
     
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, ContactFlag)
+    
     def search(self, query: str, fields: Optional[List[str]] = None) -> List[ContactFlag]:
         """
         Search contact flags by reason text.

@@ -620,9 +620,9 @@ def _create_auth_service(db_session):
     
     logger.info("Initializing AuthService with repositories")
     
-    # Create repositories with model classes
-    user_repository = UserRepository(db_session, User)
-    invite_repository = InviteTokenRepository(db_session, InviteToken)
+    # Create repositories
+    user_repository = UserRepository(db_session)
+    invite_repository = InviteTokenRepository(db_session)
     
     # Create auth service with injected repositories
     # Note: email_service will be None for now, can be added later if needed
@@ -647,7 +647,7 @@ def _create_product_service(db_session):
             return self.repository.get_all()
     
     logger.info("Initializing ProductService with repository pattern")
-    return ProductService(ProductRepository(db_session, Product))
+    return ProductService(ProductRepository(db_session))
 
 def _create_job_service(job_repository):
     """Create JobService with repository dependency"""
@@ -658,9 +658,8 @@ def _create_job_service(job_repository):
 def _create_job_repository(db_session):
     """Create JobRepository instance"""
     from repositories.job_repository import JobRepository
-    from crm_database import Job
     logger.info("Initializing JobRepository")
-    return JobRepository(session=db_session, model_class=Job)
+    return JobRepository(session=db_session)
 
 def _create_property_service(db_session):
     """Create PropertyService with PropertyRepository"""
@@ -669,7 +668,7 @@ def _create_property_service(db_session):
     from crm_database import Property
     
     logger.info("Initializing PropertyService with repository")
-    property_repo = PropertyRepository(session=db_session, model_class=Property)
+    property_repo = PropertyRepository(session=db_session)
     return PropertyService(repository=property_repo)
 
 def _create_quote_service():
@@ -684,8 +683,8 @@ def _create_quote_service():
     
     # Create repository instances
     db_session = db.session
-    quote_repo = QuoteRepository(session=db_session, model_class=Quote)
-    line_item_repo = QuoteLineItemRepository(session=db_session, model_class=QuoteLineItem)
+    quote_repo = QuoteRepository(session=db_session)
+    line_item_repo = QuoteLineItemRepository(session=db_session)
     
     return QuoteService(
         quote_repository=quote_repo,
@@ -793,8 +792,8 @@ def _create_quickbooks_service():
     
     # Create repository instances
     db_session = db.session
-    auth_repo = QuickBooksAuthRepository(session=db_session, model_class=QuickBooksAuth)
-    sync_repo = QuickBooksSyncRepository(session=db_session, model_class=QuickBooksSync)
+    auth_repo = QuickBooksAuthRepository(session=db_session)
+    sync_repo = QuickBooksSyncRepository(session=db_session)
     
     return QuickBooksService(
         auth_repository=auth_repo,
@@ -811,9 +810,9 @@ def _create_campaign_list_service(db_session):
     
     logger.info("Initializing CampaignListServiceRefactored with repository pattern")
     return CampaignListServiceRefactored(
-        campaign_list_repository=CampaignListRepository(db_session, CampaignList),
-        member_repository=CampaignListMemberRepository(db_session, CampaignListMember),
-        contact_repository=ContactRepository(db_session, Contact)
+        campaign_list_repository=CampaignListRepository(db_session),
+        member_repository=CampaignListMemberRepository(db_session),
+        contact_repository=ContactRepository(db_session)
     )
 
 def _create_dashboard_service(db_session):
@@ -843,14 +842,12 @@ def _create_contact_repository(db_session):
 def _create_campaign_repository(db_session):
     """Create CampaignRepository instance"""
     from repositories.campaign_repository import CampaignRepository
-    from crm_database import Campaign
-    return CampaignRepository(session=db_session, model_class=Campaign)
+    return CampaignRepository(session=db_session)
 
 def _create_contact_flag_repository(db_session):
     """Create ContactFlagRepository instance"""
     from repositories.contact_flag_repository import ContactFlagRepository
-    from crm_database import ContactFlag
-    return ContactFlagRepository(session=db_session, model_class=ContactFlag)
+    return ContactFlagRepository(session=db_session)
 
 def _create_opt_out_audit_repository(db_session):
     """Create OptOutAuditRepository instance"""
@@ -871,14 +868,12 @@ def _create_opt_out_service(contact_flag_repository, opt_out_audit_repository, o
 def _create_phone_validation_repository(db_session):
     """Create PhoneValidationRepository instance"""
     from repositories.phone_validation_repository import PhoneValidationRepository
-    from crm_database import PhoneValidation
-    return PhoneValidationRepository(session=db_session, model_class=PhoneValidation)
+    return PhoneValidationRepository(session=db_session)
 
 def _create_ab_test_result_repository(db_session):
     """Create ABTestResultRepository instance"""
     from repositories.ab_test_result_repository import ABTestResultRepository
-    from crm_database import ABTestResult
-    return ABTestResultRepository(session=db_session, model_class=ABTestResult)
+    return ABTestResultRepository(session=db_session)
 
 def _create_campaign_template_repository(db_session):
     """Create CampaignTemplateRepository instance"""
@@ -924,56 +919,47 @@ def _create_ab_testing_service(campaign_repository, contact_repository, ab_resul
 def _create_activity_repository(db_session):
     """Create ActivityRepository instance"""
     from repositories.activity_repository import ActivityRepository
-    from crm_database import Activity
-    return ActivityRepository(session=db_session, model_class=Activity)
+    return ActivityRepository(session=db_session)
 
 def _create_conversation_repository(db_session):
     """Create ConversationRepository instance"""
     from repositories.conversation_repository import ConversationRepository
-    from crm_database import Conversation
-    return ConversationRepository(session=db_session, model_class=Conversation)
+    return ConversationRepository(session=db_session)
 
 def _create_setting_repository(db_session):
     """Create SettingRepository instance"""
     from repositories.setting_repository import SettingRepository
-    from crm_database import Setting
-    return SettingRepository(session=db_session, model_class=Setting)
+    return SettingRepository(session=db_session)
 
 def _create_todo_repository(db_session):
     """Create TodoRepository instance"""
     from repositories.todo_repository import TodoRepository
-    from crm_database import Todo
-    return TodoRepository(session=db_session, model_class=Todo)
+    return TodoRepository(session=db_session)
 
 def _create_appointment_repository(db_session):
     """Create AppointmentRepository instance"""
     from repositories.appointment_repository import AppointmentRepository
-    from crm_database import Appointment
-    return AppointmentRepository(session=db_session, model_class=Appointment)
+    return AppointmentRepository(session=db_session)
 
 def _create_webhook_event_repository(db_session):
     """Create WebhookEventRepository instance"""
     from repositories.webhook_event_repository import WebhookEventRepository
-    from crm_database import WebhookEvent
-    return WebhookEventRepository(session=db_session, model_class=WebhookEvent)
+    return WebhookEventRepository(session=db_session)
 
 def _create_invoice_repository(db_session):
     """Create InvoiceRepository instance"""
     from repositories.invoice_repository import InvoiceRepository
-    from crm_database import Invoice
-    return InvoiceRepository(session=db_session, model_class=Invoice)
+    return InvoiceRepository(session=db_session)
 
 def _create_quote_repository(db_session):
     """Create QuoteRepository instance"""
     from repositories.quote_repository import QuoteRepository
-    from crm_database import Quote
-    return QuoteRepository(session=db_session, model_class=Quote)
+    return QuoteRepository(session=db_session)
 
 def _create_failed_webhook_queue_repository(db_session):
     """Create FailedWebhookQueueRepository instance"""
     from repositories.failed_webhook_queue_repository import FailedWebhookQueueRepository
-    from crm_database import FailedWebhookQueue
-    return FailedWebhookQueueRepository(session=db_session, model_class=FailedWebhookQueue)
+    return FailedWebhookQueueRepository(session=db_session)
 
 def _create_setting_service(setting_repository):
     """Create SettingService instance"""
@@ -990,8 +976,8 @@ def _create_conversation_service(db_session):
     logger.info("Initializing ConversationService with repositories")
     
     # Create repository instances
-    conversation_repo = ConversationRepository(session=db_session, model_class=Conversation)
-    campaign_repo = CampaignRepository(session=db_session, model_class=Campaign)
+    conversation_repo = ConversationRepository(session=db_session)
+    campaign_repo = CampaignRepository(session=db_session)
     
     return ConversationService(
         conversation_repository=conversation_repo,
@@ -1031,7 +1017,7 @@ def _create_campaign_service(openphone, campaign_list, campaign_repository, cont
     logger.info("Initializing CampaignService with repositories")
     
     # Create contact flag repository
-    contact_flag_repo = ContactFlagRepository(session=db.session, model_class=ContactFlag)
+    contact_flag_repo = ContactFlagRepository(session=db.session)
     
     return CampaignService(
         campaign_repository=campaign_repository,
@@ -1055,11 +1041,11 @@ def _create_csv_import_service(contact, db_session):
     logger.info("Initializing CSVImportService with repository pattern")
     
     # Create repository instances
-    csv_import_repo = CSVImportRepository(session=db_session, model_class=CSVImport)
-    contact_csv_import_repo = ContactCSVImportRepository(session=db_session, model_class=ContactCSVImport)
-    campaign_list_repo = CampaignListRepository(session=db_session, model_class=CampaignList)
-    campaign_list_member_repo = CampaignListMemberRepository(session=db_session, model_class=CampaignListMember)
-    contact_repo = ContactRepository(session=db_session, model_class=Contact)
+    csv_import_repo = CSVImportRepository(session=db_session)
+    contact_csv_import_repo = ContactCSVImportRepository(session=db_session)
+    campaign_list_repo = CampaignListRepository(session=db_session)
+    campaign_list_member_repo = CampaignListMemberRepository(session=db_session)
+    contact_repo = ContactRepository(session=db_session)
     
     return CSVImportService(
         csv_import_repository=csv_import_repo,
@@ -1080,8 +1066,8 @@ def _create_openphone_sync_service(openphone, db_session):
     logger.info("Initializing OpenPhoneSyncService with repositories")
     
     # Create repository instances
-    contact_repo = ContactRepository(db_session, Contact)
-    activity_repo = ActivityRepository(db_session, Activity)
+    contact_repo = ContactRepository(db_session)
+    activity_repo = ActivityRepository(db_session)
     
     return OpenPhoneSyncService(
         contact_repository=contact_repo,
@@ -1105,15 +1091,15 @@ def _create_quickbooks_sync_service(quickbooks, db_session):
     logger.info("Initializing QuickBooksSyncService with repositories")
     
     # Create repository instances
-    contact_repo = ContactRepository(session=db_session, model_class=Contact)
-    product_repo = ProductRepository(session=db_session, model_class=Product)
-    quote_repo = QuoteRepository(session=db_session, model_class=Quote)
-    invoice_repo = InvoiceRepository(session=db_session, model_class=Invoice)
-    job_repo = JobRepository(session=db_session, model_class=Job)
-    property_repo = PropertyRepository(session=db_session, model_class=Property)
-    quickbooks_sync_repo = QuickBooksSyncRepository(session=db_session, model_class=QuickBooksSync)
-    quote_line_item_repo = QuoteLineItemRepository(session=db_session, model_class=QuoteLineItem)
-    invoice_line_item_repo = InvoiceLineItemRepository(session=db_session, model_class=InvoiceLineItem)
+    contact_repo = ContactRepository(session=db_session)
+    product_repo = ProductRepository(session=db_session)
+    quote_repo = QuoteRepository(session=db_session)
+    invoice_repo = InvoiceRepository(session=db_session)
+    job_repo = JobRepository(session=db_session)
+    property_repo = PropertyRepository(session=db_session)
+    quickbooks_sync_repo = QuickBooksSyncRepository(session=db_session)
+    quote_line_item_repo = QuoteLineItemRepository(session=db_session)
+    invoice_line_item_repo = InvoiceLineItemRepository(session=db_session)
     
     return QuickBooksSyncService(
         contact_repository=contact_repo,
@@ -1131,10 +1117,9 @@ def _create_appointment_service(google_calendar, db_session):
     """Create AppointmentService with dependencies"""
     from services.appointment_service_refactored import AppointmentService
     from repositories.appointment_repository import AppointmentRepository
-    from crm_database import Appointment
     logger.info("Initializing AppointmentService with repository")
     return AppointmentService(
-        appointment_repository=AppointmentRepository(db_session, Appointment),
+        appointment_repository=AppointmentRepository(db_session),
         google_calendar_service=google_calendar
     )
 
@@ -1188,10 +1173,10 @@ def _create_scheduler_service(openphone, invoice, db_session):
     logger.info("Initializing SchedulerService with repositories")
     
     # Create repository instances
-    setting_repo = SettingRepository(session=db_session, model_class=Setting)
-    job_repo = JobRepository(session=db_session, model_class=Job)
-    quote_repo = QuoteRepository(session=db_session, model_class=Quote)
-    appointment_repo = AppointmentRepository(session=db_session, model_class=Appointment)
+    setting_repo = SettingRepository(session=db_session)
+    job_repo = JobRepository(session=db_session)
+    quote_repo = QuoteRepository(session=db_session)
+    appointment_repo = AppointmentRepository(session=db_session)
     
     return SchedulerService(
         setting_repository=setting_repo,

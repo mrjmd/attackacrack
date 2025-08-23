@@ -17,7 +17,7 @@ class TestConversationRepositoryDashboardEnhancements:
     @pytest.fixture
     def repository(self, db_session):
         """Create ConversationRepository instance"""
-        return ConversationRepository(session=db_session, model_class=Conversation)
+        return ConversationRepository(session=db_session)
     
     def test_get_recent_conversations_with_activities_preloaded(self, repository, db_session):
         """Test getting recent conversations with activities and contacts preloaded"""

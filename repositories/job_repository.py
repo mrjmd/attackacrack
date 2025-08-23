@@ -6,10 +6,15 @@ from typing import List, Optional
 from datetime import date, datetime
 from repositories.base_repository import BaseRepository
 from sqlalchemy import desc, asc, or_, and_, func
+from crm_database import Job
 
 
 class JobRepository(BaseRepository):
     """Repository for Job data access"""
+    
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Job)
     
     def find_completed_jobs_by_date(self, completion_date: date) -> List:
         """

@@ -16,7 +16,7 @@ class TestActivityRepositoryDashboardEnhancements:
     @pytest.fixture
     def repository(self, db_session):
         """Create ActivityRepository instance"""
-        return ActivityRepository(session=db_session, model_class=Activity)
+        return ActivityRepository(session=db_session)
     
     def test_get_message_volume_data_by_days(self, repository, db_session):
         """Test getting message volume data for last N days"""

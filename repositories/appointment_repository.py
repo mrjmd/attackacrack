@@ -6,10 +6,15 @@ from typing import List, Optional
 from datetime import date, datetime
 from sqlalchemy import desc, asc, or_, and_
 from repositories.base_repository import BaseRepository, PaginatedResult
+from crm_database import Appointment
 
 
 class AppointmentRepository(BaseRepository):
     """Repository for Appointment data access"""
+    
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, Appointment)
     
     def find_by_contact_id(self, contact_id: int) -> List:
         """

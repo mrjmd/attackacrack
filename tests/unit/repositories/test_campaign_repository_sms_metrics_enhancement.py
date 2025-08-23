@@ -16,7 +16,7 @@ class TestCampaignRepositorySMSMetricsEnhancement:
     @pytest.fixture
     def repository(self, db_session):
         """Create CampaignRepository instance"""
-        return CampaignRepository(session=db_session, model_class=Campaign)
+        return CampaignRepository(session=db_session)
     
     @pytest.fixture
     def sample_campaign_with_memberships(self, db_session):
