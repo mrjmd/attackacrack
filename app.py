@@ -163,6 +163,12 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    registry.register_factory(
+        'ab_test_result_repository',
+        lambda db_session: _create_ab_test_result_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Register services with lazy loading factories
     # These won't be instantiated until first use
     
@@ -281,6 +287,16 @@ def create_app(config_name=None, test_config=None):
         lambda phone_validation_repository: _create_phone_validation_service(phone_validation_repository),
         dependencies=['phone_validation_repository'],
         tags={'validation', 'api', 'external'}
+    )
+    
+    # A/B Testing service
+    registry.register_factory(
+        'ab_testing',
+        lambda campaign_repository, contact_repository, ab_test_result_repository: _create_ab_testing_service(
+            campaign_repository, contact_repository, ab_test_result_repository
+        ),
+        dependencies=['campaign_repository', 'contact_repository', 'ab_test_result_repository'],
+        tags={'testing', 'analytics'}
     )
     
     # Opt-out service
@@ -843,6 +859,12 @@ def _create_phone_validation_repository(db_session):
     from crm_database import PhoneValidation
     return PhoneValidationRepository(session=db_session, model_class=PhoneValidation)
 
+def _create_ab_test_result_repository(db_session):
+    """Create ABTestResultRepository instance"""
+    from repositories.ab_test_result_repository import ABTestResultRepository
+    from crm_database import ABTestResult
+    return ABTestResultRepository(session=db_session, model_class=ABTestResult)
+
 def _create_phone_validation_service(phone_validation_repository):
     """Create PhoneValidationService with repository dependency"""
     from services.phone_validation_service import PhoneValidationService
@@ -855,6 +877,18 @@ def _create_phone_validation_service(phone_validation_repository):
         os.environ['NUMVERIFY_API_KEY'] = 'test_api_key'
     
     return PhoneValidationService(validation_repository=phone_validation_repository)
+
+def _create_ab_testing_service(campaign_repository, contact_repository, ab_result_repository):
+    """Create ABTestingService with repository dependencies"""
+    from services.ab_testing_service import ABTestingService
+    
+    logger.info("Initializing ABTestingService with repositories")
+    
+    return ABTestingService(
+        campaign_repository=campaign_repository,
+        contact_repository=contact_repository,
+        ab_result_repository=ab_result_repository
+    )
 
 def _create_activity_repository(db_session):
     """Create ActivityRepository instance"""
