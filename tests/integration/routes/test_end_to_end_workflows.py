@@ -23,6 +23,19 @@ from crm_database import (
 from extensions import db
 
 
+@pytest.fixture(autouse=True, scope='class')
+def disable_login_disabled_for_auth_workflow_tests(request, app):
+    """Override LOGIN_DISABLED for authentication workflow tests"""
+    # Only apply to authentication workflow test classes
+    if hasattr(request.cls, '__name__') and 'Authentication' in request.cls.__name__:
+        original_value = app.config.get('LOGIN_DISABLED', True)
+        app.config['LOGIN_DISABLED'] = False  # Enable auth checking for these tests
+        yield
+        app.config['LOGIN_DISABLED'] = original_value  # Restore original value
+    else:
+        yield
+
+
 class TestFactories:
     """Factory methods for creating realistic test data"""
     

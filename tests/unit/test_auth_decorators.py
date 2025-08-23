@@ -11,12 +11,16 @@ from datetime import datetime, timedelta
 
 
 @pytest.fixture(autouse=True)
-def disable_login_disabled_for_auth_tests(app):
-    """Override LOGIN_DISABLED for auth tests to properly test authentication"""
-    original_value = app.config.get('LOGIN_DISABLED', True)
-    app.config['LOGIN_DISABLED'] = False  # Enable auth checking for these tests
-    yield
-    app.config['LOGIN_DISABLED'] = original_value  # Restore original value
+def disable_login_disabled_for_auth_decorator_tests(request, app):
+    """Override LOGIN_DISABLED for auth decorator tests only"""
+    # Only apply to tests in this specific file
+    if 'test_auth_decorators' in request.node.nodeid:
+        original_value = app.config.get('LOGIN_DISABLED', True)
+        app.config['LOGIN_DISABLED'] = False  # Enable auth checking for these tests
+        yield
+        app.config['LOGIN_DISABLED'] = original_value  # Restore original value
+    else:
+        yield
 
 
 @pytest.fixture

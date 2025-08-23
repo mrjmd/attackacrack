@@ -102,8 +102,7 @@ class CampaignTemplateService:
             TemplateDuplicateError: If name already exists
         """
         # Validate content first (before checking duplicates)
-        if not content or not content.strip():
-            raise TemplateValidationError("Content cannot be empty")
+        self.validate_template_content(content)
         
         # Check for duplicate name
         existing = self.template_repository.find_one_by(name=name)

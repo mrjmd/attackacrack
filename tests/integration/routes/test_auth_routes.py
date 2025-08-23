@@ -11,6 +11,16 @@ from datetime import datetime, timedelta
 from crm_database import User, InviteToken
 
 
+@pytest.fixture(autouse=True)
+def disable_login_disabled_for_auth_route_tests(request, app):
+    """Override LOGIN_DISABLED for auth route tests"""
+    # Auth route tests need real authentication
+    original_value = app.config.get('LOGIN_DISABLED', True)
+    app.config['LOGIN_DISABLED'] = False  # Enable auth checking for these tests
+    yield
+    app.config['LOGIN_DISABLED'] = original_value  # Restore original value
+
+
 @pytest.fixture
 def admin_user(db_session):
     """Fixture providing an admin user"""

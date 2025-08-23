@@ -148,13 +148,14 @@ def contact_detail(contact_id):
     contact_service = current_app.services.get('contact')
     message_service = current_app.services.get('message')
     
-    result = contact_service.get_contact_by_id(contact_id)
-    if not result.is_success or not result.data:
+    contact_result = contact_service.get_contact_by_id(contact_id)
+    if not contact_result.is_success or not contact_result.data:
         flash('Contact not found', 'error')
         return redirect(url_for('contact.list_all'))
     
-    contact = result.data
-    activities = message_service.get_activities_for_contact(contact_id)
+    contact = contact_result.data
+    activities_result = message_service.get_activities_for_contact(contact_id)
+    activities = activities_result.data if activities_result.is_success else []
     
     # Get emails if contact has email
     recent_emails = []
@@ -388,12 +389,12 @@ def edit_contact(contact_id):
     """Edit an existing contact"""
     contact_service = current_app.services.get('contact')
     
-    result = contact_service.get_contact_by_id(contact_id)
-    if not result.is_success or not result.data:
+    contact_result = contact_service.get_contact_by_id(contact_id)
+    if not contact_result.is_success or not contact_result.data:
         flash('Contact not found', 'error')
         return redirect(url_for('contact.list_all'))
     
-    contact = result.data
+    contact = contact_result.data
     
     if request.method == 'POST':
         update_result = contact_service.update_contact(

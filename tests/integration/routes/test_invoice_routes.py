@@ -18,6 +18,19 @@ from datetime import date, datetime
 from crm_database import Invoice, Job, Property, Contact
 
 
+@pytest.fixture(autouse=True, scope='class')
+def disable_login_disabled_for_auth_tests(request, app):
+    """Override LOGIN_DISABLED for authentication tests"""
+    # Only apply to authentication test classes
+    if hasattr(request.cls, '__name__') and 'Authentication' in request.cls.__name__:
+        original_value = app.config.get('LOGIN_DISABLED', True)
+        app.config['LOGIN_DISABLED'] = False  # Enable auth checking for these tests
+        yield
+        app.config['LOGIN_DISABLED'] = original_value  # Restore original value
+    else:
+        yield
+
+
 class TestInvoiceRoutesServiceRegistry:
     """Test that invoice routes use service registry instead of direct instantiation"""
     
