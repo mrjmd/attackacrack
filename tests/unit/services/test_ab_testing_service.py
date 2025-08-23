@@ -86,7 +86,7 @@ class TestVariantManagement(TestABTestingService):
         }
         
         expected_campaign = Campaign(id=1, **campaign_data, campaign_type="ab_test")
-        mock_campaign_repo.create.return_value = Result.success(expected_campaign)
+        mock_campaign_repo.create.return_value = expected_campaign
         
         # Act
         result = service.create_ab_campaign(campaign_data)
@@ -525,6 +525,11 @@ class TestWinnerSelection(TestABTestingService):
         }
         
         mock_ab_result_repo.get_campaign_ab_summary.return_value = Result.success(ab_summary)
+        
+        # Mock the campaign with proper ab_config
+        mock_campaign = Mock()
+        mock_campaign.ab_config = {'split_ratio': 50, 'winner_threshold': 0.95}
+        mock_campaign_repo.get_by_id.return_value = mock_campaign
         mock_campaign_repo.update_by_id.return_value = Mock(id=campaign_id)
         
         # Act
@@ -573,6 +578,10 @@ class TestWinnerSelection(TestABTestingService):
         manual_winner = 'A'
         override_reason = "Business decision based on brand voice"
         
+        # Mock the campaign with proper ab_config
+        mock_campaign = Mock()
+        mock_campaign.ab_config = {'split_ratio': 50, 'winner_threshold': 0.95}
+        mock_campaign_repo.get_by_id.return_value = mock_campaign
         mock_campaign_repo.update_by_id.return_value = Mock(id=campaign_id)
         
         # Act

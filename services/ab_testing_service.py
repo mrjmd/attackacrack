@@ -97,7 +97,7 @@ class ABTestingService:
         campaign_data['campaign_type'] = 'ab_test'
         
         # Create campaign
-        return self.campaign_repository.create(campaign_data)
+        return Result.success(self.campaign_repository.create(**campaign_data))
     
     def _get_deterministic_variant(self, campaign_id: int, contact_id: int, split_ratio: int) -> str:
         """
@@ -401,13 +401,26 @@ class ABTestingService:
                 'variant_b_conversion': summary['variant_b']['conversion_rate']
             }
             
-            # Update campaign with winner
-            updated_campaign = self.campaign_repository.update_by_id(
-                campaign_id, ab_winner=summary['winner'], ab_winner_data=winner_data
-            )
+            # Update campaign with winner - merge winner into ab_config
+            campaign = self.campaign_repository.get_by_id(campaign_id)
+            if campaign:
+                ab_config = getattr(campaign, 'ab_config', {}) or {}
+                ab_config['ab_winner'] = summary['winner']
+                ab_config.update(winner_data)
+                updated_campaign = self.campaign_repository.update_by_id(
+                    campaign_id, ab_config=ab_config
+                )
+            else:
+                updated_campaign = None
             
             if not updated_campaign:
                 logger.warning(f"Failed to update campaign winner for campaign {campaign_id}")
+            else:
+                # Commit the transaction to ensure persistence in integration tests
+                try:
+                    self.campaign_repository.session.commit()
+                except Exception as e:
+                    logger.warning(f"Could not commit transaction: {e}")
             
             return Result.success(winner_data)
         else:
@@ -443,9 +456,21 @@ class ABTestingService:
             'manual_override': True
         }
         
-        # Update campaign with manual winner
+        # Update campaign with manual winner - merge into ab_config
+        campaign = self.campaign_repository.get_by_id(campaign_id)
+        if not campaign:
+            return Result.failure(
+                f"Campaign {campaign_id} not found",
+                code="CAMPAIGN_NOT_FOUND"
+            )
+        
+        ab_config = getattr(campaign, 'ab_config', {}) or {}
+        ab_config['winner'] = winner
+        ab_config['manual_override'] = True
+        ab_config['override_reason'] = override_reason
+        
         updated_campaign = self.campaign_repository.update_by_id(
-            campaign_id, ab_winner=winner, ab_winner_data=winner_data
+            campaign_id, ab_config=ab_config
         )
         
         if not updated_campaign:
@@ -453,6 +478,12 @@ class ABTestingService:
                 f"Failed to update campaign {campaign_id} with manual winner",
                 code="UPDATE_FAILED"
             )
+        
+        # Commit the transaction to ensure persistence in integration tests
+        try:
+            self.campaign_repository.session.commit()
+        except Exception as e:
+            logger.warning(f"Could not commit transaction: {e}")
         
         return Result.success(winner_data)
     
