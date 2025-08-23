@@ -21,7 +21,7 @@ class TestContactRepositoryOpenPhoneSync:
     @pytest.fixture
     def repository(self, mock_session):
         """Create ContactRepository with mocked session"""
-        return ContactRepository(mock_session, Contact)
+        return ContactRepository(mock_session)
     
     def test_count_with_phone(self, repository, mock_session):
         """Test counting contacts that have phone numbers"""

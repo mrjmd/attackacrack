@@ -22,7 +22,7 @@ class TestQuoteRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create QuoteRepository with mocked session"""
-        return QuoteRepository(mock_session, Quote)
+        return QuoteRepository(mock_session)
     
     def test_find_by_job_id(self, repository, mock_session):
         """Test finding quotes by job ID"""
@@ -167,7 +167,7 @@ class TestQuoteRepositorySchedulerMethods:
     @pytest.fixture
     def repository(self, mock_session):
         """Create QuoteRepository instance"""
-        return QuoteRepository(mock_session, Quote)
+        return QuoteRepository(mock_session)
     
     def test_find_draft_quotes_by_job_id(self, repository, mock_session):
         """Test finding draft quotes by job ID (scheduler service pattern)"""

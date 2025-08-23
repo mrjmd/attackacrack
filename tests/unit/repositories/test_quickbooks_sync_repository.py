@@ -22,7 +22,7 @@ class TestQuickBooksSyncRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create QuickBooksSyncRepository with mocked session"""
-        return QuickBooksSyncRepository(mock_session, QuickBooksSync)
+        return QuickBooksSyncRepository(mock_session)
     
     def test_find_by_entity_type(self, repository, mock_session):
         """Test finding sync records by entity type"""

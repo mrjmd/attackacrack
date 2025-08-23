@@ -22,7 +22,7 @@ class TestActivityRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create ActivityRepository with mocked session"""
-        return ActivityRepository(mock_session, Activity)
+        return ActivityRepository(mock_session)
     
     def test_find_by_conversation_id(self, repository, mock_session):
         """Test finding activities by conversation ID"""

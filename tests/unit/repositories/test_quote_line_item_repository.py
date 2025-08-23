@@ -20,7 +20,7 @@ class TestQuoteLineItemRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create QuoteLineItemRepository with mocked session"""
-        return QuoteLineItemRepository(mock_session, QuoteLineItem)
+        return QuoteLineItemRepository(mock_session)
     
     def test_find_by_quote_id(self, repository, mock_session):
         """Test finding line items by quote ID"""

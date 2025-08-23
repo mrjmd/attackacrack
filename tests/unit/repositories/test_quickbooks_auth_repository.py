@@ -21,7 +21,7 @@ class TestQuickBooksAuthRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create QuickBooksAuthRepository with mocked session"""
-        return QuickBooksAuthRepository(mock_session, QuickBooksAuth)
+        return QuickBooksAuthRepository(mock_session)
     
     def test_find_by_company_id(self, repository, mock_session):
         """Test finding auth record by company ID"""

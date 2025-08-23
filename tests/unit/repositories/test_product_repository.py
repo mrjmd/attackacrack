@@ -18,7 +18,7 @@ class TestProductRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create ProductRepository instance with mocked session"""
-        return ProductRepository(mock_session, Product)
+        return ProductRepository(mock_session)
     
     @pytest.fixture
     def sample_product_data(self):

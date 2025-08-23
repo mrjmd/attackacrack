@@ -22,7 +22,7 @@ class TestConversationRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create ConversationRepository with mocked session"""
-        return ConversationRepository(mock_session, Conversation)
+        return ConversationRepository(mock_session)
     
     def test_find_by_contact_id(self, repository, mock_session):
         """Test finding conversations by contact ID"""

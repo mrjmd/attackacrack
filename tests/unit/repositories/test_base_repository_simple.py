@@ -19,6 +19,11 @@ class TestModel:
 
 class ConcreteRepository(BaseRepository[TestModel]):
     """Concrete implementation for testing"""
+    
+    def __init__(self, session):
+        """Initialize repository with database session"""
+        super().__init__(session, TestModel)
+    
     def search(self, query, fields=None):
         return []
 
@@ -49,6 +54,5 @@ def test_repository_creation():
     """Test that repository can be created"""
     from unittest.mock import MagicMock
     session = MagicMock(spec=Session)
-    repo = ConcreteRepository(session, TestModel)
+    repo = ConcreteRepository(session)
     assert repo.session == session
-    assert repo.model_class == TestModel

@@ -22,7 +22,7 @@ class TestContactRepositoryPagination:
     @pytest.fixture
     def contact_repository(self, mock_session):
         """Create ContactRepository with mocked session"""
-        return ContactRepository(mock_session, Contact)
+        return ContactRepository(mock_session)
     
     def test_get_paginated_contacts_method_exists(self, contact_repository):
         """Test that get_paginated_contacts method exists"""

@@ -16,12 +16,11 @@ def contact_service(db_session):
     from repositories.contact_repository import ContactRepository
     from repositories.campaign_repository import CampaignRepository
     from repositories.contact_flag_repository import ContactFlagRepository
-    from crm_database import Contact, Campaign, ContactFlag
     
     return ContactService(
-        contact_repository=ContactRepository(db_session, Contact),
-        campaign_repository=CampaignRepository(db_session, Campaign),
-        contact_flag_repository=ContactFlagRepository(db_session, ContactFlag)
+        contact_repository=ContactRepository(db_session),
+        campaign_repository=CampaignRepository(db_session),
+        contact_flag_repository=ContactFlagRepository(db_session)
     )
 
 

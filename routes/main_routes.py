@@ -94,6 +94,7 @@ def dashboard():
     data_quality_score = dashboard_service.get_data_quality_score()
     
     # Get todos for the current user using TodoService
+    # current_user should always be authenticated due to @login_required
     todo_data = todo_service.get_dashboard_todos(user_id=current_user.id, limit=5)
     todos = todo_data['todos']
     pending_tasks_count = todo_data['pending_count']

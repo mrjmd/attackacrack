@@ -17,7 +17,7 @@ class TestContactRepositoryQuickBooksEnhancements:
     @pytest.fixture
     def repository(self, mock_session):
         """Create ContactRepository instance with mocked session"""
-        return ContactRepository(mock_session, Contact)
+        return ContactRepository(mock_session)
     
     # QuickBooks-specific methods
     

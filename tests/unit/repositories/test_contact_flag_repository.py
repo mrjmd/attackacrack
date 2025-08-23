@@ -28,7 +28,7 @@ class TestContactFlagRepository:
     @pytest.fixture
     def contact_flag_repository(self, mock_session):
         """Create ContactFlagRepository with mocked session"""
-        return ContactFlagRepository(mock_session, ContactFlag)
+        return ContactFlagRepository(mock_session)
     
     def test_repository_inherits_from_base_repository(self, contact_flag_repository):
         """Test that ContactFlagRepository inherits from BaseRepository"""
@@ -514,7 +514,7 @@ class TestContactFlagRepositoryIntegration:
     
     @pytest.fixture
     def contact_flag_repository(self, mock_session):
-        return ContactFlagRepository(mock_session, ContactFlag)
+        return ContactFlagRepository(mock_session)
     
     def test_campaign_filter_integration(self, contact_flag_repository, mock_session):
         """Test that repository methods support campaign service filtering needs"""

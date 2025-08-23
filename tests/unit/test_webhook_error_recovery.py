@@ -83,7 +83,7 @@ class TestFailedWebhookQueueRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create repository with mocked session"""
-        return FailedWebhookQueueRepository(mock_session, FailedWebhookQueue)
+        return FailedWebhookQueueRepository(mock_session)
     
     def test_find_pending_retries(self, repository, mock_session):
         """Test finding failed webhooks ready for retry"""

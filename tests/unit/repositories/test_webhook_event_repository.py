@@ -22,7 +22,7 @@ class TestWebhookEventRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create WebhookEventRepository with mocked session"""
-        return WebhookEventRepository(mock_session, WebhookEvent)
+        return WebhookEventRepository(mock_session)
     
     def test_find_by_event_id(self, repository, mock_session):
         """Test finding webhook event by event ID"""

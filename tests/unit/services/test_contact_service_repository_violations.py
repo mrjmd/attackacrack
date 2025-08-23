@@ -207,7 +207,7 @@ class TestContactRepositoryEnhancements:
     
     @pytest.fixture
     def contact_repository(self, mock_session):
-        return ContactRepository(mock_session, Contact)
+        return ContactRepository(mock_session)
     
     def test_search_method_accepts_limit_parameter(self, contact_repository):
         """Test ContactRepository.search() accepts limit parameter"""
@@ -240,7 +240,7 @@ class TestContactFlagRepositoryRequiredMethods:
     
     @pytest.fixture
     def contact_flag_repository(self, mock_session):
-        return ContactFlagRepository(mock_session, ContactFlag)
+        return ContactFlagRepository(mock_session)
     
     def test_get_flag_statistics_method_exists(self, contact_flag_repository):
         """Test ContactFlagRepository has get_flag_statistics method"""

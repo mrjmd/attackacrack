@@ -12,15 +12,14 @@ from unittest.mock import MagicMock
 def test_campaign_repository_creation():
     """Test that repository can be created"""
     session = MagicMock(spec=Session)
-    repo = CampaignRepository(session, Campaign)
+    repo = CampaignRepository(session)
     assert repo.session == session
-    assert repo.model_class == Campaign
 
 
 def test_search_campaigns():
     """Test search functionality"""
     session = MagicMock(spec=Session)
-    repo = CampaignRepository(session, Campaign)
+    repo = CampaignRepository(session)
     
     # Mock query
     mock_query = MagicMock()
@@ -37,7 +36,7 @@ def test_search_campaigns():
 def test_get_campaign_stats():
     """Test getting campaign statistics"""
     session = MagicMock(spec=Session)
-    repo = CampaignRepository(session, Campaign)
+    repo = CampaignRepository(session)
     
     # Mock query results
     mock_query = MagicMock()

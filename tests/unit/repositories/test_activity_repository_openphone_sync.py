@@ -22,7 +22,7 @@ class TestActivityRepositoryOpenPhoneSync:
     @pytest.fixture
     def repository(self, mock_session):
         """Create ActivityRepository with mocked session"""
-        return ActivityRepository(mock_session, Activity)
+        return ActivityRepository(mock_session)
     
     def test_find_latest_by_type(self, repository, mock_session):
         """Test finding the latest activity of a specific type"""

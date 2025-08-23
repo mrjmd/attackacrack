@@ -22,7 +22,7 @@ class TestTodoRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create TodoRepository with mocked session"""
-        return TodoRepository(mock_session, Todo)
+        return TodoRepository(mock_session)
     
     def test_find_by_priority(self, repository, mock_session):
         """Test finding todos by priority"""

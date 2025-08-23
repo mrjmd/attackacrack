@@ -22,7 +22,7 @@ class TestInvoiceRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create InvoiceRepository with mocked session"""
-        return InvoiceRepository(mock_session, Invoice)
+        return InvoiceRepository(mock_session)
     
     def test_find_by_job_id(self, repository, mock_session):
         """Test finding invoices by job ID"""

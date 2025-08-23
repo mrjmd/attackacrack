@@ -18,7 +18,7 @@ class TestInvoiceLineItemRepository:
     @pytest.fixture
     def repository(self, mock_session):
         """Create InvoiceLineItemRepository instance with mocked session"""
-        return InvoiceLineItemRepository(mock_session, InvoiceLineItem)
+        return InvoiceLineItemRepository(mock_session)
     
     @pytest.fixture
     def sample_line_item_data(self):
