@@ -707,3 +707,63 @@ class ContactService:
         except Exception as e:
             logger.error(f"Failed to get statistics: {str(e)}")
             return Result.failure(f"Failed to get statistics: {str(e)}", code="STATS_ERROR")
+    
+    def _contact_to_dict(self, contact) -> Dict:
+        """
+        Convert a contact model object to a dictionary.
+        
+        Args:
+            contact: Contact model object
+            
+        Returns:
+            Dictionary representation of contact
+        """
+        if not contact:
+            return None
+            
+        return {
+            'id': contact.id,
+            'first_name': contact.first_name,
+            'last_name': contact.last_name,
+            'email': contact.email,
+            'phone': contact.phone,
+            'address': contact.address if hasattr(contact, 'address') else None,
+            'city': contact.city if hasattr(contact, 'city') else None,
+            'state': contact.state if hasattr(contact, 'state') else None,
+            'zip_code': contact.zip_code if hasattr(contact, 'zip_code') else None,
+            'contact_source': contact.contact_source if hasattr(contact, 'contact_source') else None,
+            'contact_type': contact.contact_type if hasattr(contact, 'contact_type') else None,
+            'tags': contact.tags if hasattr(contact, 'tags') else None,
+            'notes': contact.notes if hasattr(contact, 'notes') else None,
+            'preferred_contact_method': contact.preferred_contact_method if hasattr(contact, 'preferred_contact_method') else None,
+            'last_contacted': contact.last_contacted.isoformat() if hasattr(contact, 'last_contacted') and contact.last_contacted else None,
+            'lifecycle_stage': contact.lifecycle_stage if hasattr(contact, 'lifecycle_stage') else None,
+            'lead_score': contact.lead_score if hasattr(contact, 'lead_score') else None,
+            'company_name': contact.company_name if hasattr(contact, 'company_name') else None,
+            'job_title': contact.job_title if hasattr(contact, 'job_title') else None,
+            'industry': contact.industry if hasattr(contact, 'industry') else None,
+            'website': contact.website if hasattr(contact, 'website') else None,
+            'linkedin_url': contact.linkedin_url if hasattr(contact, 'linkedin_url') else None,
+            'twitter_handle': contact.twitter_handle if hasattr(contact, 'twitter_handle') else None,
+            'facebook_url': contact.facebook_url if hasattr(contact, 'facebook_url') else None,
+            'instagram_handle': contact.instagram_handle if hasattr(contact, 'instagram_handle') else None,
+            'birthday': contact.birthday.isoformat() if hasattr(contact, 'birthday') and contact.birthday else None,
+            'anniversary': contact.anniversary.isoformat() if hasattr(contact, 'anniversary') and contact.anniversary else None,
+            'spouse_name': contact.spouse_name if hasattr(contact, 'spouse_name') else None,
+            'children_names': contact.children_names if hasattr(contact, 'children_names') else None,
+            'referral_source': contact.referral_source if hasattr(contact, 'referral_source') else None,
+            'quickbooks_customer_id': contact.quickbooks_customer_id if hasattr(contact, 'quickbooks_customer_id') else None,
+            'stripe_customer_id': contact.stripe_customer_id if hasattr(contact, 'stripe_customer_id') else None,
+            'hubspot_contact_id': contact.hubspot_contact_id if hasattr(contact, 'hubspot_contact_id') else None,
+            'salesforce_lead_id': contact.salesforce_lead_id if hasattr(contact, 'salesforce_lead_id') else None,
+            'mailchimp_subscriber_id': contact.mailchimp_subscriber_id if hasattr(contact, 'mailchimp_subscriber_id') else None,
+            'custom_field_1': contact.custom_field_1 if hasattr(contact, 'custom_field_1') else None,
+            'custom_field_2': contact.custom_field_2 if hasattr(contact, 'custom_field_2') else None,
+            'custom_field_3': contact.custom_field_3 if hasattr(contact, 'custom_field_3') else None,
+            'custom_field_4': contact.custom_field_4 if hasattr(contact, 'custom_field_4') else None,
+            'custom_field_5': contact.custom_field_5 if hasattr(contact, 'custom_field_5') else None,
+            'is_active': contact.is_active if hasattr(contact, 'is_active') else True,
+            'is_subscribed': contact.is_subscribed if hasattr(contact, 'is_subscribed') else True,
+            'created_at': contact.created_at.isoformat() if hasattr(contact, 'created_at') and contact.created_at else None,
+            'updated_at': contact.updated_at.isoformat() if hasattr(contact, 'updated_at') and contact.updated_at else None
+        }

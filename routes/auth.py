@@ -1,8 +1,8 @@
 # routes/auth.py
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, g
-from flask_login import current_user, logout_user
-from auth_utils import login_required, admin_required, get_current_user
+from flask_login import logout_user
+from auth_utils import login_required, admin_required, get_current_user, current_user
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 

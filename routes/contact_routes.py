@@ -148,11 +148,12 @@ def contact_detail(contact_id):
     contact_service = current_app.services.get('contact')
     message_service = current_app.services.get('message')
     
-    contact = contact_service.get_contact_by_id(contact_id)
-    if not contact:
+    result = contact_service.get_contact_by_id(contact_id)
+    if not result.is_success or not result.data:
         flash('Contact not found', 'error')
         return redirect(url_for('contact.list_all'))
     
+    contact = result.data
     activities = message_service.get_activities_for_contact(contact_id)
     
     # Get emails if contact has email
@@ -187,9 +188,10 @@ def conversation(contact_id):
     
     # Get recent jobs from pre-loaded properties
     recent_jobs = []
-    if contact.properties:
+    if hasattr(contact, 'properties') and contact.properties:
         for prop in contact.properties:
-            recent_jobs.extend(prop.jobs)
+            if hasattr(prop, 'jobs'):
+                recent_jobs.extend(prop.jobs)
     recent_jobs = sorted(recent_jobs, key=lambda x: x.completed_at if x.completed_at else datetime.min, reverse=True)[:3]
     
     # Get contact flags
@@ -366,16 +368,16 @@ def add_contact():
     contact_service = current_app.services.get('contact')
     
     if request.method == 'POST':
-        contact = contact_service.add_contact(
+        result = contact_service.add_contact(
             first_name=request.form['first_name'],
             last_name=request.form['last_name'],
             email=request.form.get('email'),
             phone=request.form.get('phone')
         )
-        if contact:
+        if result.is_success:
             flash('Contact added successfully', 'success')
         else:
-            flash('Error adding contact (possible duplicate)', 'error')
+            flash(f'Error adding contact: {result.error or "possible duplicate"}', 'error')
         return redirect(url_for('contact.list_all'))
     
     return render_template('add_edit_contact_form.html')
@@ -386,23 +388,40 @@ def edit_contact(contact_id):
     """Edit an existing contact"""
     contact_service = current_app.services.get('contact')
     
-    contact = contact_service.get_contact_by_id(contact_id)
-    if not contact:
+    result = contact_service.get_contact_by_id(contact_id)
+    if not result.is_success or not result.data:
         flash('Contact not found', 'error')
         return redirect(url_for('contact.list_all'))
     
+    contact = result.data
+    
     if request.method == 'POST':
-        updated = contact_service.update_contact(
-            contact,
+        update_result = contact_service.update_contact(
+            contact_id,
             first_name=request.form['first_name'],
             last_name=request.form['last_name'],
             email=request.form.get('email'),
             phone=request.form.get('phone')
         )
-        if updated:
+        if update_result.is_success:
             flash('Contact updated successfully', 'success')
         else:
-            flash('Error updating contact', 'error')
+            flash(f'Error updating contact: {update_result.error}', 'error')
         return redirect(url_for('contact.contact_detail', contact_id=contact_id))
     
     return render_template('add_edit_contact_form.html', contact=contact)
+
+
+@contact_bp.route('/<int:contact_id>/delete', methods=['POST'])
+@login_required
+def delete_contact(contact_id):
+    """Delete a contact"""
+    contact_service = current_app.services.get('contact')
+    
+    delete_result = contact_service.delete_contact(contact_id)
+    if delete_result.is_success:
+        flash('Contact deleted successfully', 'success')
+    else:
+        flash(f'Error deleting contact: {delete_result.error}', 'error')
+    
+    return redirect(url_for('contact.list_all'))

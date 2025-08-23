@@ -221,7 +221,22 @@ class TestingConfig(Config):
     @classmethod
     def init_app(cls, app):
         """Testing-specific initialization"""
-        Config.init_app(app)
+        # Do NOT call Config.init_app for testing - it tries to connect to Redis
+        # Instead, set up minimal session configuration for tests
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Use filesystem sessions for testing to avoid Redis dependency
+        app.config['SESSION_TYPE'] = 'filesystem'
+        app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
+        app.config['SESSION_PERMANENT'] = False
+        app.config['SESSION_USE_SIGNER'] = True
+        app.config['SESSION_KEY_PREFIX'] = 'test_session:'
+        
+        # Initialize Flask-Session with filesystem backend
+        from flask_session import Session
+        Session(app)
+        logger.info("Testing mode: Using filesystem sessions")
         
         # Disable foreign keys for SQLite in tests to avoid cascading issues
         # This matches the behavior of many ORMs where foreign keys are not enforced

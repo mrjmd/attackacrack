@@ -12,7 +12,7 @@ api_bp = Blueprint('api', __name__)
 def debug_session():
     """Debug endpoint to check session and request info"""
     from flask import session, request
-    from flask_login import current_user
+    from auth_utils import current_user
     
     return jsonify({
         'is_authenticated': current_user.is_authenticated,
