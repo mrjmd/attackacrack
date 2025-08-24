@@ -115,14 +115,13 @@ class TestFailedWebhookQueueRepository:
     def test_increment_retry_count(self, repository, mock_session):
         """Test incrementing retry count and updating next retry time"""
         # Arrange
-        mock_webhook = Mock(
-            id=1, 
-            retry_count=1, 
-            max_retries=5,  # Add this missing attribute
-            backoff_multiplier=Decimal('2.0'),
-            created_at=utc_now()
-        )
-        mock_session.query.return_value.get.return_value = mock_webhook
+        mock_webhook = Mock()
+        mock_webhook.id = 1
+        mock_webhook.retry_count = 1
+        mock_webhook.max_retries = 5  # Add this missing attribute
+        mock_webhook.backoff_multiplier = Decimal('2.0')
+        mock_webhook.created_at = utc_now()
+        mock_session.get.return_value = mock_webhook
         
         # Act
         result = repository.increment_retry_count(1, base_delay_seconds=60)
@@ -137,7 +136,7 @@ class TestFailedWebhookQueueRepository:
         """Test marking failed webhook as resolved"""
         # Arrange
         mock_webhook = Mock(id=1, resolved=False, resolved_at=None)
-        mock_session.query.return_value.get.return_value = mock_webhook
+        mock_session.get.return_value = mock_webhook
         
         # Act
         result = repository.mark_as_resolved(1, "Successfully processed on retry")

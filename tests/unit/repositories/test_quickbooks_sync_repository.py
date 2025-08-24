@@ -103,9 +103,7 @@ class TestQuickBooksSyncRepository:
         """Test updating sync status"""
         # Arrange
         mock_sync = Mock(id=1, sync_status="pending")
-        mock_query = Mock()
-        mock_query.get.return_value = mock_sync
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_sync
         
         # Act
         result = repository.update_sync_status(1, "synced")
@@ -120,9 +118,7 @@ class TestQuickBooksSyncRepository:
         """Test marking sync as failed"""
         # Arrange
         mock_sync = Mock(id=1, sync_status="pending", error_message=None)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_sync
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_sync
         
         # Act
         result = repository.mark_as_failed(1, "Sync error occurred")

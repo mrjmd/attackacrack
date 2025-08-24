@@ -89,9 +89,7 @@ class TestWebhookEventRepository:
         """Test marking webhook event as processed"""
         # Arrange
         mock_event = Mock(id=1, processed=False)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_event
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_event
         
         # Act
         result = repository.mark_as_processed(1)
@@ -106,9 +104,7 @@ class TestWebhookEventRepository:
         """Test marking webhook event as failed"""
         # Arrange
         mock_event = Mock(id=1, error_message=None)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_event
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_event
         
         # Act
         result = repository.mark_as_failed(1, "Test error message")

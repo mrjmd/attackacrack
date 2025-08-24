@@ -137,9 +137,7 @@ class TestActivityRepository:
         """Test updating activity summary"""
         # Arrange
         mock_activity = Mock(id=1, summary=None)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_activity
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_activity
         
         # Act
         result = repository.update_activity_summary(1, "New summary text")
@@ -168,9 +166,7 @@ class TestActivityRepository:
         """Test marking activity as processed"""
         # Arrange
         mock_activity = Mock(id=1, processed=False)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_activity
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_activity
         
         # Act
         result = repository.mark_as_processed(1)

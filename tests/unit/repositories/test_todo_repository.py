@@ -91,9 +91,7 @@ class TestTodoRepository:
         """Test marking todo as completed"""
         # Arrange
         mock_todo = Mock(id=1, is_completed=False, completed_at=None)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_todo
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_todo
         
         # Act
         result = repository.mark_as_completed(1)
@@ -108,9 +106,7 @@ class TestTodoRepository:
         """Test marking todo as pending"""
         # Arrange
         mock_todo = Mock(id=1, is_completed=True, completed_at=utc_now())
-        mock_query = Mock()
-        mock_query.get.return_value = mock_todo
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_todo
         
         # Act
         result = repository.mark_as_pending(1)
@@ -125,9 +121,7 @@ class TestTodoRepository:
         """Test updating todo priority"""
         # Arrange
         mock_todo = Mock(id=1, priority="medium")
-        mock_query = Mock()
-        mock_query.get.return_value = mock_todo
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_todo
         
         # Act
         result = repository.update_priority(1, "high")

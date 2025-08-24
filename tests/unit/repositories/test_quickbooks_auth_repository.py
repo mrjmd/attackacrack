@@ -148,7 +148,7 @@ class TestQuickBooksAuthRepository:
         """Test updating access and refresh tokens"""
         # Arrange
         auth_record = Mock(id=1)
-        mock_session.query.return_value.get.return_value = auth_record
+        mock_session.get.return_value = auth_record
         
         # Act
         result = repository.update_tokens(
@@ -168,7 +168,7 @@ class TestQuickBooksAuthRepository:
     def test_update_tokens_record_not_found(self, repository, mock_session):
         """Test updating tokens when auth record doesn't exist"""
         # Arrange
-        mock_session.query.return_value.get.return_value = None
+        mock_session.get.return_value = None
         
         # Act
         result = repository.update_tokens(
@@ -187,7 +187,7 @@ class TestQuickBooksAuthRepository:
         # Arrange
         expired_time = utc_now() - timedelta(hours=1)
         auth_record = Mock(expires_at=expired_time)
-        mock_session.query.return_value.get.return_value = auth_record
+        mock_session.get.return_value = auth_record
         
         # Act
         result = repository.is_token_expired(1)
@@ -200,7 +200,7 @@ class TestQuickBooksAuthRepository:
         # Arrange
         future_time = utc_now() + timedelta(hours=1)
         auth_record = Mock(expires_at=future_time)
-        mock_session.query.return_value.get.return_value = auth_record
+        mock_session.get.return_value = auth_record
         
         # Act
         result = repository.is_token_expired(1)
@@ -211,7 +211,7 @@ class TestQuickBooksAuthRepository:
     def test_is_token_expired_record_not_found(self, repository, mock_session):
         """Test checking token expiry when auth record doesn't exist"""
         # Arrange
-        mock_session.query.return_value.get.return_value = None
+        mock_session.get.return_value = None
         
         # Act
         result = repository.is_token_expired(999)
@@ -223,7 +223,7 @@ class TestQuickBooksAuthRepository:
         """Test deleting auth record"""
         # Arrange
         auth_record = Mock(id=1)
-        mock_session.query.return_value.get.return_value = auth_record
+        mock_session.get.return_value = auth_record
         
         # Act
         result = repository.delete_auth(1)
@@ -236,7 +236,7 @@ class TestQuickBooksAuthRepository:
     def test_delete_auth_record_not_found(self, repository, mock_session):
         """Test deleting auth record when it doesn't exist"""
         # Arrange
-        mock_session.query.return_value.get.return_value = None
+        mock_session.get.return_value = None
         
         # Act
         result = repository.delete_auth(999)

@@ -106,9 +106,7 @@ class TestInvoiceRepository:
         """Test updating invoice payment status"""
         # Arrange
         mock_invoice = Mock(id=1, payment_status="unpaid")
-        mock_query = Mock()
-        mock_query.get.return_value = mock_invoice
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_invoice
         
         # Act
         result = repository.update_payment_status(1, "paid", paid_date=utc_now())
@@ -128,9 +126,7 @@ class TestInvoiceRepository:
             tax_amount=10.00,
             amount_paid=50.00
         )
-        mock_query = Mock()
-        mock_query.get.return_value = mock_invoice
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_invoice
         
         # Act
         result = repository.calculate_totals(1)

@@ -109,9 +109,7 @@ class TestConversationRepository:
         """Test updating conversation's last activity time"""
         # Arrange
         mock_conversation = Mock(id=1, last_activity_at=None)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_conversation
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_conversation
         new_time = utc_now()
         
         # Act
@@ -157,9 +155,7 @@ class TestConversationRepository:
         """Test archiving a conversation"""
         # Arrange
         mock_conversation = Mock(id=1)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_conversation
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_conversation
         
         # Act
         result = repository.archive_conversation(1)

@@ -140,9 +140,7 @@ class TestAppointmentRepository:
         """Test updating appointment's Google Calendar event ID"""
         # Arrange
         mock_appointment = Mock(id=1, google_calendar_event_id=None)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_appointment
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_appointment
         
         # Act
         result = repository.update_google_event_id(1, "new_google_id")

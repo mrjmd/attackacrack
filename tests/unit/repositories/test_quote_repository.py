@@ -90,9 +90,7 @@ class TestQuoteRepository:
         """Test calculating quote totals"""
         # Arrange
         mock_quote = Mock(id=1, subtotal=100.00, tax_amount=10.00)
-        mock_query = Mock()
-        mock_query.get.return_value = mock_quote
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_quote
         
         # Act
         result = repository.calculate_totals(1)
@@ -106,9 +104,7 @@ class TestQuoteRepository:
         """Test updating quote status"""
         # Arrange
         mock_quote = Mock(id=1, status="Draft")
-        mock_query = Mock()
-        mock_query.get.return_value = mock_quote
-        mock_session.query.return_value = mock_query
+        mock_session.get.return_value = mock_quote
         
         # Act
         result = repository.update_status(1, "Sent")
