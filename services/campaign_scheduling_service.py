@@ -865,11 +865,9 @@ class CampaignSchedulingService:
                 end_date = end_date.replace(tzinfo=ZoneInfo("UTC"))
             
             # Query campaigns in date range
-            campaigns = self.campaign_repository.session.query(Campaign).filter(
-                Campaign.scheduled_at >= start_date,
-                Campaign.scheduled_at <= end_date,
-                Campaign.status.in_(['scheduled', 'running'])
-            ).order_by(Campaign.scheduled_at).all()
+            campaigns = self.campaign_repository.get_scheduled_campaigns_in_range(
+                start_date, end_date
+            )
             
             # Group campaigns by date
             from collections import defaultdict

@@ -352,10 +352,10 @@ class TestCampaignSchedulingService:
         assert result.is_success
         
         # Verify scheduling was applied
-        create_args = mock_campaign_repository.create.call_args[0][0]
-        assert create_args['scheduled_at'] == scheduled_time
-        assert create_args['timezone'] == "America/New_York"
-        assert create_args['status'] == "scheduled"
+        create_kwargs = mock_campaign_repository.create.call_args[1]
+        assert create_kwargs['scheduled_at'] == scheduled_time
+        assert create_kwargs['timezone'] == "America/New_York"
+        assert create_kwargs['status'] == "scheduled"
         
     def test_archive_campaign(self, scheduling_service, mock_campaign_repository, mock_activity_repository):
         """Test archiving a completed campaign"""
@@ -383,8 +383,8 @@ class TestCampaignSchedulingService:
         # Verify activity was logged
         mock_activity_repository.create.assert_called_once()
         activity_kwargs = mock_activity_repository.create.call_args.kwargs
-        assert activity_kwargs['notes'] == "Campaign completed successfully"
-        assert activity_kwargs['type'] == "campaign_archived"
+        assert activity_kwargs['body'] == "Campaign completed successfully"
+        assert activity_kwargs['activity_type'] == "system"
         
     def test_get_archived_campaigns(self, scheduling_service, mock_campaign_repository):
         """Test retrieving archived campaigns"""
@@ -503,11 +503,13 @@ class TestCampaignSchedulingService:
         campaign_id = 1
         mock_campaign = Mock(spec=Campaign)
         mock_campaign.id = campaign_id
+        mock_campaign.status = 'scheduled'  # Add status
         mock_campaign.scheduled_at = utc_now() + timedelta(hours=2)
         mock_campaign.timezone = "America/New_York"
         mock_campaign.is_recurring = True
         mock_campaign.next_run_at = utc_now() + timedelta(days=1)
         mock_campaign.recurrence_pattern = {"type": "daily", "interval": 1}
+        mock_campaign.archived = False  # Add archived field
         
         mock_campaign_repository.get_by_id.return_value = mock_campaign
         

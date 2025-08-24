@@ -54,7 +54,7 @@ class SchedulerService:
                 message = template.format(
                     first_name=contact.first_name,
                     appointment_date=tomorrow.strftime('%B %d, %Y'),
-                    appointment_time=appt.time.strftime('%I:%M %P')
+                    appointment_time=appt.time.strftime('%I:%M %p').lower()
                 )
                 try:
                     result = self.openphone_service.send_message(contact.phone, message)

@@ -87,7 +87,15 @@ def execute_scheduled_campaign(self, campaign_id: int) -> Dict[str, Any]:
             # Update campaign status via scheduling service
             result = scheduling_service.execute_scheduled_campaign(campaign_id)
             
-            if not result.is_success():
+            if not result.is_success:
+                # For certain errors like "not found", don't retry - just return error
+                if "not found" in result.error.lower():
+                    return {
+                        'success': False,
+                        'campaign_id': campaign_id,
+                        'error': result.error,
+                        'timestamp': utc_now().isoformat()
+                    }
                 raise ValueError(result.error)
             
             # Process the campaign queue to send messages
@@ -98,7 +106,9 @@ def execute_scheduled_campaign(self, campaign_id: int) -> Dict[str, Any]:
             messages_failed = queue_result.get('messages_failed', 0) if isinstance(queue_result, dict) else 0
             
             logger.info(f"Successfully executed scheduled campaign {campaign_id}")
-            return {
+            
+            # Build result with scheduling service data and message counts
+            task_result = {
                 'success': True,
                 'campaign_id': campaign_id,
                 'status': 'executing',
@@ -106,6 +116,14 @@ def execute_scheduled_campaign(self, campaign_id: int) -> Dict[str, Any]:
                 'messages_failed': messages_failed,
                 'timestamp': utc_now().isoformat()
             }
+            
+            # Include any additional data from the scheduling service
+            if isinstance(result.data, dict):
+                for key, value in result.data.items():
+                    if key not in task_result:  # Don't override existing keys
+                        task_result[key] = value
+                        
+            return task_result
                 
     except Exception as e:
         logger.error(f"Error executing scheduled campaign {campaign_id}: {e}")
@@ -242,9 +260,10 @@ def send_schedule_notifications() -> Dict[str, Any]:
                     from crm_database import Activity
                     
                     activity = Activity(
-                        type='campaign_notification',
-                        campaign_id=campaign.id,
-                        notes=f"Campaign '{campaign.name}' scheduled to run at {campaign.scheduled_at}",
+                        activity_type='notification',
+                        direction='outgoing',
+                        status='completed',
+                        body=f"Campaign '{campaign.name}' scheduled to run at {campaign.scheduled_at}",
                         created_at=current_time
                     )
                     
@@ -417,7 +436,7 @@ def reschedule_failed_campaigns() -> Dict[str, Any]:
                     campaign.timezone
                 )
                 
-                if result.is_success():
+                if result.is_success:
                     rescheduled_count += 1
                     logger.info(f"Rescheduled campaign {campaign.id} to {new_time}")
             
@@ -467,7 +486,7 @@ def bulk_schedule_campaigns(campaign_ids: List[int], scheduled_at: str, timezone
                 campaign_ids, scheduled_datetime, timezone
             )
             
-            if result.is_success():
+            if result.is_success:
                 data = result.data
                 return {
                     'success': True,
@@ -557,7 +576,7 @@ def schedule_campaign_with_validation(campaign_data: Dict[str, Any]) -> Dict[str
                 campaign_data
             )
             
-            if result.is_success():
+            if result.is_success:
                 data = result.data
                 return {
                     'success': True,

@@ -1223,6 +1223,23 @@ class CampaignRepository(BaseRepository[Campaign]):
             Campaign.scheduled_at <= end_of_day
         ).all()
     
+    def get_scheduled_campaigns_in_range(self, start_date: datetime, end_date: datetime) -> List[Campaign]:
+        """
+        Get campaigns scheduled within a date range.
+        
+        Args:
+            start_date: Start of date range
+            end_date: End of date range
+            
+        Returns:
+            List of campaigns scheduled in the range
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.scheduled_at >= start_date,
+            Campaign.scheduled_at <= end_date,
+            Campaign.status.in_(['scheduled', 'running'])
+        ).order_by(Campaign.scheduled_at).all()
+    
     def cleanup_expired_recurring_campaigns(self, current_time: datetime) -> int:
         """
         Clean up recurring campaigns that have passed their end date.
@@ -1373,10 +1390,19 @@ class CampaignRepository(BaseRepository[Campaign]):
             Campaign.archived == True
         ).count()
         
+        # Count campaigns ready to run
+        current_time = utc_now().replace(tzinfo=None)
+        ready_to_run_count = self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled',
+            Campaign.scheduled_at <= current_time,
+            Campaign.archived == False
+        ).count()
+        
         return {
             'total_scheduled': scheduled_count,
-            'total_recurring': recurring_count,
-            'total_archived': archived_count
+            'ready_to_run': ready_to_run_count,
+            'recurring': recurring_count,
+            'archived': archived_count
         }
     
     def bulk_update_schedules(self, campaign_ids: List[int], update_data: Dict[str, Any]) -> int:
@@ -1392,10 +1418,22 @@ class CampaignRepository(BaseRepository[Campaign]):
         """
         if not campaign_ids:
             return 0
+        
+        # Handle timezone-aware datetime fields
+        processed_data = {}
+        for key, value in update_data.items():
+            if key in ['scheduled_at', 'next_run_at', 'archived_at'] and value is not None:
+                # Remove timezone info for database storage
+                if hasattr(value, 'tzinfo') and value.tzinfo is not None:
+                    processed_data[key] = value.replace(tzinfo=None)
+                else:
+                    processed_data[key] = value
+            else:
+                processed_data[key] = value
             
         count = self.session.query(Campaign).filter(
             Campaign.id.in_(campaign_ids)
-        ).update(update_data, synchronize_session=False)
+        ).update(processed_data, synchronize_session=False)
         
         self.session.flush()
         return count
@@ -1429,6 +1467,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         """
         return self.session.query(Campaign).filter(
             Campaign.status == 'scheduled',
+            Campaign.scheduled_at.isnot(None),
             Campaign.archived == False
         ).order_by(Campaign.scheduled_at).limit(limit).all()
     
