@@ -5,7 +5,7 @@ Implements deterministic variant assignment and statistical significance testing
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, ensure_utc
 import hashlib
 import logging
 from scipy import stats
@@ -554,7 +554,9 @@ class ABTestingService:
         
         # Calculate test duration
         created_at = getattr(campaign, 'created_at', None) or utc_now()
-        test_duration_days = (utc_now() - created_at).days
+        # Ensure both datetimes are timezone-aware for comparison
+        created_at_utc = ensure_utc(created_at)
+        test_duration_days = (utc_now() - created_at_utc).days
         
         # Generate recommendations
         recommendations = []

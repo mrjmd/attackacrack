@@ -57,13 +57,18 @@ class TestWebhookHealthCheckService:
     
     def test_generate_health_check_message(self, service):
         """Test health check message generation"""
-        with patch('services.webhook_health_check_service.datetime') as mock_datetime:
-            mock_datetime.utc_now.return_value = datetime(2025, 1, 22, 10, 30, 45)
+        from utils.datetime_utils import utc_now
+        from datetime import timezone
+        
+        with patch('services.webhook_health_check_service.utc_now') as mock_utc_now:
+            # Create a timezone-aware datetime for proper comparison
+            test_datetime = datetime(2025, 1, 22, 10, 30, 45, tzinfo=timezone.utc)
+            mock_utc_now.return_value = test_datetime
             
             message = service._generate_health_check_message()
             
             assert message.startswith("[HEALTH_CHECK]")
-            assert "2025-01-22T10:30:45" in message
+            assert "2025-01-22T10:30:45+00:00" in message
             assert len(message.split("-")[-1]) == 8  # Check for UUID suffix
     
     def test_send_health_check_success(self, service, mock_openphone_service):

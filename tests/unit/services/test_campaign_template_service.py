@@ -8,6 +8,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 from typing import Dict, List, Optional
+from utils.datetime_utils import utc_now, ensure_utc
 
 # These imports will fail initially - that's expected in TDD
 from services.campaign_template_service import (
@@ -727,8 +728,8 @@ class TestCampaignTemplateService:
         """Test getting template usage statistics"""
         # Arrange
         sample_template.usage_count = 50
-        sample_template.created_at = datetime(2025, 1, 1)
-        sample_template.last_used_at = datetime(2025, 8, 1)
+        sample_template.created_at = utc_now().replace(year=2025, month=1, day=1)
+        sample_template.last_used_at = utc_now().replace(year=2025, month=8, day=1)
         mock_repository.get_by_id.return_value = sample_template
         
         # Mocked campaign usage data

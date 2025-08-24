@@ -10,7 +10,7 @@ import requests
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, ensure_utc
 from services.common.result import Result
 from repositories.phone_validation_repository import PhoneValidationRepository
 
@@ -397,7 +397,7 @@ class PhoneValidationService:
             return None
         
         # Check if cache is expired
-        cache_age = utc_now() - cached.created_at
+        cache_age = utc_now() - ensure_utc(cached.created_at)
         if cache_age.days > self.CACHE_DURATION_DAYS:
             return None
         

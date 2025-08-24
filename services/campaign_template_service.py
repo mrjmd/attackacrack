@@ -6,7 +6,7 @@ Business logic for managing campaign templates
 import re
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, ensure_utc
 
 from repositories.campaign_template_repository import CampaignTemplateRepository
 from repositories.contact_repository import ContactRepository
@@ -585,8 +585,8 @@ class CampaignTemplateService:
         
         # Calculate time-based stats
         now = utc_now()
-        days_since_created = (now - template.created_at).days if template.created_at else 0
-        days_since_last_used = (now - template.last_used_at).days if template.last_used_at else None
+        days_since_created = (now - ensure_utc(template.created_at)).days if template.created_at else 0
+        days_since_last_used = (now - ensure_utc(template.last_used_at)).days if template.last_used_at else None
         
         return {
             'template_id': template_id,

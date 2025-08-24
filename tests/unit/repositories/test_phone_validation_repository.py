@@ -14,7 +14,7 @@ Features tested:
 
 import pytest
 from datetime import datetime, timedelta
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, ensure_utc
 from repositories.phone_validation_repository import PhoneValidationRepository
 from crm_database import PhoneValidation
 from repositories.base_repository import PaginationParams, SortOrder
@@ -567,4 +567,7 @@ class TestPhoneValidationRepositoryCustomMethods:
         assert len(recent_validations) == 3
         
         for validation in recent_validations:
-            assert validation.created_at > now - timedelta(days=3)
+            # Ensure both datetimes are timezone-aware for comparison
+            validation_created_at = ensure_utc(validation.created_at)
+            cutoff_date = ensure_utc(now - timedelta(days=3))
+            assert validation_created_at > cutoff_date

@@ -359,9 +359,16 @@ class TestOpenPhoneReconciliationService:
         call_args = mock_openphone_api_client.get_messages.call_args
         assert 'since' in call_args[1]
         # Check that the date is approximately 48 hours ago
-        since_date = datetime.fromisoformat(call_args[1]['since'].replace('Z', '+00:00'))
-        from datetime import timezone
-        expected_date = datetime.now(timezone.utc) - timedelta(hours=48)
+        since_str = call_args[1]['since']
+        # Handle the double timezone issue - remove extra '+00:00' if present
+        if since_str.endswith('+00:00Z'):
+            since_str = since_str[:-1]  # Remove the 'Z' 
+        elif since_str.endswith('Z'):
+            since_str = since_str[:-1] + '+00:00'
+        
+        since_date = datetime.fromisoformat(since_str)
+        from utils.datetime_utils import utc_now
+        expected_date = utc_now() - timedelta(hours=48)
         assert abs((since_date - expected_date).total_seconds()) < 60  # Within 1 minute
     
     def test_reconcile_handles_rate_limiting(self, service, mock_openphone_api_client):

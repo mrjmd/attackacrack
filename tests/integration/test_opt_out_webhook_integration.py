@@ -7,7 +7,7 @@ Tests the complete flow from webhook receipt to opt-out flag creation.
 import pytest
 import json
 from datetime import datetime
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, ensure_utc
 from unittest.mock import Mock, patch
 
 from app import create_app
@@ -156,7 +156,7 @@ class TestOptOutWebhookIntegration:
                     # Check that opt-out flag was expired
                     flag = db.session.get(ContactFlag, flag_id)
                     assert flag.expires_at is not None
-                    assert flag.expires_at <= utc_now()
+                    assert ensure_utc(flag.expires_at) <= utc_now()
                     
                     # Check that audit log was created for opt-in
                     audits = OptOutAudit.query.filter_by(

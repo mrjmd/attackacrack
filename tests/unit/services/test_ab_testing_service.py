@@ -8,6 +8,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
+from utils.datetime_utils import utc_now, ensure_utc
 
 from services.ab_testing_service import ABTestingService
 from services.common.result import Result
@@ -640,7 +641,7 @@ class TestABTestReporting(TestABTestingService):
             name="Test A/B Campaign",
             template_a="Variant A message",
             template_b="Variant B message",
-            created_at=datetime.now() - timedelta(days=7)
+            created_at=utc_now() - timedelta(days=7)
         )
         
         ab_summary = {

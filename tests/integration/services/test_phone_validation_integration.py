@@ -16,7 +16,7 @@ Integration features tested:
 import pytest
 from unittest.mock import patch, Mock
 from datetime import datetime, timedelta
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, ensure_utc
 from services.phone_validation_service import PhoneValidationService
 from repositories.phone_validation_repository import PhoneValidationRepository
 from crm_database import PhoneValidation
@@ -237,7 +237,7 @@ class TestPhoneValidationDatabaseIntegration:
         # Should have updated record with fresh carrier
         fresh_record = records[0]  # Should be only one record now (updated)
         assert fresh_record.carrier == 'Verizon Wireless'  # From mock API
-        assert fresh_record.validation_date > initial_record.created_at  # Validation was refreshed
+        assert ensure_utc(fresh_record.validation_date) > ensure_utc(initial_record.created_at)  # Validation was refreshed
     
     def test_database_transaction_rollback_on_error(self, phone_validation_service, phone_validation_repository, db_session):
         """Test that database transactions are rolled back on API errors"""
