@@ -32,10 +32,12 @@ class TestOpenPhoneWebhookServiceRefactoredInitialization:
         metrics_service = Mock()
         
         # This should pass after implementation
+        campaign_membership_repo = Mock()
         service = OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -106,10 +108,13 @@ class TestWebhookEventLoggingWithResult:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -139,10 +144,13 @@ class TestTokenValidationWebhooks:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -214,7 +222,7 @@ class TestMessageWebhooksWithRepositories:
         service.activity_repository.find_by_openphone_id.return_value = mock_activity
         
         # Mock successful update
-        service.activity_repository.update.return_value = mock_activity
+        service.activity_repository.update_by_id.return_value = mock_activity
         
         # Note: For update webhooks, we don't need to resolve contact since activity exists
         # The service short-circuits to update mode when activity is found
@@ -238,7 +246,7 @@ class TestMessageWebhooksWithRepositories:
         assert result.data['activity_id'] == 789
         
         # Verify repository update call
-        service.activity_repository.update.assert_called_once()
+        service.activity_repository.update_by_id.assert_called_once()
         service.sms_metrics_service.track_message_status.assert_called_once_with(789, 'delivered')
     
     def test_message_failed_tracks_error_metrics_via_repository(self):
@@ -250,7 +258,7 @@ class TestMessageWebhooksWithRepositories:
         mock_activity.id = 789
         mock_activity.direction = 'outgoing'
         service.activity_repository.find_by_openphone_id.return_value = mock_activity
-        service.activity_repository.update.return_value = mock_activity
+        service.activity_repository.update_by_id.return_value = mock_activity
         
         webhook_data = {
             'type': 'message.failed',
@@ -376,10 +384,13 @@ class TestMessageWebhooksWithRepositories:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -442,7 +453,7 @@ class TestCallWebhooksWithRepositories:
         mock_activity = Mock()
         mock_activity.id = 789
         service.activity_repository.find_by_openphone_id.return_value = mock_activity
-        service.activity_repository.update.return_value = mock_activity
+        service.activity_repository.update_by_id.return_value = mock_activity
         
         webhook_data = {
             'type': 'call.completed',
@@ -465,7 +476,7 @@ class TestCallWebhooksWithRepositories:
         assert result.data['activity_id'] == 789
         
         # Verify repository update
-        service.activity_repository.update.assert_called_once()
+        service.activity_repository.update_by_id.assert_called_once()
     
     def test_call_webhook_missing_participants_returns_skipped(self):
         """Test call webhook with missing participants (for status updates like call.completed)"""
@@ -553,10 +564,13 @@ class TestCallWebhooksWithRepositories:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -573,7 +587,7 @@ class TestAIContentWebhooksWithRepositories:
         mock_activity = Mock()
         mock_activity.id = 789
         service.activity_repository.find_by_openphone_id.return_value = mock_activity
-        service.activity_repository.update.return_value = mock_activity
+        service.activity_repository.update_by_id.return_value = mock_activity
         
         webhook_data = {
             'type': 'call.summary.completed',
@@ -592,10 +606,10 @@ class TestAIContentWebhooksWithRepositories:
         assert result.data['activity_id'] == 789
         
         # Verify repository update with AI summary
-        service.activity_repository.update.assert_called_once()
-        update_args = service.activity_repository.update.call_args[0]
+        service.activity_repository.update_by_id.assert_called_once()
+        update_args = service.activity_repository.update_by_id.call_args[0]
         assert update_args[0] == 789  # activity_id
-        update_kwargs = service.activity_repository.update.call_args[1]
+        update_kwargs = service.activity_repository.update_by_id.call_args[1]
         assert update_kwargs['ai_summary'] == 'Customer called about foundation repair pricing'
     
     def test_call_transcript_completed_updates_via_repository(self):
@@ -606,7 +620,7 @@ class TestAIContentWebhooksWithRepositories:
         mock_activity = Mock()
         mock_activity.id = 789
         service.activity_repository.find_by_openphone_id.return_value = mock_activity
-        service.activity_repository.update.return_value = mock_activity
+        service.activity_repository.update_by_id.return_value = mock_activity
         
         transcript_data = {
             'dialogue': [
@@ -633,8 +647,8 @@ class TestAIContentWebhooksWithRepositories:
         assert result.data['activity_id'] == 789
         
         # Verify repository update with transcript
-        service.activity_repository.update.assert_called_once()
-        update_kwargs = service.activity_repository.update.call_args[1]
+        service.activity_repository.update_by_id.assert_called_once()
+        update_kwargs = service.activity_repository.update_by_id.call_args[1]
         assert update_kwargs['ai_transcript'] == transcript_data
     
     def test_call_recording_completed_updates_via_repository(self):
@@ -645,7 +659,7 @@ class TestAIContentWebhooksWithRepositories:
         mock_activity = Mock()
         mock_activity.id = 789
         service.activity_repository.find_by_openphone_id.return_value = mock_activity
-        service.activity_repository.update.return_value = mock_activity
+        service.activity_repository.update_by_id.return_value = mock_activity
         
         webhook_data = {
             'type': 'call.recording.completed',
@@ -667,8 +681,8 @@ class TestAIContentWebhooksWithRepositories:
         assert result.data['recording_id'] == 'rec_123'
         
         # Verify repository update with recording URL
-        service.activity_repository.update.assert_called_once()
-        update_kwargs = service.activity_repository.update.call_args[1]
+        service.activity_repository.update_by_id.assert_called_once()
+        update_kwargs = service.activity_repository.update_by_id.call_args[1]
         assert update_kwargs['recording_url'] == 'https://recordings.openphone.com/call_123.mp3'
     
     def test_ai_webhook_missing_required_data_returns_failure(self):
@@ -729,10 +743,13 @@ class TestAIContentWebhooksWithRepositories:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -827,10 +844,13 @@ class TestContactAndConversationManagementWithRepositories:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -927,10 +947,13 @@ class TestMainWebhookProcessorWithResult:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )
@@ -1005,10 +1028,13 @@ class TestRepositoryErrorHandling:
         contact_service = Mock()
         metrics_service = Mock()
         
+        campaign_membership_repo = Mock()
+        
         return OpenPhoneWebhookServiceRefactored(
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=metrics_service
         )

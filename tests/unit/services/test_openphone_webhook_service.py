@@ -26,6 +26,7 @@ def create_webhook_service_with_mocks():
     mock_webhook_repo = Mock()
     mock_contact_repo = Mock()  # Add missing contact repository
     mock_appointment_repo = Mock()  # Add missing appointment repository
+    mock_campaign_membership_repo = Mock()  # Add campaign membership repository
     mock_contact_service = Mock()
     mock_sms_metrics_service = Mock()
     
@@ -38,6 +39,7 @@ def create_webhook_service_with_mocks():
         activity_repository=mock_activity_repo,
         conversation_repository=mock_conversation_repo,
         webhook_event_repository=mock_webhook_repo,
+        campaign_membership_repository=mock_campaign_membership_repo,
         contact_service=mock_contact_service,
         sms_metrics_service=mock_sms_metrics_service
     )
@@ -243,7 +245,7 @@ class TestMessageWebhooks:
         mock_existing_activity.status = 'sent'
         mock_existing_activity.direction = 'outgoing'
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_existing_activity
-        service._mock_activity_repo.update.return_value = mock_existing_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_existing_activity
         
         webhook_data = {
             'type': 'message.delivered',
@@ -264,7 +266,7 @@ class TestMessageWebhooks:
         
         # Verify repository calls
         service._mock_activity_repo.find_by_openphone_id.assert_called_once_with('msg_123')
-        service._mock_activity_repo.update.assert_called_once_with(
+        service._mock_activity_repo.update_by_id.assert_called_once_with(
             789, status='delivered', updated_at=ANY  # Allow any datetime
         )
         
@@ -280,7 +282,7 @@ class TestMessageWebhooks:
         mock_existing_activity.id = 789
         mock_existing_activity.direction = 'outgoing'
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_existing_activity
-        service._mock_activity_repo.update.return_value = mock_existing_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_existing_activity
         
         webhook_data = {
             'type': 'message.failed',
@@ -441,7 +443,7 @@ class TestCallWebhooks:
         mock_existing_activity = Mock()
         mock_existing_activity.id = 789
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_existing_activity
-        service._mock_activity_repo.update.return_value = mock_existing_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_existing_activity
         
         webhook_data = {
             'type': 'call.completed',
@@ -463,7 +465,7 @@ class TestCallWebhooks:
         
         # Verify repository calls
         service._mock_activity_repo.find_by_openphone_id.assert_called_once_with('call_123')
-        service._mock_activity_repo.update.assert_called_once_with(
+        service._mock_activity_repo.update_by_id.assert_called_once_with(
             789, status='completed', duration_seconds=450, updated_at=ANY
         )
     
@@ -527,7 +529,7 @@ class TestCallRecordingWebhooks:
         mock_call_activity = Mock()
         mock_call_activity.id = 789
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_call_activity
-        service._mock_activity_repo.update.return_value = mock_call_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_call_activity
         
         webhook_data = {
             'type': 'call.recording.completed',
@@ -550,7 +552,7 @@ class TestCallRecordingWebhooks:
         
         # Verify repository calls
         service._mock_activity_repo.find_by_openphone_id.assert_called_once_with('call_123')
-        service._mock_activity_repo.update.assert_called_once_with(
+        service._mock_activity_repo.update_by_id.assert_called_once_with(
             789, 
             recording_url='https://recordings.openphone.com/call_123.mp3',
             duration_seconds=300,
@@ -617,7 +619,7 @@ class TestAIContentWebhooks:
         mock_call_activity = Mock()
         mock_call_activity.id = 789
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_call_activity
-        service._mock_activity_repo.update.return_value = mock_call_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_call_activity
         
         webhook_data = {
             'type': 'call.summary.completed',
@@ -639,7 +641,7 @@ class TestAIContentWebhooks:
         
         # Verify repository calls
         service._mock_activity_repo.find_by_openphone_id.assert_called_once_with('call_123')
-        service._mock_activity_repo.update.assert_called_once_with(
+        service._mock_activity_repo.update_by_id.assert_called_once_with(
             789,
             ai_summary='Customer called about foundation repair pricing',
             updated_at=ANY
@@ -653,7 +655,7 @@ class TestAIContentWebhooks:
         mock_call_activity = Mock()
         mock_call_activity.id = 789
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_call_activity
-        service._mock_activity_repo.update.return_value = mock_call_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_call_activity
         
         transcript_data = {
             'dialogue': [
@@ -681,7 +683,7 @@ class TestAIContentWebhooks:
         
         # Verify repository calls
         service._mock_activity_repo.find_by_openphone_id.assert_called_once_with('call_123')
-        service._mock_activity_repo.update.assert_called_once_with(
+        service._mock_activity_repo.update_by_id.assert_called_once_with(
             789,
             ai_transcript=transcript_data,
             updated_at=ANY
@@ -991,7 +993,7 @@ class TestIdempotencyAndDuplicateHandling:
         mock_existing_activity.status = 'sent'
         mock_existing_activity.direction = 'outgoing'
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_existing_activity
-        service._mock_activity_repo.update.return_value = mock_existing_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_existing_activity
         
         webhook_data = {
             'type': 'message.delivered',
@@ -1022,7 +1024,7 @@ class TestIdempotencyAndDuplicateHandling:
         mock_existing_activity = Mock()
         mock_existing_activity.id = 789
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_existing_activity
-        service._mock_activity_repo.update.return_value = mock_existing_activity
+        service._mock_activity_repo.update_by_id.return_value = mock_existing_activity
         
         webhook_data = {
             'type': 'call.completed',
@@ -1118,7 +1120,7 @@ class TestWebhookIntegrationScenarios:
         mock_existing_outgoing.id = 789
         mock_existing_outgoing.direction = 'outgoing'
         service._mock_activity_repo.find_by_openphone_id.return_value = mock_existing_outgoing
-        service._mock_activity_repo.update.return_value = mock_existing_outgoing
+        service._mock_activity_repo.update_by_id.return_value = mock_existing_outgoing
         
         delivery_webhook = {
             'type': 'message.delivered',

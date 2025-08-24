@@ -164,6 +164,12 @@ def create_app(config_name=None, test_config=None):
     )
     
     registry.register_factory(
+        'campaign_membership_repository',
+        lambda db_session: _create_campaign_membership_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
         'ab_test_result_repository',
         lambda db_session: _create_ab_test_result_repository(db_session),
         dependencies=['db_session']
@@ -316,10 +322,10 @@ def create_app(config_name=None, test_config=None):
     
     registry.register_factory(
         'openphone_webhook',
-        lambda activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics, opt_out: _create_openphone_webhook_service(
-            activity_repository, conversation_repository, webhook_event_repository, contact, sms_metrics, opt_out
+        lambda activity_repository, conversation_repository, webhook_event_repository, campaign_membership_repository, contact, sms_metrics, opt_out: _create_openphone_webhook_service(
+            activity_repository, conversation_repository, webhook_event_repository, campaign_membership_repository, contact, sms_metrics, opt_out
         ),
-        dependencies=['activity_repository', 'conversation_repository', 'webhook_event_repository', 'contact', 'sms_metrics', 'opt_out']
+        dependencies=['activity_repository', 'conversation_repository', 'webhook_event_repository', 'campaign_membership_repository', 'contact', 'sms_metrics', 'opt_out']
     )
     
     # Register alias for webhook tests - returns openphone_webhook and ensures error recovery is connected
@@ -788,7 +794,7 @@ def _create_openphone_service():
         return None
     return OpenPhoneService()  # Uses env vars internally
 
-def _create_openphone_webhook_service(activity_repository, conversation_repository, webhook_event_repository, contact_service, sms_metrics_service, opt_out_service=None):
+def _create_openphone_webhook_service(activity_repository, conversation_repository, webhook_event_repository, campaign_membership_repository, contact_service, sms_metrics_service, opt_out_service=None):
     """Create OpenPhoneWebhookServiceRefactored instance with all dependencies"""
     from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
     logger.info("Initializing OpenPhoneWebhookServiceRefactored")
@@ -796,6 +802,7 @@ def _create_openphone_webhook_service(activity_repository, conversation_reposito
         activity_repository=activity_repository,
         conversation_repository=conversation_repository, 
         webhook_event_repository=webhook_event_repository,
+        campaign_membership_repository=campaign_membership_repository,
         contact_service=contact_service,
         sms_metrics_service=sms_metrics_service,
         opt_out_service=opt_out_service,
@@ -1059,6 +1066,11 @@ def _create_failed_webhook_queue_repository(db_session):
     """Create FailedWebhookQueueRepository instance"""
     from repositories.failed_webhook_queue_repository import FailedWebhookQueueRepository
     return FailedWebhookQueueRepository(session=db_session)
+
+def _create_campaign_membership_repository(db_session):
+    """Create CampaignMembershipRepository instance"""
+    from repositories.campaign_membership_repository import CampaignMembershipRepository
+    return CampaignMembershipRepository(session=db_session)
 
 def _create_setting_service(setting_repository):
     """Create SettingService instance"""

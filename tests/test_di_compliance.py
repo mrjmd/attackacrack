@@ -381,12 +381,14 @@ class TestOpenPhoneWebhookServiceDICompliance:
         mock_activity_repo = Mock()
         mock_conversation_repo = Mock()
         mock_webhook_repo = Mock()
+        mock_campaign_membership_repo = Mock()
         
         # Act
         service = OpenPhoneWebhookServiceRefactored(
             activity_repository=mock_activity_repo,
             conversation_repository=mock_conversation_repo,
             webhook_event_repository=mock_webhook_repo,
+            campaign_membership_repository=mock_campaign_membership_repo,
             contact_service=mock_contact_service,
             sms_metrics_service=mock_metrics_service
         )
@@ -405,12 +407,14 @@ class TestOpenPhoneWebhookServiceDICompliance:
         mock_activity_repo = Mock()
         mock_conversation_repo = Mock()
         mock_webhook_repo = Mock()
+        mock_campaign_membership_repo = Mock()
         
         # Act
         service = OpenPhoneWebhookServiceRefactored(
             activity_repository=mock_activity_repo,
             conversation_repository=mock_conversation_repo,
             webhook_event_repository=mock_webhook_repo,
+            campaign_membership_repository=mock_campaign_membership_repo,
             contact_service=mock_contact_service,
             sms_metrics_service=mock_metrics_service
         )
@@ -430,11 +434,13 @@ class TestOpenPhoneWebhookServiceDICompliance:
         mock_activity_repo = Mock()
         mock_conversation_repo = Mock()
         mock_webhook_repo = Mock()
+        mock_campaign_membership_repo = Mock()
         
         service = OpenPhoneWebhookServiceRefactored(
             activity_repository=mock_activity_repo,
             conversation_repository=mock_conversation_repo,
             webhook_event_repository=mock_webhook_repo,
+            campaign_membership_repository=mock_campaign_membership_repo,
             contact_service=mock_contact_service,
             sms_metrics_service=mock_metrics_service
         )

@@ -41,6 +41,7 @@ class OpenPhoneWebhookServiceRefactored:
                  activity_repository: ActivityRepository,
                  conversation_repository: ConversationRepository,
                  webhook_event_repository: WebhookEventRepository,
+                 campaign_membership_repository,
                  contact_service: ContactService,
                  sms_metrics_service: SMSMetricsService,
                  opt_out_service: Optional['OptOutService'] = None,
@@ -52,13 +53,16 @@ class OpenPhoneWebhookServiceRefactored:
             activity_repository: Repository for Activity data access
             conversation_repository: Repository for Conversation data access
             webhook_event_repository: Repository for WebhookEvent data access
+            campaign_membership_repository: Repository for CampaignMembership data access
             contact_service: Service for contact management (returns Result objects)
             sms_metrics_service: Service for SMS metrics tracking
             opt_out_service: Service for opt-out processing (optional)
+            error_recovery_service: Service for webhook error recovery (optional)
         """
         self.activity_repository = activity_repository
         self.conversation_repository = conversation_repository
         self.webhook_event_repository = webhook_event_repository
+        self.campaign_membership_repository = campaign_membership_repository
         self.contact_service = contact_service
         self.sms_metrics_service = sms_metrics_service
         self.opt_out_service = opt_out_service
@@ -286,7 +290,7 @@ class OpenPhoneWebhookServiceRefactored:
                 old_status = existing_activity.status
                 
                 # Update activity using repository
-                updated_activity = self.activity_repository.update(
+                updated_activity = self.activity_repository.update_by_id(
                     existing_activity.id,
                     status=status,
                     updated_at=utc_now()
@@ -304,6 +308,10 @@ class OpenPhoneWebhookServiceRefactored:
                             error_details
                         )
                         logger.warning(f"Message {openphone_id} bounced: {error_details}")
+                        
+                        # Update campaign membership status to failed
+                        self._update_campaign_membership_on_failure(existing_activity)
+                        
                     elif status == 'delivered' and old_status != 'delivered':
                         # Message successfully delivered
                         self.sms_metrics_service.track_message_status(existing_activity.id, status)
@@ -402,11 +410,17 @@ class OpenPhoneWebhookServiceRefactored:
             if media_urls:
                 logger.info(f"Message {openphone_id} includes {len(media_urls)} media attachments")
             
+            # Process campaign response tracking for incoming messages
+            campaign_tracking_result = None
+            if db_direction == 'incoming':
+                campaign_tracking_result = self._process_campaign_response_tracking(contact, new_activity)
+            
             return Result.success({
                 'status': 'created', 
                 'activity_id': new_activity.id, 
                 'media_count': len(media_urls),
-                'opt_out_processed': db_direction == 'incoming' and self.opt_out_service is not None
+                'opt_out_processed': db_direction == 'incoming' and self.opt_out_service is not None,
+                'campaign_tracking': campaign_tracking_result
             })
             
         except Exception as e:
@@ -443,7 +457,7 @@ class OpenPhoneWebhookServiceRefactored:
             if existing_activity:
                 logger.info(f"Call {openphone_id} already exists, updating")
                 
-                updated_activity = self.activity_repository.update(
+                updated_activity = self.activity_repository.update_by_id(
                     existing_activity.id,
                     status=status,
                     duration_seconds=duration,
@@ -561,7 +575,7 @@ class OpenPhoneWebhookServiceRefactored:
                 })
             
             # Update with AI summary using repository
-            updated_activity = self.activity_repository.update(
+            updated_activity = self.activity_repository.update_by_id(
                 call_activity.id,
                 ai_summary=summary_text,
                 updated_at=utc_now()
@@ -610,7 +624,7 @@ class OpenPhoneWebhookServiceRefactored:
                 })
             
             # Update with AI transcript using repository
-            updated_activity = self.activity_repository.update(
+            updated_activity = self.activity_repository.update_by_id(
                 call_activity.id,
                 ai_transcript=transcript,
                 updated_at=utc_now()
@@ -669,7 +683,7 @@ class OpenPhoneWebhookServiceRefactored:
             if recording_data.get('duration'):
                 update_data['duration_seconds'] = recording_data['duration']
             
-            updated_activity = self.activity_repository.update(call_activity.id, **update_data)
+            updated_activity = self.activity_repository.update_by_id(call_activity.id, **update_data)
             
             logger.info(f"Call recording updated for call {call_id}")
             
@@ -767,3 +781,166 @@ class OpenPhoneWebhookServiceRefactored:
         # TODO: Implement as Celery task
         logger.info(f"Should fetch recording for call {call_id} (activity {activity_id})")
         pass
+    
+    def _process_campaign_response_tracking(self, contact, reply_activity):
+        """
+        Process campaign response tracking for incoming messages.
+        
+        Args:
+            contact: Contact object who sent the message
+            reply_activity: Activity object for the incoming message
+            
+        Returns:
+            Dict with tracking results or None if no active campaigns
+        """
+        try:
+            # Look for active campaign memberships for this contact
+            # Default to 72 hours window for response tracking
+            active_memberships = self.campaign_membership_repository.find_active_memberships_for_contact(
+                contact_id=contact.id,
+                hours_window=72
+            )
+            
+            if not active_memberships:
+                # No recent campaign activity to track
+                logger.debug(f"No active campaign memberships found for contact {contact.id}")
+                return None
+            
+            # Find the most recent campaign membership to update
+            latest_membership = active_memberships[0]
+            
+            # Analyze sentiment of the message (simple keyword analysis)
+            message_body = reply_activity.body.lower() if reply_activity.body else ''
+            sentiment = self._analyze_message_sentiment(message_body)
+            
+            # Update the campaign membership with reply information
+            updated_membership = self.campaign_membership_repository.mark_as_replied(
+                membership_id=latest_membership.id,
+                reply_activity_id=reply_activity.id,
+                sentiment=sentiment
+            )
+            
+            if updated_membership:
+                logger.info(f"Updated campaign membership {latest_membership.id} with reply activity {reply_activity.id}, sentiment: {sentiment}")
+                
+                return {
+                    'membership_id': latest_membership.id,
+                    'campaign_id': latest_membership.campaign_id,
+                    'sentiment': sentiment,
+                    'status_updated': updated_membership.status
+                }
+            else:
+                logger.error(f"Failed to update campaign membership {latest_membership.id}")
+                return None
+            
+            # from datetime import datetime, timedelta
+            # from sqlalchemy import and_
+            
+            # # Look for recent campaign memberships for this contact that were sent
+            # # within a reasonable timeframe (e.g., last 30 days)
+            # recent_cutoff = datetime.utcnow() - timedelta(days=30)
+            # 
+            # recent_memberships = (
+            #     self.campaign_membership_repository.find_by_filters({
+            #         'contact_id': contact.id,
+            #         'status': 'sent',
+            #         'sent_at__gte': recent_cutoff,
+            #         'reply_activity_id__is_null': True
+            #     }, order_by='sent_at', order_desc=True)
+            # )
+            
+            # if not recent_memberships:
+            #     # No recent campaign activity to track
+            #     return None
+            # 
+            # # Find the most recent campaign membership to update
+            # latest_membership = recent_memberships[0]
+            # 
+            # # Analyze sentiment of the message (simple keyword analysis)
+            # message_body = reply_activity.body.lower() if reply_activity.body else ''
+            # sentiment = self._analyze_message_sentiment(message_body)
+            # 
+            # # Update the campaign membership with reply information
+            # self.campaign_membership_repository.update_by_id(
+            #     latest_membership.id,
+            #     reply_activity_id=reply_activity.id,
+            #     response_sentiment=sentiment,
+            #     status='replied_positive' if sentiment == 'positive'
+            #         else 'replied_negative' if sentiment == 'negative'
+            #         else 'replied_neutral'
+            # )
+            
+            # # Save the changes
+            # self.session.commit()  # Repository handles commits
+            # 
+            # logger.info(f"Updated campaign membership {latest_membership.id} with reply activity {reply_activity.id}, sentiment: {sentiment}")
+            # 
+            # return {
+            #     'membership_id': latest_membership.id,
+            #     'campaign_id': latest_membership.campaign_id,
+            #     'sentiment': sentiment,
+            #     'status_updated': latest_membership.status
+            # }
+            
+        except Exception as e:
+            logger.error(f"Error in campaign response tracking: {e}", exc_info=True)
+            return None
+    
+    def _analyze_message_sentiment(self, message_body: str) -> str:
+        """
+        Simple sentiment analysis based on keywords.
+        
+        Args:
+            message_body: Message text to analyze (lowercase)
+            
+        Returns:
+            'positive', 'negative', or 'neutral'
+        """
+        positive_keywords = [
+            'yes', 'interested', 'great', 'sounds good', 'perfect', 'awesome',
+            'thank you', 'thanks', 'please call', 'call me', 'contact me',
+            'when can', 'schedule', 'appointment', 'meeting', 'available'
+        ]
+        
+        negative_keywords = [
+            'no', 'not interested', 'stop', 'remove', 'unsubscribe', 'never',
+            'don\'t', 'can\'t', 'won\'t', 'not now', 'maybe later', 'busy',
+            'already have', 'satisfied', 'too expensive', 'cost too much'
+        ]
+        
+        # Count positive and negative indicators
+        positive_score = sum(1 for keyword in positive_keywords if keyword in message_body)
+        negative_score = sum(1 for keyword in negative_keywords if keyword in message_body)
+        
+        if positive_score > negative_score:
+            return 'positive'
+        elif negative_score > positive_score:
+            return 'negative'
+        else:
+            return 'neutral'
+    
+    def _update_campaign_membership_on_failure(self, activity):
+        """
+        Update campaign membership status when message fails.
+        
+        Args:
+            activity: Activity object for the failed message
+        """
+        try:
+            # Find campaign membership that uses this activity as sent_activity_id
+            membership = self.campaign_membership_repository.find_by_sent_activity_id(activity.id)
+            
+            if membership:
+                # Update status to failed
+                updated_membership = self.campaign_membership_repository.update_membership_status(
+                    membership_id=membership.id,
+                    status='failed'
+                )
+                
+                if updated_membership:
+                    logger.info(f"Updated campaign membership {membership.id} status to failed for activity {activity.id}")
+                else:
+                    logger.error(f"Failed to update campaign membership {membership.id} for failed activity {activity.id}")
+            
+        except Exception as e:
+            logger.error(f"Error updating campaign membership on failure: {e}", exc_info=True)

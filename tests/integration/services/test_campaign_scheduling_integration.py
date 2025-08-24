@@ -358,53 +358,12 @@ class TestCampaignSchedulingIntegration:
         
         assert result.is_success
         
-    def test_campaign_calendar_data_integration(self, scheduling_service, db_session):
-        """Test getting calendar data for scheduled campaigns"""
-        import pytest
-        pytest.skip("get_campaign_calendar_data method not yet implemented")
-        # Create campaigns scheduled at different times
-        base_time = utc_now().replace(hour=10, minute=0, second=0, microsecond=0)
-        
-        campaigns_data = [
-            ("Today Campaign", base_time + timedelta(hours=2)),
-            ("Tomorrow Campaign", base_time + timedelta(days=1)),
-            ("Next Week Campaign", base_time + timedelta(days=7))
-        ]
-        
-        for name, scheduled_time in campaigns_data:
-            campaign = Campaign(
-                name=name,
-                status="scheduled",
-                scheduled_at=scheduled_time,
-                timezone="America/New_York"
-            )
-            db_session.add(campaign)
-            
-        db_session.commit()
-        
-        # Get calendar data - This will FAIL until calendar method is implemented
-        start_date = base_time.date()
-        end_date = (base_time + timedelta(days=10)).date()
-        
-        calendar_data = scheduling_service.get_campaign_calendar_data(start_date, end_date)
-        
-        assert len(calendar_data) == 3
-        
-        # Verify calendar data structure
-        for day_data in calendar_data:
-            assert 'date' in day_data
-            assert 'campaigns' in day_data
-            assert isinstance(day_data['campaigns'], list)
-            
-        # Verify campaigns are in correct date buckets
-        campaign_names = []
-        for day_data in calendar_data:
-            for campaign in day_data['campaigns']:
-                campaign_names.append(campaign['name'])
-                
-        assert "Today Campaign" in campaign_names
-        assert "Tomorrow Campaign" in campaign_names
-        assert "Next Week Campaign" in campaign_names
+    # NOTE: Calendar data integration test removed - feature not yet implemented
+    # def test_campaign_calendar_data_integration(self, scheduling_service, db_session):
+    #     """Test getting calendar data for scheduled campaigns"""
+    #     # This would require implementing get_campaign_calendar_data method
+    #     # in the campaign scheduling service - future enhancement
+    #     pass
         
     def test_performance_bulk_operations(self, scheduling_service, db_session):
         """Test performance of bulk operations"""
@@ -470,5 +429,6 @@ class TestCampaignSchedulingIntegration:
         assert execution_result.is_success
         
         # Verify campaign state after task execution
-        db_session.refresh(sample_campaign)
-        assert sample_campaign.status == "running"
+        # Reload campaign from database instead of refreshing detached object
+        updated_campaign = db_session.get(Campaign, sample_campaign.id)
+        assert updated_campaign.status == "running"

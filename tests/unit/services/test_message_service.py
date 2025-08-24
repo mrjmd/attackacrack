@@ -39,6 +39,7 @@ def test_process_incoming_message_webhook_new_contact(app, db_session):
         activity_repo = app.services.get('activity_repository')
         conversation_repo = app.services.get('conversation_repository')
         webhook_repo = app.services.get('webhook_event_repository')
+        campaign_membership_repo = app.services.get('campaign_membership_repository')
         contact_service = app.services.get('contact')
         sms_metrics_service = app.services.get('sms_metrics')
         
@@ -46,6 +47,7 @@ def test_process_incoming_message_webhook_new_contact(app, db_session):
             activity_repository=activity_repo,
             conversation_repository=conversation_repo,
             webhook_event_repository=webhook_repo,
+            campaign_membership_repository=campaign_membership_repo,
             contact_service=contact_service,
             sms_metrics_service=sms_metrics_service
         )

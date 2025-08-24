@@ -216,7 +216,7 @@ class TestWebhookErrorRecoveryService:
         mock_failed_webhook_repository.create.assert_called_once()
         
         # Verify the creation call had correct structure
-        create_call_args = mock_failed_webhook_repository.create.call_args[0][0]
+        create_call_args = mock_failed_webhook_repository.create.call_args.kwargs
         assert create_call_args['event_id'] == 'evt_123'
         assert create_call_args['event_type'] == 'message.received'
         assert create_call_args['original_payload'] == webhook_data  # Full webhook data stored
@@ -243,7 +243,7 @@ class TestWebhookErrorRecoveryService:
         result = service.queue_failed_webhook(webhook_data, error_message, retry_config)
         
         # Assert
-        create_call_args = mock_failed_webhook_repository.create.call_args[0][0]
+        create_call_args = mock_failed_webhook_repository.create.call_args.kwargs
         assert create_call_args['max_retries'] == 3
         assert create_call_args['backoff_multiplier'] == Decimal('1.5')
     
