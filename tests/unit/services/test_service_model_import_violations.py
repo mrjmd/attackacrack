@@ -406,10 +406,15 @@ class TestServiceArchitectureEnforcement:
             f"All service files should end with '_service.py' or '_service_refactored.py'"
         )
     
-    @pytest.mark.skip(reason="TODO: Complete repository pattern migration for remaining services")
+    @pytest.mark.skip(reason="Repository pattern migration in progress - Part of Phase 2 refactoring")
     def test_repository_import_pattern(self):
         """
         RED PHASE: Test that services import repositories (not models)
+        
+        NOTE: This test is part of the Phase 2 refactoring initiative to migrate
+        all services to use the repository pattern instead of direct model imports.
+        The test is skipped until the repository pattern migration is completed
+        for all remaining services.
         
         This will FAIL initially because services don't import repositories yet.
         """

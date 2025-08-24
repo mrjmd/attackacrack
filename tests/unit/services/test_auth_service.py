@@ -356,17 +356,7 @@ class TestAuthServiceAppInit:
             'invite_repository': Mock()
         }
     
-    def test_init_app_with_mail(self, mock_repositories):
-        """Test app initialization with mail configured"""
-        # Note: init_app might not exist in refactored service
-        # This test may need to be removed or updated based on actual implementation
-        pytest.skip("init_app may not exist in refactored service")
-    
-    def test_init_app_without_mail(self, mock_repositories):
-        """Test app initialization without mail configured"""
-        # Note: init_app might not exist in refactored service
-        # This test may need to be removed or updated based on actual implementation
-        pytest.skip("init_app may not exist in refactored service")
+    # Removed obsolete init_app tests - init_app method removed in refactored service
 
 
 class TestSessionManagement:
