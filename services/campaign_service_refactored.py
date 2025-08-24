@@ -250,6 +250,24 @@ class CampaignService:
             recently_contacted_ids = self.contact_flag_repository.get_contact_ids_with_flag_type('recently_texted')
             contacts = [c for c in contacts if hasattr(c, 'id') and c.id not in recently_contacted_ids]
         
+        if filters.get('min_days_since_contact'):
+            # Filter contacts based on minimum days since last contact
+            min_days = filters['min_days_since_contact']
+            cutoff_date = datetime.utcnow() - timedelta(days=min_days)
+            
+            # Get all 'recently_texted' flags
+            recently_texted_flags = self.contact_flag_repository.find_by_flag_type('recently_texted')
+            
+            # Build set of contact IDs that were contacted within the cutoff period
+            recently_contacted_within_period = set()
+            for flag in recently_texted_flags:
+                # Check if flag was created within the cutoff period
+                if flag.created_at and flag.created_at > cutoff_date:
+                    recently_contacted_within_period.add(flag.contact_id)
+            
+            # Exclude contacts that have been contacted within the specified days
+            contacts = [c for c in contacts if hasattr(c, 'id') and c.id not in recently_contacted_within_period]
+        
         if filters.get('exclude_current_campaign'):
             # Exclude contacts already in any active campaign
             active_campaigns = self.campaign_repository.get_active_campaigns()

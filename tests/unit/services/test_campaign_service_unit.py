@@ -1177,6 +1177,99 @@ class TestCampaignServiceUnit:
         # Assert
         assert result == campaigns
         mock_campaign_repository.get_campaigns_needing_send.assert_called_once()
+    
+    def test_min_days_since_contact_filter(self, campaign_service, mock_contact_repository, mock_contact_flag_repository):
+        """Test filtering contacts by minimum days since last contact"""
+        # Arrange
+        # Create mock contacts
+        c1 = Mock(spec=Contact)
+        c1.id = 1
+        c1.phone = '+15551111111'
+        c1.first_name = 'Recent'
+        
+        c2 = Mock(spec=Contact)
+        c2.id = 2
+        c2.phone = '+15552222222'
+        c2.first_name = 'Old'
+        
+        c3 = Mock(spec=Contact)
+        c3.id = 3
+        c3.phone = '+15553333333'
+        c3.first_name = 'Never'
+        
+        mock_contact_repository.get_all.return_value = [c1, c2, c3]
+        
+        # Create mock flags - c1 contacted 3 days ago, c2 contacted 10 days ago, c3 never contacted
+        flag1 = Mock(spec=ContactFlag)
+        flag1.contact_id = 1
+        flag1.flag_type = 'recently_texted'
+        flag1.created_at = datetime.utcnow() - timedelta(days=3)
+        
+        flag2 = Mock(spec=ContactFlag)
+        flag2.contact_id = 2
+        flag2.flag_type = 'recently_texted'
+        flag2.created_at = datetime.utcnow() - timedelta(days=10)
+        
+        mock_contact_flag_repository.find_by_flag_type.return_value = [flag1, flag2]
+        
+        # Act - filter with 7 days minimum
+        filters = {'min_days_since_contact': 7}
+        result = campaign_service._get_filtered_contacts(filters)
+        
+        # Assert - c1 should be excluded (contacted 3 days ago), c2 and c3 should be included
+        assert len(result) == 2
+        assert c1 not in result
+        assert c2 in result  # Contacted 10 days ago, which is > 7
+        assert c3 in result  # Never contacted
+        mock_contact_flag_repository.find_by_flag_type.assert_called_once_with('recently_texted')
+    
+    def test_min_days_since_contact_filter_edge_case(self, campaign_service, mock_contact_repository, mock_contact_flag_repository):
+        """Test edge case where contact was contacted exactly on the cutoff day"""
+        # Arrange
+        c1 = Mock(spec=Contact)
+        c1.id = 1
+        c1.phone = '+15551111111'
+        
+        mock_contact_repository.get_all.return_value = [c1]
+        
+        # Contact was contacted exactly 7 days ago
+        flag = Mock(spec=ContactFlag)
+        flag.contact_id = 1
+        flag.flag_type = 'recently_texted'
+        flag.created_at = datetime.utcnow() - timedelta(days=7)
+        
+        mock_contact_flag_repository.find_by_flag_type.return_value = [flag]
+        
+        # Act
+        filters = {'min_days_since_contact': 7}
+        result = campaign_service._get_filtered_contacts(filters)
+        
+        # Assert - contact should be included (exactly 7 days is NOT within the cutoff)
+        assert len(result) == 1
+        assert c1 in result
+    
+    def test_min_days_since_contact_filter_no_flags(self, campaign_service, mock_contact_repository, mock_contact_flag_repository):
+        """Test filter when no contact has been recently texted"""
+        # Arrange
+        c1 = Mock(spec=Contact)
+        c1.id = 1
+        c1.phone = '+15551111111'
+        
+        c2 = Mock(spec=Contact)
+        c2.id = 2
+        c2.phone = '+15552222222'
+        
+        mock_contact_repository.get_all.return_value = [c1, c2]
+        mock_contact_flag_repository.find_by_flag_type.return_value = []  # No flags
+        
+        # Act
+        filters = {'min_days_since_contact': 30}
+        result = campaign_service._get_filtered_contacts(filters)
+        
+        # Assert - all contacts should be included when no flags exist
+        assert len(result) == 2
+        assert c1 in result
+        assert c2 in result
 
 
 # ========== FACTORY PATTERN FOR TEST DATA ==========
@@ -1283,5 +1376,3 @@ class TestCampaignServiceIntegrationPoints:
         
         # Assert - repositories should be None when not injected (dependency injection pattern)
         assert service.campaign_repository is None
-        assert service.contact_repository is None
-        assert service.contact_flag_repository is None

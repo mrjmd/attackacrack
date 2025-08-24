@@ -297,7 +297,6 @@ class TestRecipientManagement:
         assert c1.id in contact_ids
         assert c2.id not in contact_ids
     
-    @pytest.mark.skip(reason="min_days_since_contact filter not yet implemented - waiting for feature implementation")
     def test_min_days_since_contact_filter(self, campaign_service, test_campaign, db_session):
         """Test filtering by minimum days since last contact
         
