@@ -81,7 +81,7 @@ class WebhookEventRepository(BaseRepository):
         Returns:
             Updated WebhookEvent object
         """
-        event = self.session.query(self.model_class).get(event_id)
+        event = self.session.get(self.model_class, event_id)
         if event:
             event.processed = True
             event.processed_at = utc_now()
@@ -99,7 +99,7 @@ class WebhookEventRepository(BaseRepository):
         Returns:
             Updated WebhookEvent object
         """
-        event = self.session.query(self.model_class).get(event_id)
+        event = self.session.get(self.model_class, event_id)
         if event:
             event.error_message = error_message
             self.session.commit()

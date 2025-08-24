@@ -137,7 +137,7 @@ class AppointmentRepository(BaseRepository):
         Returns:
             Updated Appointment object
         """
-        appointment = self.session.query(self.model_class).get(appointment_id)
+        appointment = self.session.get(self.model_class, appointment_id)
         if appointment:
             appointment.google_calendar_event_id = google_event_id
             self.session.commit()

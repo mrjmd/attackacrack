@@ -168,7 +168,7 @@ class ActivityRepository(BaseRepository):
         Returns:
             Updated Activity object
         """
-        activity = self.session.query(self.model_class).get(activity_id)
+        activity = self.session.get(self.model_class, activity_id)
         if activity:
             activity.summary = summary
             self.session.commit()
@@ -199,7 +199,7 @@ class ActivityRepository(BaseRepository):
         Returns:
             True if successful, False otherwise
         """
-        activity = self.session.query(self.model_class).get(activity_id)
+        activity = self.session.get(self.model_class, activity_id)
         if activity:
             activity.processed = True
             self.session.commit()

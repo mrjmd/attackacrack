@@ -59,7 +59,7 @@ class FailedWebhookQueueRepository(BaseRepository):
         Returns:
             Updated FailedWebhookQueue object or None if not found
         """
-        webhook = self.session.query(self.model_class).get(failed_webhook_id)
+        webhook = self.session.get(self.model_class, failed_webhook_id)
         if not webhook:
             return None
             
@@ -90,7 +90,7 @@ class FailedWebhookQueueRepository(BaseRepository):
         Returns:
             Updated FailedWebhookQueue object or None if not found
         """
-        webhook = self.session.query(self.model_class).get(failed_webhook_id)
+        webhook = self.session.get(self.model_class, failed_webhook_id)
         if not webhook:
             return None
             

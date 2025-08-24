@@ -118,7 +118,7 @@ class ConversationRepository(BaseRepository):
         Returns:
             Updated Conversation object
         """
-        conversation = self.session.query(self.model_class).get(conversation_id)
+        conversation = self.session.get(self.model_class, conversation_id)
         if conversation:
             conversation.last_activity_at = activity_time
             self.session.commit()
@@ -199,7 +199,7 @@ class ConversationRepository(BaseRepository):
         Returns:
             True if successful, False otherwise
         """
-        conversation = self.session.query(self.model_class).get(conversation_id)
+        conversation = self.session.get(self.model_class, conversation_id)
         if conversation:
             # Archive by setting a flag or we could add an archived_at field
             # For now, we'll just ensure it exists

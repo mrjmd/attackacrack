@@ -76,7 +76,7 @@ class TodoRepository(BaseRepository):
         Returns:
             Updated Todo object
         """
-        todo = self.session.query(self.model_class).get(todo_id)
+        todo = self.session.get(self.model_class, todo_id)
         if todo:
             todo.is_completed = True
             todo.completed_at = utc_now()
@@ -93,7 +93,7 @@ class TodoRepository(BaseRepository):
         Returns:
             Updated Todo object
         """
-        todo = self.session.query(self.model_class).get(todo_id)
+        todo = self.session.get(self.model_class, todo_id)
         if todo:
             todo.is_completed = False
             todo.completed_at = None
@@ -249,7 +249,7 @@ class TodoRepository(BaseRepository):
         Returns:
             Updated Todo object
         """
-        todo = self.session.query(self.model_class).get(todo_id)
+        todo = self.session.get(self.model_class, todo_id)
         if todo:
             todo.priority = priority
             self.session.commit()

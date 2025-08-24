@@ -115,7 +115,7 @@ class QuoteRepository(BaseRepository):
         Returns:
             Updated Quote object with calculated totals
         """
-        quote = self.session.query(self.model_class).get(quote_id)
+        quote = self.session.get(self.model_class, quote_id)
         if quote:
             # Calculate total amount
             quote.total_amount = quote.subtotal + quote.tax_amount
@@ -133,7 +133,7 @@ class QuoteRepository(BaseRepository):
         Returns:
             Updated Quote object
         """
-        quote = self.session.query(self.model_class).get(quote_id)
+        quote = self.session.get(self.model_class, quote_id)
         if quote:
             quote.status = status
             self.session.commit()

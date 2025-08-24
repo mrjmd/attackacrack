@@ -85,7 +85,7 @@ class QuickBooksAuthRepository(BaseRepository):
         Returns:
             Updated QuickBooksAuth object or None if not found
         """
-        auth = self.session.query(self.model_class).get(auth_id)
+        auth = self.session.get(self.model_class, auth_id)
         if not auth:
             return None
         
@@ -107,7 +107,7 @@ class QuickBooksAuthRepository(BaseRepository):
         Returns:
             True if expired or record not found, False if still valid
         """
-        auth = self.session.query(self.model_class).get(auth_id)
+        auth = self.session.get(self.model_class, auth_id)
         if not auth:
             return True  # Treat missing record as expired
         
@@ -123,7 +123,7 @@ class QuickBooksAuthRepository(BaseRepository):
         Returns:
             True if deleted, False if record not found
         """
-        auth = self.session.query(self.model_class).get(auth_id)
+        auth = self.session.get(self.model_class, auth_id)
         if not auth:
             return False
         

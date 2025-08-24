@@ -114,7 +114,7 @@ class InvoiceRepository(BaseRepository):
         Returns:
             Updated Invoice object
         """
-        invoice = self.session.query(self.model_class).get(invoice_id)
+        invoice = self.session.get(self.model_class, invoice_id)
         if invoice:
             invoice.payment_status = status
             if paid_date:
@@ -132,7 +132,7 @@ class InvoiceRepository(BaseRepository):
         Returns:
             Updated Invoice object with calculated totals
         """
-        invoice = self.session.query(self.model_class).get(invoice_id)
+        invoice = self.session.get(self.model_class, invoice_id)
         if invoice:
             # Calculate total amount
             invoice.total_amount = invoice.subtotal + invoice.tax_amount

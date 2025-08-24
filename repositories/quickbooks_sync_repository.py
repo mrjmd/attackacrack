@@ -108,7 +108,7 @@ class QuickBooksSyncRepository(BaseRepository):
         Returns:
             Updated QuickBooksSync object
         """
-        sync_record = self.session.query(self.model_class).get(sync_id)
+        sync_record = self.session.get(self.model_class, sync_id)
         if sync_record:
             sync_record.sync_status = status
             sync_record.last_synced = utc_now()
@@ -126,7 +126,7 @@ class QuickBooksSyncRepository(BaseRepository):
         Returns:
             Updated QuickBooksSync object
         """
-        sync_record = self.session.query(self.model_class).get(sync_id)
+        sync_record = self.session.get(self.model_class, sync_id)
         if sync_record:
             sync_record.sync_status = "error"
             sync_record.error_message = error_message
