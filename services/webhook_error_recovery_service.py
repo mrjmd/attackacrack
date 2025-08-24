@@ -97,7 +97,7 @@ class WebhookErrorRecoveryService:
                 logger.warning(f"Webhook {failed_webhook_data['event_id']} already queued for retry")
                 return Result.success(existing)
             
-            failed_webhook = self.failed_webhook_repository.create(failed_webhook_data)
+            failed_webhook = self.failed_webhook_repository.create(**failed_webhook_data)
             
             logger.info(f"Queued webhook {failed_webhook.event_id} for retry. Next attempt at {next_retry_at}")
             return Result.success(failed_webhook)
@@ -131,8 +131,18 @@ class WebhookErrorRecoveryService:
             
             logger.info(f"Attempting retry {failed_webhook.retry_count + 1}/{failed_webhook.max_retries} for webhook {failed_webhook.event_id}")
             
+            # Parse the original payload if it's a JSON string
+            payload_to_process = failed_webhook.original_payload
+            if isinstance(payload_to_process, str):
+                import json
+                try:
+                    payload_to_process = json.loads(payload_to_process)
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse webhook payload for {failed_webhook.event_id}")
+                    return Result.failure("Invalid JSON in original payload")
+            
             # Attempt to process the webhook
-            retry_result = self.webhook_service.process_webhook(failed_webhook.original_payload)
+            retry_result = self.webhook_service.process_webhook(payload_to_process)
             
             if retry_result.is_success:
                 # Success! Mark as resolved
@@ -187,6 +197,72 @@ class WebhookErrorRecoveryService:
             logger.error(f"Failed to get pending retries: {e}")
             return Result.failure(f"Failed to get pending retries: {str(e)}")
     
+    def process_failed_webhooks(self, batch_size: int = 10) -> Result:
+        """
+        Process batch of failed webhooks that are ready for retry.
+        
+        Args:
+            batch_size: Number of webhooks to process in this batch
+            
+        Returns:
+            Result with summary of processing results
+        """
+        try:
+            # Get pending retries
+            pending_result = self.get_pending_retries(limit=batch_size)
+            if pending_result.is_failure:
+                return pending_result
+            
+            pending_webhooks = pending_result.data
+            if not pending_webhooks:
+                logger.debug("No pending webhooks to process")
+                return Result.success({
+                    'processed': 0,
+                    'successful': 0,
+                    'failed': 0,
+                    'message': 'No pending webhooks to process'
+                })
+            
+            logger.info(f"Processing {len(pending_webhooks)} failed webhooks")
+            
+            processed = 0
+            successful = 0
+            failed = 0
+            errors = []
+            
+            for webhook in pending_webhooks:
+                try:
+                    retry_result = self.process_retry(webhook)
+                    processed += 1
+                    
+                    if retry_result.is_success:
+                        successful += 1
+                        logger.info(f"Successfully processed webhook {webhook.event_id} on retry")
+                    else:
+                        failed += 1
+                        errors.append(f"Webhook {webhook.event_id}: {retry_result.error}")
+                        
+                except Exception as e:
+                    failed += 1
+                    processed += 1
+                    error_msg = f"Error processing webhook {webhook.event_id}: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+            
+            summary = {
+                'processed': processed,
+                'successful': successful,
+                'failed': failed,
+                'errors': errors[:10]  # Limit errors to first 10
+            }
+            
+            logger.info(f"Failed webhook processing complete: {successful}/{processed} successful")
+            return Result.success(summary)
+            
+        except Exception as e:
+            logger.error(f"Error in process_failed_webhooks: {e}")
+            return Result.failure(f"Error processing failed webhooks: {str(e)}")
+    
     def manual_replay_webhook(self, failed_webhook_id: int) -> Result:
         """
         Manually replay a failed webhook (admin interface).
@@ -208,8 +284,18 @@ class WebhookErrorRecoveryService:
             
             logger.info(f"Manual replay requested for webhook {failed_webhook.event_id}")
             
+            # Parse the original payload if it's a JSON string
+            payload_to_process = failed_webhook.original_payload
+            if isinstance(payload_to_process, str):
+                import json
+                try:
+                    payload_to_process = json.loads(payload_to_process)
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse webhook payload for {failed_webhook.event_id}")
+                    return Result.failure("Invalid JSON in original payload")
+            
             # Attempt to process the webhook
-            replay_result = self.webhook_service.process_webhook(failed_webhook.original_payload)
+            replay_result = self.webhook_service.process_webhook(payload_to_process)
             
             if replay_result.is_success:
                 # Success! Mark as resolved

@@ -687,6 +687,15 @@ class FailedWebhookQueue(db.Model):
     
     def can_retry_now(self) -> bool:
         """Check if webhook can be retried now"""
+        from utils.datetime_utils import utc_now
+        if self.is_retry_exhausted():
+            return False
+        if self.next_retry_at is None:
+            return True
+        return utc_now() >= self.next_retry_at
+    
+    def can_retry_now(self) -> bool:
+        """Check if webhook can be retried now"""
         if self.resolved or self.is_retry_exhausted():
             return False
         if self.next_retry_at is None:

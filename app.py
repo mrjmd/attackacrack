@@ -322,6 +322,28 @@ def create_app(config_name=None, test_config=None):
         dependencies=['activity_repository', 'conversation_repository', 'webhook_event_repository', 'contact', 'sms_metrics', 'opt_out']
     )
     
+    # Register alias for webhook tests - returns openphone_webhook and ensures error recovery is connected
+    def _get_webhook_with_error_recovery(openphone_webhook):
+        """Get webhook service and ensure error recovery is connected"""
+        # Try to connect error recovery service if not already connected
+        if not openphone_webhook.error_recovery_service:
+            try:
+                from flask import current_app
+                if hasattr(current_app, 'services'):
+                    error_recovery = current_app.services.get('webhook_error_recovery')
+                    if error_recovery:
+                        openphone_webhook.error_recovery_service = error_recovery
+                        logger.info("Connected webhook service with error recovery (via alias)")
+            except Exception:
+                pass  # Ignore errors
+        return openphone_webhook
+    
+    registry.register_factory(
+        'webhook',
+        _get_webhook_with_error_recovery,
+        dependencies=['openphone_webhook']
+    )
+    
     registry.register_factory(
         'webhook_error_recovery',
         lambda failed_webhook_queue_repository, openphone_webhook, webhook_event_repository: _create_webhook_error_recovery_service(
@@ -462,6 +484,20 @@ def create_app(config_name=None, test_config=None):
     
     # Attach registry to app
     app.services = registry
+    
+    # Connect circular dependencies after creation
+    # The webhook service and error recovery service need references to each other
+    with app.app_context():
+        try:
+            # Get the webhook service (openphone_webhook and webhook are now the same instance)
+            webhook_service = app.services.get('openphone_webhook')
+            error_recovery_service = app.services.get('webhook_error_recovery')
+            
+            if webhook_service and error_recovery_service:
+                webhook_service.error_recovery_service = error_recovery_service
+                logger.info("Connected webhook service with error recovery service")
+        except Exception as e:
+            logger.warning(f"Could not connect webhook and error recovery services: {e}")
     
     # Initialize authentication
     bcrypt.init_app(app)
@@ -756,24 +792,47 @@ def _create_openphone_webhook_service(activity_repository, conversation_reposito
     """Create OpenPhoneWebhookServiceRefactored instance with all dependencies"""
     from services.openphone_webhook_service_refactored import OpenPhoneWebhookServiceRefactored
     logger.info("Initializing OpenPhoneWebhookServiceRefactored")
-    return OpenPhoneWebhookServiceRefactored(
+    webhook_service = OpenPhoneWebhookServiceRefactored(
         activity_repository=activity_repository,
         conversation_repository=conversation_repository, 
         webhook_event_repository=webhook_event_repository,
         contact_service=contact_service,
         sms_metrics_service=sms_metrics_service,
-        opt_out_service=opt_out_service
+        opt_out_service=opt_out_service,
+        error_recovery_service=None  # Will be set after creation to avoid circular dependency
     )
+    
+    # Try to connect error recovery service immediately if available
+    # This handles cases where services are recreated (e.g., in tests)
+    try:
+        from flask import current_app
+        if hasattr(current_app, 'services'):
+            error_recovery = current_app.services.get('webhook_error_recovery')
+            if error_recovery:
+                webhook_service.error_recovery_service = error_recovery
+                logger.info("Connected webhook service with error recovery service (immediate)")
+    except Exception:
+        # Ignore errors - will be connected later in app initialization
+        pass
+    
+    return webhook_service
 
 def _create_webhook_error_recovery_service(failed_webhook_repository, webhook_service, webhook_event_repository):
     """Create WebhookErrorRecoveryService instance with dependencies"""
     from services.webhook_error_recovery_service import WebhookErrorRecoveryService
     logger.info("Initializing WebhookErrorRecoveryService")
-    return WebhookErrorRecoveryService(
+    error_recovery = WebhookErrorRecoveryService(
         failed_webhook_repository=failed_webhook_repository,
         webhook_service=webhook_service,
         webhook_event_repository=webhook_event_repository
     )
+    
+    # Ensure webhook service has reference to error recovery
+    if webhook_service and not webhook_service.error_recovery_service:
+        webhook_service.error_recovery_service = error_recovery
+        logger.info("Connected error recovery back to webhook service")
+    
+    return error_recovery
 
 def _create_google_calendar_service():
     """Create GoogleCalendarService instance - expensive due to OAuth"""

@@ -11,9 +11,13 @@ Based on: https://support.openphone.com/hc/en-us/articles/4690754298903-How-to-u
 """
 
 import logging
+import os
+import hmac
+import hashlib
+import json
 from datetime import datetime
 from utils.datetime_utils import utc_now
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 
 from services.common.result import Result
 # Model imports removed - using repositories only
@@ -23,6 +27,9 @@ from repositories.webhook_event_repository import WebhookEventRepository
 from services.contact_service_refactored import ContactService
 from services.sms_metrics_service import SMSMetricsService
 from services.opt_out_service import OptOutService
+
+if TYPE_CHECKING:
+    from services.webhook_error_recovery_service import WebhookErrorRecoveryService
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +43,8 @@ class OpenPhoneWebhookServiceRefactored:
                  webhook_event_repository: WebhookEventRepository,
                  contact_service: ContactService,
                  sms_metrics_service: SMSMetricsService,
-                 opt_out_service: Optional['OptOutService'] = None):
+                 opt_out_service: Optional['OptOutService'] = None,
+                 error_recovery_service: Optional['WebhookErrorRecoveryService'] = None):
         """
         Initialize with injected dependencies.
         
@@ -54,6 +62,52 @@ class OpenPhoneWebhookServiceRefactored:
         self.contact_service = contact_service
         self.sms_metrics_service = sms_metrics_service
         self.opt_out_service = opt_out_service
+        self.error_recovery_service = error_recovery_service
+    
+    def validate_webhook_signature(self, payload_string: str, headers: Dict[str, str]) -> bool:
+        """
+        Validate OpenPhone webhook signature for security.
+        
+        Args:
+            payload_string: Raw webhook payload as string
+            headers: HTTP headers containing signature
+            
+        Returns:
+            bool: True if signature is valid, False otherwise
+        """
+        # Get webhook secret from environment
+        webhook_secret = os.environ.get('OPENPHONE_WEBHOOK_SECRET')
+        if not webhook_secret:
+            logger.warning("OPENPHONE_WEBHOOK_SECRET not configured")
+            return False
+            
+        # Get signature from headers
+        signature_header = headers.get('X-OpenPhone-Signature', '')
+        if not signature_header:
+            logger.warning("Missing X-OpenPhone-Signature header")
+            return False
+            
+        # Extract the signature hash (format: sha256=hash)
+        if not signature_header.startswith('sha256='):
+            logger.warning("Invalid signature header format")
+            return False
+            
+        provided_signature = signature_header[7:]  # Remove 'sha256=' prefix
+        
+        # Calculate expected signature
+        expected_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            payload_string.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        # Compare signatures (constant time comparison to prevent timing attacks)
+        is_valid = hmac.compare_digest(provided_signature, expected_signature)
+        
+        if not is_valid:
+            logger.warning("Invalid webhook signature")
+            
+        return is_valid
     
     def process_webhook(self, webhook_data: Dict[str, Any]) -> Result[Dict[str, Any]]:
         """
@@ -76,33 +130,73 @@ class OpenPhoneWebhookServiceRefactored:
             event_type = webhook_data.get('type', '')
             
             # Route to specific handlers
+            result = None
             if event_type == 'token.validated':
-                return self._handle_token_validation(webhook_data)
+                result = self._handle_token_validation(webhook_data)
             
             elif event_type.startswith('message.'):
-                return self._handle_message_webhook(webhook_data)
+                result = self._handle_message_webhook(webhook_data)
                 
             elif event_type == 'call.recording.completed':
-                return self._handle_call_recording_webhook(webhook_data)
+                result = self._handle_call_recording_webhook(webhook_data)
                 
             elif event_type == 'call.summary.completed':
-                return self._handle_call_summary_webhook(webhook_data)
+                result = self._handle_call_summary_webhook(webhook_data)
                 
             elif event_type == 'call.transcript.completed':
-                return self._handle_call_transcript_webhook(webhook_data)
+                result = self._handle_call_transcript_webhook(webhook_data)
                 
             elif event_type.startswith('call.'):
-                return self._handle_call_webhook(webhook_data)
+                result = self._handle_call_webhook(webhook_data)
                 
             else:
                 logger.warning(f"Unknown webhook type: {event_type}")
-                return Result.failure(
+                result = Result.failure(
                     f'Unknown event type: {event_type}', 
                     code="UNKNOWN_EVENT_TYPE"
                 )
+            
+            # If processing failed, queue for retry
+            if result is not None and result.is_failure:
+                logger.info(f"Webhook processing failed for {event_type}: {result.error}")
+                if self.error_recovery_service:
+                    try:
+                        logger.info(f"Queueing failed webhook for retry: {event_type}")
+                        queue_result = self.error_recovery_service.queue_failed_webhook(
+                            webhook_data,
+                            result.error
+                        )
+                        if queue_result.is_success:
+                            logger.info(f"Successfully queued failed webhook for retry: {event_type}")
+                        else:
+                            logger.error(f"Failed to queue webhook: {queue_result.error}")
+                    except Exception as queue_error:
+                        logger.error(f"Failed to queue webhook for retry: {queue_error}")
+                else:
+                    logger.warning(f"No error recovery service available for failed webhook {event_type}")
+            
+            return result
                 
         except Exception as e:
             logger.error(f"Error processing webhook: {e}", exc_info=True)
+            
+            # Queue failed webhook for retry if error recovery service is available
+            if self.error_recovery_service:
+                try:
+                    logger.info(f"Queueing failed webhook for retry: {webhook_data.get('type', 'unknown')}")
+                    queue_result = self.error_recovery_service.queue_failed_webhook(
+                        webhook_data,
+                        str(e)
+                    )
+                    if queue_result.is_success:
+                        logger.info(f"Successfully queued failed webhook for retry: {webhook_data.get('type', 'unknown')}")
+                    else:
+                        logger.error(f"Failed to queue webhook: {queue_result.error}")
+                except Exception as queue_error:
+                    logger.error(f"Failed to queue webhook for retry: {queue_error}")
+            else:
+                logger.warning("No error recovery service available to queue failed webhook")
+            
             return Result.failure(str(e), code="PROCESSING_ERROR")
     
     def _log_webhook_event(self, webhook_data: Dict[str, Any]) -> Result[Dict]:
@@ -160,7 +254,9 @@ class OpenPhoneWebhookServiceRefactored:
         """
         try:
             event_type = webhook_data.get('type')
-            message_data = webhook_data.get('data', {}).get('object', {})
+            # Support both nested object format and direct data format for flexibility
+            data_section = webhook_data.get('data', {})
+            message_data = data_section.get('object', data_section) if data_section else {}
             
             if not message_data:
                 return Result.failure('No message data provided', code="INVALID_DATA")
