@@ -81,7 +81,13 @@ class TestCeleryBeatConfiguration:
                 'openphone-data-integrity',
                 'webhook-retry-processing',
                 'cleanup-old-failed-webhooks',
-                'webhook-failure-alerts'
+                'webhook-failure-alerts',
+                'check-scheduled-campaigns',
+                'calculate-recurring-schedules',
+                'cleanup-expired-campaigns',
+                'send-schedule-notifications',
+                'validate-scheduled-campaigns',
+                'archive-old-campaigns'
             }
             actual_tasks = set(beat_schedule.keys())
             

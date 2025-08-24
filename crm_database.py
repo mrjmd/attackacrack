@@ -360,7 +360,7 @@ class Campaign(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    status = db.Column(db.String(20), default='draft')  # 'draft', 'running', 'paused', 'complete'
+    status = db.Column(db.String(20), default='draft')  # 'draft', 'running', 'paused', 'complete', 'scheduled'
     template_a = db.Column(db.Text)  # A/B test variant A
     template_b = db.Column(db.Text, nullable=True)  # A/B test variant B
     quiet_hours_start = db.Column(db.Time, default=time(20, 0))  # 8 PM
@@ -382,7 +382,19 @@ class Campaign(db.Model):
     adapt_script_template = db.Column(db.Text, nullable=True)  # Template for previously contacted
     days_between_contacts = db.Column(db.Integer, default=30)  # Minimum days before recontacting
     
+    # Phase 3C: Campaign Scheduling fields
+    scheduled_at = db.Column(db.DateTime, nullable=True)  # When the campaign should run
+    timezone = db.Column(db.String(50), default='UTC')  # Timezone for scheduling
+    recurrence_pattern = db.Column(db.JSON, nullable=True)  # Recurring campaign configuration
+    next_run_at = db.Column(db.DateTime, nullable=True)  # Next execution time for recurring campaigns
+    is_recurring = db.Column(db.Boolean, default=False)  # Whether this is a recurring campaign
+    parent_campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=True)  # For duplicated campaigns
+    archived = db.Column(db.Boolean, default=False)  # Whether the campaign is archived
+    archived_at = db.Column(db.DateTime, nullable=True)  # When the campaign was archived
+    
+    # Relationships
     memberships = db.relationship('CampaignMembership', backref='campaign', lazy=True, cascade="all, delete-orphan")
+    parent_campaign = db.relationship('Campaign', remote_side=[id], backref=db.backref('child_campaigns', lazy='dynamic'))
 
 # --- NEW: CampaignMembership Model (Enhanced) ---
 class CampaignMembership(db.Model):

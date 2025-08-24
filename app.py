@@ -397,6 +397,16 @@ def create_app(config_name=None, test_config=None):
         dependencies=['openphone', 'campaign_list', 'campaign_repository', 'contact_repository', 'activity_repository']
     )
     
+    # Phase 3C: Campaign Scheduling Service
+    registry.register_factory(
+        'campaign_scheduling',
+        lambda campaign_repository, activity_repository: _create_campaign_scheduling_service(
+            campaign_repository, activity_repository
+        ),
+        dependencies=['campaign_repository', 'activity_repository'],
+        tags={'scheduling', 'campaigns'}
+    )
+    
     registry.register_factory(
         'csv_import',
         lambda contact, db_session: _create_csv_import_service(contact, db_session),
@@ -797,6 +807,15 @@ def _create_ai_service():
     from services.ai_service import AIService
     logger.info("Initializing AIService")
     return AIService()
+
+def _create_campaign_scheduling_service(campaign_repository, activity_repository):
+    """Create CampaignSchedulingService instance with dependencies"""
+    from services.campaign_scheduling_service import CampaignSchedulingService
+    logger.info("Initializing CampaignSchedulingService")
+    return CampaignSchedulingService(
+        campaign_repository=campaign_repository,
+        activity_repository=activity_repository
+    )
 
 def _create_quickbooks_service():
     """Create QuickBooksService instance with repository pattern"""

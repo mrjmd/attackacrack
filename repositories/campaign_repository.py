@@ -1037,3 +1037,412 @@ class CampaignRepository(BaseRepository[Campaign]):
             'roi_percentage': roi_percentage,
             'effectiveness_score': effectiveness_score
         }
+    
+    # Phase 3C: Campaign Scheduling Methods
+    
+    def find_scheduled_campaigns_ready_to_run(self, current_time: datetime) -> List[Campaign]:
+        """
+        Find campaigns that are scheduled and ready to execute.
+        
+        Args:
+            current_time: Time to check against
+            
+        Returns:
+            List of campaigns ready to run
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled',
+            Campaign.scheduled_at <= current_time,
+            Campaign.archived == False
+        ).all()
+    
+    def find_scheduled_campaigns(self) -> List[Campaign]:
+        """
+        Find all scheduled campaigns.
+        
+        Returns:
+            List of scheduled campaigns
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled'
+        ).all()
+    
+    def find_recurring_campaigns_needing_update(self, current_time: datetime) -> List[Campaign]:
+        """
+        Find recurring campaigns that need their next run time calculated.
+        
+        Args:
+            current_time: Time to check against
+            
+        Returns:
+            List of recurring campaigns needing update
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.is_recurring == True,
+            Campaign.status == 'scheduled',
+            Campaign.next_run_at <= current_time,
+            Campaign.archived == False
+        ).all()
+    
+    def find_archived_campaigns(self, include_date_range: bool = False, 
+                              start_date: Optional[datetime] = None,
+                              end_date: Optional[datetime] = None) -> List[Campaign]:
+        """
+        Find archived campaigns with optional date filtering.
+        
+        Args:
+            include_date_range: Whether to filter by date range
+            start_date: Start of date range
+            end_date: End of date range
+            
+        Returns:
+            List of archived campaigns
+        """
+        query = self.session.query(Campaign).filter(
+            Campaign.archived == True
+        )
+        
+        if include_date_range and start_date and end_date:
+            query = query.filter(
+                Campaign.archived_at >= start_date,
+                Campaign.archived_at <= end_date
+            )
+        
+        return query.all()
+    
+    def find_campaigns_by_parent(self, parent_campaign_id: int) -> List[Campaign]:
+        """
+        Find all campaigns duplicated from a parent campaign.
+        
+        Args:
+            parent_campaign_id: Parent campaign ID
+            
+        Returns:
+            List of child campaigns
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.parent_campaign_id == parent_campaign_id
+        ).all()
+    
+    def bulk_archive_campaigns(self, campaign_ids: List[int]) -> int:
+        """
+        Archive multiple campaigns at once.
+        
+        Args:
+            campaign_ids: List of campaign IDs to archive
+            
+        Returns:
+            Number of campaigns archived
+        """
+        if not campaign_ids:
+            return 0
+            
+        archived_at = utc_now()
+        count = self.session.query(Campaign).filter(
+            Campaign.id.in_(campaign_ids)
+        ).update(
+            {'archived': True, 'archived_at': archived_at},
+            synchronize_session=False
+        )
+        
+        self.session.flush()
+        return count
+    
+    def bulk_unarchive_campaigns(self, campaign_ids: List[int]) -> int:
+        """
+        Unarchive multiple campaigns at once.
+        
+        Args:
+            campaign_ids: List of campaign IDs to unarchive
+            
+        Returns:
+            Number of campaigns unarchived
+        """
+        if not campaign_ids:
+            return 0
+            
+        count = self.session.query(Campaign).filter(
+            Campaign.id.in_(campaign_ids)
+        ).update(
+            {'archived': False, 'archived_at': None},
+            synchronize_session=False
+        )
+        
+        self.session.flush()
+        return count
+    
+    def update_next_run_at(self, campaign_id: int, next_run_at: datetime) -> bool:
+        """
+        Update the next_run_at field for a recurring campaign.
+        
+        Args:
+            campaign_id: Campaign ID
+            next_run_at: Next run datetime
+            
+        Returns:
+            True if updated, False if not found
+        """
+        campaign = self.get_by_id(campaign_id)
+        if not campaign:
+            return False
+            
+        campaign.next_run_at = next_run_at
+        self.session.flush()
+        return True
+    
+    def find_campaigns_with_timezone(self, timezone: str) -> List[Campaign]:
+        """
+        Find campaigns configured for a specific timezone.
+        
+        Args:
+            timezone: Timezone string (e.g., 'America/New_York')
+            
+        Returns:
+            List of campaigns in the specified timezone
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.timezone == timezone
+        ).all()
+    
+    def get_scheduled_campaigns_for_date(self, date: datetime) -> List[Campaign]:
+        """
+        Get campaigns scheduled for a specific date.
+        
+        Args:
+            date: Date to check (will check entire day)
+            
+        Returns:
+            List of campaigns scheduled for that date
+        """
+        start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        return self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled',
+            Campaign.scheduled_at >= start_of_day,
+            Campaign.scheduled_at <= end_of_day
+        ).all()
+    
+    def cleanup_expired_recurring_campaigns(self, current_time: datetime) -> int:
+        """
+        Clean up recurring campaigns that have passed their end date.
+        
+        Args:
+            current_time: Current time to check against
+            
+        Returns:
+            Number of campaigns updated
+        """
+        expired_campaigns = self.session.query(Campaign).filter(
+            Campaign.is_recurring == True,
+            Campaign.status == 'scheduled'
+        ).all()
+        
+        count = 0
+        for campaign in expired_campaigns:
+            if campaign.recurrence_pattern and 'end_date' in campaign.recurrence_pattern:
+                end_date = datetime.fromisoformat(campaign.recurrence_pattern['end_date'])
+                if current_time > end_date:
+                    campaign.status = 'complete'
+                    campaign.is_recurring = False
+                    count += 1
+        
+        if count > 0:
+            self.session.flush()
+        
+        return count
+    
+    def find_recurring_campaigns(self) -> List[Campaign]:
+        """
+        Find all recurring campaigns.
+        
+        Returns:
+            List of recurring campaigns
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.is_recurring == True
+        ).all()
+    
+    def get_campaigns_by_timezone(self, timezone: str) -> List[Campaign]:
+        """
+        Alias for find_campaigns_with_timezone.
+        
+        Args:
+            timezone: Timezone string
+            
+        Returns:
+            List of campaigns in the specified timezone
+        """
+        return self.find_campaigns_with_timezone(timezone)
+    
+    def update_schedule(self, campaign_id: int, update_data: Dict[str, Any]) -> bool:
+        """
+        Update campaign schedule fields.
+        
+        Args:
+            campaign_id: Campaign ID
+            update_data: Dictionary with fields to update
+            
+        Returns:
+            True if updated, False if not found
+        """
+        campaign = self.get_by_id(campaign_id)
+        if not campaign:
+            return False
+            
+        for key, value in update_data.items():
+            if hasattr(campaign, key):
+                # For datetime fields, handle timezone-aware values properly
+                if key in ['scheduled_at', 'next_run_at', 'archived_at'] and value is not None:
+                    # Keep timezone-aware datetime as-is for tests
+                    setattr(campaign, key, value)
+                else:
+                    setattr(campaign, key, value)
+        
+        self.session.flush()
+        return True
+    
+    def update_next_run_time(self, campaign_id: int, next_run_at: datetime) -> bool:
+        """
+        Alias for update_next_run_at.
+        
+        Args:
+            campaign_id: Campaign ID
+            next_run_at: Next run datetime
+            
+        Returns:
+            True if updated, False if not found
+        """
+        return self.update_next_run_at(campaign_id, next_run_at)
+    
+    def archive_campaign(self, campaign_id: int, archive_time: Optional[datetime] = None) -> bool:
+        """
+        Archive a campaign.
+        
+        Args:
+            campaign_id: Campaign ID
+            archive_time: When archived (default: now)
+            
+        Returns:
+            True if archived, False if not found
+        """
+        campaign = self.get_by_id(campaign_id)
+        if not campaign:
+            return False
+            
+        campaign.archived = True
+        campaign.archived_at = archive_time or utc_now().replace(tzinfo=None)
+        self.session.flush()
+        return True
+    
+    def unarchive_campaign(self, campaign_id: int) -> bool:
+        """
+        Unarchive a campaign.
+        
+        Args:
+            campaign_id: Campaign ID
+            
+        Returns:
+            True if unarchived, False if not found
+        """
+        campaign = self.get_by_id(campaign_id)
+        if not campaign:
+            return False
+            
+        campaign.archived = False
+        campaign.archived_at = None
+        self.session.flush()
+        return True
+    
+    def get_schedule_summary(self) -> Dict[str, Any]:
+        """
+        Get summary of all scheduled campaigns.
+        
+        Returns:
+            Dictionary with scheduling statistics
+        """
+        scheduled_count = self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled'
+        ).count()
+        
+        recurring_count = self.session.query(Campaign).filter(
+            Campaign.is_recurring == True
+        ).count()
+        
+        archived_count = self.session.query(Campaign).filter(
+            Campaign.archived == True
+        ).count()
+        
+        return {
+            'total_scheduled': scheduled_count,
+            'total_recurring': recurring_count,
+            'total_archived': archived_count
+        }
+    
+    def bulk_update_schedules(self, campaign_ids: List[int], update_data: Dict[str, Any]) -> int:
+        """
+        Bulk update schedule fields for multiple campaigns.
+        
+        Args:
+            campaign_ids: List of campaign IDs
+            update_data: Fields to update
+            
+        Returns:
+            Number of campaigns updated
+        """
+        if not campaign_ids:
+            return 0
+            
+        count = self.session.query(Campaign).filter(
+            Campaign.id.in_(campaign_ids)
+        ).update(update_data, synchronize_session=False)
+        
+        self.session.flush()
+        return count
+    
+    def find_failed_scheduled_campaigns(self) -> List[Campaign]:
+        """
+        Find scheduled campaigns that failed to execute.
+        
+        Returns:
+            List of failed scheduled campaigns
+        """
+        # Find campaigns that are scheduled but past their scheduled time
+        current_time = utc_now().replace(tzinfo=None)
+        cutoff_time = current_time - timedelta(hours=1)  # Consider failed if 1 hour past
+        
+        return self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled',
+            Campaign.scheduled_at < cutoff_time,
+            Campaign.archived == False
+        ).all()
+    
+    def get_next_scheduled_campaigns(self, limit: int = 10) -> List[Campaign]:
+        """
+        Get the next scheduled campaigns to run.
+        
+        Args:
+            limit: Maximum number to return
+            
+        Returns:
+            List of upcoming scheduled campaigns
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled',
+            Campaign.archived == False
+        ).order_by(Campaign.scheduled_at).limit(limit).all()
+    
+    def search_scheduled_campaigns(self, query: str) -> List[Campaign]:
+        """
+        Search scheduled campaigns by name.
+        
+        Args:
+            query: Search query
+            
+        Returns:
+            List of matching scheduled campaigns
+        """
+        return self.session.query(Campaign).filter(
+            Campaign.status == 'scheduled',
+            Campaign.name.ilike(f'%{query}%')
+        ).all()

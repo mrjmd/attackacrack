@@ -72,6 +72,38 @@ celery.conf.beat_schedule = {
         'schedule': crontab(hour=4, minute=0, day_of_week=0),
         'kwargs': {'days_old': 30}
     },
+    # Phase 3C: Campaign Scheduling Tasks
+    'check-scheduled-campaigns': {
+        'task': 'tasks.campaign_scheduling_tasks.check_scheduled_campaigns',
+        # Executes every minute to check for campaigns ready to run
+        'schedule': 60.0,  # 1 minute
+    },
+    'calculate-recurring-schedules': {
+        'task': 'tasks.campaign_scheduling_tasks.calculate_recurring_schedules',
+        # Executes every 15 minutes to update recurring campaign schedules
+        'schedule': 900.0,  # 15 minutes
+    },
+    'cleanup-expired-campaigns': {
+        'task': 'tasks.campaign_scheduling_tasks.cleanup_expired_campaigns',
+        # Executes daily at 1 AM UTC to clean up expired recurring campaigns
+        'schedule': crontab(hour=1, minute=0),
+    },
+    'send-schedule-notifications': {
+        'task': 'tasks.campaign_scheduling_tasks.send_schedule_notifications',
+        # Executes every 30 minutes to send upcoming campaign notifications
+        'schedule': 1800.0,  # 30 minutes
+    },
+    'validate-scheduled-campaigns': {
+        'task': 'tasks.campaign_scheduling_tasks.validate_scheduled_campaigns',
+        # Executes every hour to validate scheduled campaigns
+        'schedule': 3600.0,  # 1 hour
+    },
+    'archive-old-campaigns': {
+        'task': 'tasks.campaign_scheduling_tasks.archive_old_campaigns',
+        # Executes weekly on Sunday at 5 AM UTC to archive old campaigns
+        'schedule': crontab(hour=5, minute=0, day_of_week=0),
+        'kwargs': {'days_old': 90}
+    },
 }
 celery.conf.timezone = 'UTC'
 
@@ -85,6 +117,7 @@ try:
         import tasks.webhook_health_tasks
         import tasks.webhook_retry_tasks
         import tasks.reconciliation_tasks
+        import tasks.campaign_scheduling_tasks
         print("Successfully imported tasks")
         print(f"Registered tasks: {list(celery.tasks.keys())}")
 except Exception as e:

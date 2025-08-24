@@ -7,9 +7,11 @@ from flask import Blueprint, request, jsonify, render_template, redirect, url_fo
 from auth_utils import login_required
 from datetime import datetime, timedelta
 from utils.datetime_utils import utc_now
+from services.common.result import Result
 from extensions import db
 import csv
 import io
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -571,3 +573,779 @@ def export_opt_outs():
         logger.error(f"Error exporting opt-outs: {e}")
         flash('Error exporting opt-out data', 'danger')
         return redirect(url_for('campaigns.opt_out_report'))
+
+
+# Phase 3C: Campaign Scheduling Routes
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/schedule', methods=['GET'])
+@login_required
+def api_get_campaign_schedule(campaign_id):
+    """Get campaign schedule information"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        result = scheduling_service.get_campaign_schedule_info(campaign_id)
+        
+        if result.is_success():
+            info = result.data
+            # Check if campaign is scheduled
+            is_scheduled = info['status'] == 'scheduled'
+            
+            return jsonify({
+                'success': True,
+                'campaign_id': campaign_id,
+                'is_scheduled': is_scheduled,
+                'scheduled_at': info['scheduled_at'].isoformat() if info['scheduled_at'] else None,
+                'timezone': info['timezone'],
+                'is_recurring': info['is_recurring'],
+                'recurrence_pattern': info['recurrence_pattern'],
+                'next_run_at': info['next_run_at'].isoformat() if info['next_run_at'] else None
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error getting campaign schedule: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/schedule', methods=['POST'])
+@login_required
+def api_schedule_campaign(campaign_id):
+    """Schedule a campaign for future execution"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        # Parse scheduled time
+        scheduled_at_str = data.get('scheduled_at')
+        if not scheduled_at_str:
+            return jsonify({
+                'success': False,
+                'error': 'scheduled_at is required'
+            }), 400
+        
+        scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
+        timezone = data.get('timezone', 'UTC')
+        
+        # Validate not in the past
+        if scheduled_at < utc_now():
+            return jsonify({
+                'success': False,
+                'error': 'Cannot schedule campaign in the past'
+            }), 400
+        
+        # Schedule the campaign
+        result = scheduling_service.schedule_campaign(
+            campaign_id=campaign_id,
+            scheduled_at=scheduled_at,
+            timezone=timezone
+        )
+        
+        if result.is_success:
+            return jsonify({
+                'success': True,
+                'campaign_id': campaign_id,
+                'scheduled_at': scheduled_at.isoformat(),
+                'timezone': timezone
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error scheduling campaign {campaign_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/recurring', methods=['POST'])
+@login_required
+def api_create_recurring_campaign(campaign_id):
+    """Create a recurring campaign"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        # Parse start time
+        start_at_str = data.get('start_at')
+        if not start_at_str:
+            return jsonify({
+                'success': False,
+                'error': 'start_at is required'
+            }), 400
+        
+        start_at = datetime.fromisoformat(start_at_str.replace('Z', '+00:00'))
+        recurrence_pattern = data.get('recurrence_pattern')
+        timezone = data.get('timezone', 'UTC')
+        
+        if not recurrence_pattern:
+            return jsonify({
+                'success': False,
+                'error': 'recurrence_pattern is required'
+            }), 400
+        
+        # Create recurring campaign
+        result = scheduling_service.create_recurring_campaign(
+            campaign_id=campaign_id,
+            start_at=start_at,
+            recurrence_pattern=recurrence_pattern,
+            timezone=timezone
+        )
+        
+        if result.is_success:
+            return jsonify({
+                'success': True,
+                'campaign_id': campaign_id,
+                'is_recurring': True,
+                'recurrence_pattern': recurrence_pattern
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error creating recurring campaign {campaign_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/schedule', methods=['DELETE'])
+@login_required
+def api_cancel_schedule(campaign_id):
+    """Cancel a scheduled campaign"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        result = scheduling_service.cancel_schedule(campaign_id)
+        
+        if result.is_success:
+            return jsonify({
+                'success': True,
+                'campaign_id': campaign_id,
+                'message': 'Schedule cancelled'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error cancelling schedule for campaign {campaign_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/schedule', methods=['PUT'])
+@login_required
+def api_update_schedule(campaign_id):
+    """Update schedule for a campaign"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        scheduled_at_str = data.get('scheduled_at')
+        if not scheduled_at_str:
+            return jsonify({
+                'success': False,
+                'error': 'scheduled_at is required'
+            }), 400
+        
+        scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
+        timezone = data.get('timezone')
+        
+        result = scheduling_service.update_schedule(
+            campaign_id=campaign_id,
+            scheduled_at=scheduled_at,
+            timezone=timezone
+        )
+        
+        if result.is_success:
+            return jsonify({
+                'success': True,
+                'campaign_id': campaign_id,
+                'scheduled_at': scheduled_at.isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error updating schedule for campaign {campaign_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/unarchive', methods=['POST'])
+@login_required
+def api_unarchive_campaign(campaign_id):
+    """Unarchive a campaign"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        result = scheduling_service.unarchive_campaign(campaign_id)
+        
+        if result.is_success:
+            return jsonify({
+                'success': True,
+                'campaign_id': campaign_id,
+                'archived': False
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error unarchiving campaign {campaign_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/scheduled')
+@login_required
+def api_get_scheduled_campaigns():
+    """Get all scheduled campaigns"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        include_archived = request.args.get('include_archived', 'false').lower() == 'true'
+        campaigns = scheduling_service.get_scheduled_campaigns(include_archived=include_archived)
+        
+        campaign_data = []
+        for campaign in campaigns:
+            campaign_data.append({
+                'id': campaign.id,
+                'name': campaign.name,
+                'scheduled_at': campaign.scheduled_at.isoformat() if campaign.scheduled_at else None,
+                'timezone': campaign.timezone,
+                'is_recurring': campaign.is_recurring,
+                'recurrence_pattern': campaign.recurrence_pattern,
+                'next_run_at': campaign.next_run_at.isoformat() if campaign.next_run_at else None,
+                'archived': campaign.archived
+            })
+        
+        return jsonify({
+            'success': True,
+            'campaigns': campaign_data,
+            'count': len(campaign_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting scheduled campaigns: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/campaigns/<int:campaign_id>/schedule')
+@login_required
+def campaign_schedule_page(campaign_id):
+    """Show campaign scheduling page"""
+    campaign_service = current_app.services.get('campaign')
+    scheduling_service = current_app.services.get('campaign_scheduling')
+    
+    campaign = campaign_service.get_by_id(campaign_id)
+    if not campaign:
+        abort(404)
+    
+    # Check if already scheduled
+    is_scheduled = campaign.status == 'scheduled'
+    scheduled_info = None
+    if is_scheduled:
+        scheduled_info = {
+            'scheduled_at': campaign.scheduled_at,
+            'timezone': campaign.timezone,
+            'is_recurring': campaign.is_recurring,
+            'recurrence_pattern': campaign.recurrence_pattern
+        }
+    
+    return render_template('campaigns/schedule.html',
+                         campaign=campaign,
+                         is_scheduled=is_scheduled,
+                         scheduled_info=scheduled_info)
+
+
+@campaigns_bp.route('/campaigns/scheduled')
+@login_required
+def scheduled_campaigns():
+    """Show all scheduled campaigns"""
+    scheduling_service = current_app.services.get('campaign_scheduling')
+    
+    if not scheduling_service:
+        flash('Scheduling service not available', 'error')
+        return redirect(url_for('campaigns.campaign_list'))
+    
+    scheduled = scheduling_service.get_scheduled_campaigns()
+    
+    return render_template('campaigns/scheduled.html',
+                         scheduled_campaigns=scheduled)
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/cancel-schedule', methods=['POST'])
+@login_required
+def api_cancel_campaign_schedule(campaign_id):
+    """Cancel a scheduled campaign"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        result = scheduling_service.cancel_schedule(campaign_id)
+        
+        if result.is_success():
+            return jsonify({
+                'success': True,
+                'status': result.data['status'],
+                'message': 'Campaign schedule cancelled'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error cancelling campaign schedule: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/duplicate', methods=['POST'])
+@login_required
+def api_duplicate_campaign(campaign_id):
+    """Duplicate a campaign with optional scheduling"""
+    try:
+        data = request.get_json() or {}
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        # Extract parameters
+        new_name = data.get('name', f"Copy of Campaign {campaign_id}")
+        scheduled_at = data.get('scheduled_at')
+        timezone = data.get('timezone', 'UTC')
+        
+        if scheduled_at:
+            # Parse and schedule the duplicate
+            from datetime import datetime
+            scheduled_datetime = datetime.fromisoformat(scheduled_at.replace('Z', '+00:00'))
+            result = scheduling_service.duplicate_campaign_with_schedule(
+                campaign_id, new_name, scheduled_datetime, timezone
+            )
+        else:
+            # Just duplicate without scheduling
+            campaign_service = current_app.services.get('campaign')
+            original = campaign_service.get_by_id(campaign_id)
+            if not original:
+                return jsonify({
+                    'success': False,
+                    'error': f'Campaign {campaign_id} not found'
+                }), 404
+                
+            duplicate = campaign_service.create_campaign(
+                name=new_name,
+                campaign_type=original.campaign_type,
+                template_a=original.template_a,
+                template_b=original.template_b,
+                daily_limit=original.daily_limit,
+                business_hours_only=original.business_hours_only,
+                audience_type=original.audience_type,
+                channel=original.channel
+            )
+            result = Result.success({'campaign_id': duplicate.id})
+        
+        if result.is_success():
+            return jsonify({
+                'success': True,
+                'campaign_id': result.data['campaign_id'],
+                'message': 'Campaign duplicated successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error duplicating campaign: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/archive', methods=['POST'])
+@login_required
+def api_archive_campaign(campaign_id):
+    """Archive a campaign"""
+    try:
+        data = request.get_json() or {}
+        reason = data.get('reason', '')
+        
+        campaign_repository = current_app.services.get('campaign_repository')
+        if not campaign_repository:
+            return jsonify({
+                'success': False,
+                'error': 'Campaign repository not available'
+            }), 503
+        
+        campaign = campaign_repository.get_by_id(campaign_id)
+        if not campaign:
+            return jsonify({
+                'success': False,
+                'error': f'Campaign {campaign_id} not found'
+            }), 404
+        
+        # Archive the campaign
+        from utils.datetime_utils import utc_now
+        campaign.archived = True
+        campaign.archived_at = utc_now()
+        campaign.archive_reason = reason
+        campaign_repository.commit()
+        
+        return jsonify({
+            'success': True,
+            'archived': True,
+            'archived_at': campaign.archived_at.isoformat(),
+            'message': 'Campaign archived successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error archiving campaign: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/archived')
+@login_required
+def api_get_archived_campaigns():
+    """Get all archived campaigns"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        # Get query parameters
+        include_date_range = request.args.get('include_date_range', 'false').lower() == 'true'
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # Parse dates if provided
+        from datetime import datetime
+        if start_date:
+            start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date:
+            end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        
+        campaigns = scheduling_service.get_archived_campaigns(
+            include_date_range, start_date, end_date
+        )
+        
+        campaign_data = []
+        for campaign in campaigns:
+            campaign_data.append({
+                'id': campaign.id,
+                'name': campaign.name,
+                'status': campaign.status,
+                'archived': campaign.archived,
+                'archived_at': campaign.archived_at.isoformat() if campaign.archived_at else None,
+                'archive_reason': getattr(campaign, 'archive_reason', None),
+                'created_at': campaign.created_at.isoformat() if campaign.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'campaigns': campaign_data,
+            'count': len(campaign_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting archived campaigns: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/bulk-schedule', methods=['POST'])
+@login_required
+def api_bulk_schedule_campaigns():
+    """Bulk schedule multiple campaigns"""
+    try:
+        data = request.get_json() or {}
+        
+        # Validate required fields
+        if not data.get('campaign_ids'):
+            return jsonify({
+                'success': False,
+                'error': 'campaign_ids is required'
+            }), 400
+            
+        if not data.get('scheduled_at'):
+            return jsonify({
+                'success': False,
+                'error': 'scheduled_at is required'
+            }), 400
+        
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        # Parse parameters
+        campaign_ids = data['campaign_ids']
+        scheduled_at = data['scheduled_at']
+        timezone = data.get('timezone', 'UTC')
+        
+        # Parse datetime
+        from datetime import datetime
+        scheduled_datetime = datetime.fromisoformat(scheduled_at.replace('Z', '+00:00'))
+        
+        # Schedule campaigns
+        result = scheduling_service.bulk_schedule_campaigns(
+            campaign_ids, scheduled_datetime, timezone
+        )
+        
+        if result.is_success():
+            return jsonify({
+                'success': True,
+                'campaigns_scheduled': result.data['campaigns_scheduled'],
+                'failed_campaigns': result.data.get('failed_campaigns', []),
+                'message': f"Scheduled {result.data['campaigns_scheduled']} campaigns"
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error bulk scheduling campaigns: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/calendar')
+@login_required
+def api_get_campaign_calendar():
+    """Get campaign calendar data"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        # Get date range from query params
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        timezone = request.args.get('timezone', 'UTC')
+        
+        # Parse dates
+        from datetime import datetime
+        if start_date:
+            start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        else:
+            from utils.datetime_utils import utc_now
+            start_date = utc_now()
+            
+        if end_date:
+            end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        else:
+            from datetime import timedelta
+            end_date = start_date + timedelta(days=30)
+        
+        # Get campaigns in date range
+        result = scheduling_service.get_campaign_calendar(
+            start_date, end_date, timezone
+        )
+        
+        if result.is_success():
+            return jsonify({
+                'success': True,
+                'campaigns': result.data,
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'timezone': timezone
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error getting campaign calendar: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/campaigns/<int:campaign_id>/schedule-info')
+@login_required
+def api_get_campaign_schedule_info(campaign_id):
+    """Get schedule information for a campaign"""
+    try:
+        scheduling_service = current_app.services.get('campaign_scheduling')
+        if not scheduling_service:
+            return jsonify({
+                'success': False,
+                'error': 'Scheduling service not available'
+            }), 503
+        
+        result = scheduling_service.get_campaign_schedule_info(campaign_id)
+        
+        if result.is_success():
+            info = result.data
+            return jsonify({
+                'success': True,
+                'campaign_id': info['campaign_id'],
+                'status': info['status'],
+                'scheduled_at': info['scheduled_at'].isoformat() if info['scheduled_at'] else None,
+                'timezone': info['timezone'],
+                'is_recurring': info['is_recurring'],
+                'recurrence_pattern': info['recurrence_pattern'],
+                'next_run_at': info['next_run_at'].isoformat() if info['next_run_at'] else None,
+                'archived': info['archived']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error getting campaign schedule info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/api/timezones')
+@login_required
+def api_get_timezones():
+    """Get list of supported timezones"""
+    try:
+        # Common US timezones
+        timezones = [
+            {'value': 'America/New_York', 'label': 'Eastern Time (ET)'},
+            {'value': 'America/Chicago', 'label': 'Central Time (CT)'},
+            {'value': 'America/Denver', 'label': 'Mountain Time (MT)'},
+            {'value': 'America/Phoenix', 'label': 'Arizona Time (AZ)'},
+            {'value': 'America/Los_Angeles', 'label': 'Pacific Time (PT)'},
+            {'value': 'America/Anchorage', 'label': 'Alaska Time (AK)'},
+            {'value': 'Pacific/Honolulu', 'label': 'Hawaii Time (HI)'},
+            {'value': 'UTC', 'label': 'UTC'}
+        ]
+        
+        return jsonify({
+            'success': True,
+            'timezones': timezones
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting timezones: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
