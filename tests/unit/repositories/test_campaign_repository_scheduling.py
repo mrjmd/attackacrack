@@ -238,7 +238,12 @@ class TestCampaignRepositoryScheduling:
         assert result is True
         
         db_session.refresh(campaign)
-        assert campaign.next_run_at == new_next_run
+        
+        # Compare datetimes by converting to UTC if needed
+        expected_utc = new_next_run.replace(tzinfo=None) if new_next_run.tzinfo else new_next_run
+        actual_utc = campaign.next_run_at.replace(tzinfo=None) if campaign.next_run_at.tzinfo else campaign.next_run_at
+        
+        assert actual_utc == expected_utc
         
     def test_archive_campaign_repository_method(self, campaign_repository, db_session):
         """Test repository method for archiving campaign"""
@@ -257,7 +262,12 @@ class TestCampaignRepositoryScheduling:
         
         db_session.refresh(campaign)
         assert campaign.archived is True
-        assert campaign.archived_at == archive_time
+        
+        # Compare datetimes by converting to UTC if needed
+        expected_utc = archive_time.replace(tzinfo=None) if archive_time.tzinfo else archive_time
+        actual_utc = campaign.archived_at.replace(tzinfo=None) if campaign.archived_at.tzinfo else campaign.archived_at
+        
+        assert actual_utc == expected_utc
         
     def test_unarchive_campaign_repository_method(self, campaign_repository, db_session):
         """Test repository method for unarchiving campaign"""

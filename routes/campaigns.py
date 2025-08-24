@@ -591,7 +591,7 @@ def api_get_campaign_schedule(campaign_id):
         
         result = scheduling_service.get_campaign_schedule_info(campaign_id)
         
-        if result.is_success():
+        if result.is_success:
             info = result.data
             # Check if campaign is scheduled
             is_scheduled = info['status'] == 'scheduled'
@@ -632,8 +632,16 @@ def api_schedule_campaign(campaign_id):
                 'error': 'Scheduling service not available'
             }), 503
         
-        data = request.get_json()
-        if not data:
+        # Handle malformed JSON
+        try:
+            data = request.get_json(force=True)
+        except Exception:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid JSON format'
+            }), 400
+            
+        if data is None:
             return jsonify({
                 'success': False,
                 'error': 'No data provided'
@@ -731,11 +739,13 @@ def api_create_recurring_campaign(campaign_id):
         )
         
         if result.is_success:
+            campaign = result.data
             return jsonify({
                 'success': True,
                 'campaign_id': campaign_id,
                 'is_recurring': True,
-                'recurrence_pattern': recurrence_pattern
+                'recurrence_pattern': recurrence_pattern,
+                'next_run_at': campaign.next_run_at.isoformat() if campaign.next_run_at else None
             })
         else:
             return jsonify({
@@ -891,14 +901,33 @@ def api_get_scheduled_campaigns():
         
         campaign_data = []
         for campaign in campaigns:
+            # Ensure consistent datetime formatting
+            scheduled_at = None
+            if campaign.scheduled_at:
+                # If timezone-aware, use as-is, otherwise treat as UTC
+                dt = campaign.scheduled_at
+                if dt.tzinfo is None:
+                    from zoneinfo import ZoneInfo
+                    dt = dt.replace(tzinfo=ZoneInfo('UTC'))
+                scheduled_at = dt.isoformat()
+            
+            next_run_at = None
+            if campaign.next_run_at:
+                # If timezone-aware, use as-is, otherwise treat as UTC
+                dt = campaign.next_run_at
+                if dt.tzinfo is None:
+                    from zoneinfo import ZoneInfo
+                    dt = dt.replace(tzinfo=ZoneInfo('UTC'))
+                next_run_at = dt.isoformat()
+            
             campaign_data.append({
                 'id': campaign.id,
                 'name': campaign.name,
-                'scheduled_at': campaign.scheduled_at.isoformat() if campaign.scheduled_at else None,
+                'scheduled_at': scheduled_at,
                 'timezone': campaign.timezone,
                 'is_recurring': campaign.is_recurring,
                 'recurrence_pattern': campaign.recurrence_pattern,
-                'next_run_at': campaign.next_run_at.isoformat() if campaign.next_run_at else None,
+                'next_run_at': next_run_at,
                 'archived': campaign.archived
             })
         
@@ -974,10 +1003,11 @@ def api_cancel_campaign_schedule(campaign_id):
         
         result = scheduling_service.cancel_schedule(campaign_id)
         
-        if result.is_success():
+        if result.is_success:
+            campaign = result.data
             return jsonify({
                 'success': True,
-                'status': result.data['status'],
+                'status': campaign.status,
                 'message': 'Campaign schedule cancelled'
             })
         else:
@@ -1042,7 +1072,7 @@ def api_duplicate_campaign(campaign_id):
             )
             result = Result.success({'campaign_id': duplicate.id})
         
-        if result.is_success():
+        if result.is_success:
             return jsonify({
                 'success': True,
                 'campaign_id': result.data['campaign_id'],
@@ -1201,7 +1231,7 @@ def api_bulk_schedule_campaigns():
             campaign_ids, scheduled_datetime, timezone
         )
         
-        if result.is_success():
+        if result.is_success:
             return jsonify({
                 'success': True,
                 'campaigns_scheduled': result.data['campaigns_scheduled'],
@@ -1258,10 +1288,11 @@ def api_get_campaign_calendar():
             start_date, end_date, timezone
         )
         
-        if result.is_success():
+        if result.is_success:
             return jsonify({
                 'success': True,
-                'campaigns': result.data,
+                'calendar_data': result.data,
+                'campaigns': result.data,  # Keep for backward compatibility
                 'start_date': start_date.isoformat(),
                 'end_date': end_date.isoformat(),
                 'timezone': timezone
@@ -1294,7 +1325,7 @@ def api_get_campaign_schedule_info(campaign_id):
         
         result = scheduling_service.get_campaign_schedule_info(campaign_id)
         
-        if result.is_success():
+        if result.is_success:
             info = result.data
             return jsonify({
                 'success': True,
