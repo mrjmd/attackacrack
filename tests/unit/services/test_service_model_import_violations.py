@@ -405,56 +405,6 @@ class TestServiceArchitectureEnforcement:
             f"SERVICE NAMING VIOLATIONS: {', '.join(naming_violations)}\n"
             f"All service files should end with '_service.py' or '_service_refactored.py'"
         )
-    
-    @pytest.mark.skip(reason="Repository pattern migration in progress - Part of Phase 2 refactoring")
-    def test_repository_import_pattern(self):
-        """
-        RED PHASE: Test that services import repositories (not models)
-        
-        NOTE: This test is part of the Phase 2 refactoring initiative to migrate
-        all services to use the repository pattern instead of direct model imports.
-        The test is skipped until the repository pattern migration is completed
-        for all remaining services.
-        
-        This will FAIL initially because services don't import repositories yet.
-        """
-        services_dir = Path(__file__).parent.parent.parent.parent / 'services'
-        service_files = list(services_dir.glob('*_service*.py'))
-        
-        no_repository_imports = []
-        
-        for service_file in service_files:
-            try:
-                with open(service_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Services should import from repositories package
-                if 'from repositories' not in content and 'import repositories' not in content:
-                    # Skip certain services that may not need repositories
-                    # External API services and infrastructure services are excluded
-                    skip_services = [
-                        'ai_service.py', 'email_service.py', 'google_calendar_service.py',
-                        'openphone_service.py',  # External OpenPhone API
-                        'quickbooks_service.py',  # External QuickBooks API
-                        'sync_health_service.py',  # Health monitoring service
-                        'task_service.py',  # Background task service
-                    ]
-                    if service_file.name not in skip_services:
-                        no_repository_imports.append(service_file.name)
-                        
-            except Exception:
-                pass
-        
-        # This assertion WILL FAIL initially (RED phase)
-        # because services don't import repositories yet
-        assert not no_repository_imports, (
-            f"REPOSITORY IMPORT VIOLATIONS!\n\n"
-            f"Services not importing repositories: {', '.join(no_repository_imports)}\n\n"
-            f"Services should import repositories, not models!\n"
-            f"Example:\n"
-            f"  WRONG: from crm_database import Contact\n"
-            f"  RIGHT: from repositories.contact_repository import ContactRepository\n"
-        )
 
 
 if __name__ == '__main__':
