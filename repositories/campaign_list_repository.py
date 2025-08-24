@@ -5,6 +5,7 @@ Isolates all database queries related to campaign lists
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, desc, asc
 from sqlalchemy.orm import Query
 from repositories.base_repository import BaseRepository, SortOrder
@@ -127,7 +128,7 @@ class CampaignListRepository(BaseRepository[CampaignList]):
         Returns:
             Updated campaign list
         """
-        return self.update(campaign_list, updated_at=datetime.utcnow())
+        return self.update(campaign_list, updated_at=utc_now())
     
     def get_list_counts_by_type(self) -> Dict[str, int]:
         """
@@ -179,7 +180,7 @@ class CampaignListRepository(BaseRepository[CampaignList]):
         Returns:
             Updated campaign list or None if not found
         """
-        return self.update_by_id(list_id, filter_criteria=criteria, updated_at=datetime.utcnow())
+        return self.update_by_id(list_id, filter_criteria=criteria, updated_at=utc_now())
     
     def get_lists_created_after(self, date: datetime) -> List[CampaignList]:
         """

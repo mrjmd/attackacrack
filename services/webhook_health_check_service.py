@@ -6,6 +6,7 @@ Sends test messages and verifies webhook receipt within timeout period
 import time
 import uuid
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -126,7 +127,7 @@ class WebhookHealthCheckService:
             HealthCheckResult with send status
         """
         check_message = self._generate_health_check_message()
-        sent_at = datetime.utcnow()
+        sent_at = utc_now()
         
         try:
             response = self.openphone_service.send_message(
@@ -233,7 +234,7 @@ class WebhookHealthCheckService:
         Returns:
             Dictionary with health check statistics
         """
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = utc_now() - timedelta(hours=hours)
         
         # Query health check events using a more testable approach
         events = self._get_health_check_events(since)
@@ -286,7 +287,7 @@ class WebhookHealthCheckService:
         Returns:
             Unique health check message with timestamp and ID
         """
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = utc_now().isoformat()
         unique_id = str(uuid.uuid4())[:8]
         return f"{self.health_check_prefix} Test at {timestamp}-{unique_id}"
     
@@ -341,7 +342,7 @@ OpenPhone Webhook Health Check Alert
 =====================================
 
 Status: {result.status.value.upper()}
-Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+Time: {utc_now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 Details:
 --------
@@ -390,7 +391,7 @@ This is an automated alert from the Attack-a-Crack CRM system.
                 'event_type': event_type,
                 'payload': payload,
                 'processed': True,
-                'processed_at': datetime.utcnow()
+                'processed_at': utc_now()
             })
             logger.debug("Stored health check result", event_id=event_id, status=result.status.value)
         except Exception as e:

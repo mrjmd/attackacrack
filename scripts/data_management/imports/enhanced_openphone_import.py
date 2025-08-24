@@ -14,6 +14,7 @@ import requests
 import json
 import logging
 from datetime import datetime, timezone
+from utils.datetime_utils import utc_now
 from typing import Dict, List, Optional, Tuple
 from urllib3.exceptions import InsecureRequestWarning
 from collections import Counter
@@ -458,7 +459,7 @@ class EnhancedOpenPhoneImporter:
                 
                 # Timestamps
                 created_at=created_at,
-                updated_at=datetime.utcnow()
+                updated_at=utc_now()
             )
             
             db.session.add(new_activity)

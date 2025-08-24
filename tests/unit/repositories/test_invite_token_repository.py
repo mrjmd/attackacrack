@@ -5,6 +5,7 @@ Following TDD principles: RED phase - tests written BEFORE implementation
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -34,8 +35,8 @@ class TestInviteTokenRepository:
             'email': 'invite@example.com',
             'token': 'abc123def456',
             'role': 'marketer',
-            'created_at': datetime.utcnow(),
-            'expires_at': datetime.utcnow() + timedelta(days=7),
+            'created_at': utc_now(),
+            'expires_at': utc_now() + timedelta(days=7),
             'used': False,
             'created_by_id': 1
         }
@@ -51,7 +52,7 @@ class TestInviteTokenRepository:
     def expired_invite(self, sample_invite_data):
         """Sample expired InviteToken instance"""
         data = sample_invite_data.copy()
-        data['expires_at'] = datetime.utcnow() - timedelta(days=1)
+        data['expires_at'] = utc_now() - timedelta(days=1)
         invite = InviteToken(**data)
         invite.id = 2
         return invite
@@ -61,7 +62,7 @@ class TestInviteTokenRepository:
         """Sample used InviteToken instance"""
         data = sample_invite_data.copy()
         data['used'] = True
-        data['used_at'] = datetime.utcnow()
+        data['used_at'] = utc_now()
         invite = InviteToken(**data)
         invite.id = 3
         return invite
@@ -253,7 +254,7 @@ class TestInviteTokenRepository:
         """Test marking an invite as used"""
         # Arrange
         mock_session.get.return_value = sample_invite
-        used_time = datetime.utcnow()
+        used_time = utc_now()
         
         # Act
         result = invite_repository.mark_as_used(1, used_time)
@@ -270,7 +271,7 @@ class TestInviteTokenRepository:
         mock_session.get.return_value = None
         
         # Act
-        result = invite_repository.mark_as_used(999, datetime.utcnow())
+        result = invite_repository.mark_as_used(999, utc_now())
         
         # Assert
         assert result is None

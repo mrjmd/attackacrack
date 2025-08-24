@@ -31,7 +31,7 @@ class TestDatabaseIsolation:
         
         # Also verify we can query by ID
         contact_id = contact.id
-        found_by_id = db_session.query(Contact).get(contact_id)
+        found_by_id = db_session.get(Contact, contact_id)
         assert found_by_id is not None
         assert found_by_id.phone == "+19876543210"
     

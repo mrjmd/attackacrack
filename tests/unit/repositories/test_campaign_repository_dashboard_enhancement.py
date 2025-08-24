@@ -5,6 +5,7 @@ These tests are written FIRST (TDD RED phase) before implementing the methods
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from repositories.campaign_repository import CampaignRepository
 from crm_database import Campaign, CampaignMembership, Contact
 from tests.conftest import create_test_contact
@@ -61,8 +62,8 @@ class TestCampaignRepositoryDashboardEnhancements:
     def test_get_recent_campaigns_with_limit(self, repository, db_session):
         """Test getting recent campaigns with limit"""
         # Arrange - create campaigns with different creation dates
-        old_date = datetime.utcnow() - timedelta(days=10)
-        recent_date = datetime.utcnow() - timedelta(days=1)
+        old_date = utc_now() - timedelta(days=10)
+        recent_date = utc_now() - timedelta(days=1)
         
         old_campaign = Campaign(
             name='Old Campaign',

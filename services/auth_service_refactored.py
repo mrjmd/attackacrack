@@ -7,6 +7,7 @@ import re
 import uuid
 import logging
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import Optional, List, Dict, Any
 from flask_login import login_user as flask_login_user, logout_user as flask_logout_user
 from flask_bcrypt import generate_password_hash, check_password_hash
@@ -107,12 +108,12 @@ class AuthService:
                 last_name=last_name,
                 role=role,
                 is_active=is_active,
-                created_at=datetime.utcnow()
+                created_at=utc_now()
             )
             
             self.user_repository.commit()
             logger.info(f"Created user: {email}")
-            return Result.success(user, metadata={"created_at": datetime.utcnow()})
+            return Result.success(user, metadata={"created_at": utc_now()})
         except Exception as e:
             self.user_repository.rollback()
             logger.error(f"Failed to create user: {str(e)}")
@@ -142,7 +143,7 @@ class AuthService:
             return Result.failure("Invalid email or password", code="INVALID_CREDENTIALS")
         
         # Update last login using repository
-        login_time = datetime.utcnow()
+        login_time = utc_now()
         self.user_repository.update_last_login(user.id, login_time)
         self.user_repository.commit()
         
@@ -345,7 +346,7 @@ class AuthService:
                 token=token,
                 role=role,
                 created_by_id=invited_by_id,
-                expires_at=datetime.utcnow() + timedelta(days=7)
+                expires_at=utc_now() + timedelta(days=7)
             )
             
             self.invite_repository.commit()
@@ -401,7 +402,7 @@ class AuthService:
         if invite.used:
             return Result.failure("Invite has already been used", code="TOKEN_USED")
         
-        if invite.expires_at < datetime.utcnow():
+        if invite.expires_at < utc_now():
             return Result.failure("Invite has expired", code="TOKEN_EXPIRED")
         
         return Result.success(invite)
@@ -439,7 +440,7 @@ class AuthService:
             # Mark invite as used using repository
             self.invite_repository.mark_as_used(
                 invite.id,
-                datetime.utcnow()
+                utc_now()
             )
             self.invite_repository.commit()
         
@@ -512,7 +513,7 @@ class AuthService:
         """
         try:
             # Get invites that are not used and not expired
-            current_time = datetime.utcnow()
+            current_time = utc_now()
             pagination_params = PaginationParams(page=page, per_page=per_page)
             
             # Use repository to get pending invites

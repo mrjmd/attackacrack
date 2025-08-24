@@ -12,6 +12,7 @@ Based on: https://support.openphone.com/hc/en-us/articles/4690754298903-How-to-u
 
 import logging
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from typing import Dict, Any, Optional
 
 from services.common.result import Result
@@ -119,7 +120,7 @@ class OpenPhoneWebhookServiceRefactored:
                 'event_type': webhook_data.get('type', 'unknown'),
                 'payload': webhook_data,
                 'processed': False,
-                'created_at': datetime.utcnow()
+                'created_at': utc_now()
             }
             
             webhook_event = self.webhook_event_repository.create(**event_data)
@@ -192,7 +193,7 @@ class OpenPhoneWebhookServiceRefactored:
                 updated_activity = self.activity_repository.update(
                     existing_activity.id,
                     status=status,
-                    updated_at=datetime.utcnow()
+                    updated_at=utc_now()
                 )
                 
                 # Track metrics for outgoing messages
@@ -261,8 +262,8 @@ class OpenPhoneWebhookServiceRefactored:
                 'direction': db_direction,
                 'status': status,
                 'media_urls': media_urls,
-                'created_at': created_at or datetime.utcnow(),
-                'updated_at': datetime.utcnow()
+                'created_at': created_at or utc_now(),
+                'updated_at': utc_now()
             }
             
             new_activity = self.activity_repository.create(**activity_data)
@@ -270,7 +271,7 @@ class OpenPhoneWebhookServiceRefactored:
             # Update conversation last activity using repository
             self.conversation_repository.update_last_activity(
                 conversation.id, 
-                created_at or datetime.utcnow()
+                created_at or utc_now()
             )
             
             # Track initial status for outgoing messages
@@ -350,7 +351,7 @@ class OpenPhoneWebhookServiceRefactored:
                     existing_activity.id,
                     status=status,
                     duration_seconds=duration,
-                    updated_at=datetime.utcnow()
+                    updated_at=utc_now()
                 )
                 
                 return Result.success({
@@ -405,8 +406,8 @@ class OpenPhoneWebhookServiceRefactored:
                 'duration_seconds': duration,
                 'answered_at': self._parse_timestamp(call_data.get('answeredAt')),
                 'completed_at': self._parse_timestamp(call_data.get('completedAt')),
-                'created_at': self._parse_timestamp(call_data.get('createdAt')) or datetime.utcnow(),
-                'updated_at': datetime.utcnow()
+                'created_at': self._parse_timestamp(call_data.get('createdAt')) or utc_now(),
+                'updated_at': utc_now()
             }
             
             new_activity = self.activity_repository.create(**activity_data)
@@ -467,7 +468,7 @@ class OpenPhoneWebhookServiceRefactored:
             updated_activity = self.activity_repository.update(
                 call_activity.id,
                 ai_summary=summary_text,
-                updated_at=datetime.utcnow()
+                updated_at=utc_now()
             )
             
             return Result.success({
@@ -516,7 +517,7 @@ class OpenPhoneWebhookServiceRefactored:
             updated_activity = self.activity_repository.update(
                 call_activity.id,
                 ai_transcript=transcript,
-                updated_at=datetime.utcnow()
+                updated_at=utc_now()
             )
             
             return Result.success({
@@ -565,7 +566,7 @@ class OpenPhoneWebhookServiceRefactored:
             # Update with recording URL using repository
             update_data = {
                 'recording_url': recording_url,
-                'updated_at': datetime.utcnow()
+                'updated_at': utc_now()
             }
             
             # Store recording metadata if available

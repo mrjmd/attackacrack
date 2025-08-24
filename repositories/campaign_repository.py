@@ -5,6 +5,7 @@ Isolates all database queries related to campaigns
 
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import and_, or_, func, desc, asc
 from sqlalchemy.orm import joinedload, selectinload, Query
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult, SortOrder
@@ -353,15 +354,15 @@ class CampaignRepository(BaseRepository[Campaign]):
         membership.status = status
         
         if status == 'sent':
-            membership.sent_at = datetime.utcnow()
+            membership.sent_at = utc_now()
         elif status == 'delivered':
-            membership.delivered_at = datetime.utcnow()
+            membership.delivered_at = utc_now()
         elif status == 'responded':
-            membership.responded_at = datetime.utcnow()
+            membership.responded_at = utc_now()
             if response_sentiment:
                 membership.response_sentiment = response_sentiment
         elif status == 'opted_out':
-            membership.opted_out_at = opted_out_at or datetime.utcnow()
+            membership.opted_out_at = opted_out_at or utc_now()
         
         self.session.flush()
         return True
@@ -389,7 +390,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         Returns:
             Number of messages sent today
         """
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
         
         return self.session.query(CampaignMembership).filter(
             CampaignMembership.campaign_id == campaign_id,
@@ -453,7 +454,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         Returns:
             List of recent campaigns
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utc_now() - timedelta(days=days)
         
         return self.session.query(Campaign).filter(
             Campaign.created_at >= cutoff_date
@@ -843,7 +844,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         Returns:
             Updated CampaignMembership or None if not found
         """
-        membership = self.session.query(CampaignMembership).get(membership_id)
+        membership = self.session.get(CampaignMembership, membership_id)
         if not membership:
             return None
         
@@ -872,7 +873,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         daily_stats = []
         
         for i in range(days):
-            day = datetime.utcnow().date() - timedelta(days=days-1-i)
+            day = utc_now().date() - timedelta(days=days-1-i)
             
             # Get memberships sent on this day
             day_memberships = self.session.query(CampaignMembership).filter(
@@ -955,7 +956,7 @@ class CampaignRepository(BaseRepository[Campaign]):
         Returns:
             List of timeline events
         """
-        since_time = datetime.utcnow() - timedelta(hours=hours)
+        since_time = utc_now() - timedelta(hours=hours)
         
         # Get memberships with recent activity
         memberships = self.session.query(CampaignMembership).filter(

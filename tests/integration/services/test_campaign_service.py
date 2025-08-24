@@ -7,6 +7,7 @@ recipient management, A/B testing, and compliance features.
 import pytest
 from unittest.mock import MagicMock, patch, Mock
 from datetime import datetime, timedelta, time
+from utils.datetime_utils import utc_now
 from services.campaign_service_refactored import CampaignService
 from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity
 from scipy import stats
@@ -319,7 +320,7 @@ class TestRecipientManagement:
             contact_id=c1.id,
             flag_type='recently_texted',
             flag_reason='campaign_123',
-            created_at=datetime.utcnow() - timedelta(days=3)
+            created_at=utc_now() - timedelta(days=3)
         )
         db_session.add(recent_flag)
         db_session.commit()
@@ -508,7 +509,7 @@ class TestABTesting:
             if membership:
                 membership.variant_sent = variant
                 membership.status = 'sent'
-                membership.sent_at = datetime.utcnow() - timedelta(hours=1)
+                membership.sent_at = utc_now() - timedelta(hours=1)
         
         db_session.commit()
         
@@ -523,7 +524,7 @@ class TestABTesting:
                 openphone_id=f'conv_a_{i}',
                 contact_id=variant_a_contacts[i].id,
                 participants=variant_a_contacts[i].phone,
-                last_activity_at=datetime.utcnow() - timedelta(minutes=30),
+                last_activity_at=utc_now() - timedelta(minutes=30),
                 last_activity_type='message'
             )
             db_session.add(conversation)
@@ -535,7 +536,7 @@ class TestABTesting:
                 openphone_id=f'conv_b_{i}',
                 contact_id=variant_b_contacts[i].id,
                 participants=variant_b_contacts[i].phone,
-                last_activity_at=datetime.utcnow() - timedelta(minutes=30),
+                last_activity_at=utc_now() - timedelta(minutes=30),
                 last_activity_type='message'
             )
             db_session.add(conversation)
@@ -670,7 +671,7 @@ class TestComplianceFeatures:
                 campaign_id=test_campaign.id,
                 contact_id=contact.id,
                 status='sent',
-                sent_at=datetime.utcnow()
+                sent_at=utc_now()
             )
             db_session.add(membership)
         db_session.commit()

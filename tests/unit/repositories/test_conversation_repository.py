@@ -5,6 +5,7 @@ Tests for ConversationRepository
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from repositories.conversation_repository import ConversationRepository
 from repositories.base_repository import PaginatedResult
 from crm_database import Conversation, Contact, Activity, ContactFlag
@@ -73,7 +74,7 @@ class TestConversationRepository:
     def test_find_active_conversations(self, repository, mock_session):
         """Test finding active conversations"""
         # Arrange
-        mock_conversations = [Mock(id=1, last_activity_at=datetime.utcnow())]
+        mock_conversations = [Mock(id=1, last_activity_at=utc_now())]
         mock_query = Mock()
         mock_query.filter.return_value.order_by.return_value.all.return_value = mock_conversations
         mock_session.query.return_value = mock_query
@@ -111,7 +112,7 @@ class TestConversationRepository:
         mock_query = Mock()
         mock_query.get.return_value = mock_conversation
         mock_session.query.return_value = mock_query
-        new_time = datetime.utcnow()
+        new_time = utc_now()
         
         # Act
         result = repository.update_last_activity(1, new_time)
@@ -420,7 +421,7 @@ class TestConversationRepository:
         """Test bulk updating last activity for multiple conversations"""
         # Arrange
         conversation_ids = [1, 2, 3]
-        new_time = datetime.utcnow()
+        new_time = utc_now()
         mock_conversations = [Mock(id=1), Mock(id=2), Mock(id=3)]
         mock_query = Mock()
         mock_query.filter.return_value = mock_query
@@ -440,7 +441,7 @@ class TestConversationRepository:
     def test_bulk_update_last_activity_empty_list(self, repository, mock_session):
         """Test bulk update with empty conversation list"""
         # Act
-        result = repository.bulk_update_last_activity([], datetime.utcnow())
+        result = repository.bulk_update_last_activity([], utc_now())
         
         # Assert
         assert result is False
@@ -450,7 +451,7 @@ class TestConversationRepository:
         """Test bulk update handles database errors"""
         # Arrange
         conversation_ids = [1, 2]
-        new_time = datetime.utcnow()
+        new_time = utc_now()
         mock_session.commit.side_effect = Exception("Database error")
         mock_query = Mock()
         mock_query.filter.return_value = mock_query

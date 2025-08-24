@@ -8,6 +8,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from flask import url_for
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from crm_database import User, InviteToken
 
 
@@ -94,7 +95,7 @@ def valid_invite(db_session, admin_user):
         email=f'newinvite{unique_id}@example.com',
         token=f'valid_invite_token_{unique_id}',
         role='marketer',
-        expires_at=datetime.utcnow() + timedelta(days=7),
+        expires_at=utc_now() + timedelta(days=7),
         created_by_id=admin_user.id,
         used=False
     )

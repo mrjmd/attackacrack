@@ -6,6 +6,7 @@ Follows TDD methodology - these tests should FAIL initially
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import List, Dict, Any
 
 from services.campaign_list_service_refactored import CampaignListServiceRefactored
@@ -102,7 +103,7 @@ class TestCampaignListServiceRefactored:
         expected_list = Mock()
         expected_list.id = 2
         expected_list.is_dynamic = True
-        filter_criteria = {'imported_after': datetime.utcnow()}
+        filter_criteria = {'imported_after': utc_now()}
         mock_campaign_list_repository.create.return_value = expected_list
         
         # Mock the refresh_dynamic_list call
@@ -304,8 +305,8 @@ class TestCampaignListServiceRefactored:
     def test_find_contacts_by_criteria_date_range(self, service, mock_contact_repository):
         """Test finding contacts by date range criteria"""
         # Arrange
-        start_date = datetime.utcnow() - timedelta(days=30)
-        end_date = datetime.utcnow()
+        start_date = utc_now() - timedelta(days=30)
+        end_date = utc_now()
         criteria = {
             'imported_after': start_date.isoformat(),
             'imported_before': end_date.isoformat()

@@ -5,6 +5,7 @@ These tests MUST FAIL initially - testing new methods needed for SMSMetricsServi
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 from repositories.activity_repository import ActivityRepository
 from repositories.base_repository import PaginationParams
@@ -38,7 +39,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
             activity_type='message',
             direction='outgoing',
             status='sent',
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         ))
         
         activities.append(Activity(
@@ -46,7 +47,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
             activity_type='message',
             direction='outgoing',
             status='delivered',
-            created_at=datetime.utcnow() - timedelta(hours=1)
+            created_at=utc_now() - timedelta(hours=1)
         ))
         
         activities.append(Activity(
@@ -55,7 +56,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
             direction='outgoing',
             status='failed',
             activity_metadata={'bounce_type': 'hard', 'bounce_details': 'Invalid number'},
-            created_at=datetime.utcnow() - timedelta(hours=2)
+            created_at=utc_now() - timedelta(hours=2)
         ))
         
         activities.append(Activity(
@@ -63,7 +64,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
             activity_type='message',
             direction='incoming',
             status='received',
-            created_at=datetime.utcnow() - timedelta(hours=3)
+            created_at=utc_now() - timedelta(hours=3)
         ))
         
         for activity in activities:
@@ -81,7 +82,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
         bounce_metadata = {
             'bounce_type': 'hard',
             'bounce_details': 'Invalid number',
-            'bounced_at': datetime.utcnow().isoformat()
+            'bounced_at': utc_now().isoformat()
         }
         
         # This method doesn't exist yet - should fail
@@ -102,7 +103,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
     def test_find_messages_by_date_range_and_direction(self, repository, sample_activities):
         """Test finding messages by date range and direction - MUST FAIL initially"""
         # Date range for the last 24 hours
-        since_date = datetime.utcnow() - timedelta(hours=24)
+        since_date = utc_now() - timedelta(hours=24)
         
         # This method should exist to find outgoing messages in date range
         outgoing_messages = repository.find_messages_by_date_range_and_direction(
@@ -148,7 +149,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
         # This method should exist to count messages by status categories
         counts = repository.get_message_status_counts_by_categories(
             status_categories=status_categories,
-            since_date=datetime.utcnow() - timedelta(hours=24),
+            since_date=utc_now() - timedelta(hours=24),
             direction='outgoing'
         )
         
@@ -164,7 +165,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
         """Test finding activities with bounce metadata - MUST FAIL initially"""
         # This method should exist to find activities that have bounce information
         bounced_activities = repository.find_activities_with_bounce_metadata(
-            since_date=datetime.utcnow() - timedelta(hours=24)
+            since_date=utc_now() - timedelta(hours=24)
         )
         
         # Should find the activity with bounce metadata
@@ -184,7 +185,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
         assert len(stats) == 7  # 7 days of data
         
         # Each stat should have required fields
-        today_stat = next((s for s in stats if s['date'] == datetime.utcnow().date()), None)
+        today_stat = next((s for s in stats if s['date'] == utc_now().date()), None)
         assert today_stat is not None
         assert 'sent' in today_stat
         assert 'bounced' in today_stat
@@ -221,7 +222,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
         """Test finding failed messages with bounce details - MUST FAIL initially"""
         # This method should exist to find failed messages for bounce analysis
         failed_messages = repository.find_failed_messages_with_details(
-            since_date=datetime.utcnow() - timedelta(hours=24),
+            since_date=utc_now() - timedelta(hours=24),
             bounce_types=['hard', 'soft']
         )
         
@@ -265,7 +266,7 @@ class TestActivityRepositorySMSMetricsEnhancement:
         updated_count = repository.bulk_update_activities_status(
             activity_ids=activity_ids,
             status='processed',
-            metadata={'processed_at': datetime.utcnow().isoformat()}
+            metadata={'processed_at': utc_now().isoformat()}
         )
         
         # Should return count of updated activities

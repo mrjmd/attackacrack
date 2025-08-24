@@ -7,14 +7,13 @@ Handles timeouts, progress tracking, and reliable execution for big imports
 
 import sys
 import os
+from utils.datetime_utils import utc_now
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 from scripts.script_logger import get_logger
 
 logger = get_logger(__name__)
 
-import os
 import signal
-import sys
 import time
 import json
 import requests
@@ -76,7 +75,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
         return {
             'conversations_processed': 0,
             'last_conversation_id': None,
-            'started_at': datetime.utcnow().isoformat(),
+            'started_at': utc_now().isoformat(),
             'checkpoints': []
         }
     
@@ -85,7 +84,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
         try:
             self.progress.update({
                 'conversations_processed': self.stats['conversations_processed'],
-                'updated_at': datetime.utcnow().isoformat(),
+                'updated_at': utc_now().isoformat(),
                 'stats': self.stats
             })
             
@@ -477,7 +476,7 @@ class LargeScaleImporter(EnhancedOpenPhoneImporter):
         logger.info("🎉 LARGE SCALE IMPORT COMPLETED SUCCESSFULLY")
         logger.info("="*80)
         
-        duration = datetime.utcnow() - datetime.fromisoformat(self.progress['started_at'])
+        duration = utc_now() - datetime.fromisoformat(self.progress['started_at'])
         
         logger.info(f"⏱️  Total Duration: {duration}")
         logger.info(f"📊 Conversations Processed: {self.stats['conversations_processed']}")
@@ -535,7 +534,7 @@ def main():
             with open(progress_file, 'r') as f:
                 progress = json.load(f)
                 last_update = datetime.fromisoformat(progress.get('updated_at', progress.get('started_at')))
-                age_hours = (datetime.utcnow() - last_update).total_seconds() / 3600
+                age_hours = (utc_now() - last_update).total_seconds() / 3600
                 
                 if age_hours < 24:  # Less than 24 hours old
                     logger.info(f"🔄 Progress is recent ({age_hours:.1f}h old), auto-resuming...")

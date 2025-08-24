@@ -6,6 +6,7 @@ Business logic for managing campaign templates
 import re
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from utils.datetime_utils import utc_now
 
 from repositories.campaign_template_repository import CampaignTemplateRepository
 from repositories.contact_repository import ContactRepository
@@ -334,7 +335,7 @@ class CampaignTemplateService:
         
         updates = {
             'status': TemplateStatus.ARCHIVED,
-            'archived_at': datetime.utcnow(),
+            'archived_at': utc_now(),
             'is_active': False
         }
         
@@ -489,7 +490,7 @@ class CampaignTemplateService:
         updates = {
             'status': TemplateStatus.APPROVED,
             'approved_by': approved_by,
-            'approved_at': datetime.utcnow()
+            'approved_at': utc_now()
         }
         
         updated = self.template_repository.update(template, **updates)
@@ -519,7 +520,7 @@ class CampaignTemplateService:
         
         updates = {
             'status': TemplateStatus.ACTIVE,
-            'activated_at': datetime.utcnow(),
+            'activated_at': utc_now(),
             'is_active': True
         }
         
@@ -557,7 +558,7 @@ class CampaignTemplateService:
         
         updates = {
             'usage_count': template.usage_count + 1,
-            'last_used_at': datetime.utcnow()
+            'last_used_at': utc_now()
         }
         
         updated = self.template_repository.update(template, **updates)
@@ -583,7 +584,7 @@ class CampaignTemplateService:
         usage_stats = self.template_repository.get_usage_stats(template_id)
         
         # Calculate time-based stats
-        now = datetime.utcnow()
+        now = utc_now()
         days_since_created = (now - template.created_at).days if template.created_at else 0
         days_since_last_used = (now - template.last_used_at).days if template.last_used_at else None
         

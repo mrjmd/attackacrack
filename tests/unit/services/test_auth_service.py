@@ -6,6 +6,7 @@ from services.auth_service_refactored import AuthService
 from services.common.result import Result
 from crm_database import User, InviteToken
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from flask import Flask
 from werkzeug.security import generate_password_hash
 
@@ -247,7 +248,7 @@ class TestAuthService:
         mock_invite.role = 'marketer'
         mock_invite.created_by_id = admin_user.id
         mock_invite.token = 'test_token'
-        mock_invite.expires_at = datetime.utcnow() + timedelta(days=7)
+        mock_invite.expires_at = utc_now() + timedelta(days=7)
         
         mock_user_repository.find_by_email.return_value = None  # No existing user
         mock_invite_repository.find_valid_invite_by_email = Mock(return_value=None)
@@ -270,7 +271,7 @@ class TestAuthService:
         mock_invite.id = 1
         mock_invite.token = 'valid_token'
         mock_invite.email = 'validinvite@example.com'
-        mock_invite.expires_at = datetime.utcnow() + timedelta(days=7)
+        mock_invite.expires_at = utc_now() + timedelta(days=7)
         mock_invite.used = False
         
         mock_invite_repository.find_by_token.return_value = mock_invite
@@ -289,7 +290,7 @@ class TestAuthService:
         mock_invite = Mock(spec=InviteToken)
         mock_invite.token = 'expired_token'
         mock_invite.email = 'expired@example.com'
-        mock_invite.expires_at = datetime.utcnow() - timedelta(days=1)  # Expired
+        mock_invite.expires_at = utc_now() - timedelta(days=1)  # Expired
         mock_invite.used = False
         
         mock_invite_repository.find_by_token.return_value = mock_invite
@@ -307,7 +308,7 @@ class TestAuthService:
         invite.email = 'invitee@example.com'
         invite.token = 'test_token'
         invite.role = 'marketer'
-        invite.expires_at = datetime.utcnow() + timedelta(days=7)
+        invite.expires_at = utc_now() + timedelta(days=7)
         
         # Mock email service response
         mock_email_service.send_invite.return_value = None  # Email service doesn't return Result

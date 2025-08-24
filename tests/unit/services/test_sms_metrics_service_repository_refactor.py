@@ -5,6 +5,7 @@ These tests MUST FAIL initially - testing that service uses repositories instead
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch, MagicMock
 from services.sms_metrics_service import SMSMetricsService
 
@@ -99,7 +100,7 @@ class TestSMSMetricsServiceRepositoryRefactor:
         """Test that get_global_metrics uses activity repository - MUST FAIL"""
         # Setup mock
         mock_activity_repository.get_daily_message_stats.return_value = [
-            {'date': datetime.utcnow().date(), 'sent': 10, 'bounced': 1, 'bounce_rate': 10.0}
+            {'date': utc_now().date(), 'sent': 10, 'bounced': 1, 'bounce_rate': 10.0}
         ]
         
         mock_activity_repository.find_messages_by_date_range_and_direction.return_value = []
@@ -205,7 +206,7 @@ class TestSMSMetricsServiceRepositoryRefactor:
         bounce_info = {
             'bounce_type': 'hard',
             'bounce_details': 'Invalid number',
-            'bounced_at': datetime.utcnow().isoformat()
+            'bounced_at': utc_now().isoformat()
         }
         
         # This should call the repository instead of direct DB query

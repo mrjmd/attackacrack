@@ -6,6 +6,7 @@ Tests the repository layer for opt-out audit trail management.
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, MagicMock, patch
 from repositories.opt_out_audit_repository import OptOutAuditRepository
 from crm_database import OptOutAudit, db
@@ -44,7 +45,7 @@ class TestOptOutAuditRepository:
         mock_audit = Mock(spec=OptOutAudit)
         mock_audit.id = 1
         mock_audit.contact_id = 1
-        mock_audit.created_at = datetime.utcnow()
+        mock_audit.created_at = utc_now()
         
         with patch('repositories.opt_out_audit_repository.OptOutAudit') as MockAudit:
             MockAudit.return_value = mock_audit
@@ -86,12 +87,12 @@ class TestOptOutAuditRepository:
     
     def test_find_since(self, repository, mock_session):
         """Test finding audit logs since a specific date"""
-        since_date = datetime.utcnow() - timedelta(days=7)
+        since_date = utc_now() - timedelta(days=7)
         
         # Mock query result
         mock_audits = [
-            Mock(id=1, created_at=datetime.utcnow()),
-            Mock(id=2, created_at=datetime.utcnow() - timedelta(days=1))
+            Mock(id=1, created_at=utc_now()),
+            Mock(id=2, created_at=utc_now() - timedelta(days=1))
         ]
         
         mock_query = MagicMock()
@@ -225,7 +226,7 @@ class TestOptOutAuditRepository:
     
     def test_count_since(self, repository, mock_session):
         """Test counting audit logs since a date"""
-        since_date = datetime.utcnow() - timedelta(days=30)
+        since_date = utc_now() - timedelta(days=30)
         
         # Mock query result
         mock_query = MagicMock()
@@ -247,7 +248,7 @@ class TestOptOutAuditRepository:
         contact_id = 1
         
         # Mock query result
-        mock_audit = Mock(id=5, contact_id=1, created_at=datetime.utcnow())
+        mock_audit = Mock(id=5, contact_id=1, created_at=utc_now())
         
         mock_query = MagicMock()
         mock_query.filter_by.return_value.order_by.return_value.first.return_value = mock_audit
@@ -263,7 +264,7 @@ class TestOptOutAuditRepository:
     
     def test_delete_old_audits(self, repository, mock_session):
         """Test deleting old audit logs"""
-        older_than = datetime.utcnow() - timedelta(days=365)
+        older_than = utc_now() - timedelta(days=365)
         
         # Mock the delete operation
         mock_query = MagicMock()

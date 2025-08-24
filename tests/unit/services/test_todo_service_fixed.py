@@ -8,6 +8,7 @@ This test suite demonstrates proper testing with:
 """
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.todo_service_refactored import TodoService
 from tests.fixtures.repository_fixtures import create_todo_repository_mock
 
@@ -34,7 +35,7 @@ def sample_todo_data():
         'title': 'Test Todo',
         'description': 'This is a test todo',
         'priority': 'high',
-        'due_date': (datetime.utcnow() + timedelta(days=1)).isoformat()
+        'due_date': (utc_now() + timedelta(days=1)).isoformat()
     }
 
 

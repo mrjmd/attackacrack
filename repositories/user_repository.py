@@ -5,6 +5,7 @@ Isolates all database queries related to users
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func, desc, asc
 from sqlalchemy.orm import Query
 from sqlalchemy.exc import SQLAlchemyError
@@ -169,7 +170,7 @@ class UserRepository(BaseRepository[User]):
             return []
         
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = utc_now() - timedelta(days=days)
             return (self.session.query(User)
                    .filter(User.created_at >= cutoff_date)
                    .order_by(desc(User.created_at))

@@ -12,6 +12,7 @@ import json
 import io
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from flask import url_for
 from werkzeug.datastructures import FileStorage
 
@@ -54,7 +55,7 @@ class TestFactories:
             'phone': unique_phone,
             'email': 'john.smith@example.com',
             'contact_metadata': {'source': 'test'},
-            'imported_at': datetime.utcnow()
+            'imported_at': utc_now()
         }
         defaults.update(kwargs)
         
@@ -381,14 +382,14 @@ class TestContactManagementWorkflows:
                     activity_type='message',
                     direction='incoming',
                     body='Hello, I need help with my order',
-                    created_at=datetime.utcnow() - timedelta(hours=2)
+                    created_at=utc_now() - timedelta(hours=2)
                 ),
                 Activity(
                     conversation_id=conversation.id,
                     activity_type='message',
                     direction='outgoing',
                     body='Hi! I\'d be happy to help. What\'s your order number?',
-                    created_at=datetime.utcnow() - timedelta(hours=1)
+                    created_at=utc_now() - timedelta(hours=1)
                 )
             ]
             
@@ -878,7 +879,7 @@ class TestCriticalUserJourneys:
                 activity_type='message',  # Use message type so body is displayed
                 direction='incoming',
                 body='Customer called about warranty issue',
-                created_at=datetime.utcnow()
+                created_at=utc_now()
             )
             db_session.add(support_activity)
             db_session.commit()
@@ -967,7 +968,7 @@ class TestCriticalUserJourneys:
                     contact_id=contact.id,
                     status='sent',
                     variant_sent='A' if i % 2 == 0 else 'B',
-                    sent_at=datetime.utcnow() - timedelta(hours=i)
+                    sent_at=utc_now() - timedelta(hours=i)
                 )
                 db_session.add(membership)
             db_session.commit()

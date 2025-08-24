@@ -5,6 +5,7 @@ These tests are written FIRST (TDD RED phase) before implementing the methods
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 from sqlalchemy import func
 from repositories.contact_repository import ContactRepository
@@ -47,8 +48,8 @@ class TestContactRepositoryDashboardEnhancements:
         db_session.commit()
         
         # Create recent activities for contact1 and contact2
-        recent_date = datetime.utcnow() - timedelta(days=3)
-        old_date = datetime.utcnow() - timedelta(days=10)
+        recent_date = utc_now() - timedelta(days=3)
+        old_date = utc_now() - timedelta(days=10)
         
         from crm_database import Activity
         activity1 = Activity(

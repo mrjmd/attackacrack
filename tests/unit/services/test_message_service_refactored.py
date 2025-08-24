@@ -12,6 +12,7 @@ Following Phase 2 refactoring:
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from typing import Dict, Any, List, Optional
 
 from services.message_service_refactored import MessageServiceRefactored
@@ -95,7 +96,7 @@ class TestGetOrCreateConversationWithResult:
         conversation.contact_id = 123
         conversation.openphone_id = "op_conv_456"
         conversation.participants = "+11234567890,+19876543210"
-        conversation.last_activity_at = datetime.utcnow()
+        conversation.last_activity_at = utc_now()
         return conversation
     
     def test_get_or_create_conversation_finds_existing_by_openphone_id(self, service, mock_conversation):

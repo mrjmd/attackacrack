@@ -5,6 +5,7 @@ Isolates all database queries related to CSV imports
 
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func, desc, asc
 from sqlalchemy.orm import Query
 from sqlalchemy.exc import SQLAlchemyError
@@ -250,7 +251,7 @@ class CSVImportRepository(BaseRepository[CSVImport]):
         csv_import = self.get_by_id(import_id)
         if csv_import:
             metadata = csv_import.import_metadata or {}
-            metadata['completed_at'] = datetime.utcnow().isoformat()
+            metadata['completed_at'] = utc_now().isoformat()
             return self.update(
                 csv_import,
                 import_metadata=metadata
@@ -312,7 +313,7 @@ class CSVImportRepository(BaseRepository[CSVImport]):
         Returns:
             Number of imports deleted
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utc_now() - timedelta(days=days)
         filters = {'imported_at': cutoff_date}  # This should be "less than" but base repo handles equality
         
         # Use a more direct approach for date comparison

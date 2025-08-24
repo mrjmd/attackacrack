@@ -6,6 +6,7 @@ import csv
 import os
 import re
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from typing import List, Dict, Optional, Tuple
 from werkzeug.datastructures import FileStorage
 # Model imports removed - using repositories only
@@ -277,7 +278,7 @@ class CSVImportService:
             # Create import record using repository
             csv_import = self.csv_import_repository.create(
                 filename=filename,
-                imported_at=datetime.utcnow(),
+                imported_at=utc_now(),
                 imported_by=imported_by,
                 import_type='contacts',
                 import_metadata={}
@@ -389,7 +390,7 @@ class CSVImportService:
                                 phone=normalized_phone,
                                 csv_import_id=csv_import.id,
                                 import_source=filename,
-                                imported_at=datetime.utcnow(),
+                                imported_at=utc_now(),
                                 contact_metadata=self._extract_metadata_from_mapped(mapped_row)
                             )
                             results['contacts_created'].append(contact.id)
@@ -423,7 +424,7 @@ class CSVImportService:
                                 self.campaign_list_member_repository.update(
                                     existing_member,
                                     status='active',
-                                    added_at=datetime.utcnow()
+                                    added_at=utc_now()
                                 )
                         
                         results['successful'] += 1

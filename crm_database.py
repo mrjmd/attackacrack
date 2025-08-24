@@ -2,6 +2,7 @@
 
 from extensions import db
 from datetime import datetime, time, date, timedelta
+from utils.datetime_utils import utc_now
 from enum import Enum
 import json
 
@@ -14,7 +15,7 @@ class User(db.Model):
     last_name = db.Column(db.String(50), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='marketer')  # 'admin' or 'marketer'
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
     last_login = db.Column(db.DateTime)
     
     # Legacy OpenPhone field - keeping for backward compatibility
@@ -542,7 +543,7 @@ class Todo(db.Model):
     def mark_complete(self):
         """Mark todo as completed"""
         self.is_completed = True
-        self.completed_at = datetime.utcnow()
+        self.completed_at = utc_now()
         
     def mark_incomplete(self):
         """Mark todo as incomplete"""
@@ -666,7 +667,7 @@ class FailedWebhookQueue(db.Model):
         """Calculate next retry time using exponential backoff"""
         from decimal import Decimal
         delay_seconds = self.base_delay_seconds * (Decimal(str(self.backoff_multiplier)) ** self.retry_count)
-        return datetime.utcnow() + timedelta(seconds=int(delay_seconds))
+        return utc_now() + timedelta(seconds=int(delay_seconds))
     
     def is_retry_exhausted(self) -> bool:
         """Check if retry attempts are exhausted"""
@@ -678,7 +679,7 @@ class FailedWebhookQueue(db.Model):
             return False
         if self.next_retry_at is None:
             return True
-        return datetime.utcnow() >= self.next_retry_at
+        return utc_now() >= self.next_retry_at
 
 
 # --- Opt-Out Management ---
@@ -736,7 +737,7 @@ class PhoneValidation(db.Model):
     
     # Caching metadata
     validation_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    cached_until = db.Column(db.DateTime, nullable=False, index=True, default=lambda: datetime.utcnow() + timedelta(days=30))  # When cache expires
+    cached_until = db.Column(db.DateTime, nullable=False, index=True, default=lambda: utc_now() + timedelta(days=30))  # When cache expires
     
     # Raw API response for debugging
     raw_response = db.Column(db.JSON, nullable=True)

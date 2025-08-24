@@ -6,6 +6,7 @@ Shows recent webhook events and their processing status
 
 import sys
 import os
+from utils.datetime_utils import utc_now
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import create_app
@@ -41,7 +42,7 @@ def check_webhook_status():
         
         # 2. Check webhooks in last hour
         print("\n⏰ WEBHOOKS IN LAST HOUR:")
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = utc_now() - timedelta(hours=1)
         recent_count = WebhookEvent.query.filter(
             WebhookEvent.created_at > one_hour_ago
         ).count()
@@ -86,7 +87,7 @@ def check_webhook_status():
         ).first()
         
         if latest_webhook:
-            time_since = datetime.utcnow() - latest_webhook.created_at
+            time_since = utc_now() - latest_webhook.created_at
             hours = time_since.total_seconds() / 3600
             
             if hours < 1:

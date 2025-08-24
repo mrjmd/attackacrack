@@ -6,6 +6,7 @@ Handles scheduled and manual reconciliation of OpenPhone data.
 
 import logging
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from typing import Dict, Any
 
 from celery import shared_task
@@ -55,7 +56,7 @@ def run_daily_reconciliation(self, hours_back: int = 48) -> Dict[str, Any]:
         # Prepare summary
         summary = {
             'task_id': self.request.id,
-            'executed_at': datetime.utcnow().isoformat(),
+            'executed_at': utc_now().isoformat(),
             'hours_back': hours_back,
             'messages': message_result.value,
             'conversations': conversation_result.value if conversation_result.is_success else {
@@ -93,7 +94,7 @@ def run_daily_reconciliation(self, hours_back: int = 48) -> Dict[str, Any]:
         # Max retries exceeded
         summary = {
             'task_id': self.request.id,
-            'executed_at': datetime.utcnow().isoformat(),
+            'executed_at': utc_now().isoformat(),
             'hours_back': hours_back,
             'success': False,
             'error': str(e),
@@ -145,7 +146,7 @@ def run_manual_reconciliation(hours_back: int = 24, user_id: int = None) -> Dict
             'success': True,
             'data': result.value,
             'user_id': user_id,
-            'executed_at': datetime.utcnow().isoformat()
+            'executed_at': utc_now().isoformat()
         }
         
     except Exception as e:
@@ -187,7 +188,7 @@ def validate_data_integrity() -> Dict[str, Any]:
         return {
             'success': True,
             'report': result.value,
-            'executed_at': datetime.utcnow().isoformat()
+            'executed_at': utc_now().isoformat()
         }
         
     except Exception as e:
@@ -218,7 +219,7 @@ def cleanup_old_reconciliation_logs(days_to_keep: int = 30) -> Dict[str, Any]:
         return {
             'success': True,
             'message': f'Cleaned up logs older than {days_to_keep} days',
-            'executed_at': datetime.utcnow().isoformat()
+            'executed_at': utc_now().isoformat()
         }
         
     except Exception as e:

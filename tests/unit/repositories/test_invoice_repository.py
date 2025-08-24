@@ -5,6 +5,7 @@ Tests for InvoiceRepository
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import date, datetime
+from utils.datetime_utils import utc_now
 from repositories.invoice_repository import InvoiceRepository
 from repositories.base_repository import PaginatedResult
 from crm_database import Invoice
@@ -110,7 +111,7 @@ class TestInvoiceRepository:
         mock_session.query.return_value = mock_query
         
         # Act
-        result = repository.update_payment_status(1, "paid", paid_date=datetime.utcnow())
+        result = repository.update_payment_status(1, "paid", paid_date=utc_now())
         
         # Assert
         assert result == mock_invoice

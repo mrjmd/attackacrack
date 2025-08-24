@@ -5,6 +5,7 @@ Follows the repository pattern with Result-based error handling
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import func, and_, or_
@@ -108,7 +109,7 @@ class ABTestResultRepository(BaseRepository[ABTestResult]):
                 campaign_id=campaign_id,
                 contact_id=contact_id,
                 variant=variant,
-                assigned_at=datetime.utcnow()
+                assigned_at=utc_now()
             )
             
             self.session.add(assignment)
@@ -240,7 +241,7 @@ class ABTestResultRepository(BaseRepository[ABTestResult]):
             
             assignment.message_sent = True
             assignment.sent_activity_id = activity_id
-            assignment.sent_at = datetime.utcnow()
+            assignment.sent_at = utc_now()
             
             self.session.commit()
             return Result.success(True)
@@ -279,7 +280,7 @@ class ABTestResultRepository(BaseRepository[ABTestResult]):
                 )
             
             assignment.message_opened = True
-            assignment.opened_at = datetime.utcnow()
+            assignment.opened_at = utc_now()
             
             self.session.commit()
             return Result.success(True)
@@ -320,7 +321,7 @@ class ABTestResultRepository(BaseRepository[ABTestResult]):
             
             assignment.link_clicked = True
             assignment.clicked_link_url = link_url
-            assignment.clicked_at = datetime.utcnow()
+            assignment.clicked_at = utc_now()
             
             self.session.commit()
             return Result.success(True)
@@ -371,7 +372,7 @@ class ABTestResultRepository(BaseRepository[ABTestResult]):
             assignment.response_received = True
             assignment.response_type = response_type
             assignment.response_activity_id = activity_id
-            assignment.responded_at = datetime.utcnow()
+            assignment.responded_at = utc_now()
             
             self.session.commit()
             return Result.success(True)
@@ -563,7 +564,7 @@ class ABTestResultRepository(BaseRepository[ABTestResult]):
         try:
             # Prepare assignment objects
             for assignment_data in assignments:
-                assignment_data['assigned_at'] = datetime.utcnow()
+                assignment_data['assigned_at'] = utc_now()
             
             # Bulk insert
             self.session.bulk_insert_mappings(ABTestResult, assignments)

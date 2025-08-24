@@ -10,6 +10,7 @@ import requests
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.common.result import Result
 from repositories.phone_validation_repository import PhoneValidationRepository
 
@@ -302,7 +303,7 @@ class PhoneValidationService:
         try:
             # If recent_days is specified, filter by date
             if recent_days:
-                cutoff_date = datetime.utcnow() - timedelta(days=recent_days)
+                cutoff_date = utc_now() - timedelta(days=recent_days)
                 total_validations = self.validation_repository.count_with_date_filter(cutoff_date)
                 valid_numbers = self.validation_repository.count_with_date_filter(cutoff_date, is_valid=True)
                 mobile_numbers = self.validation_repository.count_with_date_filter(cutoff_date, is_valid=True, line_type='mobile')
@@ -356,7 +357,7 @@ class PhoneValidationService:
             Result object with deletion count
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = utc_now() - timedelta(days=days)
             # Use the repository's bulk_delete_expired method
             deleted_count = self.validation_repository.bulk_delete_expired(cutoff_date)
             
@@ -396,7 +397,7 @@ class PhoneValidationService:
             return None
         
         # Check if cache is expired
-        cache_age = datetime.utcnow() - cached.created_at
+        cache_age = utc_now() - cached.created_at
         if cache_age.days > self.CACHE_DURATION_DAYS:
             return None
         
@@ -456,7 +457,7 @@ class PhoneValidationService:
     def _cache_validation_result(self, phone_number: str, validation_data: Dict, raw_response: Dict):
         """Save validation result to cache"""
         try:
-            cache_until = datetime.utcnow() + timedelta(days=self.CACHE_DURATION_DAYS)
+            cache_until = utc_now() + timedelta(days=self.CACHE_DURATION_DAYS)
             
             # Check if record already exists
             existing_record = self.validation_repository.find_one_by(phone_number=phone_number)
@@ -474,7 +475,7 @@ class PhoneValidationService:
                     cached_until=cache_until,
                     raw_response=raw_response,
                     api_response=raw_response,  # Legacy field support
-                    validation_date=datetime.utcnow()
+                    validation_date=utc_now()
                 )
             else:
                 # Create new record
@@ -489,7 +490,7 @@ class PhoneValidationService:
                     cached_until=cache_until,
                     raw_response=raw_response,
                     api_response=raw_response,  # Legacy field support
-                    created_at=datetime.utcnow()
+                    created_at=utc_now()
                 )
         except Exception as e:
             # Log but don't fail if caching fails

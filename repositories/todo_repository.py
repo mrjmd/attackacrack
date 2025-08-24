@@ -4,6 +4,7 @@ TodoRepository - Data access layer for Todo model
 
 from typing import List, Optional
 from datetime import datetime, date
+from utils.datetime_utils import utc_now
 from sqlalchemy import desc, or_, and_
 from repositories.base_repository import BaseRepository, PaginatedResult
 from crm_database import Todo
@@ -59,7 +60,7 @@ class TodoRepository(BaseRepository):
         Returns:
             List of overdue Todo objects
         """
-        now = datetime.utcnow()
+        now = utc_now()
         return self.session.query(self.model_class)\
             .filter(self.model_class.due_date < now)\
             .filter(self.model_class.is_completed == False)\
@@ -78,7 +79,7 @@ class TodoRepository(BaseRepository):
         todo = self.session.query(self.model_class).get(todo_id)
         if todo:
             todo.is_completed = True
-            todo.completed_at = datetime.utcnow()
+            todo.completed_at = utc_now()
             self.session.commit()
         return todo
     
@@ -230,7 +231,7 @@ class TodoRepository(BaseRepository):
         Returns:
             Count of overdue todos
         """
-        now = datetime.utcnow()
+        now = utc_now()
         return self.session.query(self.model_class).filter(
             self.model_class.user_id == user_id,
             self.model_class.is_completed == False,

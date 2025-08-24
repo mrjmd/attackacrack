@@ -5,6 +5,7 @@ Handles all database operations for campaign templates
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, desc, func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -192,7 +193,7 @@ class CampaignTemplateRepository(BaseRepository[CampaignTemplate]):
             template = self.session.get(CampaignTemplate, template_id)
             if template:
                 template.usage_count += 1
-                template.last_used_at = datetime.utcnow()
+                template.last_used_at = utc_now()
                 self.session.flush()
                 return template
             return None
@@ -244,7 +245,7 @@ class CampaignTemplateRepository(BaseRepository[CampaignTemplate]):
             List of recently used templates
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = utc_now() - timedelta(days=days)
             return self.session.query(CampaignTemplate).filter(
                 CampaignTemplate.last_used_at >= cutoff_date
             ).order_by(desc(CampaignTemplate.last_used_at)).limit(limit).all()

@@ -4,6 +4,7 @@ WebhookEventRepository - Data access layer for WebhookEvent model
 
 from typing import List, Optional
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from sqlalchemy import desc, or_, and_
 from repositories.base_repository import BaseRepository, PaginatedResult
 from crm_database import WebhookEvent
@@ -83,7 +84,7 @@ class WebhookEventRepository(BaseRepository):
         event = self.session.query(self.model_class).get(event_id)
         if event:
             event.processed = True
-            event.processed_at = datetime.utcnow()
+            event.processed_at = utc_now()
             self.session.commit()
         return event
     

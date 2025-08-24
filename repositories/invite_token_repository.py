@@ -5,6 +5,7 @@ Isolates all database queries related to invite tokens
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func, desc, asc
 from sqlalchemy.orm import Query
 from sqlalchemy.exc import SQLAlchemyError
@@ -111,7 +112,7 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             Valid InviteToken or None
         """
         try:
-            now = datetime.utcnow()
+            now = utc_now()
             return (self.session.query(InviteToken)
                    .filter(
                        and_(
@@ -133,7 +134,7 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             List of expired invite tokens
         """
         try:
-            now = datetime.utcnow()
+            now = utc_now()
             return (self.session.query(InviteToken)
                    .filter(InviteToken.expires_at < now)
                    .all())
@@ -214,13 +215,13 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
         
         Args:
             pagination_params: Pagination parameters
-            current_time: Current time for expiry check (defaults to utcnow)
+            current_time: Current time for expiry check (defaults to )
             
         Returns:
             Paginated result of pending invites
         """
         try:
-            now = current_time or datetime.utcnow()
+            now = current_time or utc_now()
             
             # Build query for pending invites
             query = (self.session.query(InviteToken)
@@ -261,7 +262,7 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             Number of deleted invite tokens
         """
         try:
-            now = datetime.utcnow()
+            now = utc_now()
             count = (self.session.query(InviteToken)
                     .filter(InviteToken.expires_at < now)
                     .delete(synchronize_session=False))
@@ -284,7 +285,7 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             used_invites = self.session.query(InviteToken).filter_by(used=True).count()
             unused_invites = self.session.query(InviteToken).filter_by(used=False).count()
             
-            now = datetime.utcnow()
+            now = utc_now()
             expired_invites = (self.session.query(InviteToken)
                              .filter(InviteToken.expires_at < now)
                              .count())
@@ -319,7 +320,7 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             return []
         
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = utc_now() - timedelta(days=days)
             return (self.session.query(InviteToken)
                    .filter(InviteToken.created_at >= cutoff_date)
                    .order_by(desc(InviteToken.created_at))
@@ -343,7 +344,7 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             return []
         
         try:
-            now = datetime.utcnow()
+            now = utc_now()
             cutoff_time = now + timedelta(hours=hours)
             return (self.session.query(InviteToken)
                    .filter(
@@ -415,7 +416,7 @@ class InviteTokenRepository(BaseRepository[InviteToken]):
             Number of expired invites
         """
         try:
-            now = datetime.utcnow()
+            now = utc_now()
             count = (self.session.query(InviteToken)
                     .filter(
                         and_(

@@ -5,6 +5,7 @@ Following TDD principles: RED phase - tests written BEFORE implementation
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -37,7 +38,7 @@ class TestUserRepository:
             'last_name': 'User',
             'role': 'marketer',
             'is_active': True,
-            'created_at': datetime.utcnow()
+            'created_at': utc_now()
         }
     
     @pytest.fixture
@@ -219,7 +220,7 @@ class TestUserRepository:
     def test_update_last_login(self, user_repository, mock_session, sample_user):
         """Test updating user's last login timestamp"""
         # Arrange
-        login_time = datetime.utcnow()
+        login_time = utc_now()
         mock_session.get.return_value = sample_user
         
         # Act
@@ -237,7 +238,7 @@ class TestUserRepository:
         mock_session.get.return_value = None
         
         # Act
-        result = user_repository.update_last_login(999, datetime.utcnow())
+        result = user_repository.update_last_login(999, utc_now())
         
         # Assert
         assert result is None

@@ -16,6 +16,7 @@ Integration features tested:
 import pytest
 from unittest.mock import patch, Mock
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.phone_validation_service import PhoneValidationService
 from repositories.phone_validation_repository import PhoneValidationRepository
 from crm_database import PhoneValidation
@@ -205,7 +206,7 @@ class TestPhoneValidationDatabaseIntegration:
             line_type='mobile',
             carrier='Old Carrier',
             country_code='US',
-            created_at=datetime.utcnow() - timedelta(days=31)  # Expired
+            created_at=utc_now() - timedelta(days=31)  # Expired
         )
         
         phone_validation_repository.create(
@@ -214,7 +215,7 @@ class TestPhoneValidationDatabaseIntegration:
             line_type='mobile',
             carrier='Old Carrier',
             country_code='US',
-            created_at=datetime.utcnow() - timedelta(days=31)
+            created_at=utc_now() - timedelta(days=31)
         )
         db_session.commit()
         
@@ -275,7 +276,7 @@ class TestPhoneValidationDatabaseIntegration:
                 line_type='mobile',
                 carrier='Test Carrier',
                 country_code='US',
-                created_at=datetime.utcnow()
+                created_at=utc_now()
             )
         
         # Create expired records
@@ -286,7 +287,7 @@ class TestPhoneValidationDatabaseIntegration:
                 line_type='mobile',
                 carrier='Expired Carrier',
                 country_code='US',
-                created_at=datetime.utcnow() - timedelta(days=31)
+                created_at=utc_now() - timedelta(days=31)
             )
         
         db_session.commit()
@@ -411,7 +412,7 @@ class TestPhoneValidationCSVIntegrationWorkflow:
             line_type='mobile',
             carrier='Cached Carrier',
             country_code='US',
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         db_session.commit()
         
@@ -544,7 +545,7 @@ class TestPhoneValidationStatisticsIntegration:
                 line_type=line_type,
                 carrier=carrier,
                 country_code='US' if valid else '',
-                created_at=datetime.utcnow()
+                created_at=utc_now()
             )
         
         db_session.commit()
@@ -575,7 +576,7 @@ class TestPhoneValidationStatisticsIntegration:
                 line_type='mobile',
                 carrier='Old Carrier',
                 country_code='US',
-                created_at=datetime.utcnow() - timedelta(days=30)
+                created_at=utc_now() - timedelta(days=30)
             )
         
         # Recent validations
@@ -586,7 +587,7 @@ class TestPhoneValidationStatisticsIntegration:
                 line_type='mobile',
                 carrier='Recent Carrier',
                 country_code='US',
-                created_at=datetime.utcnow() - timedelta(hours=1)
+                created_at=utc_now() - timedelta(hours=1)
             )
         
         db_session.commit()

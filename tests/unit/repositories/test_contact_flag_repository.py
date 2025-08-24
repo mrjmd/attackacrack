@@ -10,6 +10,7 @@ Flag types include: opted_out, invalid_phone, office_number, do_not_contact, rec
 import pytest
 from unittest.mock import Mock
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import List, Set
 
 from repositories.contact_flag_repository import ContactFlagRepository
@@ -74,7 +75,7 @@ class TestContactFlagRepository:
         # Arrange
         contact_id = 456
         flag_type = 'recently_texted'
-        expires_at = datetime.utcnow() + timedelta(days=30)
+        expires_at = utc_now() + timedelta(days=30)
         
         # Act
         result = contact_flag_repository.create_temporary_flag(
@@ -207,7 +208,7 @@ class TestContactFlagRepository:
         """Test getting only active (non-expired) flags for a contact"""
         # Arrange
         contact_id = 789
-        now = datetime.utcnow()
+        now = utc_now()
         
         mock_flags = [
             Mock(id=1, contact_id=contact_id, flag_type='opted_out', expires_at=None),
@@ -229,7 +230,7 @@ class TestContactFlagRepository:
     def test_get_expired_flags(self, contact_flag_repository, mock_session):
         """Test finding flags that have expired"""
         # Arrange
-        expired_time = datetime.utcnow() - timedelta(days=1)
+        expired_time = utc_now() - timedelta(days=1)
         
         mock_flags = [
             Mock(id=1, contact_id=101, flag_type='recently_texted', expires_at=expired_time)
@@ -245,7 +246,7 @@ class TestContactFlagRepository:
         
         # Assert
         assert len(result) == 1
-        assert result[0].expires_at < datetime.utcnow()
+        assert result[0].expires_at < utc_now()
     
     def test_bulk_check_contacts_for_flag_type(self, contact_flag_repository, mock_session):
         """Test checking multiple contacts for a specific flag type efficiently"""
@@ -341,11 +342,11 @@ class TestContactFlagRepository:
         """Test extending the expiration date of a temporary flag"""
         # Arrange
         flag_id = 456
-        new_expiration = datetime.utcnow() + timedelta(days=60)
+        new_expiration = utc_now() + timedelta(days=60)
         
         mock_flag = Mock()
         mock_flag.id = flag_id
-        mock_flag.expires_at = datetime.utcnow() + timedelta(days=30)
+        mock_flag.expires_at = utc_now() + timedelta(days=30)
         
         mock_session.get.return_value = mock_flag
         mock_session.flush.return_value = None

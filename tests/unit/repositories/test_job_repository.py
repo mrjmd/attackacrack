@@ -7,6 +7,7 @@ job status tracking and completion date filtering for scheduler tasks.
 
 import pytest
 from datetime import date, datetime, timedelta
+from utils.datetime_utils import utc_now
 from repositories.job_repository import JobRepository
 from crm_database import Job, Property, Contact
 
@@ -61,8 +62,8 @@ class TestJobRepository:
         contact, property_obj = test_contact_and_property
         
         # Create jobs with different statuses and completion dates
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        two_days_ago = datetime.utcnow() - timedelta(days=2)
+        yesterday = utc_now() - timedelta(days=1)
+        two_days_ago = utc_now() - timedelta(days=2)
         
         jobs = [
             Job(
@@ -184,7 +185,7 @@ class TestJobRepository:
         updated_job = job_repository.update(
             job, 
             status='Completed',
-            completed_at=datetime.utcnow()
+            completed_at=utc_now()
         )
         
         # Assert
@@ -204,7 +205,7 @@ class TestJobRepository:
         assert result is True
         
         # Verify deletion
-        deleted_job = db_session.query(Job).get(job_id)
+        deleted_job = db_session.get(Job, job_id)
         assert deleted_job is None
     
     def test_count_jobs_by_status(self, job_repository, sample_jobs):
@@ -242,9 +243,9 @@ class TestJobRepositorySchedulerMethods:
         contact, property_obj = test_contact_and_property
         
         # Create jobs with specific completion dates for testing
-        yesterday = datetime.utcnow().date() - timedelta(days=1)
-        two_days_ago = datetime.utcnow().date() - timedelta(days=2)
-        today = datetime.utcnow().date()
+        yesterday = utc_now().date() - timedelta(days=1)
+        two_days_ago = utc_now().date() - timedelta(days=2)
+        today = utc_now().date()
         
         # Set specific times for completed_at to test date filtering
         yesterday_dt = datetime.combine(yesterday, datetime.min.time())
@@ -292,7 +293,7 @@ class TestJobRepositorySchedulerMethods:
     def test_find_completed_jobs_by_date(self, job_repository, scheduler_test_jobs):
         """Test finding completed jobs by specific completion date"""
         # Arrange
-        yesterday = datetime.utcnow().date() - timedelta(days=1)
+        yesterday = utc_now().date() - timedelta(days=1)
         
         # Act - This tests the pattern used in scheduler_service.py line 66-69
         completed_jobs_yesterday = job_repository.find_completed_jobs_by_date(yesterday)
@@ -306,7 +307,7 @@ class TestJobRepositorySchedulerMethods:
     def test_find_completed_jobs_by_date_no_results(self, job_repository, scheduler_test_jobs):
         """Test finding completed jobs when no jobs match the date"""
         # Arrange
-        future_date = datetime.utcnow().date() + timedelta(days=10)
+        future_date = utc_now().date() + timedelta(days=10)
         
         # Act
         completed_jobs = job_repository.find_completed_jobs_by_date(future_date)
@@ -317,7 +318,7 @@ class TestJobRepositorySchedulerMethods:
     def test_find_completed_jobs_excludes_active_jobs(self, job_repository, scheduler_test_jobs):
         """Test that finding completed jobs excludes active jobs"""
         # Arrange
-        today = datetime.utcnow().date()
+        today = utc_now().date()
         
         # Act
         completed_jobs_today = job_repository.find_completed_jobs_by_date(today)
@@ -331,7 +332,7 @@ class TestJobRepositorySchedulerMethods:
         """Test that completed jobs maintain property relationship for contact access"""
         # Arrange
         contact, property_obj = test_contact_and_property
-        yesterday = datetime.utcnow().date() - timedelta(days=1)
+        yesterday = utc_now().date() - timedelta(days=1)
         
         # Act
         completed_jobs = job_repository.find_completed_jobs_by_date(yesterday)
@@ -345,9 +346,9 @@ class TestJobRepositorySchedulerMethods:
     def test_find_completed_jobs_different_dates(self, job_repository, scheduler_test_jobs):
         """Test finding completed jobs across different dates"""
         # Arrange
-        yesterday = datetime.utcnow().date() - timedelta(days=1)
-        two_days_ago = datetime.utcnow().date() - timedelta(days=2)
-        today = datetime.utcnow().date()
+        yesterday = utc_now().date() - timedelta(days=1)
+        two_days_ago = utc_now().date() - timedelta(days=2)
+        today = utc_now().date()
         
         # Act
         jobs_yesterday = job_repository.find_completed_jobs_by_date(yesterday)
@@ -392,7 +393,7 @@ class TestJobRepositoryServiceMethods:
         completed_job = Job(
             description='Completed job for property',
             status='Completed',
-            completed_at=datetime.utcnow(),
+            completed_at=utc_now(),
             property_id=property_obj.id
         )
         
@@ -418,7 +419,7 @@ class TestJobRepositoryServiceMethods:
         completed_job = Job(
             description='Completed job for property',
             status='Completed',
-            completed_at=datetime.utcnow(),
+            completed_at=utc_now(),
             property_id=property_obj.id
         )
         db_session.add(completed_job)

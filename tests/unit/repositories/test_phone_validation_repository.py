@@ -14,6 +14,7 @@ Features tested:
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from repositories.phone_validation_repository import PhoneValidationRepository
 from crm_database import PhoneValidation
 from repositories.base_repository import PaginationParams, SortOrder
@@ -37,7 +38,7 @@ def sample_validation_data():
         'country_name': 'United States',
         'location': 'California',
         'api_response': '{"valid": true, "line_type": "mobile"}',
-        'created_at': datetime.utcnow()
+        'created_at': utc_now()
     }
 
 
@@ -176,7 +177,7 @@ class TestPhoneValidationRepositorySearch:
     def test_find_expired_validations(self, phone_validation_repository, db_session):
         """Test finding validations older than specified date"""
         # Arrange
-        now = datetime.utcnow()
+        now = utc_now()
         
         # Recent validation
         phone_validation_repository.create(
@@ -290,7 +291,7 @@ class TestPhoneValidationRepositoryBulkOperations:
     def test_delete_many_expired(self, phone_validation_repository, db_session):
         """Test bulk deletion of expired validation records"""
         # Arrange
-        now = datetime.utcnow()
+        now = utc_now()
         
         # Create fresh validations
         for i in range(3):
@@ -372,7 +373,7 @@ class TestPhoneValidationRepositoryPagination:
                 is_valid=True,
                 line_type='mobile',
                 carrier=f'Carrier {i}',
-                created_at=datetime.utcnow() - timedelta(minutes=i)
+                created_at=utc_now() - timedelta(minutes=i)
             )
         
         db_session.flush()
@@ -537,7 +538,7 @@ class TestPhoneValidationRepositoryCustomMethods:
     def test_find_recent_validations(self, phone_validation_repository, db_session):
         """Test finding validations from recent time period"""
         # Arrange
-        now = datetime.utcnow()
+        now = utc_now()
         
         # Recent validations
         for i in range(3):

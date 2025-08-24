@@ -4,6 +4,7 @@ Handles syncing data between QuickBooks and CRM
 """
 
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from decimal import Decimal
 from flask import current_app
@@ -520,7 +521,7 @@ class QuickBooksSyncService:
             'local_id': local_id,
             'local_table': local_table,
             'sync_version': sync_version,
-            'last_synced': datetime.utcnow(),
+            'last_synced': utc_now(),
             'sync_status': 'synced'
         }
         

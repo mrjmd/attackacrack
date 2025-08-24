@@ -7,6 +7,7 @@ import json
 import random
 import statistics
 from datetime import datetime, time, timedelta
+from utils.datetime_utils import utc_now
 from typing import List, Dict, Optional, Tuple, Any
 from scipy import stats
 # Session import removed - using repositories only
@@ -253,7 +254,7 @@ class CampaignService:
         if filters.get('min_days_since_contact'):
             # Filter contacts based on minimum days since last contact
             min_days = filters['min_days_since_contact']
-            cutoff_date = datetime.utcnow() - timedelta(days=min_days)
+            cutoff_date = utc_now() - timedelta(days=min_days)
             
             # Get all 'recently_texted' flags
             recently_texted_flags = self.contact_flag_repository.find_by_flag_type('recently_texted')

@@ -7,6 +7,7 @@ Tests the complete flow from webhook receipt to opt-out flag creation.
 import pytest
 import json
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 
 from app import create_app
@@ -51,7 +52,7 @@ class TestOptOutWebhookIntegration:
                     'text': 'STOP',
                     'conversationId': 'conv_123',
                     'status': 'received',
-                    'createdAt': datetime.utcnow().isoformat()
+                    'createdAt': utc_now().isoformat()
                 }
             }
         }
@@ -128,7 +129,7 @@ class TestOptOutWebhookIntegration:
                     'text': 'START',
                     'conversationId': 'conv_123',
                     'status': 'received',
-                    'createdAt': datetime.utcnow().isoformat()
+                    'createdAt': utc_now().isoformat()
                 }
             }
         }
@@ -153,9 +154,9 @@ class TestOptOutWebhookIntegration:
                     assert response.status_code == 200
                     
                     # Check that opt-out flag was expired
-                    flag = ContactFlag.query.get(flag_id)
+                    flag = db.session.get(ContactFlag, flag_id)
                     assert flag.expires_at is not None
-                    assert flag.expires_at <= datetime.utcnow()
+                    assert flag.expires_at <= utc_now()
                     
                     # Check that audit log was created for opt-in
                     audits = OptOutAudit.query.filter_by(
@@ -185,7 +186,7 @@ class TestOptOutWebhookIntegration:
                     'text': 'Yes, I am interested in your services',
                     'conversationId': 'conv_123',
                     'status': 'received',
-                    'createdAt': datetime.utcnow().isoformat()
+                    'createdAt': utc_now().isoformat()
                 }
             }
         }

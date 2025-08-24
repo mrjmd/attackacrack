@@ -5,6 +5,7 @@ These tests are written FIRST (TDD RED phase) before implementing the methods
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy.orm import selectinload, joinedload
 from repositories.conversation_repository import ConversationRepository
 from crm_database import Conversation, Contact, Activity
@@ -28,8 +29,8 @@ class TestConversationRepositoryDashboardEnhancements:
         db_session.add_all([contact1, contact2, contact3])
         db_session.commit()
         
-        recent_time = datetime.utcnow() - timedelta(hours=1)
-        old_time = datetime.utcnow() - timedelta(days=5)
+        recent_time = utc_now() - timedelta(hours=1)
+        old_time = utc_now() - timedelta(days=5)
         
         # Create conversations
         conv1 = Conversation(
@@ -112,7 +113,7 @@ class TestConversationRepositoryDashboardEnhancements:
         db_session.add_all([contact1, contact2])
         db_session.commit()
         
-        recent_time = datetime.utcnow() - timedelta(hours=1)
+        recent_time = utc_now() - timedelta(hours=1)
         
         # Conversation with activity
         conv_with_activity = Conversation(
@@ -167,7 +168,7 @@ class TestConversationRepositoryDashboardEnhancements:
         db_session.add_all(contacts)
         db_session.commit()
         
-        recent_time = datetime.utcnow() - timedelta(hours=1)
+        recent_time = utc_now() - timedelta(hours=1)
         
         for i, contact in enumerate(contacts):
             conv = Conversation(
@@ -221,7 +222,7 @@ class TestConversationRepositoryDashboardEnhancements:
         
         conv = Conversation(
             contact_id=contact.id,
-            last_activity_at=datetime.utcnow(),
+            last_activity_at=utc_now(),
             openphone_id='test_conv'
         )
         db_session.add(conv)
@@ -235,7 +236,7 @@ class TestConversationRepositoryDashboardEnhancements:
                 activity_type='message',
                 direction='incoming',
                 body=f'Message {i}',
-                created_at=datetime.utcnow() - timedelta(minutes=i)
+                created_at=utc_now() - timedelta(minutes=i)
             )
             db_session.add(activity)
         

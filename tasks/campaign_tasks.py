@@ -4,6 +4,7 @@ Handles background sending and queue processing
 """
 
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from celery_worker import celery
 from app import create_app
 from logging_config import get_logger
@@ -31,7 +32,7 @@ def process_campaign_queue(self):
             
             return {
                 'success': True,
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': utc_now().isoformat(),
                 'stats': stats
             }
             
@@ -48,7 +49,7 @@ def process_campaign_queue(self):
             return {
                 'success': False,
                 'error': str(e),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }
 
 
@@ -74,7 +75,7 @@ def handle_incoming_message_opt_out(phone: str, message: str):
                 'success': True,
                 'is_opt_out': is_opt_out,
                 'phone': phone,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }
             
         except Exception as e:
@@ -83,5 +84,5 @@ def handle_incoming_message_opt_out(phone: str, message: str):
                 'success': False,
                 'error': str(e),
                 'phone': phone,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }

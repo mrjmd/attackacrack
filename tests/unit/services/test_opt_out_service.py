@@ -11,6 +11,7 @@ Tests the complete opt-out processing pipeline:
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch, MagicMock
 from services.opt_out_service import OptOutService
 from services.common.result import Result
@@ -178,7 +179,7 @@ class TestOptOutProcessing:
         contact = Mock(id=1, phone="+1234567890")
         
         # Mock that flag already exists
-        existing_flag = Mock(id=1, flag_type='opted_out', created_at=datetime.utcnow())
+        existing_flag = Mock(id=1, flag_type='opted_out', created_at=utc_now())
         opt_out_service.contact_flag_repository.find_active_flags.return_value = [existing_flag]
         
         result = opt_out_service.process_opt_out(
@@ -430,10 +431,10 @@ class TestOptOutReporting:
         """Test generating opt-out statistics"""
         # Mock audit logs
         audit_logs = [
-            Mock(created_at=datetime.utcnow(), keyword_used='STOP', opt_out_method='sms_keyword'),
-            Mock(created_at=datetime.utcnow(), keyword_used='UNSUBSCRIBE', opt_out_method='sms_keyword'),
-            Mock(created_at=datetime.utcnow(), keyword_used='STOP', opt_out_method='sms_keyword'),
-            Mock(created_at=datetime.utcnow() - timedelta(days=35), keyword_used='END', opt_out_method='sms_keyword'),
+            Mock(created_at=utc_now(), keyword_used='STOP', opt_out_method='sms_keyword'),
+            Mock(created_at=utc_now(), keyword_used='UNSUBSCRIBE', opt_out_method='sms_keyword'),
+            Mock(created_at=utc_now(), keyword_used='STOP', opt_out_method='sms_keyword'),
+            Mock(created_at=utc_now() - timedelta(days=35), keyword_used='END', opt_out_method='sms_keyword'),
         ]
         opt_out_service.opt_out_audit_repository.find_all.return_value = audit_logs
         
@@ -460,7 +461,7 @@ class TestOptOutReporting:
     
     def test_get_recent_opt_outs(self, opt_out_service):
         """Test retrieving recent opt-out events"""
-        since_date = datetime.utcnow() - timedelta(days=7)
+        since_date = utc_now() - timedelta(days=7)
         
         # Mock audit logs with contact info
         audit_logs = [
@@ -469,7 +470,7 @@ class TestOptOutReporting:
                 contact_id=1, 
                 phone_number="+1111111111",
                 contact_name="John Doe",
-                created_at=datetime.utcnow(),
+                created_at=utc_now(),
                 keyword_used='STOP',
                 opt_out_method='sms_keyword',  # Add this field
                 source='webhook'
@@ -479,7 +480,7 @@ class TestOptOutReporting:
                 contact_id=2,
                 phone_number="+2222222222", 
                 contact_name="Jane Smith",
-                created_at=datetime.utcnow() - timedelta(days=1),
+                created_at=utc_now() - timedelta(days=1),
                 keyword_used='UNSUBSCRIBE',
                 opt_out_method='sms_keyword',  # Add this field
                 source='webhook'

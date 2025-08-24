@@ -7,6 +7,7 @@ no messages are missed. Runs daily to catch any webhook failures.
 
 import logging
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import Dict, Any, List, Optional
 
 from services.common.result import Result
@@ -67,12 +68,12 @@ class OpenPhoneReconciliationService:
             logger.info(f"Starting OpenPhone reconciliation for last {hours_back} hours")
             
             # Calculate date range
-            since_date = datetime.utcnow() - timedelta(hours=hours_back)
+            since_date = utc_now() - timedelta(hours=hours_back)
             since_str = since_date.isoformat() + 'Z'
             
             # Track reconciliation stats
             stats = {
-                'start_time': datetime.utcnow(),
+                'start_time': utc_now(),
                 'total_messages': 0,
                 'new_messages': 0,
                 'existing_messages': 0,
@@ -131,7 +132,7 @@ class OpenPhoneReconciliationService:
                     break
             
             # Calculate duration
-            stats['end_time'] = datetime.utcnow()
+            stats['end_time'] = utc_now()
             stats['duration_seconds'] = (stats['end_time'] - stats['start_time']).total_seconds()
             
             # Update service statistics
@@ -252,9 +253,9 @@ class OpenPhoneReconciliationService:
                     created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
                 except Exception as e:
                     logger.warning(f"Failed to parse timestamp {created_at_str}: {e}")
-                    created_at = datetime.utcnow()
+                    created_at = utc_now()
             else:
-                created_at = datetime.utcnow()
+                created_at = utc_now()
             
             # Create activity record
             activity_data = {
@@ -308,7 +309,7 @@ class OpenPhoneReconciliationService:
         
         # Reset daily counter if new day
         if self.stats['last_run']:
-            today = datetime.utcnow().date()
+            today = utc_now().date()
             if not hasattr(self, '_last_run_date') or self._last_run_date != today:
                 self.stats['runs_today'] = 1
                 self._last_run_date = today

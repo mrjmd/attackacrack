@@ -305,7 +305,7 @@ class TestContactServiceResult:
         Test adding contact to campaign using repository pattern.
         
         THIS TEST MUST FAIL INITIALLY because current implementation uses direct DB queries:
-        - Campaign.query.get(campaign_id)  # Should use campaign_repository.get_by_id()
+        - db.session.get(Campaign, campaign_id)  # Should use campaign_repository.get_by_id()
         - CampaignMembership.query.filter_by()  # Should use campaign_repository.get_member_by_contact()
         """
         # Arrange
@@ -410,7 +410,7 @@ class TestContactServiceResult:
         Test bulk adding contacts to campaign using repository pattern.
         
         THIS TEST MUST FAIL because current implementation uses:
-        - Campaign.query.get(campaign_id)  # Should use campaign_repository.get_by_id()
+        - db.session.get(Campaign, campaign_id)  # Should use campaign_repository.get_by_id()
         """
         # Arrange
         contact_ids = [1, 2, 3]

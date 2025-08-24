@@ -13,6 +13,7 @@ Following TDD: These tests should FAIL initially and guide implementation.
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from decimal import Decimal
 
 from crm_database import FailedWebhookQueue  # This model needs to be created
@@ -32,10 +33,10 @@ class TestFailedWebhookQueueModel:
             'original_payload': {'data': 'test'},
             'error_message': 'Connection timeout',
             'retry_count': 0,
-            'next_retry_at': datetime.utcnow() + timedelta(minutes=1),
+            'next_retry_at': utc_now() + timedelta(minutes=1),
             'max_retries': 5,
             'backoff_multiplier': Decimal('2.0'),
-            'created_at': datetime.utcnow()
+            'created_at': utc_now()
         }
         
         # Act
@@ -88,7 +89,7 @@ class TestFailedWebhookQueueRepository:
     def test_find_pending_retries(self, repository, mock_session):
         """Test finding failed webhooks ready for retry"""
         # Arrange
-        now = datetime.utcnow()
+        now = utc_now()
         mock_failed_webhooks = [
             Mock(id=1, event_id='evt_1', next_retry_at=now - timedelta(minutes=1)),
             Mock(id=2, event_id='evt_2', next_retry_at=now - timedelta(minutes=5))
@@ -119,7 +120,7 @@ class TestFailedWebhookQueueRepository:
             retry_count=1, 
             max_retries=5,  # Add this missing attribute
             backoff_multiplier=Decimal('2.0'),
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         mock_session.query.return_value.get.return_value = mock_webhook
         

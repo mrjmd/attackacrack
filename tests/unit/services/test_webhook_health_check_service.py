@@ -6,6 +6,7 @@ Following TDD principles - tests written before implementation
 import pytest
 from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.webhook_health_check_service import (
     WebhookHealthCheckService,
     HealthCheckResult,
@@ -57,7 +58,7 @@ class TestWebhookHealthCheckService:
     def test_generate_health_check_message(self, service):
         """Test health check message generation"""
         with patch('services.webhook_health_check_service.datetime') as mock_datetime:
-            mock_datetime.utcnow.return_value = datetime(2025, 1, 22, 10, 30, 45)
+            mock_datetime.utc_now.return_value = datetime(2025, 1, 22, 10, 30, 45)
             
             message = service._generate_health_check_message()
             
@@ -109,7 +110,7 @@ class TestWebhookHealthCheckService:
         """Test successful webhook receipt verification"""
         # Arrange
         check_message = "[HEALTH_CHECK] Test at 2025-01-22T10:30:45-abc12345"
-        sent_at = datetime.utcnow()
+        sent_at = utc_now()
         
         # Mock webhook event with matching message
         mock_event = Mock(
@@ -133,7 +134,7 @@ class TestWebhookHealthCheckService:
         """Test webhook receipt verification timeout"""
         # Arrange
         check_message = "[HEALTH_CHECK] Test at 2025-01-22T10:30:45-abc12345"
-        sent_at = datetime.utcnow() - timedelta(seconds=150)  # 2.5 minutes ago
+        sent_at = utc_now() - timedelta(seconds=150)  # 2.5 minutes ago
         
         # Mock the helper method to return None (no matching webhook)
         with patch.object(service, '_find_matching_webhook', return_value=None):
@@ -157,7 +158,7 @@ class TestWebhookHealthCheckService:
         mock_event = Mock(
             event_type='message.received',
             payload={'text': '[HEALTH_CHECK] Test'},
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         
         # Mock the helper method
@@ -261,12 +262,12 @@ class TestWebhookHealthCheckService:
         mock_events = [
             Mock(
                 event_type='health_check.success',
-                created_at=datetime.utcnow() - timedelta(hours=1),
+                created_at=utc_now() - timedelta(hours=1),
                 payload={'response_time': 1.5}
             ),
             Mock(
                 event_type='health_check.timeout',
-                created_at=datetime.utcnow() - timedelta(hours=2),
+                created_at=utc_now() - timedelta(hours=2),
                 payload={'error': 'Timeout'}
             )
         ]
@@ -289,8 +290,8 @@ class TestWebhookHealthCheckService:
         result = HealthCheckResult(
             status=HealthCheckStatus.SUCCESS,
             message_id="msg_123",
-            sent_at=datetime.utcnow(),
-            received_at=datetime.utcnow() + timedelta(seconds=2),
+            sent_at=utc_now(),
+            received_at=utc_now() + timedelta(seconds=2),
             response_time=2.0
         )
         

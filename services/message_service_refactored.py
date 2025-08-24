@@ -8,6 +8,7 @@ Refactored MessageService following Phase 2 patterns:
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from utils.datetime_utils import utc_now
 
 from services.common.result import Result
 # Model imports removed - using repositories only
@@ -93,7 +94,7 @@ class MessageServiceRefactored:
                 'contact_id': contact_id,
                 'openphone_id': openphone_convo_id,
                 'participants': ','.join(participants) if participants else '',
-                'last_activity_at': datetime.utcnow()
+                'last_activity_at': utc_now()
             }
             
             new_conversation = self.conversation_repository.create(conversation_data)

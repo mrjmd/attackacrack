@@ -6,6 +6,7 @@ These tests verify the service uses repositories instead of direct DB queries
 import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.dashboard_service import DashboardService
 from crm_database import Contact, Campaign, CampaignMembership, Activity, Conversation
 
@@ -92,7 +93,7 @@ class TestDashboardServiceRepositoryRefactor:
         mock_activity1.activity_type = 'message'
         mock_activity1.direction = 'incoming'
         mock_activity1.body = 'Test message'
-        mock_activity1.created_at = datetime.utcnow() - timedelta(hours=1)
+        mock_activity1.created_at = utc_now() - timedelta(hours=1)
         mock_activity1.duration_seconds = None
         
         mock_conversation1 = Mock()
@@ -123,11 +124,11 @@ class TestDashboardServiceRepositoryRefactor:
         # Arrange
         mock_campaign1 = Mock()
         mock_campaign1.name = 'Test Campaign 1'
-        mock_campaign1.created_at = datetime.utcnow() - timedelta(days=1)
+        mock_campaign1.created_at = utc_now() - timedelta(days=1)
         
         mock_campaign2 = Mock()
         mock_campaign2.name = 'Test Campaign 2'
-        mock_campaign2.created_at = datetime.utcnow() - timedelta(days=2)
+        mock_campaign2.created_at = utc_now() - timedelta(days=2)
         
         mock_campaign_repository.get_recent_campaigns_with_limit.return_value = [mock_campaign1, mock_campaign2]
         
@@ -144,7 +145,7 @@ class TestDashboardServiceRepositoryRefactor:
                                                     mock_activity_repository):
         """Test that get_message_volume_data uses activity repository"""
         # Arrange
-        today = datetime.utcnow().date()
+        today = utc_now().date()
         yesterday = today - timedelta(days=1)
         
         mock_volume_data = [
@@ -210,7 +211,7 @@ class TestDashboardServiceRepositoryRefactor:
         mock_message_activity = Mock()
         mock_message_activity.activity_type = 'message'
         mock_message_activity.body = 'Hello world'
-        mock_message_activity.created_at = datetime.utcnow()
+        mock_message_activity.created_at = utc_now()
         mock_message_activity.direction = 'incoming'
         mock_message_activity.duration_seconds = None
         
@@ -230,7 +231,7 @@ class TestDashboardServiceRepositoryRefactor:
         mock_call_activity.direction = 'incoming'
         mock_call_activity.duration_seconds = 180  # 3 minutes
         mock_call_activity.body = None
-        mock_call_activity.created_at = datetime.utcnow()
+        mock_call_activity.created_at = utc_now()
         
         # Act
         result_call = dashboard_service._format_activity_item(mock_conversation, mock_call_activity)
@@ -245,7 +246,7 @@ class TestDashboardServiceRepositoryRefactor:
         mock_voicemail_activity.direction = 'incoming'
         mock_voicemail_activity.duration_seconds = None
         mock_voicemail_activity.body = None
-        mock_voicemail_activity.created_at = datetime.utcnow()
+        mock_voicemail_activity.created_at = utc_now()
         
         # Act
         result_voicemail = dashboard_service._format_activity_item(mock_conversation, mock_voicemail_activity)

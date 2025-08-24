@@ -10,6 +10,7 @@ Handles database operations for the webhook error recovery system:
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from decimal import Decimal
 from sqlalchemy import desc, and_, or_, func
 
@@ -34,7 +35,7 @@ class FailedWebhookQueueRepository(BaseRepository):
         Returns:
             List of FailedWebhookQueue objects ready for retry
         """
-        now = datetime.utcnow()
+        now = utc_now()
         
         return self.session.query(self.model_class)\
             .filter(self.model_class.resolved == False)\
@@ -64,17 +65,17 @@ class FailedWebhookQueueRepository(BaseRepository):
             
         # Increment retry count
         webhook.retry_count += 1
-        webhook.last_retry_at = datetime.utcnow()
+        webhook.last_retry_at = utc_now()
         
         # Calculate next retry time using exponential backoff
         if webhook.retry_count < webhook.max_retries:
             delay_seconds = base_delay_seconds * (Decimal(str(webhook.backoff_multiplier)) ** webhook.retry_count)
-            webhook.next_retry_at = datetime.utcnow() + timedelta(seconds=int(delay_seconds))
+            webhook.next_retry_at = utc_now() + timedelta(seconds=int(delay_seconds))
         else:
             # No more retries - set next_retry_at to None
             webhook.next_retry_at = None
             
-        webhook.updated_at = datetime.utcnow()
+        webhook.updated_at = utc_now()
         self.session.commit()
         return webhook
     
@@ -94,9 +95,9 @@ class FailedWebhookQueueRepository(BaseRepository):
             return None
             
         webhook.resolved = True
-        webhook.resolved_at = datetime.utcnow()
+        webhook.resolved_at = utc_now()
         webhook.resolution_note = resolution_note
-        webhook.updated_at = datetime.utcnow()
+        webhook.updated_at = utc_now()
         
         self.session.commit()
         return webhook
@@ -137,7 +138,7 @@ class FailedWebhookQueueRepository(BaseRepository):
         Returns:
             Number of deleted records
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        cutoff_date = utc_now() - timedelta(days=days_old)
         
         # Delete resolved webhooks or webhooks that have exhausted retries
         deleted_count = self.session.query(self.model_class)\
@@ -161,7 +162,7 @@ class FailedWebhookQueueRepository(BaseRepository):
         Returns:
             Dictionary with failure statistics
         """
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours_back)
+        cutoff_time = utc_now() - timedelta(hours=hours_back)
         
         # Total failed webhooks in time period
         total_failed = self.session.query(func.count(self.model_class.id))\
@@ -202,7 +203,7 @@ class FailedWebhookQueueRepository(BaseRepository):
             'exhausted_retries': exhausted_retries,
             'resolved': resolved,
             'failure_rate_24h': round(failure_rate, 3),
-            'calculated_at': datetime.utcnow().isoformat()
+            'calculated_at': utc_now().isoformat()
         }
     
     def find_by_event_type(self, event_type: str, resolved: bool = None) -> List[FailedWebhookQueue]:
@@ -231,7 +232,7 @@ class FailedWebhookQueueRepository(BaseRepository):
         Returns:
             Dictionary with queue status information
         """
-        now = datetime.utcnow()
+        now = utc_now()
         
         # Count by status
         total_unresolved = self.session.query(func.count(self.model_class.id))\

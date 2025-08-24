@@ -105,7 +105,7 @@ class TestFullCampaignLifecycle:
         assert start_result is True
         # Get updated campaign from database
         from crm_database import Campaign
-        campaign = db_session.query(Campaign).get(campaign.id)
+        campaign = db_session.get(Campaign, campaign.id)
         assert campaign.status == 'running'  # Campaign status is 'running' not 'active'
         
         # Step 6: Process the campaign queue to send messages
@@ -123,7 +123,7 @@ class TestFullCampaignLifecycle:
         
         # Campaign should still be running (can be manually stopped)
         # Get updated campaign from database
-        campaign = db_session.query(Campaign).get(campaign.id)
+        campaign = db_session.get(Campaign, campaign.id)
         assert campaign.status == 'running'
     
     def test_ab_test_campaign_lifecycle(self, campaign_service, list_service,

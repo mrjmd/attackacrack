@@ -8,6 +8,7 @@ import io
 import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func
 # Model and Session imports removed - using repositories only
 from services.common.result import Result, PagedResult
@@ -84,7 +85,7 @@ class ContactService:
             contact = self.contact_repository.create(**contact_data)
             logger.info(f"Created contact: {contact.id} - {contact.first_name} {contact.last_name}")
             
-            return Result.success(contact, metadata={"created_at": datetime.utcnow()})
+            return Result.success(contact, metadata={"created_at": utc_now()})
             
         except Exception as e:
             logger.error(f"Failed to create contact: {str(e)}")
@@ -257,7 +258,7 @@ class ContactService:
                 if hasattr(contact, key):
                     setattr(contact, key, value)
             
-            contact.updated_at = datetime.utcnow()
+            contact.updated_at = utc_now()
             # Repository handles commit
             
             logger.info(f"Updated contact: {contact_id}")

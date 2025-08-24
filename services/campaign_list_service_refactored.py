@@ -4,6 +4,7 @@ Manages campaign lists and contact selection using repository pattern
 """
 
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import List, Dict, Optional, Any
 from services.common.result import Result
 from repositories.campaign_list_repository import CampaignListRepository
@@ -120,7 +121,7 @@ class CampaignListServiceRefactored:
                             self.member_repository.update(
                                 existing,
                                 status='active',
-                                added_at=datetime.utcnow()
+                                added_at=utc_now()
                             )
                             results['added'] += 1
                         else:
@@ -340,7 +341,7 @@ class CampaignListServiceRefactored:
                 self.member_repository.remove_contacts_from_list(list_id, list(to_remove))
             
             # Update list timestamp
-            self.campaign_list_repository.update(campaign_list, updated_at=datetime.utcnow())
+            self.campaign_list_repository.update(campaign_list, updated_at=utc_now())
             self.campaign_list_repository.commit()
             
             stats = {

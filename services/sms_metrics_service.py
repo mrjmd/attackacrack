@@ -3,6 +3,7 @@ SMS Metrics and Bounce Tracking Service
 Tracks delivery rates, bounce rates, and message performance
 """
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import Dict, List, Optional, Tuple
 import logging
 
@@ -61,7 +62,7 @@ class SMSMetricsService:
                 bounce_metadata = {
                     'bounce_type': bounce_type,
                     'bounce_details': status_details,
-                    'bounced_at': datetime.utcnow().isoformat()
+                    'bounced_at': utc_now().isoformat()
                 }
                 
                 # Update activity status and metadata via repository
@@ -112,7 +113,7 @@ class SMSMetricsService:
         bounce_info = {
             'bounce_type': bounce_type,
             'bounce_details': f'Bounce type: {bounce_type}',
-            'bounced_at': datetime.utcnow().isoformat()
+            'bounced_at': utc_now().isoformat()
         }
         
         self.contact_repository.update_contact_bounce_status(

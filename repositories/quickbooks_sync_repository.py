@@ -4,6 +4,7 @@ QuickBooksSyncRepository - Data access layer for QuickBooksSync model
 
 from typing import List, Optional
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from sqlalchemy import desc, or_, and_
 from repositories.base_repository import BaseRepository, PaginatedResult
 from crm_database import QuickBooksSync
@@ -110,7 +111,7 @@ class QuickBooksSyncRepository(BaseRepository):
         sync_record = self.session.query(self.model_class).get(sync_id)
         if sync_record:
             sync_record.sync_status = status
-            sync_record.last_synced = datetime.utcnow()
+            sync_record.last_synced = utc_now()
             self.session.commit()
         return sync_record
     

@@ -74,7 +74,7 @@ def test_process_incoming_message_webhook_new_contact(app, db_session):
 
         # Get the created activity
         activity_id = result.data['activity_id']
-        new_activity = db_session.query(Activity).get(activity_id)
+        new_activity = db_session.get(Activity, activity_id)
         assert new_activity is not None
         assert new_activity.openphone_id == "msg_new_contact_123"
         assert new_activity.body == "Hi, I'm a new customer."

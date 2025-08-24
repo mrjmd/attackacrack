@@ -11,6 +11,7 @@ currently have incorrect type hints for model classes that no longer exist.
 import pytest
 from unittest.mock import Mock, MagicMock
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import List, Dict, Any
 
 from services.campaign_list_service_refactored import CampaignListServiceRefactored
@@ -38,8 +39,8 @@ class TestCampaignListServiceTypeHints:
             'is_dynamic': False,
             'filter_criteria': None,
             'created_by': 'test-user',
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
+            'created_at': utc_now(),
+            'updated_at': utc_now()
         }
         return repo
     
@@ -197,7 +198,7 @@ class TestCampaignServiceTypeHints:
             'template_a': 'Hello {first_name}',
             'template_b': None,
             'daily_limit': 125,
-            'created_at': datetime.utcnow()
+            'created_at': utc_now()
         }
         return repo
     

@@ -4,6 +4,7 @@ Handles periodic health checks and alerting
 """
 
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from celery_worker import celery
 from app import create_app
 from logging_config import get_logger
@@ -44,7 +45,7 @@ def run_webhook_health_check(self):
                 'response_time': result.response_time,
                 'message_id': result.message_id,
                 'error': result.error_message,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }
             
         except Exception as e:
@@ -60,7 +61,7 @@ def run_webhook_health_check(self):
             return {
                 'success': False,
                 'error': str(e),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }
 
 
@@ -97,7 +98,7 @@ def get_webhook_health_status(hours: int = 24):
             return {
                 'success': True,
                 'data': status,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }
             
         except Exception as e:
@@ -105,7 +106,7 @@ def get_webhook_health_status(hours: int = 24):
             return {
                 'success': False,
                 'error': str(e),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }
 
 
@@ -130,7 +131,7 @@ def cleanup_old_health_checks(days: int = 30):
             from extensions import db
             
             # Calculate cutoff date
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = utc_now() - timedelta(days=days)
             
             # Delete old health check events
             deleted_count = WebhookEvent.query.filter(
@@ -150,7 +151,7 @@ def cleanup_old_health_checks(days: int = 30):
                 'success': True,
                 'deleted_count': deleted_count,
                 'cutoff_date': cutoff_date.isoformat(),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }
             
         except Exception as e:
@@ -159,5 +160,5 @@ def cleanup_old_health_checks(days: int = 30):
             return {
                 'success': False,
                 'error': str(e),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': utc_now().isoformat()
             }

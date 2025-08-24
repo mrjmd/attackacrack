@@ -5,6 +5,7 @@ Tests for QuickBooksAuthRepository
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from repositories.quickbooks_auth_repository import QuickBooksAuthRepository
 from crm_database import QuickBooksAuth
 
@@ -100,7 +101,7 @@ class TestQuickBooksAuthRepository:
             'company_id': '123456',
             'access_token': 'new_encrypted_token',
             'refresh_token': 'new_encrypted_refresh',
-            'expires_at': datetime.utcnow() + timedelta(hours=1)
+            'expires_at': utc_now() + timedelta(hours=1)
         }
         
         # Act
@@ -131,7 +132,7 @@ class TestQuickBooksAuthRepository:
                 'company_id': '123456',
                 'access_token': 'encrypted_token',
                 'refresh_token': 'encrypted_refresh',
-                'expires_at': datetime.utcnow() + timedelta(hours=1)
+                'expires_at': utc_now() + timedelta(hours=1)
             }
             
             # Act
@@ -154,7 +155,7 @@ class TestQuickBooksAuthRepository:
             auth_id=1,
             access_token="new_access_token",
             refresh_token="new_refresh_token",
-            expires_at=datetime.utcnow() + timedelta(hours=1)
+            expires_at=utc_now() + timedelta(hours=1)
         )
         
         # Assert
@@ -174,7 +175,7 @@ class TestQuickBooksAuthRepository:
             auth_id=999,
             access_token="new_access_token",
             refresh_token="new_refresh_token",
-            expires_at=datetime.utcnow() + timedelta(hours=1)
+            expires_at=utc_now() + timedelta(hours=1)
         )
         
         # Assert
@@ -184,7 +185,7 @@ class TestQuickBooksAuthRepository:
     def test_is_token_expired_true(self, repository, mock_session):
         """Test checking if token is expired when it is expired"""
         # Arrange
-        expired_time = datetime.utcnow() - timedelta(hours=1)
+        expired_time = utc_now() - timedelta(hours=1)
         auth_record = Mock(expires_at=expired_time)
         mock_session.query.return_value.get.return_value = auth_record
         
@@ -197,7 +198,7 @@ class TestQuickBooksAuthRepository:
     def test_is_token_expired_false(self, repository, mock_session):
         """Test checking if token is expired when it's still valid"""
         # Arrange
-        future_time = datetime.utcnow() + timedelta(hours=1)
+        future_time = utc_now() + timedelta(hours=1)
         auth_record = Mock(expires_at=future_time)
         mock_session.query.return_value.get.return_value = auth_record
         

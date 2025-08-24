@@ -8,6 +8,7 @@ import json
 import base64
 import requests
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import Dict, Optional, List, Any
 from urllib.parse import urlencode
 from cryptography.fernet import Fernet
@@ -110,7 +111,7 @@ class QuickBooksService:
             # Update tokens using repository
             encrypted_access_token = self.cipher.encrypt(token_data['access_token'].encode()).decode()
             encrypted_refresh_token = self.cipher.encrypt(token_data['refresh_token'].encode()).decode()
-            expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+            expires_at = utc_now() + timedelta(seconds=token_data['expires_in'])
             
             updated_auth = self.auth_repository.update_tokens(
                 auth_id=auth.id,
@@ -173,7 +174,7 @@ class QuickBooksService:
             'company_id': company_id,
             'access_token': self.cipher.encrypt(token_data['access_token'].encode()).decode(),
             'refresh_token': self.cipher.encrypt(token_data['refresh_token'].encode()).decode(),
-            'expires_at': datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+            'expires_at': utc_now() + timedelta(seconds=token_data['expires_in'])
         }
         
         # Use repository to create or update auth

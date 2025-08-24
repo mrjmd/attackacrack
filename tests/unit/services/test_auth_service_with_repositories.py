@@ -5,6 +5,7 @@ Following TDD principles: RED phase - tests written BEFORE refactoring
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 
@@ -58,7 +59,7 @@ class TestAuthServiceWithRepositories:
             last_name='User',
             role='marketer',
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         user.id = 1
         return user
@@ -71,8 +72,8 @@ class TestAuthServiceWithRepositories:
             email='invite@example.com',
             token='abc123def456',
             role='marketer',
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(days=7),
+            created_at=utc_now(),
+            expires_at=utc_now() + timedelta(days=7),
             used=False,
             created_by_id=1
         )
@@ -304,7 +305,7 @@ class TestAuthServiceWithRepositories:
     def test_validate_invite_should_fail_when_invite_is_expired(self, auth_service, mock_invite_repository, sample_invite):
         """Test validate_invite failure when invite is expired"""
         # Arrange
-        sample_invite.expires_at = datetime.utcnow() - timedelta(days=1)
+        sample_invite.expires_at = utc_now() - timedelta(days=1)
         mock_invite_repository.find_by_token.return_value = sample_invite
         
         # Act

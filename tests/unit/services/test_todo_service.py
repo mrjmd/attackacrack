@@ -3,6 +3,7 @@ Tests for TodoService
 """
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.todo_service_refactored import TodoServiceRefactored
 from tests.fixtures.repository_fixtures import create_todo_repository_mock
 
@@ -29,7 +30,7 @@ def sample_todo_data():
         'title': 'Test Todo',
         'description': 'This is a test todo',
         'priority': 'high',
-        'due_date': (datetime.utcnow() + timedelta(days=1)).isoformat()
+        'due_date': (utc_now() + timedelta(days=1)).isoformat()
     }
 
 
@@ -85,7 +86,7 @@ class TestTodoService:
         todo_service.todo_repository.update_by_id(
             todo3['id'], 
             is_completed=True, 
-            completed_at=datetime.utcnow()
+            completed_at=utc_now()
         )
         
         # Get all todos
@@ -185,7 +186,7 @@ class TestTodoService:
         todo_service.todo_repository.update_by_id(
             completed_todo['id'],
             is_completed=True,
-            completed_at=datetime.utcnow()
+            completed_at=utc_now()
         )
         
         # Get dashboard todos
@@ -208,7 +209,7 @@ class TestTodoService:
         todo_service.create_todo(test_user_id, {'title': 'Todo 3', 'priority': 'low'})
         
         # Create overdue todo
-        overdue_date = datetime.utcnow() - timedelta(days=1)
+        overdue_date = utc_now() - timedelta(days=1)
         todo_service.create_todo(test_user_id, {
             'title': 'Overdue',
             'due_date': overdue_date.isoformat()
@@ -220,7 +221,7 @@ class TestTodoService:
         todo_service.todo_repository.update_by_id(
             completed_todo['id'],
             is_completed=True,
-            completed_at=datetime.utcnow()
+            completed_at=utc_now()
         )
         
         # Get stats - the service returns Result pattern for get_todo_stats

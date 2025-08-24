@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from datetime import datetime
+from utils.datetime_utils import utc_now
 
 from crm_database import Contact, Conversation, Activity, Campaign, Todo
 
@@ -254,7 +255,7 @@ class DiagnosticsRepository:
             Dictionary with health check results
         """
         health_check = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': utc_now().isoformat(),
             'database_connected': False,
             'model_counts': {},
             'connection_pool': {},

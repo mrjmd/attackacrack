@@ -13,6 +13,7 @@ This test suite follows TDD principles:
 import pytest
 from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime, time, timedelta
+from utils.datetime_utils import utc_now
 from typing import List, Dict, Optional
 
 # Import the service and dependencies
@@ -1089,7 +1090,7 @@ class TestCampaignServiceUnit:
         campaign_id = 1
         contact_id = 1
         status = 'sent'
-        additional_data = {'sent_at': datetime.utcnow(), 'variant': 'A'}
+        additional_data = {'sent_at': utc_now(), 'variant': 'A'}
         
         mock_campaign_repository.update_member_status.return_value = True
         
@@ -1149,9 +1150,9 @@ class TestCampaignServiceUnit:
         # Arrange
         campaign_id = 1
         expected_timeline = [
-            {'event': 'created', 'timestamp': datetime.utcnow()},
-            {'event': 'activated', 'timestamp': datetime.utcnow()},
-            {'event': 'first_send', 'timestamp': datetime.utcnow()}
+            {'event': 'created', 'timestamp': utc_now()},
+            {'event': 'activated', 'timestamp': utc_now()},
+            {'event': 'first_send', 'timestamp': utc_now()}
         ]
         
         mock_campaign_repository.get_campaign_timeline.return_value = expected_timeline
@@ -1203,12 +1204,12 @@ class TestCampaignServiceUnit:
         flag1 = Mock(spec=ContactFlag)
         flag1.contact_id = 1
         flag1.flag_type = 'recently_texted'
-        flag1.created_at = datetime.utcnow() - timedelta(days=3)
+        flag1.created_at = utc_now() - timedelta(days=3)
         
         flag2 = Mock(spec=ContactFlag)
         flag2.contact_id = 2
         flag2.flag_type = 'recently_texted'
-        flag2.created_at = datetime.utcnow() - timedelta(days=10)
+        flag2.created_at = utc_now() - timedelta(days=10)
         
         mock_contact_flag_repository.find_by_flag_type.return_value = [flag1, flag2]
         
@@ -1236,7 +1237,7 @@ class TestCampaignServiceUnit:
         flag = Mock(spec=ContactFlag)
         flag.contact_id = 1
         flag.flag_type = 'recently_texted'
-        flag.created_at = datetime.utcnow() - timedelta(days=7)
+        flag.created_at = utc_now() - timedelta(days=7)
         
         mock_contact_flag_repository.find_by_flag_type.return_value = [flag]
         

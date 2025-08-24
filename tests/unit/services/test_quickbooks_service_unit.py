@@ -7,6 +7,7 @@ import os
 # import jwt  # Commented out - not installed
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.quickbooks_service import QuickBooksService
 from crm_database import QuickBooksAuth
 
@@ -40,7 +41,7 @@ class TestQuickBooksService:
         auth.company_id = "123456"
         auth.access_token = "encrypted_access_token"
         auth.refresh_token = "encrypted_refresh_token"
-        auth.expires_at = datetime.utcnow() + timedelta(hours=1)
+        auth.expires_at = utc_now() + timedelta(hours=1)
         return auth
     
     def test_init_sets_config_from_environment(self):

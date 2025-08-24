@@ -6,6 +6,7 @@ This script checks all prerequisites and configuration for webhook deployment
 
 import sys
 import os
+from utils.datetime_utils import utc_now
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import create_app
@@ -52,7 +53,7 @@ def verify_webhook_setup():
             
             # Check recent webhook activity
             recent = WebhookEvent.query.filter(
-                WebhookEvent.created_at > datetime.utcnow() - timedelta(days=1)
+                WebhookEvent.created_at > utc_now() - timedelta(days=1)
             ).count()
             
             if recent > 0:

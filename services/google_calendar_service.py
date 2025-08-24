@@ -5,6 +5,7 @@ Handles all Google Calendar API interactions with proper dependency injection
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -66,7 +67,7 @@ class GoogleCalendarService:
             return []
         
         try:
-            now = datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+            now = utc_now().isoformat() + 'Z'  # 'Z' indicates UTC time
             events_result = service.events().list(
                 calendarId=calendar_id,
                 timeMin=now,

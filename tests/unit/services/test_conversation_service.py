@@ -5,6 +5,7 @@ Tests for ConversationService - TDD for Repository Pattern Refactoring
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.conversation_service import ConversationService
 from crm_database import Conversation, Contact, Activity, Campaign
 
@@ -195,7 +196,7 @@ class TestConversationService:
         # Activity with real attachments
         activity_with_media = Mock(
             direction='incoming', 
-            created_at=datetime.utcnow(),
+            created_at=utc_now(),
             media_urls=['http://example.com/image.jpg'],
             ai_summary=None
         )
@@ -203,7 +204,7 @@ class TestConversationService:
         # Activity without attachments
         activity_no_media = Mock(
             direction='incoming', 
-            created_at=datetime.utcnow(),
+            created_at=utc_now(),
             media_urls=[],
             ai_summary=None
         )
@@ -350,7 +351,7 @@ class TestConversationService:
             Mock(
                 id=1,
                 contact=Mock(first_name="Test", last_name="User", phone="+11111111111", email="test@example.com"),
-                last_activity_at=datetime.utcnow()
+                last_activity_at=utc_now()
             )
         ]
         activity_counts = {1: 2}

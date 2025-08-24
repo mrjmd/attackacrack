@@ -5,6 +5,7 @@ Isolates all database queries related to campaign list members
 
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from sqlalchemy import and_, or_, func, desc
 from sqlalchemy.orm import Query, joinedload
 from repositories.base_repository import BaseRepository
@@ -233,7 +234,7 @@ class CampaignListMemberRepository(BaseRepository[CampaignListMember]):
             self.update(
                 member,
                 status='active',
-                added_at=datetime.utcnow(),
+                added_at=utc_now(),
                 added_by=added_by
             )
             return True

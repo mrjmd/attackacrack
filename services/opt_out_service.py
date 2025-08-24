@@ -8,6 +8,7 @@ Manages keyword detection, flag creation, audit logging, and confirmation messag
 import re
 import logging
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import List, Optional, Dict, Any
 
 from services.common.result import Result
@@ -418,7 +419,7 @@ class OptOutService:
         all_audits = self.opt_out_audit_repository.find_all()
         
         # Get audits from last 30 days
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = utc_now() - timedelta(days=30)
         recent_count = self.opt_out_audit_repository.count_since(thirty_days_ago)
         
         # Get keyword breakdown

@@ -16,6 +16,7 @@ Features tested:
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.phone_validation_service import PhoneValidationService
 from services.common.result import Result
 import requests
@@ -182,7 +183,7 @@ class TestPhoneValidationServiceValidation:
         cached_result.line_type = 'mobile'
         cached_result.carrier = 'Verizon Wireless'
         cached_result.country_code = 'US'
-        cached_result.created_at = datetime.utcnow()
+        cached_result.created_at = utc_now()
         
         mock_validation_repository.find_one_by.return_value = cached_result
         
@@ -211,7 +212,7 @@ class TestPhoneValidationServiceValidation:
         phone_number = '+14158586273'
         expired_result = Mock()
         expired_result.phone_number = phone_number
-        expired_result.created_at = datetime.utcnow() - timedelta(days=31)  # Expired
+        expired_result.created_at = utc_now() - timedelta(days=31)  # Expired
         
         mock_validation_repository.find_one_by.return_value = expired_result
         
@@ -426,7 +427,7 @@ class TestPhoneValidationServiceBulkValidation:
         cached_result.line_type = 'mobile'
         cached_result.carrier = 'Cached Carrier'
         cached_result.country_code = 'US'
-        cached_result.created_at = datetime.utcnow()
+        cached_result.created_at = utc_now()
         
         def mock_find_cache(phone_number):
             if phone_number == '+14158586273':

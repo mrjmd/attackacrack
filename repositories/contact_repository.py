@@ -5,6 +5,7 @@ Isolates all database queries related to contacts
 
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func, exists, desc, asc
 from sqlalchemy.orm import joinedload, selectinload, Query
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult, SortOrder
@@ -609,7 +610,7 @@ class ContactRepository(BaseRepository[Contact]):
         Returns:
             List of contacts without recent activity
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utc_now() - timedelta(days=days)
         
         # Subquery to find contacts with recent outgoing activity
         recent_contacts = self.session.query(Activity.contact_id).filter(
@@ -631,7 +632,7 @@ class ContactRepository(BaseRepository[Contact]):
         opted_out = self.session.query(ContactFlag.contact_id).filter(
             ContactFlag.flag_type == 'opted_out',
             or_(ContactFlag.expires_at.is_(None), 
-                ContactFlag.expires_at > datetime.utcnow())
+                ContactFlag.expires_at > utc_now())
         )
         
         return self.session.query(Contact).filter(

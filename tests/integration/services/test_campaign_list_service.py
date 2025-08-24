@@ -6,6 +6,7 @@ contact filtering, and dynamic list functionality.
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.campaign_list_service_refactored import CampaignListServiceRefactored
 from crm_database import Contact, CampaignList, CampaignListMember, CSVImport, ContactCSVImport, Activity, ContactFlag
 
@@ -30,7 +31,7 @@ def test_contacts(db_session):
         last_name='Doe',
         email=f'john{unique_suffix}@example.com',
         phone=f'+1555123{unique_suffix}',
-        imported_at=datetime.utcnow() - timedelta(days=10)
+        imported_at=utc_now() - timedelta(days=10)
     )
     contacts.append(c1)
     
@@ -39,7 +40,7 @@ def test_contacts(db_session):
         first_name='Jane',
         last_name='Smith',
         phone=f'+1555234{unique_suffix}',
-        imported_at=datetime.utcnow() - timedelta(days=5)
+        imported_at=utc_now() - timedelta(days=5)
     )
     contacts.append(c2)
     
@@ -48,7 +49,7 @@ def test_contacts(db_session):
         first_name='Bob',
         last_name='Johnson',
         email=f'bob{unique_suffix}@example.com',
-        imported_at=datetime.utcnow() - timedelta(days=30)
+        imported_at=utc_now() - timedelta(days=30)
     )
     contacts.append(c3)
     
@@ -59,7 +60,7 @@ def test_contacts(db_session):
         email=f'alice{unique_suffix}@example.com',
         phone=f'+1555456{unique_suffix}',
         contact_metadata={'source': 'website', 'lead_score': 85},
-        imported_at=datetime.utcnow() - timedelta(days=2)
+        imported_at=utc_now() - timedelta(days=2)
     )
     contacts.append(c4)
     
@@ -104,7 +105,7 @@ class TestListCreation:
     
     def test_create_dynamic_list(self, list_service, test_contacts, db_session):
         """Test creating a dynamic list with filter criteria"""
-        imported_after = datetime.utcnow() - timedelta(days=7)
+        imported_after = utc_now() - timedelta(days=7)
         criteria = {
             'has_email': True,
             'imported_after': imported_after
@@ -337,8 +338,8 @@ class TestContactFiltering:
         """Test filtering contacts by import date range"""
         # Filter for contacts imported in last 7 days
         criteria = {
-            'imported_after': datetime.utcnow() - timedelta(days=7),
-            'imported_before': datetime.utcnow()
+            'imported_after': utc_now() - timedelta(days=7),
+            'imported_before': utc_now()
         }
         
         result = list_service.find_contacts_by_criteria(criteria)
@@ -363,7 +364,7 @@ class TestContactFiltering:
             activity_type='message',
             direction='outgoing',
             body='Recent message',
-            created_at=datetime.utcnow() - timedelta(days=5)
+            created_at=utc_now() - timedelta(days=5)
         )
         db_session.add(activity)
         db_session.commit()
@@ -494,7 +495,7 @@ class TestDynamicLists:
     def test_refresh_dynamic_list_remove_non_matches(self, list_service, test_contacts, db_session):
         """Test refreshing dynamic list removes non-matching contacts"""
         # Create dynamic list for recent imports (last 7 days)
-        criteria = {'imported_after': datetime.utcnow() - timedelta(days=7)}
+        criteria = {'imported_after': utc_now() - timedelta(days=7)}
         result = list_service.create_list(
             name='Recent Imports',
             filter_criteria=criteria,

@@ -4,6 +4,7 @@ ActivityRepository - Data access layer for Activity model
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import desc, func
 from repositories.base_repository import BaseRepository, PaginatedResult
 from crm_database import Activity
@@ -247,7 +248,7 @@ class ActivityRepository(BaseRepository):
         
         message_volume_data = []
         for i in range(days):
-            day = datetime.utcnow().date() - timedelta(days=days-1-i)
+            day = utc_now().date() - timedelta(days=days-1-i)
             count = self.session.query(self.model_class).filter(
                 self.model_class.activity_type == 'message',
                 func.date(self.model_class.created_at) == day
@@ -266,8 +267,8 @@ class ActivityRepository(BaseRepository):
         from datetime import datetime, time
         
         # Get start and end of today in UTC
-        today_start = datetime.combine(datetime.utcnow().date(), time.min)
-        today_end = datetime.combine(datetime.utcnow().date(), time.max)
+        today_start = datetime.combine(utc_now().date(), time.min)
+        today_end = datetime.combine(utc_now().date(), time.max)
         
         return self.session.query(self.model_class).filter(
             self.model_class.activity_type == 'message',
@@ -310,7 +311,7 @@ class ActivityRepository(BaseRepository):
         """
         from datetime import datetime, timedelta
         
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utc_now() - timedelta(days=days)
         return self.session.query(self.model_class.contact_id).filter(
             self.model_class.created_at >= cutoff_date,
             self.model_class.contact_id.isnot(None)
@@ -336,7 +337,7 @@ class ActivityRepository(BaseRepository):
         
         # Update status
         activity.status = status
-        activity.updated_at = datetime.utcnow()
+        activity.updated_at = utc_now()
         
         # Merge metadata
         if activity.activity_metadata:
@@ -451,7 +452,7 @@ class ActivityRepository(BaseRepository):
         stats = []
         
         for i in range(days):
-            day = datetime.utcnow().date() - timedelta(days=days-1-i)
+            day = utc_now().date() - timedelta(days=days-1-i)
             
             # Count messages for this day
             day_messages = self.session.query(self.model_class).filter(
@@ -493,7 +494,7 @@ class ActivityRepository(BaseRepository):
         else:
             activity.activity_metadata = metadata
         
-        activity.updated_at = datetime.utcnow()
+        activity.updated_at = utc_now()
         self.session.flush()
         return activity
     
@@ -582,7 +583,7 @@ class ActivityRepository(BaseRepository):
             activity = self.get_by_id(activity_id)
             if activity:
                 activity.status = status
-                activity.updated_at = datetime.utcnow()
+                activity.updated_at = utc_now()
                 
                 if metadata:
                     if activity.activity_metadata:

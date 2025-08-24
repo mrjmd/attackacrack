@@ -4,6 +4,7 @@ TodoServiceRefactored - Refactored Todo service with repository pattern and Resu
 
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+from utils.datetime_utils import utc_now
 # Model and db imports removed - using repositories only
 from repositories.todo_repository import TodoRepository
 from services.common.result import Result
@@ -236,7 +237,7 @@ class TodoServiceRefactored:
                     update_data['due_date'] = None
             
             # Always update the updated_at timestamp
-            update_data['updated_at'] = datetime.utcnow()
+            update_data['updated_at'] = utc_now()
             
             # Perform update
             updated_todo = self.todo_repository.update_by_id(todo_id, **update_data)
@@ -280,7 +281,7 @@ class TodoServiceRefactored:
             else:
                 update_data = {
                     'is_completed': True,
-                    'completed_at': datetime.utcnow()
+                    'completed_at': utc_now()
                 }
             
             # Update in repository

@@ -5,6 +5,7 @@ These tests are written FIRST (TDD RED phase) before implementing the methods
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from repositories.activity_repository import ActivityRepository
 from crm_database import Activity, Contact
 from tests.conftest import create_test_contact
@@ -26,7 +27,7 @@ class TestActivityRepositoryDashboardEnhancements:
         db_session.commit()
         
         # Create activities for different days
-        today = datetime.utcnow().date()
+        today = utc_now().date()
         yesterday = today - timedelta(days=1)
         two_days_ago = today - timedelta(days=2)
         
@@ -94,8 +95,8 @@ class TestActivityRepositoryDashboardEnhancements:
         
         # Use fixed times to avoid flaky tests based on when they run
         from datetime import time
-        today_noon = datetime.combine(datetime.utcnow().date(), time(12, 0, 0))
-        today_morning = datetime.combine(datetime.utcnow().date(), time(10, 0, 0))
+        today_noon = datetime.combine(utc_now().date(), time(12, 0, 0))
+        today_morning = datetime.combine(utc_now().date(), time(10, 0, 0))
         yesterday = today_noon - timedelta(days=1)
         
         # Today's outgoing messages (should be counted)
@@ -161,7 +162,7 @@ class TestActivityRepositoryDashboardEnhancements:
                 contact_id=contact.id,
                 activity_type='message',
                 direction='outgoing',
-                created_at=datetime.utcnow() - timedelta(minutes=i*10)
+                created_at=utc_now() - timedelta(minutes=i*10)
             )
             db_session.add(outgoing)
         
@@ -171,7 +172,7 @@ class TestActivityRepositoryDashboardEnhancements:
                 contact_id=contact.id,
                 activity_type='message', 
                 direction='incoming',
-                created_at=datetime.utcnow() - timedelta(minutes=i*15)
+                created_at=utc_now() - timedelta(minutes=i*15)
             )
             db_session.add(incoming)
         
@@ -180,7 +181,7 @@ class TestActivityRepositoryDashboardEnhancements:
             contact_id=contact.id,
             activity_type='call',
             direction='incoming',
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         db_session.add(call)
         db_session.commit()
@@ -202,7 +203,7 @@ class TestActivityRepositoryDashboardEnhancements:
             contact_id=contact.id,
             activity_type='message',
             direction='incoming',
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         db_session.add(incoming)
         db_session.commit()
@@ -222,8 +223,8 @@ class TestActivityRepositoryDashboardEnhancements:
         db_session.add_all([contact1, contact2, contact3])
         db_session.commit()
         
-        recent_date = datetime.utcnow() - timedelta(days=3)
-        old_date = datetime.utcnow() - timedelta(days=10)
+        recent_date = utc_now() - timedelta(days=3)
+        old_date = utc_now() - timedelta(days=10)
         
         # Recent activities for contact1 and contact2
         activity1a = Activity(

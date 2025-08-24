@@ -4,6 +4,7 @@ ConversationRepository - Data access layer for Conversation model
 
 from typing import List, Optional, Dict, Any, Set
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import desc, or_, func, and_, exists, select
 from sqlalchemy.orm import joinedload, selectinload
 from repositories.base_repository import BaseRepository, PaginatedResult
@@ -178,7 +179,7 @@ class ConversationRepository(BaseRepository):
         conversation_data = {
             'contact_id': contact_id,
             'openphone_id': openphone_id,
-            'last_activity_at': datetime.utcnow(),
+            'last_activity_at': utc_now(),
             **kwargs
         }
         

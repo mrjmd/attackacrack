@@ -5,6 +5,7 @@ Tests for webhook health check Celery tasks
 import pytest
 from unittest.mock import Mock, MagicMock, patch, ANY
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from services.webhook_health_check_service import HealthCheckStatus, HealthCheckResult
 
 
@@ -41,7 +42,7 @@ class TestWebhookHealthTasks:
             status=HealthCheckStatus.SUCCESS,
             message_id='msg_123',
             response_time=1.5,
-            sent_at=datetime.utcnow()
+            sent_at=utc_now()
         )
         
         assert result.status == HealthCheckStatus.SUCCESS

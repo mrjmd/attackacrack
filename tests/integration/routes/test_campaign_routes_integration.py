@@ -175,7 +175,7 @@ class TestCampaignRoutesIntegration:
         
         # Assert
         assert response.status_code == 200
-        campaign = Campaign.query.get(campaign.id)
+        campaign = db_session.get(Campaign, campaign.id)
         assert campaign.status == 'running'
     
     def test_pause_campaign(self, authenticated_client, db_session):
@@ -201,7 +201,7 @@ class TestCampaignRoutesIntegration:
         
         # Assert
         assert response.status_code == 200
-        campaign = Campaign.query.get(campaign.id)
+        campaign = db_session.get(Campaign, campaign.id)
         assert campaign.status == 'paused'
     
     def test_api_campaign_analytics(self, authenticated_client, db_session):

@@ -5,6 +5,7 @@ Tests for TodoRepository
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, date
+from utils.datetime_utils import utc_now
 from repositories.todo_repository import TodoRepository
 from repositories.base_repository import PaginatedResult
 from crm_database import Todo
@@ -106,7 +107,7 @@ class TestTodoRepository:
     def test_mark_as_pending(self, repository, mock_session):
         """Test marking todo as pending"""
         # Arrange
-        mock_todo = Mock(id=1, is_completed=True, completed_at=datetime.utcnow())
+        mock_todo = Mock(id=1, is_completed=True, completed_at=utc_now())
         mock_query = Mock()
         mock_query.get.return_value = mock_todo
         mock_session.query.return_value = mock_query

@@ -6,6 +6,7 @@ Refactored to use service registry pattern
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app, abort, Response
 from auth_utils import login_required
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from extensions import db
 import csv
 import io
@@ -491,7 +492,7 @@ def opt_out_report():
         per_page = 20
         
         # Get opt-outs from last 30 days
-        since_date = datetime.utcnow() - timedelta(days=30)
+        since_date = utc_now() - timedelta(days=30)
         recent_opt_outs = opt_out_service.get_recent_opt_outs(since=since_date)
         
         # Manual pagination
@@ -528,7 +529,7 @@ def export_opt_outs():
             return redirect(url_for('campaigns.opt_out_report'))
         
         # Get all opt-outs from last year
-        since_date = datetime.utcnow() - timedelta(days=365)
+        since_date = utc_now() - timedelta(days=365)
         opt_outs = opt_out_service.get_recent_opt_outs(since=since_date)
         
         # Create CSV

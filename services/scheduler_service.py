@@ -1,6 +1,7 @@
 # services/scheduler_service.py
 
 from datetime import date, timedelta, datetime
+from utils.datetime_utils import utc_now
 import logging
 from celery_worker import celery
 from flask import current_app
@@ -68,7 +69,7 @@ class SchedulerService:
     
     def send_review_requests(self):
         """Send SMS review requests for jobs completed yesterday"""
-        yesterday = datetime.utcnow().date() - timedelta(days=1)
+        yesterday = utc_now().date() - timedelta(days=1)
 
         # Get template from repository
         template_setting = self.setting_repository.find_one_by(key='review_request_template')

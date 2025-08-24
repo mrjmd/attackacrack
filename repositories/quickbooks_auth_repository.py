@@ -4,6 +4,7 @@ QuickBooksAuthRepository - Data access layer for QuickBooksAuth model
 
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_
 from repositories.base_repository import BaseRepository
 from crm_database import QuickBooksAuth
@@ -65,7 +66,7 @@ class QuickBooksAuthRepository(BaseRepository):
         auth.access_token = auth_data['access_token']
         auth.refresh_token = auth_data['refresh_token']
         auth.expires_at = auth_data['expires_at']
-        auth.updated_at = datetime.utcnow()
+        auth.updated_at = utc_now()
         
         self.session.commit()
         return auth
@@ -91,7 +92,7 @@ class QuickBooksAuthRepository(BaseRepository):
         auth.access_token = access_token
         auth.refresh_token = refresh_token
         auth.expires_at = expires_at
-        auth.updated_at = datetime.utcnow()
+        auth.updated_at = utc_now()
         
         self.session.commit()
         return auth
@@ -110,7 +111,7 @@ class QuickBooksAuthRepository(BaseRepository):
         if not auth:
             return True  # Treat missing record as expired
         
-        return datetime.utcnow() >= auth.expires_at
+        return utc_now() >= auth.expires_at
     
     def delete_auth(self, auth_id: int) -> bool:
         """

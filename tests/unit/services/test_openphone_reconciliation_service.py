@@ -8,6 +8,7 @@ syncs them with the local database.
 import pytest
 from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from typing import Dict, Any, List
 
 from services.openphone_reconciliation_service import OpenPhoneReconciliationService
@@ -387,7 +388,7 @@ class TestOpenPhoneReconciliationService:
         """Test getting reconciliation statistics"""
         # Arrange
         service.stats = {
-            'last_run': datetime.utcnow(),
+            'last_run': utc_now(),
             'total_processed': 1000,
             'total_errors': 5,
             'last_error': 'Sample error',

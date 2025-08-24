@@ -14,6 +14,7 @@ Uses repository pattern for data access and Result pattern for error handling.
 import logging
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from decimal import Decimal
 
 from services.common.result import Result
@@ -70,7 +71,7 @@ class WebhookErrorRecoveryService:
                 default_config.update(retry_config)
             
             # Calculate initial retry time (1 minute from now)
-            next_retry_at = datetime.utcnow() + timedelta(seconds=default_config['base_delay_seconds'])
+            next_retry_at = utc_now() + timedelta(seconds=default_config['base_delay_seconds'])
             
             # Create failed webhook queue entry
             failed_webhook_data = {
@@ -84,7 +85,7 @@ class WebhookErrorRecoveryService:
                 'base_delay_seconds': default_config['base_delay_seconds'],
                 'next_retry_at': next_retry_at,
                 'resolved': False,
-                'created_at': datetime.utcnow()
+                'created_at': utc_now()
             }
             
             # Check if this webhook is already queued

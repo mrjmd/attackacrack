@@ -3,6 +3,7 @@ ConversationService - Handles conversation listing, filtering, and management
 """
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+from utils.datetime_utils import utc_now
 # Model imports removed - using repositories only
 from repositories.conversation_repository import ConversationRepository
 from repositories.campaign_repository import CampaignRepository
@@ -158,7 +159,7 @@ class ConversationService:
             return False, "No conversations selected"
         
         success = self.conversation_repository.bulk_update_last_activity(
-            conversation_ids, datetime.utcnow()
+            conversation_ids, utc_now()
         )
         
         if success:

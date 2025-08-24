@@ -5,6 +5,7 @@ These tests MUST FAIL initially - testing new methods needed for SMSMetricsServi
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 from repositories.campaign_repository import CampaignRepository
 from crm_database import Campaign, CampaignMembership, Contact
@@ -53,7 +54,7 @@ class TestCampaignRepositorySMSMetricsEnhancement:
                 campaign_id=campaign.id,
                 contact_id=contact.id,
                 status=status,
-                sent_at=datetime.utcnow() - timedelta(hours=i) if status != 'pending' else None,
+                sent_at=utc_now() - timedelta(hours=i) if status != 'pending' else None,
                 variant_sent='A' if i % 2 == 0 else 'B'
             )
             memberships.append(membership)
@@ -171,7 +172,7 @@ class TestCampaignRepositorySMSMetricsEnhancement:
             'bounce_type': 'hard',
             'bounce_reason': 'invalid_number',
             'bounce_details': 'Number disconnected',
-            'bounced_at': datetime.utcnow().isoformat(),
+            'bounced_at': utc_now().isoformat(),
             'carrier': 'verizon'
         }
         
@@ -271,7 +272,7 @@ class TestCampaignRepositorySMSMetricsEnhancement:
         updated_count = repository.bulk_update_membership_statuses(
             membership_ids=membership_ids,
             status='processed',
-            metadata={'processed_at': datetime.utcnow().isoformat()}
+            metadata={'processed_at': utc_now().isoformat()}
         )
         
         # Should return count of updated memberships
@@ -280,7 +281,7 @@ class TestCampaignRepositorySMSMetricsEnhancement:
         # Verify memberships were updated
         for membership_id in membership_ids:
             # Use a separate query to avoid session cache
-            membership = repository.session.query(CampaignMembership).get(membership_id)
+            membership = repository.session.get(CampaignMembership, membership_id)
             assert membership.status == 'processed'
             assert membership.membership_metadata is not None
             assert 'processed_at' in membership.membership_metadata

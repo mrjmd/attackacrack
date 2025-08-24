@@ -9,6 +9,7 @@ exact scheduling functionality.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import date, datetime, timedelta
+from utils.datetime_utils import utc_now
 from services.scheduler_service import SchedulerService
 from repositories.setting_repository import SettingRepository
 from repositories.job_repository import JobRepository
@@ -236,7 +237,7 @@ class TestSchedulerServiceRepositoryPattern:
         mock_template.value = 'Template'
         mock_setting_repository.find_one_by.return_value = mock_template
         
-        yesterday = (datetime.utcnow().date() - timedelta(days=1))
+        yesterday = (utc_now().date() - timedelta(days=1))
         mock_job_repository.find_completed_jobs_by_date.return_value = []
         
         # Act

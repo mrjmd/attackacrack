@@ -5,6 +5,7 @@ Manages cached phone validation results from NumVerify API
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from sqlalchemy import and_, func, desc
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult
 from crm_database import PhoneValidation
@@ -30,7 +31,7 @@ class PhoneValidationRepository(BaseRepository[PhoneValidation]):
         Returns:
             List of expired validation records
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utc_now() - timedelta(days=days)
         return self.session.query(PhoneValidation).filter(
             PhoneValidation.created_at < cutoff_date
         ).all()
@@ -118,7 +119,7 @@ class PhoneValidationRepository(BaseRepository[PhoneValidation]):
         Returns:
             List of recent validation records
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utc_now() - timedelta(days=days)
         return self.session.query(PhoneValidation).filter(
             PhoneValidation.created_at >= cutoff_date
         ).order_by(desc(PhoneValidation.created_at)).all()
@@ -191,7 +192,7 @@ class PhoneValidationRepository(BaseRepository[PhoneValidation]):
         # Handle special filter syntax from tests
         if 'created_at__gte' in str(kwargs):
             # Recent means last 24 hours
-            cutoff = datetime.utcnow() - timedelta(hours=24)
+            cutoff = utc_now() - timedelta(hours=24)
             query = query.filter(PhoneValidation.created_at >= cutoff)
         
         for key, value in kwargs.items():

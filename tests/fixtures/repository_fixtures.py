@@ -22,6 +22,7 @@ import threading
 from typing import Any, Dict, List, Optional, Set, Callable, TypeVar
 from unittest.mock import Mock, MagicMock, create_autospec
 from datetime import datetime, date
+from utils.datetime_utils import utc_now
 from dataclasses import dataclass, field
 import copy
 
@@ -88,7 +89,7 @@ class InMemoryStorage:
                     self._next_id = kwargs['id'] + 1
             
             # Add timestamps if not present
-            now = datetime.utcnow()
+            now = utc_now()
             if 'created_at' not in kwargs:
                 kwargs['created_at'] = now
             if 'updated_at' not in kwargs:
@@ -114,7 +115,7 @@ class InMemoryStorage:
         with self._lock:
             if entity_id in self._data:
                 self._data[entity_id].update(updates)
-                self._data[entity_id]['updated_at'] = datetime.utcnow()
+                self._data[entity_id]['updated_at'] = utc_now()
                 return MockModel(self._data[entity_id])
             return None
     
@@ -323,7 +324,7 @@ class MockTodoRepository(MockRepositoryBase):
     
     def find_overdue_todos(self) -> List[Dict[str, Any]]:
         """Find overdue todos."""
-        now = datetime.utcnow()
+        now = utc_now()
         results = []
         for todo in self.storage.get_all():
             if (not todo.get('is_completed') and 
@@ -337,7 +338,7 @@ class MockTodoRepository(MockRepositoryBase):
         return self.update_by_id(
             todo_id,
             is_completed=True,
-            completed_at=datetime.utcnow()
+            completed_at=utc_now()
         )
     
     def mark_as_pending(self, todo_id: int) -> Optional[Dict[str, Any]]:

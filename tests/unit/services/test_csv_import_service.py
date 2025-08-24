@@ -20,6 +20,7 @@ import io
 import os
 import tempfile
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch, MagicMock, mock_open
 from werkzeug.datastructures import FileStorage
 
@@ -240,7 +241,7 @@ def mock_db_models():
         mock_csv_import = Mock(spec=CSVImport)
         mock_csv_import.id = 1
         mock_csv_import.filename = 'test.csv'
-        mock_csv_import.imported_at = datetime.utcnow()
+        mock_csv_import.imported_at = utc_now()
         mock_csv_import.contacts = [mock_contact]
         
         # Mock CampaignList model

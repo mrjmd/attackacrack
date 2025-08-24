@@ -108,7 +108,6 @@ class Config:
     # Session configuration - Use Redis for session storage to support multiple workers
     SESSION_TYPE = 'redis'
     SESSION_PERMANENT = False
-    SESSION_USE_SIGNER = True
     SESSION_KEY_PREFIX = 'attackacrack:'
     SESSION_COOKIE_NAME = 'attackacrack_session'
     SESSION_COOKIE_SECURE = True  # Always use secure cookies in production
@@ -230,7 +229,6 @@ class TestingConfig(Config):
         app.config['SESSION_TYPE'] = 'filesystem'
         app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
         app.config['SESSION_PERMANENT'] = False
-        app.config['SESSION_USE_SIGNER'] = True
         app.config['SESSION_KEY_PREFIX'] = 'test_session:'
         
         # Initialize Flask-Session with filesystem backend

@@ -5,6 +5,7 @@ These tests MUST FAIL initially - testing new methods needed for SMSMetricsServi
 
 import pytest
 from datetime import datetime, timedelta
+from utils.datetime_utils import utc_now
 from unittest.mock import Mock, patch
 from repositories.contact_repository import ContactRepository
 from crm_database import Contact
@@ -84,7 +85,7 @@ class TestContactRepositorySMSMetricsEnhancement:
         bounce_info = {
             'bounce_type': 'hard',
             'bounce_details': 'Invalid number',
-            'bounced_at': datetime.utcnow().isoformat()
+            'bounced_at': utc_now().isoformat()
         }
         
         # This method doesn't exist yet - should fail
@@ -179,7 +180,7 @@ class TestContactRepositorySMSMetricsEnhancement:
         
         # This method should exist to bulk update metadata
         metadata_update = {
-            'last_metrics_check': datetime.utcnow().isoformat(),
+            'last_metrics_check': utc_now().isoformat(),
             'metrics_source': 'sms_service'
         }
         
@@ -254,7 +255,7 @@ class TestContactRepositorySMSMetricsEnhancement:
         new_bounce_info = {
             'bounce_type': 'hard',
             'bounce_details': 'Number disconnected',
-            'bounced_at': datetime.utcnow().isoformat()
+            'bounced_at': utc_now().isoformat()
         }
         
         # This method should exist to merge new bounce info with existing

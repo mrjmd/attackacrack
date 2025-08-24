@@ -7,6 +7,7 @@ TDD Implementation: This is the minimal implementation to make tests fail with m
 
 from typing import List, Optional, Dict, Any, Set
 from datetime import datetime
+from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func, desc, asc
 from sqlalchemy.orm import Query
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult, SortOrder
@@ -62,7 +63,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
             flag_reason=flag_reason,
             applies_to=applies_to,
             created_by=created_by,
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         self.session.add(flag)
         self.session.flush()
@@ -77,7 +78,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
             flag_type=flag_type,
             flag_reason=flag_reason,
             expires_at=expires_at,
-            created_at=datetime.utcnow()
+            created_at=utc_now()
         )
         self.session.add(flag)
         self.session.flush()
@@ -93,7 +94,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
                 flag_type=flag_type,
                 flag_reason=flag_reason,
                 applies_to=applies_to,
-                created_at=datetime.utcnow()
+                created_at=utc_now()
             )
             flags.append(flag)
         
@@ -129,7 +130,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
     
     def get_active_flags_for_contact(self, contact_id: int) -> List[ContactFlag]:
         """Get only active (non-expired) flags for a contact"""
-        now = datetime.utcnow()
+        now = utc_now()
         return self.session.query(ContactFlag).filter(
             and_(
                 ContactFlag.contact_id == contact_id,
@@ -142,7 +143,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
     
     def get_expired_flags(self) -> List[ContactFlag]:
         """Find flags that have expired"""
-        now = datetime.utcnow()
+        now = utc_now()
         return self.session.query(ContactFlag).filter(
             and_(
                 ContactFlag.expires_at.is_not(None),
@@ -169,7 +170,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
             exclusion_flags = ['opted_out', 'do_not_contact', 'office_number', 'recently_texted']
         
         from datetime import datetime
-        now = datetime.utcnow()
+        now = utc_now()
         
         results = self.session.query(ContactFlag.contact_id).filter(
             and_(
@@ -231,7 +232,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
     
     def cleanup_expired_flags(self) -> int:
         """Remove all expired flags"""
-        now = datetime.utcnow()
+        now = utc_now()
         count = self.session.query(ContactFlag).filter(
             and_(
                 ContactFlag.expires_at.is_not(None),
@@ -254,7 +255,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
     
     def find_active_flags(self, contact_id: int, flag_type: Optional[str] = None) -> List[ContactFlag]:
         """Find active (non-expired) flags for a contact, optionally filtered by type"""
-        now = datetime.utcnow()
+        now = utc_now()
         query = self.session.query(ContactFlag).filter(
             and_(
                 ContactFlag.contact_id == contact_id,
@@ -277,7 +278,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
         )
         
         if active_only:
-            now = datetime.utcnow()
+            now = utc_now()
             query = query.filter(
                 or_(
                     ContactFlag.expires_at.is_(None),
@@ -291,7 +292,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
         """Expire a flag by setting its expiration date to now"""
         flag = self.get_by_id(flag_id)
         if flag:
-            flag.expires_at = datetime.utcnow()
+            flag.expires_at = utc_now()
             self.session.flush()
         return flag
     
@@ -302,7 +303,7 @@ class ContactFlagRepository(BaseRepository[ContactFlag]):
         )
         
         if active_only:
-            now = datetime.utcnow()
+            now = utc_now()
             query = query.filter(
                 or_(
                     ContactFlag.expires_at.is_(None),

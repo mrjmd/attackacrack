@@ -185,7 +185,7 @@ class TestSettingRepository:
         assert result is True
         
         # Verify deletion
-        deleted_setting = db_session.query(Setting).get(setting_id)
+        deleted_setting = db_session.get(Setting, setting_id)
         assert deleted_setting is None
     
     def test_delete_by_id(self, setting_repository, sample_settings, db_session):
@@ -200,7 +200,7 @@ class TestSettingRepository:
         assert result is True
         
         # Verify deletion
-        deleted_setting = db_session.query(Setting).get(setting_id)
+        deleted_setting = db_session.get(Setting, setting_id)
         assert deleted_setting is None
     
     def test_count_all_settings(self, setting_repository, sample_settings):
