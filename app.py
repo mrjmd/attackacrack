@@ -170,6 +170,12 @@ def create_app(config_name=None, test_config=None):
     )
     
     registry.register_factory(
+        'campaign_response_repository',
+        lambda db_session: _create_campaign_response_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
         'ab_test_result_repository',
         lambda db_session: _create_ab_test_result_repository(db_session),
         dependencies=['db_session']
@@ -192,6 +198,25 @@ def create_app(config_name=None, test_config=None):
         'engagement_score_repository',
         lambda db_session: _create_engagement_score_repository(db_session),
         dependencies=['db_session']
+    )
+    
+    # Analytics and ML services
+    registry.register_singleton(
+        'sentiment_analysis',
+        lambda: _create_sentiment_analysis_service()
+    )
+    
+    registry.register_singleton(
+        'cache',
+        lambda: _create_cache_service()
+    )
+    
+    registry.register_factory(
+        'response_analytics',
+        lambda campaign_response_repository, campaign_repository, activity_repository, contact_repository, sentiment_analysis, cache: _create_response_analytics_service(
+            campaign_response_repository, campaign_repository, activity_repository, contact_repository, sentiment_analysis, cache
+        ),
+        dependencies=['campaign_response_repository', 'campaign_repository', 'activity_repository', 'contact_repository', 'sentiment_analysis', 'cache']
     )
     
     # Register services with lazy loading factories
@@ -1115,6 +1140,34 @@ def _create_campaign_membership_repository(db_session):
     """Create CampaignMembershipRepository instance"""
     from repositories.campaign_membership_repository import CampaignMembershipRepository
     return CampaignMembershipRepository(session=db_session)
+
+def _create_campaign_response_repository(db_session):
+    """Create CampaignResponseRepository instance"""
+    from repositories.campaign_response_repository import CampaignResponseRepository
+    return CampaignResponseRepository(session=db_session)
+
+def _create_sentiment_analysis_service():
+    """Create SentimentAnalysisService instance"""
+    from services.sentiment_analysis_service import SentimentAnalysisService
+    return SentimentAnalysisService()
+
+def _create_cache_service():
+    """Create CacheService instance"""
+    from services.cache_service import CacheService
+    return CacheService()
+
+def _create_response_analytics_service(response_repository, campaign_repository, activity_repository, contact_repository, sentiment_service, cache_service):
+    """Create ResponseAnalyticsService with dependencies"""
+    from services.response_analytics_service import ResponseAnalyticsService
+    logger.info("Initializing ResponseAnalyticsService with dependencies")
+    return ResponseAnalyticsService(
+        response_repository=response_repository,
+        campaign_repository=campaign_repository,
+        activity_repository=activity_repository,
+        contact_repository=contact_repository,
+        sentiment_service=sentiment_service,
+        cache_service=cache_service
+    )
 
 def _create_setting_service(setting_repository):
     """Create SettingService instance"""

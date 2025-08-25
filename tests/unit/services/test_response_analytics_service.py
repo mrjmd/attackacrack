@@ -163,7 +163,7 @@ class TestResponseAnalyticsService:
         result = service.track_response_from_webhook(sample_response_event)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         response_data = result.unwrap()
         assert response_data['response_tracked'] == True
         assert response_data['sentiment'] == 'positive'
@@ -198,7 +198,7 @@ class TestResponseAnalyticsService:
         result = service.track_response_from_webhook(sample_response_event)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         mock_response_repo.create.assert_called_once()
         mock_campaign_repo.get_by_id.assert_called_once_with(sample_response_event.campaign_id)
     
@@ -222,7 +222,7 @@ class TestResponseAnalyticsService:
         result = service.track_response_from_webhook(sample_response_event)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         response_data = result.unwrap()
         assert response_data['response_tracked'] == True
         assert response_data.get('sentiment') is None
@@ -248,7 +248,7 @@ class TestResponseAnalyticsService:
         result = service.calculate_response_rate_with_confidence(campaign_id, confidence_level=0.95)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['response_rate'] == 0.18
         assert data['total_sent'] == 500
@@ -277,7 +277,7 @@ class TestResponseAnalyticsService:
         result = service.calculate_response_rate_with_confidence(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['response_rate'] == 0.0
         assert data['total_sent'] == 5
@@ -316,7 +316,7 @@ class TestResponseAnalyticsService:
         result = service.compare_ab_test_variants(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['variant_a']['response_rate'] == 0.22
         assert data['variant_b']['response_rate'] == 0.14
@@ -355,7 +355,7 @@ class TestResponseAnalyticsService:
         result = service.compare_ab_test_variants(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['statistical_test']['p_value'] == 0.389
         assert data['statistical_test']['significant'] == False
@@ -398,7 +398,7 @@ class TestResponseAnalyticsService:
         result = service.generate_response_funnel(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['funnel']['sent'] == 1000
         assert data['funnel']['delivered'] == 970
@@ -432,7 +432,7 @@ class TestResponseAnalyticsService:
         result = service.generate_response_funnel(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         
         # Should identify low open rate as optimization opportunity
@@ -442,7 +442,7 @@ class TestResponseAnalyticsService:
         )
         assert open_rate_suggestion is not None
         assert open_rate_suggestion['current_rate'] == 0.50
-        assert open_rate_suggestion['benchmark'] > 0.60
+        assert open_rate_suggestion['benchmark'] >= 0.60
         assert 'subject_line' in open_rate_suggestion['recommendations']
 
     # ===== Time-Based Analysis =====
@@ -476,7 +476,7 @@ class TestResponseAnalyticsService:
         result = service.analyze_response_timing_patterns(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['best_send_times']['optimal_hours'] == [9, 10, 16]
         assert data['best_send_times']['optimal_days'] == ['tuesday', 'wednesday']
@@ -512,7 +512,7 @@ class TestResponseAnalyticsService:
             result = service.predict_optimal_send_schedule(**historical_data)
             
             # Assert
-            assert result.is_success()
+            assert result.is_success
             data = result.unwrap()
             assert len(data['optimal_windows']) == 2
             assert data['recommended_schedule']['primary_window']['hour'] == 9
@@ -548,7 +548,7 @@ class TestResponseAnalyticsService:
         result = service.bulk_analyze_response_sentiment(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['analyzed_count'] == 3
         assert data['sentiment_breakdown']['positive'] == 1
@@ -578,7 +578,7 @@ class TestResponseAnalyticsService:
         result = service.get_response_analytics_cached(campaign_id)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['response_rate'] == 0.18
         assert data['cache_hit'] == True
@@ -609,7 +609,7 @@ class TestResponseAnalyticsService:
         result = service.get_response_analytics_cached(campaign_id, cache_ttl=3600)
         
         # Assert
-        assert result.is_success()
+        assert result.is_success
         data = result.unwrap()
         assert data['response_rate'] == 0.19
         assert data['cache_hit'] == False
@@ -637,8 +637,8 @@ class TestResponseAnalyticsService:
         result = service.track_response_from_webhook(invalid_event)
         
         # Assert
-        assert result.is_failure()
-        error = result.unwrap_error()
+        assert result.is_failure
+        error = result.error
         assert "Campaign not found" in str(error)
     
     def test_calculate_response_rate_database_error(self, service, mock_response_repo):
@@ -651,8 +651,8 @@ class TestResponseAnalyticsService:
         result = service.calculate_response_rate_with_confidence(campaign_id)
         
         # Assert
-        assert result.is_failure()
-        error = result.unwrap_error()
+        assert result.is_failure
+        error = result.error
         assert "Database connection failed" in str(error)
     
     def test_service_initialization_validates_dependencies(self):

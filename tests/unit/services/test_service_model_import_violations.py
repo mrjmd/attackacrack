@@ -36,6 +36,7 @@ class TestServiceModelImportViolations:
     # (e.g., new services that need model types for type hints)
     ALLOWED_SERVICES = {
         'engagement_scoring_service.py',  # P4-01: Needs EngagementEvent, EngagementScore, Contact for type hints
+        'response_analytics_service.py',  # P4-02: Needs CampaignResponse for type hints
     }
     
     @pytest.fixture

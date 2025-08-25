@@ -6,6 +6,7 @@ from utils.datetime_utils import utc_now
 from enum import Enum
 import json
 from decimal import Decimal
+from typing import Optional
 
 # --- NEW: User Model ---
 class User(db.Model):
@@ -1029,4 +1030,123 @@ class EngagementScore(db.Model):
             'engagement_level': self.engagement_level,
             'calculated_at': self.calculated_at.isoformat() if self.calculated_at else None,
             'score_version': self.score_version
+        }
+
+
+# --- Campaign Response Analytics Model ---
+class CampaignResponse(db.Model):
+    """Track and analyze responses to campaign messages for response rate analytics"""
+    __tablename__ = 'campaign_responses'
+    
+    # Primary key
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Foreign keys
+    campaign_membership_id = db.Column(db.Integer, db.ForeignKey('campaign_membership.id', ondelete='CASCADE'), nullable=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id', ondelete='CASCADE'), nullable=False, index=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    # Message tracking fields
+    message_sent_at = db.Column(db.DateTime, nullable=False, index=True)
+    first_response_at = db.Column(db.DateTime, nullable=True, index=True)
+    response_time_seconds = db.Column(db.Integer, nullable=True)
+    
+    # Response analysis fields
+    response_sentiment = db.Column(db.String(20), nullable=True, index=True)  # positive, negative, neutral
+    response_intent = db.Column(db.String(50), nullable=True)  # interested, not_interested, question, complaint, other
+    conversation_count = db.Column(db.Integer, default=0)
+    ai_confidence_score = db.Column(db.Float, nullable=True)  # 0-1 confidence in sentiment/intent classification
+    
+    # A/B testing fields
+    message_variant = db.Column(db.String(1), nullable=True, index=True)  # A or B
+    
+    # Response content
+    response_text = db.Column(db.Text, nullable=True)
+    
+    # Response metadata
+    is_automated_response = db.Column(db.Boolean, default=False)
+    response_channel = db.Column(db.String(20), default='sms')  # sms, email, etc.
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    campaign_membership = db.relationship('CampaignMembership', backref='response', uselist=False)
+    contact = db.relationship('Contact', backref='campaign_responses')
+    campaign = db.relationship('Campaign', backref='responses')
+    
+    # Composite indexes for performance
+    __table_args__ = (
+        db.Index('ix_campaign_responses_campaign_variant', 'campaign_id', 'message_variant'),
+        db.Index('ix_campaign_responses_campaign_sentiment', 'campaign_id', 'response_sentiment'),
+    )
+    
+    def __repr__(self):
+        return f'<CampaignResponse {self.id}: Campaign {self.campaign_id}, Contact {self.contact_id}>'
+    
+    @property
+    def response_time_hours(self) -> Optional[float]:
+        """Get response time in hours"""
+        if self.response_time_seconds:
+            return self.response_time_seconds / 3600.0
+        return None
+    
+    @property
+    def response_time_display(self) -> str:
+        """Get human-readable response time"""
+        if not self.response_time_seconds:
+            return "No response"
+        
+        hours = self.response_time_seconds // 3600
+        minutes = (self.response_time_seconds % 3600) // 60
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
+    
+    @property
+    def is_positive_response(self) -> bool:
+        """Check if this is a positive response"""
+        return self.response_sentiment == 'positive'
+    
+    @property
+    def is_interested(self) -> bool:
+        """Check if contact is interested"""
+        return self.response_intent == 'interested'
+    
+    @property
+    def has_responded(self) -> bool:
+        """Check if contact has responded"""
+        return self.first_response_at is not None
+    
+    def calculate_response_time(self) -> None:
+        """Calculate and set response time in seconds"""
+        if self.message_sent_at and self.first_response_at:
+            delta = self.first_response_at - self.message_sent_at
+            self.response_time_seconds = int(delta.total_seconds())
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'campaign_id': self.campaign_id,
+            'contact_id': self.contact_id,
+            'campaign_membership_id': self.campaign_membership_id,
+            'message_sent_at': self.message_sent_at.isoformat() if self.message_sent_at else None,
+            'first_response_at': self.first_response_at.isoformat() if self.first_response_at else None,
+            'response_time_seconds': self.response_time_seconds,
+            'response_time_display': self.response_time_display,
+            'response_sentiment': self.response_sentiment,
+            'response_intent': self.response_intent,
+            'conversation_count': self.conversation_count,
+            'ai_confidence_score': float(self.ai_confidence_score) if self.ai_confidence_score else None,
+            'message_variant': self.message_variant,
+            'is_automated_response': self.is_automated_response,
+            'response_channel': self.response_channel,
+            'has_responded': self.has_responded,
+            'is_positive_response': self.is_positive_response,
+            'is_interested': self.is_interested,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

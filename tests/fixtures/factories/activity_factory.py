@@ -135,7 +135,7 @@ class ActivityFactory(BaseFactory):
                 'Voicemail requesting service appointment',
                 'Follow-up voicemail after inspection'
             ])),
-            voicemail_url=factory.LazyFunction(fake.url),
+            voicemail_url=factory.LazyFunction(lambda: fake.url()),
             duration_seconds=factory.LazyFunction(lambda: random.randint(30, 180))
         )
     

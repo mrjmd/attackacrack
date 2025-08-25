@@ -151,6 +151,17 @@ class Result(Generic[T]):
         return f"Result.failure(error={self.error!r}, code={self.error_code!r})"
 
 
+# Convenience functions for easier usage
+def Success(data: T, metadata: Optional[Dict[str, Any]] = None) -> Result[T]:
+    """Convenience function to create a successful result."""
+    return Result.success(data, metadata)
+
+
+def Failure(error: str, code: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> Result[T]:
+    """Convenience function to create a failure result."""
+    return Result.failure(error, code, metadata)
+
+
 @dataclass
 class PagedResult(Generic[T], Result[T]):
     """
