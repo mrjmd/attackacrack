@@ -1150,3 +1150,106 @@ class CampaignResponse(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+
+# --- P4-03: Conversion Tracking System Models ---
+class ConversionEvent(db.Model):
+    """Track conversion events for analytics and attribution analysis"""
+    __tablename__ = 'conversion_events'
+    
+    # Primary key
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core relationships
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False, index=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=True, index=True)
+    
+    # Conversion details
+    conversion_type = db.Column(db.String(50), nullable=False, index=True)  # 'purchase', 'appointment_booked', 'quote_requested', 'lead_qualified', 'custom'
+    conversion_value = db.Column(db.Numeric(12, 2), nullable=True)  # Monetary value of conversion
+    currency = db.Column(db.String(3), nullable=False, default='USD')  # ISO currency code
+    
+    # Attribution tracking
+    attribution_model = db.Column(db.String(20), nullable=True)  # 'first_touch', 'last_touch', 'linear', 'time_decay'
+    attribution_weights = db.Column(db.JSON, nullable=True)  # Campaign attribution weights
+    attribution_window_days = db.Column(db.Integer, nullable=True, default=30)  # Attribution window
+    
+    # Source tracking
+    source_campaign_membership_id = db.Column(db.Integer, db.ForeignKey('campaign_membership.id'), nullable=True)
+    source_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)  # Triggering activity
+    
+    # Conversion timing
+    converted_at = db.Column(db.DateTime, nullable=False, default=utc_now, index=True)
+    first_touch_at = db.Column(db.DateTime, nullable=True)  # First touchpoint timestamp
+    last_touch_at = db.Column(db.DateTime, nullable=True)   # Last touchpoint before conversion
+    
+    # Metadata and context
+    conversion_metadata = db.Column(db.JSON, nullable=True)  # Additional conversion data
+    customer_journey_stage = db.Column(db.String(20), nullable=True)  # 'prospect', 'lead', 'opportunity', 'customer'
+    
+    # Quality metrics
+    confidence_score = db.Column(db.Numeric(4, 3), nullable=True)  # 0-1 confidence in attribution
+    data_source = db.Column(db.String(50), nullable=True, default='manual')  # 'manual', 'api', 'webhook', 'import'
+    
+    # Validation and status
+    is_validated = db.Column(db.Boolean, default=False)  # Whether conversion has been validated
+    validation_notes = db.Column(db.Text, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    contact = db.relationship('Contact', backref='conversion_events')
+    campaign = db.relationship('Campaign', backref='conversion_events')
+    source_membership = db.relationship('CampaignMembership', backref='triggered_conversions')
+    source_activity = db.relationship('Activity', backref='triggered_conversions')
+    
+    # Indexes for performance
+    __table_args__ = (
+        db.Index('idx_conversion_events_contact_campaign', 'contact_id', 'campaign_id'),
+        db.Index('idx_conversion_events_type_value', 'conversion_type', 'conversion_value'),
+        db.Index('idx_conversion_events_converted_at', 'converted_at'),
+        db.Index('idx_conversion_events_attribution', 'attribution_model', 'converted_at'),
+    )
+    
+    def __repr__(self):
+        return f'<ConversionEvent {self.id}: {self.conversion_type} ${self.conversion_value} Contact:{self.contact_id}>'
+    
+    @property
+    def time_to_conversion_hours(self) -> Optional[float]:
+        """Calculate hours from first touch to conversion"""
+        if self.first_touch_at and self.converted_at:
+            delta = self.converted_at - self.first_touch_at
+            return delta.total_seconds() / 3600.0
+        return None
+    
+    @property
+    def is_high_value(self, threshold: Decimal = Decimal('100.00')) -> bool:
+        """Check if conversion is above high-value threshold"""
+        return self.conversion_value and self.conversion_value >= threshold
+    
+    @property
+    def has_attribution(self) -> bool:
+        """Check if conversion has attribution data"""
+        return self.attribution_weights is not None and len(self.attribution_weights) > 0
+    
+    def to_dict(self) -> dict:
+        """Convert conversion to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'contact_id': self.contact_id,
+            'campaign_id': self.campaign_id,
+            'conversion_type': self.conversion_type,
+            'conversion_value': float(self.conversion_value) if self.conversion_value else None,
+            'currency': self.currency,
+            'attribution_model': self.attribution_model,
+            'attribution_weights': self.attribution_weights,
+            'converted_at': self.converted_at.isoformat() if self.converted_at else None,
+            'time_to_conversion_hours': self.time_to_conversion_hours,
+            'is_high_value': self.is_high_value,
+            'has_attribution': self.has_attribution,
+            'conversion_metadata': self.conversion_metadata,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
