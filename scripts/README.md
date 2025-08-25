@@ -54,9 +54,6 @@ Development and debugging utilities:
 - `reset_database.py` - Drop and recreate database tables
 - `remove_secrets.sh` - Remove secrets from git history
 
-### maintenance/
-(Currently empty - for future maintenance scripts)
-
 ## Usage Examples
 
 ### Data Import
@@ -100,11 +97,12 @@ python scripts/data_management/media/fix_existing_media_urls.py
 - The `large_scale_import.py` is the recommended script for production imports
 - Use dry run options when available to preview changes before execution
 
-## Archived Scripts
+## Removed Scripts
 
-The `archive/` directory contains historical scripts that are no longer actively used but preserved for reference. These include:
+All one-off and archived scripts have been removed to reduce clutter and improve test coverage reports. These can be retrieved from git history if needed. Removed items include:
+- Phase 2 warning reduction scripts
 - One-off migration and fix scripts
 - Deprecated import/export utilities
 - Testing and debugging tools from earlier development phases
-
-Note: One-off scripts for specific fixes (like Phase 2 warning reduction) have been removed to reduce clutter. They can be retrieved from git history if needed.
+- The entire `archive/` directory with old scripts
+- Empty `maintenance/` and `production_debugging/` directories
