@@ -39,3 +39,7 @@ def create_admin(email, password, first_name, last_name):
 def init_app(app):
     """Register commands with the Flask app"""
     app.cli.add_command(create_admin)
+    
+    # Register password fix commands
+    from scripts.fix_password_hashes import register_commands
+    register_commands(app)
