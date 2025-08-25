@@ -206,6 +206,12 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    registry.register_factory(
+        'roi_repository',
+        lambda db_session: _create_roi_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Analytics and ML services
     registry.register_singleton(
         'sentiment_analysis',
@@ -497,6 +503,16 @@ def create_app(config_name=None, test_config=None):
         ),
         dependencies=['conversion_repository', 'campaign_response_repository', 'campaign_repository', 'contact_repository'],
         tags={'analytics', 'conversion', 'roi'}
+    )
+    
+    # Phase 4: ROI Calculation Service
+    registry.register_factory(
+        'roi_calculation',
+        lambda roi_repository, conversion_repository, campaign_repository, contact_repository, cache: _create_roi_calculation_service(
+            roi_repository, conversion_repository, campaign_repository, contact_repository, cache
+        ),
+        dependencies=['roi_repository', 'conversion_repository', 'campaign_repository', 'contact_repository', 'cache'],
+        tags={'analytics', 'roi', 'optimization'}
     )
     
     registry.register_factory(
@@ -1065,6 +1081,11 @@ def _create_conversion_repository(db_session):
     from repositories.conversion_repository import ConversionRepository
     return ConversionRepository(session=db_session)
 
+def _create_roi_repository(db_session):
+    """Create ROIRepository instance"""
+    from repositories.roi_repository import ROIRepository
+    return ROIRepository(session=db_session)
+
 def _create_engagement_scoring_service(engagement_event_repository, engagement_score_repository):
     """Create EngagementScoringService with repository dependencies"""
     from services.engagement_scoring_service import EngagementScoringService
@@ -1087,6 +1108,20 @@ def _create_conversion_tracking_service(conversion_repository, campaign_response
         response_repository=campaign_response_repository,  # Note: parameter name is response_repository
         campaign_repository=campaign_repository,
         contact_repository=contact_repository
+    )
+
+def _create_roi_calculation_service(roi_repository, conversion_repository, campaign_repository, contact_repository, cache):
+    """Create ROICalculationService with repository dependencies"""
+    from services.roi_calculation_service import ROICalculationService
+    
+    logger.info("Initializing ROICalculationService with repositories")
+    
+    return ROICalculationService(
+        roi_repository=roi_repository,
+        conversion_repository=conversion_repository,
+        campaign_repository=campaign_repository,
+        contact_repository=contact_repository,
+        cache_service=cache
     )
 
 def _create_campaign_template_service(campaign_template_repository, contact_repository):

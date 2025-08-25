@@ -38,7 +38,7 @@ from crm_database import (
     ConversionEvent, Campaign, Contact, CampaignMembership, CampaignResponse
 )
 from utils.datetime_utils import utc_now, ensure_utc
-from tests.conftest import create_test_contact, create_test_campaign
+# Test helper imports handled through fixtures
 
 
 class TestROICalculationService:
@@ -67,7 +67,12 @@ class TestROICalculationService:
     @pytest.fixture
     def mock_cache_service(self):
         """Mock cache service"""
-        return Mock(spec=CacheService)
+        mock = Mock()
+        mock.get.return_value = None  # Default to cache miss
+        mock.set.return_value = True
+        mock.delete.return_value = True
+        mock.delete_pattern = Mock(return_value=True)  # Add delete_pattern as extra method
+        return mock
     
     @pytest.fixture
     def service(
@@ -120,6 +125,7 @@ class TestROICalculationService:
         mock_cost_record.amount = sample_cost_data['amount']
         mock_roi_repository.create_campaign_cost.return_value = mock_cost_record
         mock_roi_repository.get_campaign_costs.return_value = [mock_cost_record]
+        mock_roi_repository.get_total_campaign_cost.return_value = Decimal('500.00')  # Mock total cost
         
         # Act - Test should FAIL initially (RED phase)
         result = service.record_campaign_cost(sample_cost_data)
@@ -677,16 +683,16 @@ class TestROICalculationService:
         
         allocation_data = {
             'total_budget': total_budget,
-            'current_allocation': {
-                1: Decimal('2000.00'),  # High ROI campaign
-                2: Decimal('1500.00'),  # Medium ROI campaign
-                3: Decimal('1500.00')   # Low ROI campaign
-            },
-            'recommended_allocation': {
-                1: Decimal('2800.00'),  # Increase high performer
-                2: Decimal('1600.00'),  # Slight increase
-                3: Decimal('600.00')    # Decrease underperformer
-            },
+            'current_allocation': [
+                {'campaign_id': 1, 'current_budget': Decimal('2000.00'), 'roi': Decimal('5.0')},
+                {'campaign_id': 2, 'current_budget': Decimal('1500.00'), 'roi': Decimal('3.0')},
+                {'campaign_id': 3, 'current_budget': Decimal('1500.00'), 'roi': Decimal('1.5')}
+            ],
+            'recommended_allocation': [
+                {'campaign_id': 1, 'recommended_budget': Decimal('2800.00'), 'budget_change': Decimal('800.00')},
+                {'campaign_id': 2, 'recommended_budget': Decimal('1600.00'), 'budget_change': Decimal('100.00')},
+                {'campaign_id': 3, 'recommended_budget': Decimal('600.00'), 'budget_change': Decimal('-900.00')}
+            ],
             'expected_roi_improvement': Decimal('1.2')
         }
         
@@ -848,7 +854,8 @@ class TestROICalculationService:
         campaign_id = 1
         cost_data = {'campaign_id': 1, 'amount': Decimal('50.00'), 'cost_type': 'sms_cost'}
         
-        mock_roi_repository.create_campaign_cost.return_value = Mock(id=1)
+        mock_roi_repository.create_campaign_cost.return_value = Mock(id=1, amount=Decimal('50.00'))
+        mock_roi_repository.get_total_campaign_cost.return_value = Decimal('100.00')
         mock_cache_service.delete_pattern.return_value = True
         
         # Act - Test should FAIL initially (RED phase)

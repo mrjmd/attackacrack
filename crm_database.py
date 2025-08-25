@@ -1253,3 +1253,330 @@ class ConversionEvent(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+# --- P4-04: Advanced ROI Calculation System Models ---
+class CampaignCost(db.Model):
+    """Track all campaign expenses for ROI calculation"""
+    __tablename__ = 'campaign_costs'
+    
+    # Primary key
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core relationships
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False, index=True)
+    
+    # Cost details
+    cost_type = db.Column(db.String(20), nullable=False, index=True)  # 'sms', 'labor', 'tools', 'overhead', 'other'
+    amount = db.Column(db.Numeric(12, 2), nullable=False)  # Cost amount
+    currency = db.Column(db.String(3), nullable=False, default='USD')  # ISO currency code
+    description = db.Column(db.Text, nullable=True)  # Description of the cost
+    cost_date = db.Column(db.Date, nullable=False, index=True)  # When the cost was incurred
+    
+    # Cost allocation for shared expenses
+    is_shared = db.Column(db.Boolean, default=False)  # Whether cost is shared across campaigns
+    allocation_method = db.Column(db.String(20), nullable=True)  # 'equal', 'weighted', 'performance_based'
+    allocation_details = db.Column(db.JSON, nullable=True)  # Details of allocation (e.g., campaign weights)
+    
+    # Audit fields
+    created_by = db.Column(db.String(100), nullable=True)  # Who created this cost entry
+    approved_by = db.Column(db.String(100), nullable=True)  # Who approved the cost
+    approval_date = db.Column(db.DateTime, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    campaign = db.relationship('Campaign', backref='costs')
+    
+    # Indexes and constraints
+    __table_args__ = (
+        db.CheckConstraint('amount >= 0', name='ck_campaign_costs_amount_positive'),
+        db.Index('idx_campaign_costs_campaign_type', 'campaign_id', 'cost_type'),
+        db.Index('idx_campaign_costs_date_range', 'campaign_id', 'cost_date'),
+    )
+    
+    def __repr__(self):
+        return f'<CampaignCost {self.id}: {self.cost_type} ${self.amount} for Campaign {self.campaign_id}>'
+    
+    @property
+    def is_operational(self) -> bool:
+        """Check if this is an operational cost"""
+        return self.cost_type in ['labor', 'overhead']
+    
+    @property
+    def is_variable(self) -> bool:
+        """Check if this is a variable cost"""
+        return self.cost_type in ['sms', 'tools']
+    
+    def to_dict(self) -> dict:
+        """Convert cost to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'campaign_id': self.campaign_id,
+            'cost_type': self.cost_type,
+            'amount': float(self.amount),
+            'currency': self.currency,
+            'description': self.description,
+            'cost_date': self.cost_date.isoformat() if self.cost_date else None,
+            'is_shared': self.is_shared,
+            'allocation_method': self.allocation_method,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class CustomerLifetimeValue(db.Model):
+    """Track customer lifetime value metrics for ROI analysis"""
+    __tablename__ = 'customer_lifetime_values'
+    
+    # Primary key
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core relationships
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False, index=True)
+    
+    # Calculation details
+    calculation_date = db.Column(db.Date, nullable=False, index=True)  # When LTV was calculated
+    
+    # Historical metrics
+    total_revenue = db.Column(db.Numeric(12, 2), nullable=False, default=0)  # Total revenue from customer
+    total_purchases = db.Column(db.Integer, nullable=False, default=0)  # Number of purchases
+    average_order_value = db.Column(db.Numeric(10, 2), nullable=True)  # Average purchase amount
+    purchase_frequency = db.Column(db.Numeric(6, 3), nullable=True)  # Purchases per month
+    customer_lifespan_days = db.Column(db.Integer, nullable=True)  # Days since first purchase
+    
+    # Predictive metrics
+    predicted_ltv = db.Column(db.Numeric(12, 2), nullable=True)  # Predicted lifetime value
+    confidence_score = db.Column(db.Numeric(4, 3), nullable=True)  # 0-1 confidence in prediction
+    prediction_method = db.Column(db.String(50), nullable=True)  # 'historical', 'cohort', 'ml_model'
+    prediction_horizon_months = db.Column(db.Integer, nullable=True, default=24)  # Prediction timeframe
+    
+    # Cohort analysis
+    cohort_month = db.Column(db.Date, nullable=True, index=True)  # Month customer was acquired
+    cohort_segment = db.Column(db.String(50), nullable=True)  # Customer segment for analysis
+    
+    # Retention metrics
+    retention_probability = db.Column(db.Numeric(4, 3), nullable=True)  # 0-1 probability of retention
+    churn_probability = db.Column(db.Numeric(4, 3), nullable=True)  # 0-1 probability of churn
+    last_purchase_date = db.Column(db.Date, nullable=True)
+    days_since_last_purchase = db.Column(db.Integer, nullable=True)
+    
+    # Value segmentation
+    value_tier = db.Column(db.String(20), nullable=True)  # 'high', 'medium', 'low'
+    percentile_rank = db.Column(db.Numeric(5, 2), nullable=True)  # Percentile among all customers
+    
+    # Metadata
+    calculation_metadata = db.Column(db.JSON, nullable=True)  # Additional calculation details
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    contact = db.relationship('Contact', backref='lifetime_values')
+    
+    # Indexes and constraints
+    __table_args__ = (
+        db.UniqueConstraint('contact_id', 'calculation_date', name='unique_contact_ltv_date'),
+        db.CheckConstraint('total_revenue >= 0', name='ck_ltv_revenue_positive'),
+        db.CheckConstraint('total_purchases >= 0', name='ck_ltv_purchases_positive'),
+        db.CheckConstraint('confidence_score >= 0 AND confidence_score <= 1', name='ck_ltv_confidence_range'),
+        db.Index('idx_customer_ltv_contact_date', 'contact_id', 'calculation_date'),
+        db.Index('idx_customer_ltv_cohort', 'cohort_month', 'value_tier'),
+        db.Index('idx_customer_ltv_value', 'predicted_ltv', 'total_revenue'),
+    )
+    
+    def __repr__(self):
+        return f'<CustomerLifetimeValue {self.id}: Contact {self.contact_id} LTV ${self.predicted_ltv}>'
+    
+    @property
+    def is_high_value(self, threshold: Decimal = Decimal('1000.00')) -> bool:
+        """Check if customer is high value"""
+        return self.predicted_ltv and self.predicted_ltv >= threshold
+    
+    @property
+    def is_at_risk(self, days_threshold: int = 90) -> bool:
+        """Check if customer is at risk of churning"""
+        if self.days_since_last_purchase and self.days_since_last_purchase > days_threshold:
+            return True
+        if self.churn_probability and self.churn_probability > 0.5:
+            return True
+        return False
+    
+    @property
+    def months_since_acquisition(self) -> Optional[int]:
+        """Calculate months since customer acquisition"""
+        if self.cohort_month and self.calculation_date:
+            delta = self.calculation_date - self.cohort_month
+            return delta.days // 30
+        return None
+    
+    def to_dict(self) -> dict:
+        """Convert LTV to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'contact_id': self.contact_id,
+            'calculation_date': self.calculation_date.isoformat() if self.calculation_date else None,
+            'total_revenue': float(self.total_revenue) if self.total_revenue else 0,
+            'total_purchases': self.total_purchases,
+            'average_order_value': float(self.average_order_value) if self.average_order_value else None,
+            'purchase_frequency': float(self.purchase_frequency) if self.purchase_frequency else None,
+            'customer_lifespan_days': self.customer_lifespan_days,
+            'predicted_ltv': float(self.predicted_ltv) if self.predicted_ltv else None,
+            'confidence_score': float(self.confidence_score) if self.confidence_score else None,
+            'cohort_month': self.cohort_month.isoformat() if self.cohort_month else None,
+            'value_tier': self.value_tier,
+            'is_high_value': self.is_high_value,
+            'is_at_risk': self.is_at_risk,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class ROIAnalysis(db.Model):
+    """Store calculated ROI metrics for campaigns and segments"""
+    __tablename__ = 'roi_analyses'
+    
+    # Primary key
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core relationships (nullable for aggregate analyses)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=True, index=True)
+    
+    # Analysis details
+    analysis_date = db.Column(db.Date, nullable=False, index=True)  # Date of analysis
+    analysis_type = db.Column(db.String(20), nullable=False, index=True)  # 'campaign', 'segment', 'channel', 'cohort'
+    analysis_period_start = db.Column(db.Date, nullable=True)  # Start of analysis period
+    analysis_period_end = db.Column(db.Date, nullable=True)  # End of analysis period
+    
+    # Financial metrics
+    total_cost = db.Column(db.Numeric(12, 2), nullable=False, default=0)  # Total campaign costs
+    total_revenue = db.Column(db.Numeric(12, 2), nullable=False, default=0)  # Total revenue generated
+    gross_profit = db.Column(db.Numeric(12, 2), nullable=True)  # Revenue - COGS
+    net_profit = db.Column(db.Numeric(12, 2), nullable=True)  # Revenue - All costs
+    
+    # ROI metrics
+    roi_percentage = db.Column(db.Numeric(10, 2), nullable=True)  # ((Revenue - Cost) / Cost) * 100
+    roas = db.Column(db.Numeric(10, 2), nullable=True)  # Return on Ad Spend (Revenue / Ad Spend)
+    profit_margin = db.Column(db.Numeric(6, 2), nullable=True)  # (Net Profit / Revenue) * 100
+    
+    # Customer acquisition metrics
+    cac = db.Column(db.Numeric(10, 2), nullable=True)  # Customer Acquisition Cost
+    new_customers_acquired = db.Column(db.Integer, nullable=True, default=0)
+    ltv_cac_ratio = db.Column(db.Numeric(8, 2), nullable=True)  # LTV / CAC ratio
+    
+    # Payback and break-even
+    payback_period_days = db.Column(db.Integer, nullable=True)  # Days to recover investment
+    break_even_date = db.Column(db.Date, nullable=True)  # When campaign broke even
+    break_even_customers = db.Column(db.Integer, nullable=True)  # Number of customers to break even
+    
+    # Performance metrics
+    conversion_rate = db.Column(db.Numeric(6, 3), nullable=True)  # Percentage of contacts converted
+    average_order_value = db.Column(db.Numeric(10, 2), nullable=True)
+    customer_retention_rate = db.Column(db.Numeric(6, 3), nullable=True)  # Percentage retained
+    
+    # Segmentation details (for segment analysis)
+    segment_criteria = db.Column(db.JSON, nullable=True)  # Criteria used for segmentation
+    segment_size = db.Column(db.Integer, nullable=True)  # Number of contacts in segment
+    
+    # Flexible metadata storage
+    analysis_metadata = db.Column(db.JSON, nullable=True)  # Additional metrics and details
+    
+    # Data quality
+    data_completeness = db.Column(db.Numeric(4, 3), nullable=True)  # 0-1 completeness score
+    confidence_level = db.Column(db.Numeric(4, 3), nullable=True)  # 0-1 confidence in calculations
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    campaign = db.relationship('Campaign', backref='roi_analyses')
+    
+    # Indexes and constraints
+    __table_args__ = (
+        db.CheckConstraint('total_cost >= 0', name='ck_roi_cost_positive'),
+        db.CheckConstraint('total_revenue >= 0', name='ck_roi_revenue_positive'),
+        db.CheckConstraint('roi_percentage IS NULL OR roi_percentage >= -100', name='ck_roi_percentage_min'),
+        db.CheckConstraint('roas IS NULL OR roas >= 0', name='ck_roi_roas_positive'),
+        db.Index('idx_roi_analysis_campaign_date', 'campaign_id', 'analysis_date'),
+        db.Index('idx_roi_analysis_type_date', 'analysis_type', 'analysis_date'),
+        db.Index('idx_roi_analysis_roi', 'roi_percentage', 'roas'),
+        db.Index('idx_roi_analysis_performance', 'campaign_id', 'roi_percentage', 'total_revenue'),
+    )
+    
+    def __repr__(self):
+        return f'<ROIAnalysis {self.id}: {self.analysis_type} ROI {self.roi_percentage}%>'
+    
+    @property
+    def is_profitable(self) -> bool:
+        """Check if analysis shows profitability"""
+        return self.net_profit and self.net_profit > 0
+    
+    @property
+    def roi_multiplier(self) -> Optional[float]:
+        """Get ROI as a multiplier (e.g., 2.5x)"""
+        if self.roi_percentage:
+            return 1 + (float(self.roi_percentage) / 100)
+        return None
+    
+    @property
+    def is_high_performing(self, roi_threshold: Decimal = Decimal('100')) -> bool:
+        """Check if this is a high-performing campaign/segment"""
+        return self.roi_percentage and self.roi_percentage >= roi_threshold
+    
+    @property
+    def efficiency_rating(self) -> str:
+        """Rate efficiency based on ROI and ROAS"""
+        if not self.roi_percentage:
+            return 'unknown'
+        
+        roi = float(self.roi_percentage)
+        if roi >= 200:
+            return 'excellent'
+        elif roi >= 100:
+            return 'good'
+        elif roi >= 50:
+            return 'fair'
+        elif roi >= 0:
+            return 'poor'
+        else:
+            return 'negative'
+    
+    def calculate_roi(self) -> None:
+        """Calculate ROI percentage from cost and revenue"""
+        if self.total_cost and self.total_cost > 0:
+            roi = ((self.total_revenue - self.total_cost) / self.total_cost) * 100
+            self.roi_percentage = Decimal(str(round(roi, 2)))
+    
+    def calculate_roas(self) -> None:
+        """Calculate Return on Ad Spend"""
+        if self.total_cost and self.total_cost > 0:
+            roas = self.total_revenue / self.total_cost
+            self.roas = Decimal(str(round(roas, 2)))
+    
+    def to_dict(self) -> dict:
+        """Convert ROI analysis to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'campaign_id': self.campaign_id,
+            'analysis_date': self.analysis_date.isoformat() if self.analysis_date else None,
+            'analysis_type': self.analysis_type,
+            'total_cost': float(self.total_cost) if self.total_cost else 0,
+            'total_revenue': float(self.total_revenue) if self.total_revenue else 0,
+            'gross_profit': float(self.gross_profit) if self.gross_profit else None,
+            'net_profit': float(self.net_profit) if self.net_profit else None,
+            'roi_percentage': float(self.roi_percentage) if self.roi_percentage else None,
+            'roi_multiplier': self.roi_multiplier,
+            'roas': float(self.roas) if self.roas else None,
+            'cac': float(self.cac) if self.cac else None,
+            'ltv_cac_ratio': float(self.ltv_cac_ratio) if self.ltv_cac_ratio else None,
+            'payback_period_days': self.payback_period_days,
+            'break_even_date': self.break_even_date.isoformat() if self.break_even_date else None,
+            'is_profitable': self.is_profitable,
+            'is_high_performing': self.is_high_performing,
+            'efficiency_rating': self.efficiency_rating,
+            'metadata': self.analysis_metadata,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

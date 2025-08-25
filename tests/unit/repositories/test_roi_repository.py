@@ -824,6 +824,7 @@ class TestROIRepository:
         
         mock_query = Mock()
         mock_session.query.return_value = mock_query
+        mock_query.join.return_value = mock_query  # Add join to mock chain
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query

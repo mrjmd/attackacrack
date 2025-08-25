@@ -21,7 +21,7 @@ import pytest
 import os
 from app import create_app
 from extensions import db
-from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Setting, InviteToken
+from crm_database import Contact, Property, Job, Quote, Invoice, Appointment, Setting, InviteToken, Campaign
 from datetime import date, time
 from unittest.mock import MagicMock # Import MagicMock
 
@@ -49,6 +49,25 @@ def create_test_contact(**kwargs):
     }
     defaults.update(kwargs)
     return Contact(**defaults)
+
+def create_test_campaign(**kwargs):
+    """
+    Helper function to create test campaigns with default values.
+    Used across multiple test files.
+    """
+    from datetime import datetime
+    from utils.datetime_utils import utc_now
+    
+    defaults = {
+        'name': 'Test Campaign',
+        'message_template': 'Test message',
+        'type': 'blast',
+        'status': 'active',
+        'created_at': utc_now(),
+        'created_by': 1  # Default to first user
+    }
+    defaults.update(kwargs)
+    return Campaign(**defaults)
 
 @pytest.fixture(scope='module')
 def app():
