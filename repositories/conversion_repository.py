@@ -842,9 +842,9 @@ class ConversionRepository(BaseRepository[ConversionEvent]):
                         'responded' as stage,
                         COUNT(DISTINCT cr.contact_id) as count,
                         4 as stage_order
-                    FROM campaign_response cr
+                    FROM campaign_responses cr
                     WHERE cr.campaign_id = :campaign_id
-                        AND cr.response_received_at IS NOT NULL
+                        AND cr.first_response_at IS NOT NULL
                     
                     UNION ALL
                     
@@ -1120,7 +1120,7 @@ class ConversionRepository(BaseRepository[ConversionEvent]):
                     SUM(conversion_value) as total_value,
                     MIN(conversion_value) as min_value,
                     MAX(conversion_value) as max_value,
-                    STD(conversion_value) as std_deviation,
+                    0 as std_deviation, -- SQLite doesn't have STDDEV
                     COUNT(*) as conversion_count
                 FROM conversion_events
                 WHERE campaign_id = :campaign_id

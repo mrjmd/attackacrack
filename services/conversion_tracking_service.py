@@ -6,6 +6,7 @@ Service layer for conversion tracking, ROI analysis, and attribution modeling
 import logging
 import math
 import time
+import json
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -56,6 +57,17 @@ class ConversionTrackingService:
         self.campaign_repository = campaign_repository
         self.contact_repository = contact_repository
         self.response_repository = response_repository
+    
+    def _serialize_decimals(self, obj):
+        """Convert Decimal objects to strings for JSON serialization."""
+        if isinstance(obj, Decimal):
+            return str(obj)
+        elif isinstance(obj, dict):
+            return {k: self._serialize_decimals(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._serialize_decimals(item) for item in obj]
+        else:
+            return obj
     
     # ===== Conversion Event Recording =====
     
@@ -117,10 +129,14 @@ class ConversionTrackingService:
                     attribution_window_days=attribution_window_days
                 )
                 
-                # Store attribution weights in metadata
+                # Store attribution weights in metadata (convert Decimals for JSON serialization)
                 if 'conversion_metadata' not in conversion_data:
                     conversion_data['conversion_metadata'] = {}
-                conversion_data['conversion_metadata']['attribution_weights'] = attribution_weights
+                conversion_data['conversion_metadata']['attribution_weights'] = self._serialize_decimals(attribution_weights)
+            
+            # Serialize any Decimal values in conversion_metadata before saving
+            if 'conversion_metadata' in conversion_data and conversion_data['conversion_metadata']:
+                conversion_data['conversion_metadata'] = self._serialize_decimals(conversion_data['conversion_metadata'])
             
             # Create the conversion event
             conversion = self.conversion_repository.create_conversion_event(conversion_data)

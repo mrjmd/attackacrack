@@ -22,8 +22,7 @@ from decimal import Decimal
 from typing import List, Dict, Any
 from unittest.mock import Mock, patch
 
-# Skip all integration tests until infrastructure is ready
-pytestmark = pytest.mark.skip(reason="ROI calculation integration tests require complete infrastructure setup")
+# Integration tests for ROI calculation system - now enabled
 
 from services.roi_calculation_service import ROICalculationService
 from repositories.roi_repository import ROIRepository
@@ -65,7 +64,9 @@ class TestROICalculationIntegration:
     @pytest.fixture
     def cache_service(self):
         """Create mock cache service for testing"""
-        return Mock(spec=CacheService)
+        mock_cache = Mock(spec=CacheService)
+        mock_cache.delete_pattern = Mock(return_value=True)
+        return mock_cache
     
     @pytest.fixture
     def roi_service(
@@ -556,7 +557,7 @@ class TestROICalculationIntegration:
         """Test cache invalidation when underlying data changes"""
         # Arrange
         campaign = campaign_with_full_data['campaign']
-        cache_service.delete_pattern.return_value = True
+        cache_service.delete_pattern = Mock(return_value=True)
         
         # Act - Test should FAIL initially (RED phase)
         # Add new cost data, which should invalidate cache

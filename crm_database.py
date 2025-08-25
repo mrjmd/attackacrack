@@ -326,11 +326,16 @@ class Activity(db.Model):
     # SMS Metrics tracking
     activity_metadata = db.Column(db.JSON, nullable=True)  # For bounce tracking and other metadata
     
+    # Campaign attribution
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id', ondelete='SET NULL'), nullable=True, index=True)
+    
     # Timestamps
     created_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relationships
     media_attachments = db.relationship('MediaAttachment', backref='activity', lazy=True, cascade="all, delete-orphan")
+    campaign = db.relationship('Campaign', backref=db.backref('activities', lazy='dynamic'))
 
 class MediaAttachment(db.Model):
     id = db.Column(db.Integer, primary_key=True)

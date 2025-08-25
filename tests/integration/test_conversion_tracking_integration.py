@@ -35,7 +35,6 @@ from utils.datetime_utils import utc_now
 from tests.conftest import create_test_contact
 
 
-@pytest.mark.skip(reason="Conversion tracking integration tests require database schema updates (activity.campaign_id column) not yet implemented")
 class TestConversionTrackingEndToEnd:
     """Test complete conversion tracking workflows end-to-end
     
@@ -86,14 +85,16 @@ class TestConversionTrackingEndToEnd:
             campaign = campaign_result.data
             campaign_id = campaign.id if hasattr(campaign, 'id') else campaign['id']
             
-            # Add contact to campaign
-            campaign_service.add_recipients(campaign_id, {'phone': contact.phone})
+            # Add contact to campaign manually
+            membership = CampaignMembership(
+                campaign_id=campaign_id,
+                contact_id=contact.id,
+                status='pending'
+            )
+            db_session.add(membership)
+            db_session.commit()
             
             # Simulate campaign message sent
-            membership = CampaignMembership.query.filter_by(
-                contact_id=contact.id,
-                campaign_id=campaign_id
-            ).first()
             membership.status = 'sent'
             membership.sent_at = utc_now()
             db_session.commit()
@@ -121,6 +122,11 @@ class TestConversionTrackingEndToEnd:
                 response_intent='interested'
             )
             db_session.add(campaign_response)
+            db_session.commit()
+            
+            # Add campaign_id to the response activity for attribution tracking
+            response_activity.campaign_id = campaign_id
+            db_session.add(response_activity)
             db_session.commit()
             
             # Step 2: Record conversion event
@@ -219,7 +225,8 @@ class TestConversionTrackingEndToEnd:
                     direction='outgoing',
                     body=f"Campaign {i+1} message",
                     to_numbers=[contact.phone],
-                    created_at=touch_time
+                    created_at=touch_time,
+                    campaign_id=campaign['id']  # Add campaign_id for attribution
                 )
                 db_session.add(activity)
                 
@@ -264,7 +271,7 @@ class TestConversionTrackingEndToEnd:
             weights = attribution_data['weights']
             assert len(weights) == 3
             for campaign_id, weight in weights.items():
-                assert abs(weight - Decimal('0.333')) < Decimal('0.01')  # ~33.3% each
+                assert abs(float(weight) - 0.333) < 0.01  # ~33.3% each
     
     def test_conversion_funnel_real_data_analysis(self, db_session, app):
         """Test conversion funnel analysis with realistic campaign data"""
@@ -306,7 +313,12 @@ class TestConversionTrackingEndToEnd:
             
             # Add all contacts to campaign
             for contact, _ in contacts:
-                campaign_service.add_contact_to_campaign(campaign_id, contact.id)
+                membership = CampaignMembership(
+                    campaign_id=campaign_id,
+                    contact_id=contact.id,
+                    status='pending'
+                )
+                db_session.add(membership)
             
             # Simulate campaign execution and responses
             base_time = utc_now() - timedelta(hours=48)
@@ -329,7 +341,8 @@ class TestConversionTrackingEndToEnd:
                         direction='incoming',
                         body="Looks interesting!" if not contact_data['converts'] else "I want to buy this!",
                         from_number=contact.phone,
-                        created_at=base_time + timedelta(hours=2)
+                        created_at=base_time + timedelta(hours=2),
+                        campaign_id=campaign_id  # Add campaign_id for attribution
                     )
                     db_session.add(engagement_activity)
                     
@@ -424,7 +437,8 @@ class TestConversionTrackingEndToEnd:
                     direction='outgoing',
                     body="Limited time offer!",
                     to_numbers=[contact.phone],
-                    created_at=base_time
+                    created_at=base_time,
+                    campaign_id=campaign.id  # Add campaign_id for attribution
                 )
                 db_session.add(first_touch)
                 
@@ -672,7 +686,13 @@ class TestConversionTrackingEndToEnd:
             campaign_id = campaign.id if hasattr(campaign, 'id') else campaign['id']
             
             # Add contact to campaign
-            campaign_service.add_contact_to_campaign(campaign_id, contact.id)
+            membership = CampaignMembership(
+                campaign_id=campaign_id,
+                contact_id=contact.id,
+                status='pending'
+            )
+            db_session.add(membership)
+            db_session.commit()
             
             # Simulate engagement through engagement service
             engagement_event_data = {
@@ -719,7 +739,6 @@ class TestConversionTrackingEndToEnd:
             assert db_conversion.conversion_value == Decimal('299.99')
 
 
-@pytest.mark.skip(reason="Conversion tracking integration tests require database schema updates not yet implemented")
 class TestConversionTrackingErrorRecovery:
     """Test error recovery and resilience in conversion tracking system"""
     
@@ -819,7 +838,6 @@ class TestConversionTrackingErrorRecovery:
             assert recovery_result.is_success
 
 
-@pytest.mark.skip(reason="Conversion tracking integration tests require database schema updates not yet implemented")
 class TestConversionTrackingPerformance:
     """Test performance characteristics of conversion tracking system"""
     
