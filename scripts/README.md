@@ -1,6 +1,18 @@
 # Scripts Directory
 
-This directory contains administrative and one-off scripts for maintenance and data management tasks.
+This directory contains administrative utilities and data management scripts for the Attack-a-Crack CRM.
+
+## Core Utilities
+
+### Essential Scripts (Main Directory)
+- `commands.py` - Flask CLI commands for admin user creation and password management
+- `fix_password_hashes.py` - Utility for fixing and verifying password hashes
+- `lint_check.py` - Code linting and style checking utility
+- `celery_utils.py` - Shared Celery utilities used by data management scripts
+- `script_logger.py` - Logging utilities for script execution
+- `setup_dev.sh` - Development environment setup script
+- `extract_secrets_for_github.sh` - Extract and format secrets for GitHub Actions
+- `fix_env_vars.sh` - Environment variable configuration helper
 
 ## Directory Structure
 
@@ -87,3 +99,12 @@ python scripts/data_management/media/fix_existing_media_urls.py
 - Always run data modification scripts in a test environment first
 - The `large_scale_import.py` is the recommended script for production imports
 - Use dry run options when available to preview changes before execution
+
+## Archived Scripts
+
+The `archive/` directory contains historical scripts that are no longer actively used but preserved for reference. These include:
+- One-off migration and fix scripts
+- Deprecated import/export utilities
+- Testing and debugging tools from earlier development phases
+
+Note: One-off scripts for specific fixes (like Phase 2 warning reduction) have been removed to reduce clutter. They can be retrieved from git history if needed.
