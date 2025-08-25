@@ -181,6 +181,19 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    # Phase 4: Engagement Analytics repositories
+    registry.register_factory(
+        'engagement_event_repository',
+        lambda db_session: _create_engagement_event_repository(db_session),
+        dependencies=['db_session']
+    )
+    
+    registry.register_factory(
+        'engagement_score_repository',
+        lambda db_session: _create_engagement_score_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Register services with lazy loading factories
     # These won't be instantiated until first use
     
@@ -433,6 +446,16 @@ def create_app(config_name=None, test_config=None):
         ),
         dependencies=['campaign_repository', 'activity_repository'],
         tags={'scheduling', 'campaigns'}
+    )
+    
+    # Phase 4: Engagement Scoring Service
+    registry.register_factory(
+        'engagement_scoring',
+        lambda engagement_event_repository, engagement_score_repository: _create_engagement_scoring_service(
+            engagement_event_repository, engagement_score_repository
+        ),
+        dependencies=['engagement_event_repository', 'engagement_score_repository'],
+        tags={'analytics', 'engagement', 'scoring'}
     )
     
     registry.register_factory(
@@ -985,6 +1008,27 @@ def _create_campaign_template_repository(db_session):
     """Create CampaignTemplateRepository instance"""
     from repositories.campaign_template_repository import CampaignTemplateRepository
     return CampaignTemplateRepository(session=db_session)
+
+def _create_engagement_event_repository(db_session):
+    """Create EngagementEventRepository instance"""
+    from repositories.engagement_event_repository import EngagementEventRepository
+    return EngagementEventRepository(session=db_session)
+
+def _create_engagement_score_repository(db_session):
+    """Create EngagementScoreRepository instance"""
+    from repositories.engagement_score_repository import EngagementScoreRepository
+    return EngagementScoreRepository(session=db_session)
+
+def _create_engagement_scoring_service(engagement_event_repository, engagement_score_repository):
+    """Create EngagementScoringService with repository dependencies"""
+    from services.engagement_scoring_service import EngagementScoringService
+    
+    logger.info("Initializing EngagementScoringService with repositories")
+    
+    return EngagementScoringService(
+        event_repository=engagement_event_repository,
+        score_repository=engagement_score_repository
+    )
 
 def _create_campaign_template_service(campaign_template_repository, contact_repository):
     """Create CampaignTemplateService with repository dependencies"""

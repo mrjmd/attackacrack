@@ -5,6 +5,7 @@ from datetime import datetime, time, date, timedelta
 from utils.datetime_utils import utc_now
 from enum import Enum
 import json
+from decimal import Decimal
 
 # --- NEW: User Model ---
 class User(db.Model):
@@ -825,3 +826,207 @@ class ABTestResult(db.Model):
     def conversion_achieved(self) -> bool:
         """Check if this assignment resulted in a positive conversion"""
         return self.response_received and self.response_type == 'positive'
+
+
+# --- P4-01: Engagement Scoring System Models ---
+class EngagementEvent(db.Model):
+    """Track individual engagement events for scoring calculation"""
+    __tablename__ = 'engagement_events'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core relationships
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False, index=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=True, index=True)
+    activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=True)  # Link to actual message/call
+    parent_event_id = db.Column(db.Integer, db.ForeignKey('engagement_events.id'), nullable=True)  # For event chains
+    
+    # Event details
+    event_type = db.Column(db.String(20), nullable=False, index=True)  # 'delivered', 'opened', 'clicked', 'responded', 'converted', 'opted_out', 'bounced'
+    event_timestamp = db.Column(db.DateTime, nullable=False, index=True)
+    channel = db.Column(db.String(10), nullable=False, index=True)  # 'sms', 'email', 'call'
+    
+    # Message/Campaign context
+    message_id = db.Column(db.String(100), nullable=True, index=True)  # OpenPhone message ID or similar
+    campaign_message_variant = db.Column(db.String(1), nullable=True)  # 'A' or 'B' for A/B testing
+    
+    # Event-specific data
+    click_url = db.Column(db.String(500), nullable=True)  # For 'clicked' events
+    response_text = db.Column(db.Text, nullable=True)  # For 'responded' events
+    response_sentiment = db.Column(db.String(20), nullable=True)  # 'positive', 'negative', 'neutral'
+    
+    # Conversion tracking
+    conversion_type = db.Column(db.String(50), nullable=True)  # 'purchase', 'appointment_booked', 'quote_requested'
+    conversion_value = db.Column(db.Numeric(10, 2), nullable=True)  # Monetary value if applicable
+    
+    # Opt-out tracking
+    opt_out_method = db.Column(db.String(50), nullable=True)  # 'keyword', 'link', 'manual'
+    opt_out_keyword = db.Column(db.String(20), nullable=True)  # 'STOP', 'UNSUBSCRIBE', etc.
+    
+    # Metadata and analytics
+    event_metadata = db.Column(db.JSON, nullable=True)  # Flexible storage for additional data
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    contact = db.relationship('Contact', backref='engagement_events')
+    campaign = db.relationship('Campaign', backref='engagement_events')
+    activity = db.relationship('Activity', backref='engagement_events')
+    parent_event = db.relationship('EngagementEvent', remote_side=[id], backref='child_events')
+    
+    # Indexes for performance
+    __table_args__ = (
+        db.Index('idx_engagement_events_contact_time', 'contact_id', 'event_timestamp'),
+        db.Index('idx_engagement_events_campaign_time', 'campaign_id', 'event_timestamp'),
+        db.Index('idx_engagement_events_type_time', 'event_type', 'event_timestamp'),
+        db.Index('idx_engagement_events_message', 'message_id', 'event_type'),
+    )
+    
+    def __repr__(self):
+        return f'<EngagementEvent {self.id}: {self.event_type} for Contact {self.contact_id}>'
+    
+    @property
+    def is_positive_event(self) -> bool:
+        """Check if this is a positive engagement event"""
+        positive_events = ['opened', 'clicked', 'responded', 'converted']
+        return self.event_type in positive_events
+    
+    @property
+    def is_negative_event(self) -> bool:
+        """Check if this is a negative engagement event"""
+        negative_events = ['opted_out', 'bounced', 'complained']
+        return self.event_type in negative_events
+    
+    @property
+    def has_monetary_value(self) -> bool:
+        """Check if this event has associated monetary value"""
+        return self.conversion_value is not None and self.conversion_value > 0
+
+
+class EngagementScore(db.Model):
+    """Calculated engagement scores for contacts in campaigns"""
+    __tablename__ = 'engagement_scores'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core relationships
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False, index=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=True, index=True)
+    
+    # Primary scores (0-100 scale)
+    overall_score = db.Column(db.Numeric(5, 2), nullable=False, index=True)  # Composite engagement score
+    recency_score = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # How recent is engagement
+    frequency_score = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # How frequent is engagement
+    monetary_score = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # Monetary value contribution
+    
+    # Advanced scoring components
+    engagement_diversity_score = db.Column(db.Numeric(5, 2), nullable=True, default=0)  # Variety of engagement types
+    time_decay_score = db.Column(db.Numeric(5, 2), nullable=True, default=0)  # Time-weighted engagement
+    negative_events_penalty = db.Column(db.Numeric(5, 2), nullable=True, default=0)  # Penalty for opt-outs, etc.
+    
+    # Predictive metrics
+    engagement_probability = db.Column(db.Numeric(4, 3), nullable=False, default=0)  # 0-1 probability of future engagement
+    conversion_probability = db.Column(db.Numeric(4, 3), nullable=True, default=0)  # 0-1 probability of conversion
+    churn_risk_score = db.Column(db.Numeric(5, 2), nullable=True, default=0)  # Risk of disengagement
+    
+    # Percentile rankings (calculated relative to campaign)
+    overall_percentile = db.Column(db.Numeric(5, 2), nullable=True)  # Percentile within campaign
+    recency_percentile = db.Column(db.Numeric(5, 2), nullable=True)
+    frequency_percentile = db.Column(db.Numeric(5, 2), nullable=True)
+    monetary_percentile = db.Column(db.Numeric(5, 2), nullable=True)
+    
+    # Metadata
+    score_version = db.Column(db.String(10), nullable=False, default='1.0')  # Algorithm version
+    calculation_method = db.Column(db.String(50), nullable=True)  # 'rfm', 'ml_model', 'hybrid'
+    confidence_level = db.Column(db.Numeric(4, 3), nullable=True)  # Confidence in score accuracy
+    
+    # Event statistics (cached for performance)
+    total_events_count = db.Column(db.Integer, nullable=False, default=0)
+    positive_events_count = db.Column(db.Integer, nullable=False, default=0)
+    negative_events_count = db.Column(db.Integer, nullable=False, default=0)
+    last_event_timestamp = db.Column(db.DateTime, nullable=True)
+    first_event_timestamp = db.Column(db.DateTime, nullable=True)
+    
+    # Flexible metadata storage
+    score_metadata = db.Column(db.JSON, nullable=True)
+    
+    # Timestamps
+    calculated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
+    
+    # Relationships
+    contact = db.relationship('Contact', backref='engagement_scores')
+    campaign = db.relationship('Campaign', backref='engagement_scores')
+    
+    # Unique constraint - one score per contact per campaign
+    __table_args__ = (
+        db.UniqueConstraint('contact_id', 'campaign_id', name='unique_contact_campaign_score'),
+        db.Index('idx_engagement_scores_overall', 'overall_score'),
+        db.Index('idx_engagement_scores_probability', 'engagement_probability'),
+        db.Index('idx_engagement_scores_calculated', 'calculated_at'),
+        db.Index('idx_engagement_scores_campaign_score', 'campaign_id', 'overall_score'),
+    )
+    
+    def __repr__(self):
+        return f'<EngagementScore {self.id}: {self.overall_score} for Contact {self.contact_id}>'
+    
+    @property
+    def score_grade(self) -> str:
+        """Convert overall score to letter grade"""
+        if self.overall_score >= 90:
+            return 'A+'
+        elif self.overall_score >= 80:
+            return 'A'
+        elif self.overall_score >= 70:
+            return 'B'
+        elif self.overall_score >= 60:
+            return 'C'
+        elif self.overall_score >= 50:
+            return 'D'
+        else:
+            return 'F'
+    
+    @property
+    def engagement_level(self) -> str:
+        """Categorize engagement level"""
+        if self.overall_score >= 80:
+            return 'high'
+        elif self.overall_score >= 60:
+            return 'medium'
+        elif self.overall_score >= 40:
+            return 'low'
+        else:
+            return 'very_low'
+    
+    @property
+    def is_recent(self, hours: int = 24) -> bool:
+        """Check if score was calculated recently"""
+        if not self.calculated_at:
+            return False
+        cutoff = utc_now() - timedelta(hours=hours)
+        return self.calculated_at >= cutoff
+    
+    def needs_recalculation(self, max_age_hours: int = 168) -> bool:
+        """Check if score needs recalculation (default 7 days)"""
+        if not self.calculated_at:
+            return True
+        cutoff = utc_now() - timedelta(hours=max_age_hours)
+        return self.calculated_at < cutoff
+    
+    def to_dict(self) -> dict:
+        """Convert score to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'contact_id': self.contact_id,
+            'campaign_id': self.campaign_id,
+            'overall_score': float(self.overall_score),
+            'recency_score': float(self.recency_score),
+            'frequency_score': float(self.frequency_score),
+            'monetary_score': float(self.monetary_score),
+            'engagement_probability': float(self.engagement_probability),
+            'score_grade': self.score_grade,
+            'engagement_level': self.engagement_level,
+            'calculated_at': self.calculated_at.isoformat() if self.calculated_at else None,
+            'score_version': self.score_version
+        }
