@@ -32,7 +32,7 @@ from crm_database import (
     ConversionEvent, Contact, Campaign, CampaignMembership, CampaignResponse
 )
 from utils.datetime_utils import utc_now, ensure_utc
-from tests.conftest import create_test_contact, create_test_campaign
+from tests.conftest import create_test_contact
 
 
 class TestConversionTrackingService:
@@ -804,11 +804,16 @@ class TestConversionTrackingService:
     # ===== Integration with Campaign Response System =====
     
     def test_link_conversion_to_campaign_response(self, service, mock_conversion_repository,
-                                                mock_response_repository, sample_conversion_data):
+                                                mock_response_repository, mock_contact_repository,
+                                                mock_campaign_repository, sample_conversion_data):
         """Test linking conversion events to existing campaign responses"""
         # Arrange
         contact_id = sample_conversion_data['contact_id']
         campaign_id = sample_conversion_data['campaign_id']
+        
+        # Mock contact and campaign exist
+        mock_contact_repository.get_by_id.return_value = Mock(spec=Contact, id=contact_id)
+        mock_campaign_repository.get_by_id.return_value = Mock(spec=Campaign, id=campaign_id)
         
         # Mock existing campaign response
         mock_response = Mock(spec=CampaignResponse)
@@ -821,7 +826,13 @@ class TestConversionTrackingService:
         mock_response_repository.get_by_campaign_and_contact.return_value = mock_response
         
         # Mock conversion creation
-        mock_conversion = Mock(spec=ConversionEvent, id=1)
+        mock_conversion = Mock(spec=ConversionEvent)
+        mock_conversion.id = 1
+        mock_conversion.contact_id = contact_id
+        mock_conversion.campaign_id = campaign_id
+        mock_conversion.conversion_type = sample_conversion_data['conversion_type']
+        mock_conversion.conversion_value = sample_conversion_data['conversion_value']
+        mock_conversion.converted_at = utc_now()  # Use real datetime
         mock_conversion_repository.create_conversion_event.return_value = mock_conversion
         
         # Act
@@ -976,11 +987,26 @@ class TestConversionTrackingService:
         mock_conversion_repository.bulk_create_conversion_events.assert_called_once()
     
     @patch('services.conversion_tracking_service.time.time')
-    def test_performance_monitoring(self, mock_time, service, mock_conversion_repository, sample_conversion_data):
+    def test_performance_monitoring(self, mock_time, service, mock_conversion_repository, 
+                                   mock_contact_repository, sample_conversion_data):
         """Test that service monitors performance of operations"""
         # Arrange
-        mock_time.side_effect = [1000.0, 1002.5]  # 2.5 second operation
+        # Use a callable that tracks calls and returns different values
+        call_count = {'count': 0}
+        def time_mock():
+            if call_count['count'] == 0:
+                call_count['count'] += 1
+                return 1000.0
+            elif call_count['count'] == 1:
+                call_count['count'] += 1
+                return 1002.5
+            else:
+                # For any additional calls (e.g., from logging)
+                return 1002.5
         
+        mock_time.side_effect = time_mock
+        
+        mock_contact_repository.get_by_id.return_value = Mock(spec=Contact, id=1)
         mock_conversion_repository.create_conversion_event.return_value = Mock(spec=ConversionEvent, id=1)
         
         # Act

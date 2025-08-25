@@ -200,6 +200,12 @@ def create_app(config_name=None, test_config=None):
         dependencies=['db_session']
     )
     
+    registry.register_factory(
+        'conversion_repository',
+        lambda db_session: _create_conversion_repository(db_session),
+        dependencies=['db_session']
+    )
+    
     # Analytics and ML services
     registry.register_singleton(
         'sentiment_analysis',
@@ -481,6 +487,16 @@ def create_app(config_name=None, test_config=None):
         ),
         dependencies=['engagement_event_repository', 'engagement_score_repository'],
         tags={'analytics', 'engagement', 'scoring'}
+    )
+    
+    # Phase 4: Conversion Tracking Service
+    registry.register_factory(
+        'conversion_tracking',
+        lambda conversion_repository, campaign_response_repository, campaign_repository, contact_repository: _create_conversion_tracking_service(
+            conversion_repository, campaign_response_repository, campaign_repository, contact_repository
+        ),
+        dependencies=['conversion_repository', 'campaign_response_repository', 'campaign_repository', 'contact_repository'],
+        tags={'analytics', 'conversion', 'roi'}
     )
     
     registry.register_factory(
@@ -1044,6 +1060,11 @@ def _create_engagement_score_repository(db_session):
     from repositories.engagement_score_repository import EngagementScoreRepository
     return EngagementScoreRepository(session=db_session)
 
+def _create_conversion_repository(db_session):
+    """Create ConversionRepository instance"""
+    from repositories.conversion_repository import ConversionRepository
+    return ConversionRepository(session=db_session)
+
 def _create_engagement_scoring_service(engagement_event_repository, engagement_score_repository):
     """Create EngagementScoringService with repository dependencies"""
     from services.engagement_scoring_service import EngagementScoringService
@@ -1053,6 +1074,19 @@ def _create_engagement_scoring_service(engagement_event_repository, engagement_s
     return EngagementScoringService(
         event_repository=engagement_event_repository,
         score_repository=engagement_score_repository
+    )
+
+def _create_conversion_tracking_service(conversion_repository, campaign_response_repository, campaign_repository, contact_repository):
+    """Create ConversionTrackingService with repository dependencies"""
+    from services.conversion_tracking_service import ConversionTrackingService
+    
+    logger.info("Initializing ConversionTrackingService with repositories")
+    
+    return ConversionTrackingService(
+        conversion_repository=conversion_repository,
+        response_repository=campaign_response_repository,  # Note: parameter name is response_repository
+        campaign_repository=campaign_repository,
+        contact_repository=contact_repository
     )
 
 def _create_campaign_template_service(campaign_template_repository, contact_repository):

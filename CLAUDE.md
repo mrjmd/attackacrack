@@ -22,6 +22,7 @@
   - **Database**: SQLAlchemy models accessed only through repositories
 
 ## 🚨 CRITICAL: Test-Driven Development with appropriate subagents is MANDATORY
+## 🚨 CRITICAL: Always verify that all tests are passing and CI/CD is working before completing a feature
 
 **ENFORCEMENT RULES:**
 1. **ALWAYS** have test subagent write tests BEFORE implementation - NO EXCEPTIONS

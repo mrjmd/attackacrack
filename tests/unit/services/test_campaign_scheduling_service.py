@@ -82,8 +82,8 @@ class TestCampaignSchedulingService:
         """Test scheduling with timezone conversion to UTC"""
         # Arrange
         campaign_id = 1
-        # 2 PM Eastern Time
-        local_time = datetime(2025, 8, 25, 14, 0, 0)
+        # 2 PM Eastern Time (tomorrow to ensure it's in the future)
+        local_time = datetime(2025, 8, 26, 14, 0, 0)
         timezone = "America/New_York"
         
         mock_campaign = Mock(spec=Campaign)
