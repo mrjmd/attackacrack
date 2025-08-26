@@ -597,19 +597,27 @@ class CSVImportService:
                         
                         if not propertyradar_service:
                             # Create new instance with dependencies
-                            property_repo = PropertyRepository(current_app.db.session)
+                            # Get session from existing repository instead of db directly
+                            session = self.contact_repository.session
+                            property_repo = PropertyRepository(session)
                             contact_repo = self.contact_repository
+                            csv_import_repo = self.csv_import_repository
                             propertyradar_service = PropertyRadarImportService(
                                 property_repository=property_repo,
-                                contact_repository=contact_repo
+                                contact_repository=contact_repo,
+                                csv_import_repository=csv_import_repo,
+                                session=session
                             )
                     else:
-                        # Fallback: create with basic dependencies
-                        from extensions import db
-                        property_repo = PropertyRepository(db.session)
+                        # Fallback: create with basic dependencies using existing session
+                        session = self.contact_repository.session
+                        property_repo = PropertyRepository(session)
+                        csv_import_repo = self.csv_import_repository
                         propertyradar_service = PropertyRadarImportService(
                             property_repository=property_repo,
-                            contact_repository=self.contact_repository
+                            contact_repository=self.contact_repository,
+                            csv_import_repository=csv_import_repo,
+                            session=session
                         )
                     
                     # Import using PropertyRadar service
