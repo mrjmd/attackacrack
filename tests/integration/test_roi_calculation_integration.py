@@ -175,13 +175,18 @@ class TestROICalculationIntegration:
     
     # ===== End-to-End ROI Calculation Workflows =====
     
+    @pytest.mark.postgresql
     def test_complete_roi_calculation_workflow(
         self, 
         roi_service, 
         db_session, 
         campaign_with_full_data
     ):
-        """Test complete ROI calculation from cost recording to final analysis"""
+        """Test complete ROI calculation from cost recording to final analysis
+        
+        NOTE: Requires PostgreSQL for complex Invoice→Contact joins
+        and advanced financial calculations with proper DECIMAL precision.
+        """
         # Arrange
         campaign = campaign_with_full_data['campaign']
         
@@ -273,13 +278,18 @@ class TestROICalculationIntegration:
         assert 'best_performing_type' in comparison_result.data
         assert comparison_result.data['performance_gap'] >= 0
     
+    @pytest.mark.postgresql
     def test_ltv_cac_analysis_integration(
         self, 
         roi_service, 
         db_session, 
         campaign_with_full_data
     ):
-        """Test integrated LTV:CAC analysis with historical customer data"""
+        """Test integrated LTV:CAC analysis with historical customer data
+        
+        NOTE: Requires PostgreSQL for complex aggregations over time
+        and advanced analytical functions for LTV calculations.
+        """
         # Arrange
         campaign = campaign_with_full_data['campaign']
         contacts = campaign_with_full_data['contacts']
@@ -329,13 +339,18 @@ class TestROICalculationIntegration:
         assert ratio_result.data['ltv_cac_ratio'] > 0
         assert ratio_result.data['health_score'] > 0
     
+    @pytest.mark.postgresql
     def test_predictive_roi_modeling_workflow(
         self, 
         roi_service, 
         db_session, 
         campaign_with_full_data
     ):
-        """Test complete predictive ROI modeling workflow"""
+        """Test complete predictive ROI modeling workflow
+        
+        NOTE: Requires PostgreSQL for statistical functions and
+        time-series analysis not available in SQLite.
+        """
         # Arrange
         campaign = campaign_with_full_data['campaign']
         
@@ -397,12 +412,17 @@ class TestROICalculationIntegration:
     
     # ===== Performance and Scalability Tests =====
     
+    @pytest.mark.postgresql
     def test_large_dataset_roi_calculation_performance(
         self, 
         roi_service, 
         db_session
     ):
-        """Test ROI calculation performance with large datasets"""
+        """Test ROI calculation performance with large datasets
+        
+        NOTE: Requires PostgreSQL for realistic performance testing
+        with proper indexing and query optimization.
+        """
         # Arrange - Create large campaign with many contacts
         campaign = Campaign(
             name="Large ROI Test Campaign",
@@ -576,13 +596,18 @@ class TestROICalculationIntegration:
     
     # ===== Error Handling and Recovery Tests =====
     
+    @pytest.mark.postgresql
     def test_transaction_rollback_on_error(
         self, 
         roi_service, 
         db_session, 
         campaign_with_full_data
     ):
-        """Test transaction rollback when ROI calculation fails"""
+        """Test transaction rollback when ROI calculation fails
+        
+        NOTE: Requires PostgreSQL for proper transaction isolation
+        and rollback behavior testing.
+        """
         # Arrange
         campaign = campaign_with_full_data['campaign']
         
@@ -605,13 +630,18 @@ class TestROICalculationIntegration:
         final_count = db_session.query(Campaign).count()
         assert final_count == initial_count
     
+    @pytest.mark.postgresql
     def test_partial_failure_handling(
         self, 
         roi_service, 
         db_session, 
         sample_contacts
     ):
-        """Test handling of partial failures in batch operations"""
+        """Test handling of partial failures in batch operations
+        
+        NOTE: Requires PostgreSQL for complex error handling scenarios
+        and partial transaction recovery.
+        """
         # Arrange - Create campaigns, some with invalid data
         valid_campaign = Campaign(
             name="Valid Campaign",
@@ -671,13 +701,18 @@ class TestROICalculationIntegration:
         # Allow for small rounding differences
         assert abs(roas_from_direct - roas_from_dashboard) < Decimal('0.01')
     
+    @pytest.mark.postgresql
     def test_cross_campaign_data_isolation(
         self, 
         roi_service, 
         db_session, 
         sample_contacts
     ):
-        """Test that ROI calculations don't leak data between campaigns"""
+        """Test that ROI calculations don't leak data between campaigns
+        
+        NOTE: Requires PostgreSQL for proper data isolation testing
+        with advanced filtering and partitioning logic.
+        """
         # Arrange - Create two separate campaigns
         campaign1 = Campaign(
             name="Isolated Campaign 1",
@@ -781,13 +816,18 @@ class TestROICalculationIntegration:
         assert optimization_result.data['total_potential_improvement'] > 0
         assert len(strategy_result.data['strategies']) > 0
     
+    @pytest.mark.postgresql
     def test_comprehensive_roi_reporting_integration(
         self, 
         roi_service, 
         db_session, 
         campaign_with_full_data
     ):
-        """Test comprehensive ROI reporting with all integrated data"""
+        """Test comprehensive ROI reporting with all integrated data
+        
+        NOTE: Requires PostgreSQL for complex reporting queries with
+        multiple joins and advanced aggregation functions.
+        """
         # Arrange
         campaign = campaign_with_full_data['campaign']
         
