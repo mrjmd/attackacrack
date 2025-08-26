@@ -485,6 +485,13 @@ def create_app(config_name=None, test_config=None):
         tags={'scheduling', 'campaigns'}
     )
     
+    # PropertyRadar Import Service for enhanced CSV imports
+    registry.register_factory(
+        'propertyradar_import',
+        lambda: _create_propertyradar_import_service(db.session),
+        tags={'import', 'csv', 'propertyradar', 'real_estate'}
+    )
+    
     # Phase 4: Engagement Scoring Service
     registry.register_factory(
         'engagement_scoring',
@@ -1331,6 +1338,27 @@ def _create_csv_import_service(contact, db_session):
         campaign_list_member_repository=campaign_list_member_repo,
         contact_repository=contact_repo,
         contact_service=contact
+    )
+
+def _create_propertyradar_import_service(db_session):
+    """Create PropertyRadarImportService with repository dependencies"""
+    from services.propertyradar_import_service import PropertyRadarImportService
+    from repositories.property_repository import PropertyRepository
+    from repositories.contact_repository import ContactRepository
+    from repositories.csv_import_repository import CSVImportRepository
+    
+    logger.info("Initializing PropertyRadarImportService")
+    
+    # Create repository instances
+    property_repo = PropertyRepository(session=db_session)
+    contact_repo = ContactRepository(session=db_session)
+    csv_import_repo = CSVImportRepository(session=db_session)
+    
+    return PropertyRadarImportService(
+        property_repository=property_repo,
+        contact_repository=contact_repo,
+        csv_import_repository=csv_import_repo,
+        session=db_session
     )
 
 def _create_openphone_sync_service(openphone, db_session):

@@ -23,7 +23,7 @@ from repositories.property_repository import PropertyRepository
 from repositories.contact_repository import ContactRepository
 from repositories.csv_import_repository import CSVImportRepository
 from crm_database import Property, Contact, PropertyContact, CSVImport
-from utils.result import Result
+from services.common.result import Result
 
 
 class TestPropertyRadarImportService:
@@ -142,7 +142,7 @@ class TestPropertyRadarImportService:
         # Should fail - parse_csv_row method doesn't exist yet
         result = service.parse_csv_row(sample_csv_row)
         
-        assert result.is_success()
+        assert result.is_success
         property_data = result.value['property']
         
         # Test all PropertyRadar property fields are mapped
@@ -181,7 +181,7 @@ class TestPropertyRadarImportService:
         # Should fail - dual contact parsing doesn't exist yet
         result = service.parse_csv_row(sample_csv_row)
         
-        assert result.is_success()
+        assert result.is_success
         primary_contact = result.value['primary_contact']
         
         assert primary_contact['first_name'] == 'JON'
@@ -197,7 +197,7 @@ class TestPropertyRadarImportService:
         # Should fail - secondary contact parsing doesn't exist yet
         result = service.parse_csv_row(sample_csv_row)
         
-        assert result.is_success()
+        assert result.is_success
         secondary_contact = result.value['secondary_contact']
         
         assert secondary_contact['first_name'] == 'AIMEE'
@@ -217,7 +217,7 @@ class TestPropertyRadarImportService:
         
         result = service.parse_csv_row(row_without_secondary)
         
-        assert result.is_success()
+        assert result.is_success
         assert result.value['secondary_contact'] is None
     
     def test_normalize_phone_number(self, service):
@@ -264,7 +264,7 @@ class TestPropertyRadarImportService:
         
         result = service.import_row(sample_csv_row, mock_csv_import)
         
-        assert result.is_success()
+        assert result.is_success
         
         # Verify property created
         mock_property_repository.create.assert_called_once()
@@ -293,7 +293,7 @@ class TestPropertyRadarImportService:
         
         result = service.import_row(sample_csv_row, mock_csv_import)
         
-        assert result.is_success()
+        assert result.is_success
         
         # Should not create new property
         mock_property_repository.create.assert_not_called()
@@ -318,7 +318,7 @@ class TestPropertyRadarImportService:
         
         result = service.import_row(sample_csv_row, mock_csv_import)
         
-        assert result.is_success()
+        assert result.is_success
         
         # Should not create new contact
         mock_contact_repository.create.assert_not_called()
@@ -344,7 +344,7 @@ class TestPropertyRadarImportService:
             
             result = service.import_csv(sample_csv_content, 'test.csv', 'test_user')
             
-            assert result.is_success()
+            assert result.is_success
             
             # Should process one row (excluding header)
             mock_import_row.assert_called_once()
@@ -366,7 +366,7 @@ class TestPropertyRadarImportService:
             
             result = service.import_csv(sample_csv_content, 'test.csv', 'test_user')
             
-            assert result.is_success()  # Overall import succeeds even with row failures
+            assert result.is_success  # Overall import succeeds even with row failures
             
             # Should update import status with failures
             mock_csv_import_repository.update_import_status.assert_called_once_with(
@@ -383,12 +383,12 @@ class TestPropertyRadarImportService:
         
         # Valid headers
         valid_headers = required_headers + ['Extra Field']
-        assert service.validate_csv_headers(valid_headers).is_success()
+        assert service.validate_csv_headers(valid_headers).is_success
         
         # Missing required header
         invalid_headers = required_headers[:-1]  # Remove last header
         result = service.validate_csv_headers(invalid_headers)
-        assert result.is_failure()
+        assert result.is_failure
         assert 'missing required headers' in result.error.lower()
     
     def test_data_type_conversions(self, service, sample_csv_row):
@@ -433,7 +433,7 @@ class TestPropertyRadarImportService:
         result = service.parse_csv_row(malformed_row)
         
         # Should handle errors gracefully
-        if result.is_failure():
+        if result.is_failure:
             assert 'data validation' in result.error.lower()
         else:
             # Or should provide defaults for invalid data
@@ -485,7 +485,7 @@ class TestPropertyRadarImportService:
         
         result = service.import_csv(sample_csv_content, 'test.csv', 'test_user')
         
-        assert result.is_success()
+        assert result.is_success
         stats = result.value
         
         # Should return comprehensive statistics
@@ -510,7 +510,7 @@ class TestPropertyRadarImportService:
         
         result = service.import_csv(large_csv_content, 'large_test.csv', 'test_user', batch_size=100)
         
-        assert result.is_success()
+        assert result.is_success
         assert result.value['total_rows'] == 1000
     
     def test_memory_efficient_processing(self, service):
@@ -524,5 +524,211 @@ class TestPropertyRadarImportService:
             # Simulate large file processing
             result = service.import_csv_file('/path/to/large_file.csv', 'test_user')
             
-            assert result.is_success()
+            assert result.is_success
             mock_stream_process.assert_called_once()
+    
+    # ==============================================================================
+    # DATA NORMALIZATION TESTS - TDD RED PHASE
+    # These tests should FAIL initially since normalization methods don't exist yet
+    # ==============================================================================
+    
+    def test_normalize_name_all_caps_to_proper_case(self, service):
+        """Test name normalization from ALL CAPS to proper case"""
+        # Should fail - normalize_name method doesn't exist yet
+        assert service.normalize_name('JOHN SMITH') == 'John Smith'
+        assert service.normalize_name('MARY JANE DOE') == 'Mary Jane Doe'
+        assert service.normalize_name('ELIZABETH BROWN') == 'Elizabeth Brown'
+    
+    def test_normalize_name_handles_hyphenated_names(self, service):
+        """Test normalization of hyphenated names"""
+        # Should fail - normalize_name method doesn't exist yet
+        assert service.normalize_name('MARY-JANE SMITH') == 'Mary-Jane Smith'
+        assert service.normalize_name('JEAN-LUC PICARD') == 'Jean-Luc Picard'
+        assert service.normalize_name('ANNE-MARIE O\'CONNOR') == 'Anne-Marie O\'Connor'
+    
+    def test_normalize_name_handles_apostrophes(self, service):
+        """Test normalization of names with apostrophes"""
+        # Should fail - normalize_name method doesn't exist yet
+        assert service.normalize_name('O\'BRIEN') == 'O\'Brien'
+        assert service.normalize_name('D\'ANGELO') == 'D\'Angelo'
+        assert service.normalize_name('MC\'DONALD') == 'Mc\'Donald'
+        assert service.normalize_name('O\'NEILL-SMITH') == 'O\'Neill-Smith'
+    
+    def test_normalize_name_handles_multiple_spaces(self, service):
+        """Test normalization removes extra spaces"""
+        # Should fail - normalize_name method doesn't exist yet
+        assert service.normalize_name('JOHN  SMITH') == 'John Smith'
+        assert service.normalize_name('MARY   JANE    DOE') == 'Mary Jane Doe'
+        assert service.normalize_name('  ELIZABETH  BROWN  ') == 'Elizabeth Brown'
+    
+    def test_normalize_name_preserves_proper_case(self, service):
+        """Test that existing proper case is preserved"""
+        # Should fail - normalize_name method doesn't exist yet
+        assert service.normalize_name('McDonald') == 'McDonald'
+        assert service.normalize_name('McConnell') == 'McConnell'
+        assert service.normalize_name('MacArthur') == 'MacArthur'
+        assert service.normalize_name('O\'Brien') == 'O\'Brien'
+        assert service.normalize_name('DuBois') == 'DuBois'
+    
+    def test_normalize_name_handles_suffixes(self, service):
+        """Test normalization of names with suffixes"""
+        # Should fail - normalize_name method doesn't exist yet
+        assert service.normalize_name('JOHN SMITH JR') == 'John Smith Jr'
+        assert service.normalize_name('ROBERT DOE SR') == 'Robert Doe Sr'
+        assert service.normalize_name('WILLIAM JONES III') == 'William Jones III'
+        assert service.normalize_name('CHARLES BROWN IV') == 'Charles Brown IV'
+        assert service.normalize_name('MICHAEL DAVIS JR.') == 'Michael Davis Jr.'
+    
+    def test_normalize_name_handles_edge_cases(self, service):
+        """Test name normalization edge cases"""
+        # Should fail - normalize_name method doesn't exist yet
+        assert service.normalize_name('') == ''
+        assert service.normalize_name('   ') == ''
+        assert service.normalize_name('JOHN') == 'John'
+        assert service.normalize_name('j') == 'J'
+        assert service.normalize_name('a-b') == 'A-B'
+    
+    def test_normalize_address_basic_conversion(self, service):
+        """Test basic address normalization to proper case"""
+        # Should fail - normalize_address method doesn't exist yet
+        assert service.normalize_address('455 MIDDLE ST') == '455 Middle St'
+        assert service.normalize_address('123 MAIN STREET') == '123 Main Street'
+        assert service.normalize_address('789 OAK AVENUE') == '789 Oak Avenue'
+    
+    def test_normalize_address_standardizes_street_suffixes(self, service):
+        """Test address normalization standardizes street suffixes"""
+        # Should fail - normalize_address method doesn't exist yet
+        assert service.normalize_address('123 MAIN STREET') == '123 Main St'
+        assert service.normalize_address('456 OAK AVENUE') == '456 Oak Ave'
+        assert service.normalize_address('789 PINE ROAD') == '789 Pine Rd'
+        assert service.normalize_address('321 ELM DRIVE') == '321 Elm Dr'
+        assert service.normalize_address('654 MAPLE LANE') == '654 Maple Ln'
+        assert service.normalize_address('987 CEDAR COURT') == '987 Cedar Ct'
+        assert service.normalize_address('147 BIRCH PLACE') == '147 Birch Pl'
+        assert service.normalize_address('258 WILLOW CIRCLE') == '258 Willow Cir'
+        assert service.normalize_address('369 POPLAR BOULEVARD') == '369 Poplar Blvd'
+    
+    def test_normalize_address_handles_directionals(self, service):
+        """Test address normalization handles directional indicators"""
+        # Should fail - normalize_address method doesn't exist yet
+        assert service.normalize_address('123 N MAIN ST') == '123 N Main St'
+        assert service.normalize_address('456 SOUTH OAK AVE') == '456 S Oak Ave'
+        assert service.normalize_address('789 EAST PINE RD') == '789 E Pine Rd'
+        assert service.normalize_address('321 WEST ELM DR') == '321 W Elm Dr'
+        assert service.normalize_address('654 NORTHEAST MAPLE LN') == '654 NE Maple Ln'
+        assert service.normalize_address('987 SOUTHWEST CEDAR CT') == '987 SW Cedar Ct'
+    
+    def test_normalize_address_preserves_apartment_units(self, service):
+        """Test address normalization preserves apartment/unit numbers"""
+        # Should fail - normalize_address method doesn't exist yet
+        assert service.normalize_address('123 MAIN ST APT 4B') == '123 Main St Apt 4B'
+        assert service.normalize_address('456 OAK AVE UNIT 12') == '456 Oak Ave Unit 12'
+        assert service.normalize_address('789 PINE RD #205') == '789 Pine Rd #205'
+        assert service.normalize_address('321 ELM DR SUITE 100') == '321 Elm Dr Suite 100'
+    
+    def test_normalize_address_handles_po_boxes(self, service):
+        """Test address normalization handles PO Boxes properly"""
+        # Should fail - normalize_address method doesn't exist yet
+        assert service.normalize_address('PO BOX 1234') == 'PO Box 1234'
+        assert service.normalize_address('P.O. BOX 5678') == 'PO Box 5678'
+        assert service.normalize_address('POST OFFICE BOX 9999') == 'PO Box 9999'
+    
+    def test_normalize_address_handles_edge_cases(self, service):
+        """Test address normalization edge cases"""
+        # Should fail - normalize_address method doesn't exist yet
+        assert service.normalize_address('') == ''
+        assert service.normalize_address('   ') == ''
+        assert service.normalize_address('123') == '123'
+        assert service.normalize_address('MAIN ST') == 'Main St'
+    
+    def test_normalize_city_basic_conversion(self, service):
+        """Test basic city normalization to proper case"""
+        # Should fail - normalize_city method doesn't exist yet
+        assert service.normalize_city('BRAINTREE') == 'Braintree'
+        assert service.normalize_city('BOSTON') == 'Boston'
+        assert service.normalize_city('CAMBRIDGE') == 'Cambridge'
+    
+    def test_normalize_city_handles_multi_word_cities(self, service):
+        """Test normalization of multi-word city names"""
+        # Should fail - normalize_city method doesn't exist yet
+        assert service.normalize_city('SAN FRANCISCO') == 'San Francisco'
+        assert service.normalize_city('LOS ANGELES') == 'Los Angeles'
+        assert service.normalize_city('NEW YORK') == 'New York'
+        assert service.normalize_city('SALT LAKE CITY') == 'Salt Lake City'
+        assert service.normalize_city('BATON ROUGE') == 'Baton Rouge'
+    
+    def test_normalize_city_handles_hyphenated_cities(self, service):
+        """Test normalization of hyphenated city names"""
+        # Should fail - normalize_city method doesn't exist yet
+        assert service.normalize_city('WINSTON-SALEM') == 'Winston-Salem'
+        assert service.normalize_city('WILKES-BARRE') == 'Wilkes-Barre'
+        assert service.normalize_city('JOHNSON-CITY') == 'Johnson-City'
+    
+    def test_normalize_city_preserves_proper_case(self, service):
+        """Test that existing proper case in cities is preserved"""
+        # Should fail - normalize_city method doesn't exist yet
+        assert service.normalize_city('San Francisco') == 'San Francisco'
+        assert service.normalize_city('Los Angeles') == 'Los Angeles'
+        assert service.normalize_city('New York') == 'New York'
+        assert service.normalize_city('McDonald Heights') == 'McDonald Heights'
+    
+    def test_normalize_city_handles_edge_cases(self, service):
+        """Test city normalization edge cases"""
+        # Should fail - normalize_city method doesn't exist yet
+        assert service.normalize_city('') == ''
+        assert service.normalize_city('   ') == ''
+        assert service.normalize_city('A') == 'A'
+        assert service.normalize_city('x-y') == 'X-Y'
+    
+    def test_normalization_applied_during_csv_import(self, service, mock_property_repository, 
+                                                   mock_contact_repository, mock_csv_import_repository):
+        """Test that normalization is applied during CSV row processing"""
+        # Should fail - normalization methods don't exist yet
+        mock_csv_import = Mock()
+        mock_csv_import.id = 1
+        mock_csv_import_repository.create.return_value = mock_csv_import
+        
+        # Sample row with ALL CAPS data that should be normalized
+        test_row = {
+            'Type': 'SFR',
+            'Address': '455 MIDDLE STREET',
+            'City': 'SAN FRANCISCO',
+            'ZIP': '02184',
+            'Primary Name': 'JOHN O\'BRIEN-SMITH JR',
+            'Primary Mobile Phone1': '339-222-4624',
+            'Secondary Name': 'MARY-JANE MCDONALD',
+            'Secondary Mobile Phone1': '781-316-1658'
+        }
+        
+        # Mock property and contact creation
+        mock_property = Mock()
+        mock_property_repository.find_duplicate.return_value = None
+        mock_property_repository.create.return_value = mock_property
+        
+        mock_contact = Mock()
+        mock_contact_repository.find_by_phone.return_value = None
+        mock_contact_repository.create.return_value = mock_contact
+        
+        # Process the row
+        result = service.import_row(test_row, mock_csv_import)
+        
+        # Verify result is successful
+        assert result.is_success
+        
+        # Verify property was created with normalized address and city
+        property_call_args = mock_property_repository.create.call_args[1]
+        assert property_call_args['address'] == '455 Middle St'  # Normalized
+        assert property_call_args['city'] == 'San Francisco'  # Normalized
+        
+        # Verify contacts were created with normalized names
+        contact_calls = mock_contact_repository.create.call_args_list
+        
+        # Primary contact should have normalized name
+        primary_contact_args = contact_calls[0][1]
+        assert primary_contact_args['first_name'] == 'John'  # Normalized from JOHN
+        assert primary_contact_args['last_name'] == 'O\'Brien-Smith Jr'  # Normalized from O'BRIEN-SMITH JR
+        
+        # Secondary contact should have normalized name
+        secondary_contact_args = contact_calls[1][1]
+        assert secondary_contact_args['first_name'] == 'Mary-Jane'  # Normalized from MARY-JANE
+        assert secondary_contact_args['last_name'] == 'McDonald'  # Normalized from MCDONALD

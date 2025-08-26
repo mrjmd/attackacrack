@@ -520,7 +520,7 @@ class CSVImportService:
         Import contacts from CSV file (wrapper for import_contacts with route-expected response format)
         
         This method wraps import_contacts to provide a simplified response format
-        expected by the route handlers.
+        expected by the route handlers. For PropertyRadar files, delegates to specialized service.
         
         Args:
             file: The uploaded CSV file
@@ -536,6 +536,130 @@ class CSVImportService:
                 - message: summary message of the import
                 - list_id: ID of created campaign list (if any)
         """
+        try:
+            # Check if this is a PropertyRadar CSV that needs special handling
+            import csv
+            import io
+            
+            # Read file content to detect format
+            file.seek(0)
+            file_content = file.read()
+            
+            # Try to decode the content
+            try:
+                if isinstance(file_content, bytes):
+                    content_str = file_content.decode('utf-8', errors='ignore')
+                else:
+                    content_str = file_content
+            except Exception:
+                # Fall back to basic import if we can't read the file
+                file.seek(0)
+                return self._basic_import_csv(file, list_name)
+            
+            # Parse headers to detect format
+            csv_reader = csv.reader(io.StringIO(content_str))
+            headers = next(csv_reader, [])
+            
+            # Reset file pointer for actual import
+            file.seek(0)
+            
+            # Check if this is a PropertyRadar CSV
+            is_propertyradar = False
+            if headers:
+                # Check for PropertyRadar specific headers
+                propertyradar_indicators = [
+                    'Primary First Name', 'Primary Last Name', 'Primary Mobile Phone1',
+                    'Secondary Name', 'Secondary Mobile Phone1',
+                    'APN', 'Est Value', 'Est Equity', 'Owner Occ?'
+                ]
+                matches = sum(1 for indicator in propertyradar_indicators if indicator in headers)
+                if matches >= 4:  # If we match at least 4 PropertyRadar fields
+                    is_propertyradar = True
+                
+                # Also check filename
+                filename = getattr(file, 'filename', '')
+                if filename and ('propertyradar' in filename.lower() or 
+                               'cleaned_data_phone' in filename.lower()):
+                    is_propertyradar = True
+            
+            # Delegate to PropertyRadar service if detected
+            if is_propertyradar:
+                try:
+                    # Import the PropertyRadar service (delayed import to avoid circular dependencies)
+                    from services.propertyradar_import_service import PropertyRadarImportService
+                    from repositories.property_repository import PropertyRepository
+                    from flask import current_app
+                    
+                    # Get or create PropertyRadar service instance
+                    if hasattr(current_app, 'services') and current_app.services:
+                        # Try to get from service registry
+                        propertyradar_service = current_app.services.get('propertyradar_import', None)
+                        
+                        if not propertyradar_service:
+                            # Create new instance with dependencies
+                            property_repo = PropertyRepository(current_app.db.session)
+                            contact_repo = self.contact_repository
+                            propertyradar_service = PropertyRadarImportService(
+                                property_repository=property_repo,
+                                contact_repository=contact_repo
+                            )
+                    else:
+                        # Fallback: create with basic dependencies
+                        from extensions import db
+                        property_repo = PropertyRepository(db.session)
+                        propertyradar_service = PropertyRadarImportService(
+                            property_repository=property_repo,
+                            contact_repository=self.contact_repository
+                        )
+                    
+                    # Import using PropertyRadar service
+                    result = propertyradar_service.import_propertyradar_csv(file, list_name)
+                    
+                    # Transform Result object to expected format
+                    if hasattr(result, 'is_success') and result.is_success():
+                        data = result.value
+                        return {
+                            'success': True,
+                            'imported': data.get('contacts_created', 0),
+                            'updated': data.get('contacts_updated', 0),
+                            'errors': data.get('errors', []),
+                            'message': data.get('message', 'PropertyRadar import completed'),
+                            'list_id': data.get('list_id')
+                        }
+                    else:
+                        error_msg = str(result.error) if hasattr(result, 'error') else 'PropertyRadar import failed'
+                        return {
+                            'success': False,
+                            'imported': 0,
+                            'updated': 0,
+                            'errors': [error_msg],
+                            'message': error_msg,
+                            'list_id': None
+                        }
+                except Exception as pr_error:
+                    # Log the error but fall back to basic import
+                    import logging
+                    logging.warning(f"PropertyRadar import failed, falling back to basic: {str(pr_error)}")
+                    # Fall back to basic import
+                    file.seek(0)
+                    return self._basic_import_csv(file, list_name)
+            
+            # Not PropertyRadar, use basic import
+            return self._basic_import_csv(file, list_name)
+            
+        except Exception as e:
+            # Handle any exceptions
+            return {
+                'success': False,
+                'imported': 0,
+                'updated': 0,
+                'errors': [f"Import error: {str(e)}"],
+                'message': f"Import failed: {str(e)}",
+                'list_id': None
+            }
+    
+    def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None) -> Dict[str, any]:
+        """Basic CSV import for non-PropertyRadar files"""
         try:
             # Call the existing import_contacts method
             result = self.import_contacts(

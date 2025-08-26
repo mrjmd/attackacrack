@@ -96,7 +96,9 @@ def app():
         # --- Seeding the database with test data ---
         # This provides consistent data for tests to run against.
         contact = Contact(id=1, first_name="Test", last_name="User", email="test@user.com", phone="+15551234567")
-        prop = Property(id=1, address="123 Test St", contact=contact)
+        db.session.add(contact)
+        db.session.flush()  # Get the ID
+        prop = Property(id=1, address="123 Test St", contact_id=contact.id)
         job = Job(id=1, description="Test Job", property=prop, status='Active')
         quote = Quote(id=1, subtotal=100.0, tax_amount=0.0, total_amount=100.0, job=job, status='Sent')
         invoice = Invoice(id=1, subtotal=100.0, tax_amount=0.0, total_amount=100.0, due_date=date(2025, 1, 1), job=job, status='Unpaid')

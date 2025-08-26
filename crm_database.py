@@ -111,17 +111,215 @@ class Contact(db.Model):
     lead_source = db.Column(db.String(100), nullable=True)  # e.g., 'website', 'referral', 'cold-call'
     customer_since = db.Column(db.Date, nullable=True)  # Date when prospect became customer
     
-    properties = db.relationship('Property', backref='contact', lazy=True, cascade="all, delete-orphan")
+    # Note: The 'properties' relationship is now handled via many-to-many through PropertyContact
+    # Legacy relationship kept for backward compatibility
+    properties_legacy = db.relationship('Property', backref='contact_legacy', lazy=True, cascade="all, delete-orphan", foreign_keys='Property.contact_id')
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
     # A contact can now have multiple conversations
     conversations = db.relationship('Conversation', backref='contact', lazy=True, cascade="all, delete-orphan")
 
-class Property(db.Model):
+# --- Property-Contact Association Table ---
+class PropertyContact(db.Model):
+    """Association table for many-to-many relationship between Property and Contact"""
+    __tablename__ = 'property_contact'
+    
     id = db.Column(db.Integer, primary_key=True)
+    property_id = db.Column(db.Integer, db.ForeignKey('property.id', ondelete='CASCADE'), nullable=False)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id', ondelete='CASCADE'), nullable=False)
+    relationship_type = db.Column(db.String(20), nullable=True)  # 'owner', 'tenant', 'agent', etc.
+    ownership_percentage = db.Column(db.Numeric(5, 2), nullable=True)  # For fractional ownership
+    is_primary = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
+    
+    # Relationships
+    property = db.relationship('Property', backref=db.backref('contact_associations', lazy='dynamic'))
+    contact = db.relationship('Contact', backref=db.backref('property_associations', lazy='dynamic'))
+    
+    __table_args__ = (
+        db.UniqueConstraint('property_id', 'contact_id', name='uq_property_contact'),
+    )
+    
+    def __repr__(self):
+        return f'<PropertyContact Property:{self.property_id} Contact:{self.contact_id} Type:{self.relationship_type}>'
+
+
+class Property(db.Model):
+    """Enhanced Property model with PropertyRadar fields and many-to-many Contact relationship"""
+    __tablename__ = 'property'
+    
+    # Primary key
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Basic property information
     address = db.Column(db.String(200), nullable=False)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=False)
-    property_type = db.Column(db.String(50), nullable=True)  # e.g., 'residential', 'commercial', 'industrial'
+    city = db.Column(db.String(100), nullable=True)
+    state = db.Column(db.String(2), nullable=True)
+    zip_code = db.Column(db.String(10), nullable=True)
+    subdivision = db.Column(db.String(100), nullable=True)
+    property_type = db.Column(db.String(50), nullable=True)  # 'SFR', 'Condo', 'Townhouse', 'Multi-Family', etc.
+    
+    # Geographic coordinates
+    longitude = db.Column(db.Numeric(10, 7), nullable=True)
+    latitude = db.Column(db.Numeric(10, 7), nullable=True)
+    
+    # Property identifiers
+    apn = db.Column(db.String(100), nullable=True, unique=True)  # Assessor Parcel Number
+    external_id = db.Column(db.String(100), nullable=True)  # ID from external source
+    
+    # Property details
+    year_built = db.Column(db.Integer, nullable=True)
+    square_feet = db.Column(db.Integer, nullable=True)
+    bedrooms = db.Column(db.Integer, nullable=True)
+    bathrooms = db.Column(db.Numeric(3, 1), nullable=True)
+    
+    # Financial fields
+    assessed_value = db.Column(db.Numeric(12, 2), nullable=True)
+    market_value = db.Column(db.Numeric(12, 2), nullable=True)
+    equity_estimate = db.Column(db.Numeric(12, 2), nullable=True)
+    last_sale_price = db.Column(db.Numeric(12, 2), nullable=True)
+    last_sale_date = db.Column(db.Date, nullable=True)
+    purchase_months_since = db.Column(db.Integer, nullable=True)
+    
+    # PropertyRadar specific fields (legacy naming preserved)
+    estimated_value = db.Column(db.Numeric(12, 2), nullable=True)
+    estimated_equity = db.Column(db.Numeric(12, 2), nullable=True)
+    estimated_equity_percent = db.Column(db.Integer, nullable=True)
+    
+    # Purchase information
+    purchase_date = db.Column(db.Date, nullable=True)
+    purchase_price = db.Column(db.Numeric(12, 2), nullable=True)
+    
+    # Status flags
+    owner_occupied = db.Column(db.Boolean, default=False)
+    listed_for_sale = db.Column(db.Boolean, default=False)
+    listing_status = db.Column(db.String(50), nullable=True)
+    foreclosure = db.Column(db.Boolean, default=False)
+    foreclosure_status = db.Column(db.String(50), nullable=True)
+    high_equity = db.Column(db.Boolean, default=False)
+    
+    # Owner information
+    owner_name = db.Column(db.String(200), nullable=True)
+    
+    # Mailing address fields (both naming conventions for compatibility)
+    mail_address = db.Column(db.String(200), nullable=True)
+    mail_city = db.Column(db.String(100), nullable=True)
+    mail_state = db.Column(db.String(2), nullable=True)
+    mail_zip = db.Column(db.String(10), nullable=True)
+    
+    mailing_address = db.Column(db.String(200), nullable=True)
+    mailing_city = db.Column(db.String(100), nullable=True)
+    mailing_state = db.Column(db.String(2), nullable=True)
+    mailing_zip = db.Column(db.String(10), nullable=True)
+    
+    # Metadata
+    property_metadata = db.Column(db.JSON, nullable=True)
+    import_source = db.Column(db.String(50), nullable=True)  # 'PropertyRadar', 'Manual', etc.
+    
+    # Legacy field - kept for backward compatibility (will be migrated to PropertyContact)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id'), nullable=True)
+    
+    # Audit fields
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
+    
+    # Relationships
     jobs = db.relationship('Job', backref='property', lazy=True, cascade="all, delete-orphan")
+    # Many-to-many relationship with contacts
+    contacts = db.relationship(
+        'Contact',
+        secondary='property_contact',
+        backref=db.backref('properties', lazy='dynamic'),
+        overlaps="contact_associations,property_associations"
+    )
+    
+    def __repr__(self):
+        return f'<Property {self.id}: {self.address}, {self.city} {self.state} {self.zip_code}>'
+    
+    # Utility methods
+    @classmethod
+    def search_by_address(cls, address):
+        """Search properties by address"""
+        return cls.query.filter(cls.address.ilike(f'%{address}%')).all()
+    
+    @classmethod
+    def search_by_zip(cls, zip_code):
+        """Search properties by zip code"""
+        return cls.query.filter_by(zip_code=zip_code).all()
+    
+    @classmethod
+    def search_by_city(cls, city):
+        """Search properties by city"""
+        return cls.query.filter(cls.city.ilike(f'%{city}%')).all()
+    
+    def calculate_equity_percentage(self):
+        """Calculate equity percentage based on values"""
+        if self.estimated_value and self.estimated_equity:
+            return int((self.estimated_equity / self.estimated_value) * 100)
+        return 0
+    
+    def is_high_equity(self, threshold=50):
+        """Determine if property has high equity"""
+        equity_pct = self.calculate_equity_percentage()
+        return equity_pct >= threshold
+    
+    def get_equity_tier(self):
+        """Classify equity tier"""
+        equity_pct = self.calculate_equity_percentage()
+        if equity_pct >= 70:
+            return 'high'
+        elif equity_pct >= 40:
+            return 'medium'
+        else:
+            return 'low'
+    
+    def has_valid_coordinates(self):
+        """Check if property has valid geographic coordinates"""
+        if self.longitude and self.latitude:
+            return -180 <= self.longitude <= 180 and -90 <= self.latitude <= 90
+        return False
+    
+    def distance_to(self, other_property):
+        """Calculate approximate distance to another property in miles"""
+        if not (self.has_valid_coordinates() and other_property.has_valid_coordinates()):
+            return None
+        
+        # Simple haversine formula for distance calculation
+        from math import radians, sin, cos, sqrt, atan2
+        
+        R = 3959  # Earth's radius in miles
+        lat1, lon1 = radians(float(self.latitude)), radians(float(self.longitude))
+        lat2, lon2 = radians(float(other_property.latitude)), radians(float(other_property.longitude))
+        
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * atan2(sqrt(a), sqrt(1-a))
+        
+        return R * c
+    
+    @classmethod
+    def bulk_create(cls, properties_data):
+        """Bulk create properties for efficient imports"""
+        properties = []
+        for data in properties_data:
+            prop = cls(**data)
+            db.session.add(prop)
+            properties.append(prop)
+        
+        db.session.flush()  # Get IDs without committing
+        return properties
+    
+    @classmethod
+    def bulk_update(cls, properties, update_data):
+        """Bulk update properties"""
+        prop_ids = [p.id for p in properties]
+        updated = cls.query.filter(cls.id.in_(prop_ids)).update(
+            update_data, synchronize_session=False
+        )
+        db.session.flush()
+        return updated
 
 class Job(db.Model):
     id = db.Column(db.Integer, primary_key=True)
