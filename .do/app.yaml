@@ -56,7 +56,7 @@ services:
   - key: OPENPHONE_WEBHOOK_SIGNING_KEY
     scope: RUN_AND_BUILD_TIME
     type: SECRET
-    value: EV[1:FtwGK03Iba1gir7wiV2S7Aaj+ieT4kNU:hZ15zkFHN0oNy+lVmfrjDS6PtkylVNMXUxMOvP8Hg8dpei9E25yxxDILGKknsRWU8H25DgeUIFvBKDKH]
+    value: EV[1:6nDajxoyRG/N32tyJRw6zhyZevr4Qgql:TMI8mXaol3qvTeeQMQaJjjwAnul9KCRLOBeGmZJI9VPsEhdlchIbGQjjHy8qFaAYQJki+oppoQEZkJBk]
   - key: OPENPHONE_PHONE_NUMBER
     scope: RUN_AND_BUILD_TIME
     type: SECRET
@@ -160,7 +160,7 @@ workers:
   - key: OPENPHONE_WEBHOOK_SIGNING_KEY
     scope: RUN_AND_BUILD_TIME
     type: SECRET
-    value: EV[1:v5HrX+0RjDXi37L5DCXe2xr6KXyuJ6qn:2BrK30phqYA5ZZO7UfbCCQFty9mbezw7Y5QrSAoyUi7BT5CWTU7xkxtec9qjn8VpNmf5pIGB2NUVdWnT]
+    value: EV[1:6nDajxoyRG/N32tyJRw6zhyZevr4Qgql:TMI8mXaol3qvTeeQMQaJjjwAnul9KCRLOBeGmZJI9VPsEhdlchIbGQjjHy8qFaAYQJki+oppoQEZkJBk]
   - key: OPENPHONE_PHONE_NUMBER
     scope: RUN_AND_BUILD_TIME
     type: SECRET
