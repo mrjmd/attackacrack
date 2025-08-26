@@ -1342,6 +1342,290 @@ class TestEdgeCases:
 
 
 # ============================================================================
+# IMPORT_CSV METHOD TESTS (MUST FAIL INITIALLY - TDD RED PHASE)
+# ============================================================================
+
+class TestImportCSVMethod:
+    """Test the import_csv method that acts as a wrapper for import_contacts"""
+    
+    def test_import_csv_method_exists(self, csv_import_service):
+        """Test that the import_csv method exists and is callable"""
+        # Act & Assert
+        assert hasattr(csv_import_service, 'import_csv'), "import_csv method should exist"
+        assert callable(getattr(csv_import_service, 'import_csv')), "import_csv should be callable"
+    
+    @patch('services.csv_import_service.os.path.exists')
+    @patch('services.csv_import_service.os.remove')
+    def test_import_csv_delegates_to_import_contacts(self, mock_remove, mock_exists,
+                                                   csv_import_service, mock_file_storage):
+        """Test that import_csv properly delegates to import_contacts with correct parameters"""
+        # Arrange
+        csv_content = "first_name,last_name,phone,email\nJohn,Doe,5551234567,john@example.com"
+        mock_file = mock_file_storage('test.csv', csv_content)
+        mock_exists.return_value = True
+        
+        # Mock the import_contacts method to track calls
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            mock_import_contacts.return_value = {
+                'success': True,
+                'imported': 1,
+                'updated': 0,
+                'errors': [],
+                'message': 'Import completed successfully',
+                'list_id': 123
+            }
+            
+            # Act
+            result = csv_import_service.import_csv(
+                file=mock_file,
+                list_name='Test List',
+                enrichment_mode='enrich_missing'
+            )
+            
+            # Assert that import_contacts was called with correct parameters
+            mock_import_contacts.assert_called_once_with(
+                file=mock_file,
+                list_name='Test List',
+                create_list=True,
+                imported_by=None
+            )
+    
+    def test_import_csv_returns_expected_format(self, csv_import_service, mock_file_storage):
+        """Test that import_csv returns the expected response format for the route"""
+        # Arrange
+        mock_file = mock_file_storage('test.csv')
+        
+        # Mock import_contacts to return typical response
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            mock_import_contacts.return_value = {
+                'total_rows': 5,
+                'successful': 3,
+                'failed': 1,
+                'errors': ['Row 4: Invalid phone number'],
+                'duplicates': 1,
+                'contacts_created': [1, 2, 3],
+                'import_id': 456,
+                'list_id': 789
+            }
+            
+            # Act
+            result = csv_import_service.import_csv(
+                file=mock_file,
+                list_name='Test Import',
+                enrichment_mode='enrich_missing'
+            )
+        
+        # Assert response has all required keys for the route
+        assert 'success' in result
+        assert 'imported' in result
+        assert 'updated' in result
+        assert 'errors' in result
+        assert 'message' in result
+        assert 'list_id' in result
+        
+        # Assert correct mappings from import_contacts response
+        assert result['success'] is True  # Should be True when successful > 0
+        assert result['imported'] == 3   # Maps to successful
+        assert result['updated'] == 1    # Maps to duplicates
+        assert result['errors'] == ['Row 4: Invalid phone number']
+        assert result['list_id'] == 789
+        assert 'completed successfully' in result['message'].lower()
+    
+    def test_import_csv_handles_import_contacts_failure(self, csv_import_service, mock_file_storage):
+        """Test that import_csv handles failures from import_contacts gracefully"""
+        # Arrange
+        mock_file = mock_file_storage('test.csv')
+        
+        # Mock import_contacts to return failure scenario
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            mock_import_contacts.return_value = {
+                'total_rows': 2,
+                'successful': 0,
+                'failed': 2,
+                'errors': ['Row 2: Invalid phone', 'Row 3: Missing data'],
+                'duplicates': 0,
+                'contacts_created': [],
+                'import_id': 123,
+                'list_id': None
+            }
+            
+            # Act
+            result = csv_import_service.import_csv(
+                file=mock_file,
+                list_name='Failed Import'
+            )
+        
+        # Assert failure response format
+        assert result['success'] is False  # Should be False when no successful imports
+        assert result['imported'] == 0
+        assert result['updated'] == 0
+        assert len(result['errors']) == 2
+        assert result['list_id'] is None
+        assert 'failed' in result['message'].lower() or 'error' in result['message'].lower()
+    
+    def test_import_csv_handles_enrichment_mode_parameter(self, csv_import_service, mock_file_storage):
+        """Test that import_csv accepts and stores enrichment_mode parameter"""
+        # Arrange
+        mock_file = mock_file_storage('test.csv')
+        
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            mock_import_contacts.return_value = {
+                'total_rows': 1,
+                'successful': 1,
+                'failed': 0,
+                'errors': [],
+                'duplicates': 0,
+                'contacts_created': [1],
+                'import_id': 123,
+                'list_id': 456
+            }
+            
+            # Act - test with different enrichment modes
+            result1 = csv_import_service.import_csv(
+                file=mock_file,
+                list_name='Test',
+                enrichment_mode='enrich_missing'
+            )
+            
+            result2 = csv_import_service.import_csv(
+                file=mock_file,
+                list_name='Test',
+                enrichment_mode='enrich_all'
+            )
+            
+            result3 = csv_import_service.import_csv(
+                file=mock_file,
+                list_name='Test',
+                enrichment_mode='no_enrichment'
+            )
+        
+        # Assert that method accepts all enrichment modes without error
+        assert result1['success'] is True
+        assert result2['success'] is True
+        assert result3['success'] is True
+    
+    def test_import_csv_default_parameters(self, csv_import_service, mock_file_storage):
+        """Test import_csv with minimal parameters (only file required)"""
+        # Arrange
+        mock_file = mock_file_storage('test.csv')
+        
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            mock_import_contacts.return_value = {
+                'total_rows': 1,
+                'successful': 1,
+                'failed': 0,
+                'errors': [],
+                'duplicates': 0,
+                'contacts_created': [1],
+                'import_id': 123,
+                'list_id': 456
+            }
+            
+            # Act - call with only required file parameter
+            result = csv_import_service.import_csv(file=mock_file)
+            
+            # Assert that import_contacts was called with sensible defaults
+            mock_import_contacts.assert_called_once()
+            call_args = mock_import_contacts.call_args
+            
+            assert call_args[1]['file'] == mock_file
+            assert call_args[1]['create_list'] is True  # Should default to creating a list
+            assert 'list_name' in call_args[1]  # Should have some default list name
+    
+    def test_import_csv_with_custom_list_name(self, csv_import_service, mock_file_storage):
+        """Test that import_csv passes custom list_name to import_contacts"""
+        # Arrange
+        mock_file = mock_file_storage('agents.csv')
+        custom_list_name = 'Real Estate Agents - Q1 2025'
+        
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            mock_import_contacts.return_value = {
+                'total_rows': 1,
+                'successful': 1,
+                'failed': 0,
+                'errors': [],
+                'duplicates': 0,
+                'contacts_created': [1],
+                'import_id': 123,
+                'list_id': 456
+            }
+            
+            # Act
+            result = csv_import_service.import_csv(
+                file=mock_file,
+                list_name=custom_list_name
+            )
+            
+            # Assert custom list name was passed through
+            mock_import_contacts.assert_called_once()
+            call_args = mock_import_contacts.call_args
+            assert call_args[1]['list_name'] == custom_list_name
+    
+    def test_import_csv_handles_exception_from_import_contacts(self, csv_import_service, mock_file_storage):
+        """Test that import_csv handles exceptions from import_contacts gracefully"""
+        # Arrange
+        mock_file = mock_file_storage('test.csv')
+        
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            # Mock import_contacts to raise an exception
+            mock_import_contacts.side_effect = Exception("Database connection failed")
+            
+            # Act
+            result = csv_import_service.import_csv(file=mock_file)
+        
+        # Assert error is handled gracefully
+        assert result['success'] is False
+        assert result['imported'] == 0
+        assert result['updated'] == 0
+        assert len(result['errors']) > 0
+        assert any('error' in error.lower() for error in result['errors'])
+        assert result['list_id'] is None
+        assert 'error' in result['message'].lower() or 'failed' in result['message'].lower()
+    
+    def test_import_csv_preserves_route_contract(self, csv_import_service, mock_file_storage):
+        """Test that import_csv maintains the exact contract expected by the route"""
+        # Arrange
+        mock_file = mock_file_storage('test.csv')
+        
+        with patch.object(csv_import_service, 'import_contacts') as mock_import_contacts:
+            mock_import_contacts.return_value = {
+                'total_rows': 10,
+                'successful': 8,
+                'failed': 1,
+                'errors': ['Row 5: Invalid format'],
+                'duplicates': 1,
+                'contacts_created': [1, 2, 3, 4, 5, 6, 7, 8],
+                'import_id': 999,
+                'list_id': 888
+            }
+            
+            # Act - exactly like the route calls it
+            result = csv_import_service.import_csv(
+                file=mock_file,
+                list_name='Campaign List',
+                enrichment_mode='enrich_missing'
+            )
+        
+        # Assert the exact keys the route expects
+        expected_keys = {'success', 'imported', 'updated', 'errors', 'message', 'list_id'}
+        assert set(result.keys()) >= expected_keys, f"Missing keys: {expected_keys - set(result.keys())}"
+        
+        # Assert correct data types
+        assert isinstance(result['success'], bool)
+        assert isinstance(result['imported'], int)
+        assert isinstance(result['updated'], int)
+        assert isinstance(result['errors'], list)
+        assert isinstance(result['message'], str)
+        assert result['list_id'] is None or isinstance(result['list_id'], int)
+        
+        # Assert reasonable values
+        assert result['success'] is True  # 8 successful > 0
+        assert result['imported'] == 8
+        assert result['updated'] == 1  # duplicates
+        assert result['list_id'] == 888
+
+
+# ============================================================================
 # TEST EXECUTION VERIFICATION
 # ============================================================================
 
