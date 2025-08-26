@@ -151,13 +151,25 @@ def upgrade():
     # Phase 5: Migrate existing contact_id relationships to PropertyContact table
     # This preserves existing relationships during the transition
     connection = op.get_bind()
-    result = connection.execute(sa.text("""
-        INSERT INTO property_contact (property_id, contact_id, relationship_type, is_primary, created_at)
-        SELECT id, contact_id, 'owner', true, CURRENT_TIMESTAMP
-        FROM property
-        WHERE contact_id IS NOT NULL
-        ON CONFLICT (property_id, contact_id) DO NOTHING
-    """))
+    from alembic import context
+    
+    # SQLite uses different syntax for INSERT ... ON CONFLICT
+    if context.get_context().dialect.name == 'sqlite':
+        result = connection.execute(sa.text("""
+            INSERT OR IGNORE INTO property_contact (property_id, contact_id, relationship_type, is_primary, created_at)
+            SELECT id, contact_id, 'owner', 1, CURRENT_TIMESTAMP
+            FROM property
+            WHERE contact_id IS NOT NULL
+        """))
+    else:
+        # PostgreSQL syntax
+        result = connection.execute(sa.text("""
+            INSERT INTO property_contact (property_id, contact_id, relationship_type, is_primary, created_at)
+            SELECT id, contact_id, 'owner', true, CURRENT_TIMESTAMP
+            FROM property
+            WHERE contact_id IS NOT NULL
+            ON CONFLICT (property_id, contact_id) DO NOTHING
+        """))
     
     # Log migration progress
     if result.rowcount > 0:
@@ -165,7 +177,10 @@ def upgrade():
     
     # Phase 6: Make contact_id nullable for backward compatibility
     # This allows properties to be created without requiring a contact_id
-    op.alter_column('property', 'contact_id', nullable=True)
+    # Note: SQLite doesn't support ALTER COLUMN, so we need to check the database type
+    from alembic import context
+    if context.get_context().dialect.name != 'sqlite':
+        op.alter_column('property', 'contact_id', nullable=True)
     
     # Note: We're keeping the contact_id column for now to ensure backward compatibility
     # It can be removed in a future migration after all code is updated
