@@ -11,7 +11,13 @@
             <p><strong>Status:</strong> <span class="badge bg-primary">{{ quote.status }}</span></p>
             <p><strong>Amount:</strong> ${{ "%.2f"|format(quote.total_amount) }}</p>
             <p><strong>Job Description:</strong> {{ quote.job.description }}</p>
-            <p><strong>Customer:</strong> {{ quote.job.property.contact.first_name }} {{ quote.job.property.contact.last_name }}</p>
+            <p><strong>Customer:</strong> 
+                {% if quote.job.property.contact %}
+                    {{ quote.job.property.contact.first_name }} {{ quote.job.property.contact.last_name }}
+                {% else %}
+                    No customer assigned
+                {% endif %}
+            </p>
             <p><strong>Property Address:</strong> {{ quote.job.property.address }}</p>
 
             <hr>

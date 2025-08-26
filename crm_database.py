@@ -112,8 +112,6 @@ class Contact(db.Model):
     customer_since = db.Column(db.Date, nullable=True)  # Date when prospect became customer
     
     # Note: The 'properties' relationship is now handled via many-to-many through PropertyContact
-    # Legacy relationship kept for backward compatibility
-    properties_legacy = db.relationship('Property', backref='contact_legacy', lazy=True, cascade="all, delete-orphan", foreign_keys='Property.contact_id')
     appointments = db.relationship('Appointment', backref='contact', lazy=True, cascade="all, delete-orphan")
     # A contact can now have multiple conversations
     conversations = db.relationship('Conversation', backref='contact', lazy=True, cascade="all, delete-orphan")
@@ -235,6 +233,31 @@ class Property(db.Model):
     
     def __repr__(self):
         return f'<Property {self.id}: {self.address}, {self.city} {self.state} {self.zip_code}>'
+    
+    # Backward compatibility property
+    @property
+    def contact(self):
+        """Returns the primary contact for backward compatibility.
+        
+        Returns:
+            Contact: The primary contact if exists, or first contact, or None
+        """
+        # First try to find a contact marked as primary
+        primary_assoc = self.contact_associations.filter_by(is_primary=True).first()
+        if primary_assoc:
+            return primary_assoc.contact
+        
+        # If no primary, return the first contact
+        if self.contacts:
+            return self.contacts[0]
+        
+        return None
+    
+    @property
+    def contact_id(self):
+        """Returns the primary contact ID for backward compatibility."""
+        contact = self.contact
+        return contact.id if contact else None
     
     # Utility methods
     @classmethod

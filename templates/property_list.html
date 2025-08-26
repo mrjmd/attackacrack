@@ -10,7 +10,14 @@
     <div class="bg-gray-900 rounded-lg shadow p-6">
         <ul>
             {% for property in properties %}
-                <li class="border-b border-gray-700 py-2"><a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="hover:text-blue-400">{{ property.address }}</a> (Owner: {{ property.contact.first_name }} {{ property.contact.last_name }})</li>
+                <li class="border-b border-gray-700 py-2">
+                    <a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="hover:text-blue-400">{{ property.address }}</a>
+                    {% if property.contact %}
+                        (Owner: {{ property.contact.first_name }} {{ property.contact.last_name }})
+                    {% else %}
+                        (No owner assigned)
+                    {% endif %}
+                </li>
             {% else %}
                 <li>No properties found.</li>
             {% endfor %}

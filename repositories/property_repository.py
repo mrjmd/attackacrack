@@ -43,7 +43,7 @@ class PropertyRepository(BaseRepository[Property]):
         """Create a new property with validation
         
         Args:
-            **kwargs: Property attributes including address, property_type
+            **kwargs: Property attributes including address, property_type, contact_id
             
         Returns:
             Created Property instance
@@ -57,8 +57,28 @@ class PropertyRepository(BaseRepository[Property]):
             raise ValueError("address is required")
         
         try:
+            # Extract contact_id if provided (for backward compatibility)
+            contact_id = kwargs.pop('contact_id', None)
+            
             property_instance = Property(**kwargs)
             self.session.add(property_instance)
+            self.session.flush()  # Get ID without committing
+            
+            # If contact_id provided, add the contact relationship
+            if contact_id:
+                from crm_database import Contact, PropertyContact
+                contact = self.session.query(Contact).get(contact_id)
+                if contact:
+                    # Create the association with the contact marked as primary
+                    assoc = PropertyContact(
+                        property_id=property_instance.id,
+                        contact_id=contact_id,
+                        is_primary=True,
+                        relationship_type='owner'
+                    )
+                    self.session.add(assoc)
+                    logger.info(f"Associated property {property_instance.id} with contact {contact_id}")
+            
             self.session.commit()
             self.session.refresh(property_instance)
             
@@ -87,7 +107,11 @@ class PropertyRepository(BaseRepository[Property]):
         Returns:
             List of Property instances for the contact
         """
-        return self.session.query(Property).filter_by(contact_id=contact_id).all()
+        from crm_database import Contact
+        contact = self.session.query(Contact).get(contact_id)
+        if contact:
+            return list(contact.properties)
+        return []
     
     def find_by_address_contains(self, address_part: str) -> List[Property]:
         """Find properties with addresses containing the given text
@@ -179,7 +203,7 @@ class PropertyRepository(BaseRepository[Property]):
         
         Args:
             property_instance: Property instance to update
-            **updates: Fields to update
+            **updates: Fields to update (including contact_id for backward compatibility)
             
         Returns:
             Updated Property instance
@@ -188,8 +212,48 @@ class PropertyRepository(BaseRepository[Property]):
             SQLAlchemyError: If database operation fails
         """
         try:
+            # Extract contact_id if provided (for backward compatibility)
+            contact_id = updates.pop('contact_id', None)
+            
+            # Update regular property fields
             for key, value in updates.items():
                 setattr(property_instance, key, value)
+            
+            # Handle contact relationship update if contact_id provided
+            if contact_id is not None:
+                from crm_database import Contact, PropertyContact
+                
+                # Remove existing primary contact association if any
+                existing_primary = self.session.query(PropertyContact).filter_by(
+                    property_id=property_instance.id,
+                    is_primary=True
+                ).first()
+                
+                if existing_primary:
+                    if existing_primary.contact_id != contact_id:
+                        # Mark old primary as non-primary
+                        existing_primary.is_primary = False
+                
+                # Check if new contact association exists
+                assoc = self.session.query(PropertyContact).filter_by(
+                    property_id=property_instance.id,
+                    contact_id=contact_id
+                ).first()
+                
+                if assoc:
+                    # Update existing association to be primary
+                    assoc.is_primary = True
+                else:
+                    # Create new association
+                    new_assoc = PropertyContact(
+                        property_id=property_instance.id,
+                        contact_id=contact_id,
+                        is_primary=True,
+                        relationship_type='owner'
+                    )
+                    self.session.add(new_assoc)
+                
+                logger.info(f"Updated property {property_instance.id} primary contact to {contact_id}")
             
             self.session.commit()
             logger.info(f"Updated property {property_instance.id}")

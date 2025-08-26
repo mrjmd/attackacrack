@@ -16,7 +16,12 @@
                     <option value="">Select a Job</option>
                     {% for job in jobs %}
                         <option value="{{ job.id }}" {% if quote and quote.job_id == job.id %}selected{% endif %}>
-                            Job #{{ job.id }} - {{ job.property.address }} ({{ job.property.contact.first_name }} {{ job.property.contact.last_name }})
+                            Job #{{ job.id }} - {{ job.property.address }}
+                            {% if job.property.contact %}
+                                ({{ job.property.contact.first_name }} {{ job.property.contact.last_name }})
+                            {% else %}
+                                (No owner)
+                            {% endif %}
                         </option>
                     {% endfor %}
                 </select>
