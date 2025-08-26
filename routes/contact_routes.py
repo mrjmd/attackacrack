@@ -19,6 +19,10 @@ def list_all():
     search_query = request.args.get('search', '').strip()
     filter_type = request.args.get('filter', 'all')
     sort_by = request.args.get('sort', 'name')
+    list_filter = request.args.get('list_filter', type=int)  # None if not provided
+    
+    # Get available lists for dropdown
+    available_lists = contact_service.get_available_lists()
     
     # Get paginated contacts
     result = contact_service.get_contacts_page(
@@ -26,7 +30,8 @@ def list_all():
         filter_type=filter_type,
         sort_by=sort_by,
         page=page,
-        per_page=per_page
+        per_page=per_page,
+        list_filter=list_filter
     )
     
     return render_template('contact_list.html', 
@@ -38,7 +43,9 @@ def list_all():
                          has_next=result['has_next'],
                          search_query=search_query,
                          filter_type=filter_type,
-                         sort_by=sort_by)
+                         sort_by=sort_by,
+                         list_filter=list_filter,
+                         available_lists=available_lists)
 
 @contact_bp.route('/conversations')
 @login_required

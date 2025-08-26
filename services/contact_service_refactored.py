@@ -153,7 +153,8 @@ class ContactService:
         filter_type: str = 'all',
         sort_by: str = 'name',
         page: int = 1,
-        per_page: int = 50
+        per_page: int = 50,
+        list_filter: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Get paginated contacts with search and filtering for route layer.
@@ -164,6 +165,7 @@ class ContactService:
             sort_by: Field to sort by ('name', 'created', 'recent_activity')
             page: Page number (1-based)
             per_page: Items per page
+            list_filter: Optional campaign list ID to filter by
             
         Returns:
             Dictionary with pagination metadata and contacts
@@ -174,7 +176,8 @@ class ContactService:
                 filter_type=filter_type,
                 sort_by=sort_by,
                 page=page,
-                per_page=per_page
+                per_page=per_page,
+                list_filter=list_filter
             )
         except Exception as e:
             logger.error(f"Failed to get contacts page: {str(e)}")
@@ -765,3 +768,21 @@ class ContactService:
             'created_at': contact.created_at.isoformat() if hasattr(contact, 'created_at') and contact.created_at else None,
             'updated_at': contact.updated_at.isoformat() if hasattr(contact, 'updated_at') and contact.updated_at else None
         }
+    
+    def get_available_lists(self) -> List:
+        """
+        Get all available campaign lists for filtering dropdown.
+        
+        Returns:
+            List of CampaignList objects (empty list if error)
+        """
+        try:
+            if not self.campaign_repository:
+                return []
+            
+            # Use campaign repository to get all lists
+            return self.campaign_repository.get_all_lists()
+            
+        except Exception as e:
+            logger.error(f"Failed to get available lists: {str(e)}")
+            return []

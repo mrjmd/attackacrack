@@ -45,6 +45,17 @@
                 </select>
             </div>
             
+            <!-- List Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">List</label>
+                <select name="list_filter" class="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Lists</option>
+                    {% for list in available_lists %}
+                    <option value="{{ list.id }}" {{ 'selected' if list_filter == list.id }}>{{ list.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
             <!-- Sort By -->
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">Sort</label>
@@ -63,7 +74,7 @@
             </div>
             
             <!-- Clear Filters -->
-            {% if search_query or filter_type != 'all' or sort_by != 'name' %}
+            {% if search_query or filter_type != 'all' or sort_by != 'name' or list_filter %}
             <div>
                 <a href="{{ url_for('contact.list_all') }}" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">
                     Clear
@@ -189,7 +200,7 @@
     {% if total_pages > 1 %}
     <div class="flex justify-center items-center gap-2">
         {% if has_prev %}
-        <a href="{{ url_for('contact.list_all', page=page-1, search=search_query, filter=filter_type, sort=sort_by) }}" 
+        <a href="{{ url_for('contact.list_all', page=page-1, search=search_query, filter=filter_type, sort=sort_by, list_filter=list_filter) }}" 
            class="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Previous</a>
         {% endif %}
         
@@ -198,7 +209,7 @@
         </span>
         
         {% if has_next %}
-        <a href="{{ url_for('contact.list_all', page=page+1, search=search_query, filter=filter_type, sort=sort_by) }}" 
+        <a href="{{ url_for('contact.list_all', page=page+1, search=search_query, filter=filter_type, sort=sort_by, list_filter=list_filter) }}" 
            class="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Next</a>
         {% endif %}
     </div>
