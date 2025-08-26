@@ -259,6 +259,38 @@ class Property(db.Model):
         contact = self.contact
         return contact.id if contact else None
     
+    @contact_id.setter
+    def contact_id(self, value):
+        """
+        Sets the primary contact by ID for backward compatibility.
+        Creates or updates the PropertyContact association.
+        """
+        if value is None:
+            # Remove all contact associations if setting to None
+            PropertyContact.query.filter_by(property_id=self.id).delete()
+        else:
+            # Check if we already have this contact associated
+            existing = PropertyContact.query.filter_by(
+                property_id=self.id, 
+                contact_id=value
+            ).first()
+            
+            if existing:
+                # Make this contact primary, others non-primary
+                PropertyContact.query.filter_by(property_id=self.id).update({'is_primary': False})
+                existing.is_primary = True
+            else:
+                # Remove other primary designations
+                PropertyContact.query.filter_by(property_id=self.id).update({'is_primary': False})
+                # Create new primary association
+                new_assoc = PropertyContact(
+                    property_id=self.id,
+                    contact_id=value,
+                    relationship_type='owner',
+                    is_primary=True
+                )
+                db.session.add(new_assoc)
+    
     # Utility methods
     @classmethod
     def search_by_address(cls, address):
