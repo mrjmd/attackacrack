@@ -59,12 +59,21 @@ class TestContactRelations:
     
     def test_get_contact_with_relations(self, contact_service, test_contact, db_session):
         """Test getting contact with eager loaded properties and jobs"""
-        # Add a property and job to the contact
-        prop = Property(
-            address=f'123 Test St',
-            contact_id=test_contact.id
-        )
+        from crm_database import PropertyContact
+        
+        # Add a property and associate with contact
+        prop = Property(address=f'123 Test St')
         db_session.add(prop)
+        db_session.commit()
+        
+        # Create the association
+        association = PropertyContact(
+            contact_id=test_contact.id,
+            property_id=prop.id,
+            relationship_type='owner',
+            is_primary=True
+        )
+        db_session.add(association)
         db_session.commit()
         
         job = Job(
@@ -80,9 +89,12 @@ class TestContactRelations:
         
         assert result is not None
         assert result.id == test_contact.id
-        assert len(result.properties) == 1
-        assert len(result.properties[0].jobs) == 1
-        assert result.properties[0].jobs[0].description == 'Roof repair job'
+        # Use the property associations (many-to-many relationship)
+        property_associations = result.property_associations.all()
+        assert len(property_associations) == 1
+        property_obj = property_associations[0].property
+        assert len(property_obj.jobs) == 1
+        assert property_obj.jobs[0].description == 'Roof repair job'
     
     def test_get_contact_with_relations_not_found(self, contact_service):
         """Test getting non-existent contact returns None"""

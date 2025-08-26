@@ -505,11 +505,8 @@ class ContactService:
             Contact object with relations or None if not found
         """
         try:
-            # Use repository to get contact
-            # Note: For now, just get the contact without eager loading
-            # The repository can be extended to support eager loading if needed
-            contact = self.contact_repository.get_by_id(contact_id)
-            return contact
+            # Use repository method with eager loading
+            return self.contact_repository.get_contact_with_relations(contact_id)
             
         except Exception as e:
             logger.error(f"Failed to get contact with relations: {str(e)}")

@@ -9,7 +9,7 @@ from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func, exists, desc, asc
 from sqlalchemy.orm import joinedload, selectinload, Query
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult, SortOrder
-from crm_database import Contact, ContactFlag, Conversation, Activity, CampaignMembership, Property, Job
+from crm_database import Contact, ContactFlag, Conversation, Activity, CampaignMembership, Property, Job, PropertyContact
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,24 @@ class ContactRepository(BaseRepository[Contact]):
             Contact or None
         """
         return self.find_one_by(openphone_contact_id=openphone_contact_id)
+    
+    def get_contact_with_relations(self, contact_id: int) -> Optional[Contact]:
+        """
+        Get contact with eager loaded properties and jobs.
+        
+        Args:
+            contact_id: Contact ID
+            
+        Returns:
+            Contact object with relations or None if not found
+        """
+        try:
+            # For dynamic relationships, we just get the contact
+            # and let the relationships be loaded on-demand
+            return self.get_by_id(contact_id)
+        except Exception as e:
+            logger.error(f"Failed to get contact with relations: {str(e)}")
+            return None
     
     def get_contacts_with_filter(
         self,

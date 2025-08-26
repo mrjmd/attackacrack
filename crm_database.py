@@ -131,8 +131,14 @@ class PropertyContact(db.Model):
     updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
     
     # Relationships
-    property = db.relationship('Property', backref=db.backref('contact_associations', lazy='dynamic'))
-    contact = db.relationship('Contact', backref=db.backref('property_associations', lazy='dynamic'))
+    property = db.relationship(
+        'Property', 
+        backref=db.backref('contact_associations', lazy='dynamic', overlaps="contacts,properties,contact,property")
+    )
+    contact = db.relationship(
+        'Contact', 
+        backref=db.backref('property_associations', lazy='dynamic', overlaps="contacts,properties,contact,property")
+    )
     
     __table_args__ = (
         db.UniqueConstraint('property_id', 'contact_id', name='uq_property_contact'),
@@ -227,8 +233,8 @@ class Property(db.Model):
     contacts = db.relationship(
         'Contact',
         secondary='property_contact',
-        backref=db.backref('properties', lazy='dynamic'),
-        overlaps="contact_associations,property_associations"
+        backref=db.backref('properties', lazy='dynamic', overlaps="contact_associations,property_associations,contact,property"),
+        overlaps="contact_associations,property_associations,contact,property"
     )
     
     def __repr__(self):

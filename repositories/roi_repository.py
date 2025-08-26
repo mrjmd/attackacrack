@@ -615,7 +615,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         COALESCE(SUM(cc.amount), 0) as total_cost
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -678,7 +679,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         COALESCE(SUM(cc.amount), 0) as total_ad_spend
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -888,7 +890,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                     FROM campaign c
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN conversion_events ce ON ce.campaign_id = c.id
@@ -946,7 +949,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         COALESCE(SUM(CASE WHEN cc.cost_type IN ('overhead', 'tools') THEN cc.amount ELSE 0 END), 0) as fixed_costs
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -1024,7 +1028,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         COALESCE(SUM(cc.amount), 0) as daily_cost
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -1268,7 +1273,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                     LEFT JOIN campaign_response cr ON cr.campaign_id = c.id
                     LEFT JOIN conversion_events ce ON ce.campaign_id = c.id
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     WHERE c.id = :campaign_id
@@ -1378,7 +1384,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         COUNT(DISTINCT c.id) as campaign_count
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -1498,7 +1505,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         AVG(cc.amount / NULLIF(conv.conversion_count, 0)) as cac
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -1553,7 +1561,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         AND ce.campaign_id = cr.campaign_id
                     LEFT JOIN campaign_membership cm ON cm.contact_id = cr.contact_id
                         AND cm.campaign_id = cr.campaign_id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = cr.campaign_id
@@ -1726,7 +1735,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         c.campaign_type
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -1913,7 +1923,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         SUM(cc.amount) / NULLIF(COUNT(DISTINCT cm.contact_id), 0) as cac
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
@@ -2025,7 +2036,8 @@ class ROIRepository(BaseRepository[ROIAnalysis]):
                         0.05 as conversion_rate
                     FROM campaign c
                     LEFT JOIN campaign_membership cm ON cm.campaign_id = c.id
-                    LEFT JOIN property p ON p.contact_id = cm.contact_id
+                    LEFT JOIN property_contact pc ON pc.contact_id = cm.contact_id AND pc.is_primary = 1
+                    LEFT JOIN property p ON p.id = pc.property_id
                     LEFT JOIN job j ON j.property_id = p.id
                     LEFT JOIN invoice i ON i.job_id = j.id
                     LEFT JOIN campaign_costs cc ON cc.campaign_id = c.id
