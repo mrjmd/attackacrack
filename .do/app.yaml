@@ -55,7 +55,8 @@ services:
     value: EV[1:UcllzLx2cdzihUfeL1u3qNWGZTMaI0Sh:Wtu5++hxiq9iitu0dm7b2S+oDsHrQYi7YEe52DQcErJTzZ6FBnT+eahY3Zmp920o]
   - key: OPENPHONE_WEBHOOK_SIGNING_KEY
     scope: RUN_AND_BUILD_TIME
-    value: NmkyTExvUVVWa1k5STg5VHFUOEFSSzlIbzZVTGpVOTU=
+    type: SECRET
+    value: EV[1:FtwGK03Iba1gir7wiV2S7Aaj+ieT4kNU:hZ15zkFHN0oNy+lVmfrjDS6PtkylVNMXUxMOvP8Hg8dpei9E25yxxDILGKknsRWU8H25DgeUIFvBKDKH]
   - key: OPENPHONE_PHONE_NUMBER
     scope: RUN_AND_BUILD_TIME
     type: SECRET
@@ -158,7 +159,8 @@ workers:
     value: EV[1:3fIeth4gFA4L2hschC9DE9fY9lKxOe1o:LyKv7BUS9axkcDeWx2tgQqnew9ua3MIJh1nvmFUZhA2HWYdN1Lnw5E///ayL6iJz]
   - key: OPENPHONE_WEBHOOK_SIGNING_KEY
     scope: RUN_AND_BUILD_TIME
-    value: NmkyTExvUVVWa1k5STg5VHFUOEFSSzlIbzZVTGpVOTU=
+    type: SECRET
+    value: EV[1:v5HrX+0RjDXi37L5DCXe2xr6KXyuJ6qn:2BrK30phqYA5ZZO7UfbCCQFty9mbezw7Y5QrSAoyUi7BT5CWTU7xkxtec9qjn8VpNmf5pIGB2NUVdWnT]
   - key: OPENPHONE_PHONE_NUMBER
     scope: RUN_AND_BUILD_TIME
     type: SECRET
