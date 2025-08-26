@@ -512,3 +512,69 @@ class CSVImportService:
         """Get all contacts from a specific import using repository"""
         contact_associations = self.contact_csv_import_repository.get_contacts_by_import_with_details(import_id)
         return [contact for contact, association in contact_associations]
+    
+    def import_csv(self, file: FileStorage, 
+                   list_name: Optional[str] = None,
+                   enrichment_mode: Optional[str] = None) -> Dict[str, any]:
+        """
+        Import contacts from CSV file (wrapper for import_contacts with route-expected response format)
+        
+        This method wraps import_contacts to provide a simplified response format
+        expected by the route handlers.
+        
+        Args:
+            file: The uploaded CSV file
+            list_name: Optional name for the campaign list
+            enrichment_mode: Optional enrichment mode (not used in current implementation)
+            
+        Returns:
+            Dict with:
+                - success: boolean indicating if any imports were successful
+                - imported: number of successful imports
+                - updated: number of existing contacts updated (duplicates)
+                - errors: list of error messages
+                - message: summary message of the import
+                - list_id: ID of created campaign list (if any)
+        """
+        try:
+            # Call the existing import_contacts method
+            result = self.import_contacts(
+                file=file,
+                list_name=list_name,
+                create_list=True,  # Always create list (default behavior)
+                imported_by=None  # Will be set by route if needed
+            )
+            
+            # Transform the response to match route expectations
+            imported = result.get('successful', 0)
+            updated = result.get('duplicates', 0)
+            errors = result.get('errors', [])
+            failed_count = result.get('failed', 0)
+            success = imported > 0  # True if any successful imports
+            
+            # Build message
+            if success:
+                message = f"Import completed successfully: {imported} imported, {updated} updated"
+                if failed_count > 0:
+                    message += f", {failed_count} failed"
+            else:
+                message = f"Import failed: {failed_count} errors"
+            
+            return {
+                'success': success,
+                'imported': imported,
+                'updated': updated,
+                'errors': errors,
+                'message': message,
+                'list_id': result.get('list_id')
+            }
+        except Exception as e:
+            # Handle any exceptions from import_contacts
+            return {
+                'success': False,
+                'imported': 0,
+                'updated': 0,
+                'errors': [f"Import error: {str(e)}"],
+                'message': f"Import failed: {str(e)}",
+                'list_id': None
+            }
