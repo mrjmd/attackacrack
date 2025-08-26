@@ -265,6 +265,12 @@ class Property(db.Model):
         Sets the primary contact by ID for backward compatibility.
         Creates or updates the PropertyContact association.
         """
+        # Store the value for later use if property doesn't have an ID yet
+        if not self.id:
+            # Property not saved yet, store the contact_id for later
+            self._pending_contact_id = value
+            return
+            
         if value is None:
             # Remove all contact associations if setting to None
             PropertyContact.query.filter_by(property_id=self.id).delete()

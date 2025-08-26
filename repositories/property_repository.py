@@ -64,6 +64,11 @@ class PropertyRepository(BaseRepository[Property]):
             self.session.add(property_instance)
             self.session.flush()  # Get ID without committing
             
+            # Check for pending contact_id (set via property setter before save)
+            if hasattr(property_instance, '_pending_contact_id'):
+                contact_id = property_instance._pending_contact_id
+                delattr(property_instance, '_pending_contact_id')
+            
             # If contact_id provided, add the contact relationship
             if contact_id:
                 from crm_database import Contact, PropertyContact
