@@ -30,3 +30,8 @@ csvs/
 .claude/session-todos.md.backup
 .claude/last-update.txt
 .claude/*.tmp
+
+# Security - Never commit these files with actual secrets
+scripts/set_webhook_signing_key.sh
+scripts/*_secret*.sh
+scripts/*_key*.sh

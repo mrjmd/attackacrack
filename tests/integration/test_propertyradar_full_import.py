@@ -69,7 +69,7 @@ class TestPropertyRadarFullImport:
     @pytest.fixture
     def real_csv_data(self):
         """Load real CSV data from csvs/short-csv.csv"""
-        csv_path = '/Users/matt/Projects/attackacrack/openphone-sms/csvs/short-csv.csv'
+        csv_path = '/app/csvs/short-csv.csv'
         
         if not os.path.exists(csv_path):
             pytest.skip(f"CSV file not found: {csv_path}")
@@ -112,7 +112,7 @@ class TestPropertyRadarFullImport:
             imported_by='test_user'
         )
         
-        assert result.is_success(), f"Import failed: {result.error if result.is_failure() else 'Unknown error'}"
+        assert result.is_success, f"Import failed: {result.error if result.is_failure else 'Unknown error'}"
         
         stats = result.value
         assert stats['total_rows'] > 0
@@ -214,7 +214,7 @@ class TestPropertyRadarFullImport:
         end_time = datetime.now()
         processing_time = (end_time - start_time).total_seconds()
         
-        assert result.is_success(), f"Large import failed: {result.error if result.is_failure() else 'Unknown'}"
+        assert result.is_success, f"Large import failed: {result.error if result.is_failure else 'Unknown'}"
         
         stats = result.value
         assert stats['total_rows'] >= 3000
@@ -270,12 +270,11 @@ SFR,789 Another Valid St,City,67890,,,,,,,,,,,200000,100000,Owner,789 Another Va
         result = import_service.import_csv(
             csv_content=invalid_csv,
             filename='invalid_test.csv',
-            imported_by='test_user',
-            rollback_on_error=True
+            imported_by='test_user'
         )
         
         # Import might succeed with error handling, or fail completely
-        if result.is_failure():
+        if result.is_failure:
             # If it fails, no data should be saved
             final_property_count = db_session.query(Property).count()
             final_contact_count = db_session.query(Contact).count()
@@ -478,4 +477,4 @@ SFR,789 Another Good St,City,67890,,,APN-GOOD2,,,,,,,,200000,100000,Owner,789 An
         
         # All imports should succeed
         for worker_id, result in results:
-            assert result.is_success(), f"Worker {worker_id} failed: {result.error if result.is_failure() else 'Unknown'}"
+            assert result.is_success, f"Worker {worker_id} failed: {result.error if result.is_failure else 'Unknown'}"

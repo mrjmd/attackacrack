@@ -147,8 +147,8 @@ class TestPropertyRadarImportService:
         
         # Test all PropertyRadar property fields are mapped
         assert property_data['property_type'] == 'SFR'
-        assert property_data['address'] == '455 MIDDLE ST'
-        assert property_data['city'] == 'BRAINTREE'
+        assert property_data['address'] == '455 Middle St'  # Normalized
+        assert property_data['city'] == 'Braintree'  # Normalized
         assert property_data['zip_code'] == '02184'
         assert property_data['subdivision'] == 'BRAINTREE'
         assert property_data['longitude'] == -70.987754
@@ -184,8 +184,8 @@ class TestPropertyRadarImportService:
         assert result.is_success
         primary_contact = result.value['primary_contact']
         
-        assert primary_contact['first_name'] == 'JON'
-        assert primary_contact['last_name'] == 'LINKER'
+        assert primary_contact['first_name'] == 'Jon'  # Normalized
+        assert primary_contact['last_name'] == 'Linker'  # Normalized
         assert primary_contact['phone'] == '+13392224624'  # Normalized phone
         assert primary_contact['email'] == 'linkeraimee@hotmail.com'
         assert primary_contact['contact_metadata']['phone_status'] == 'Active'
@@ -200,8 +200,8 @@ class TestPropertyRadarImportService:
         assert result.is_success
         secondary_contact = result.value['secondary_contact']
         
-        assert secondary_contact['first_name'] == 'AIMEE'
-        assert secondary_contact['last_name'] == 'LINKER'
+        assert secondary_contact['first_name'] == 'Aimee'  # Normalized
+        assert secondary_contact['last_name'] == 'Linker'  # Normalized
         assert secondary_contact['phone'] == '+17813161658'  # Normalized phone
         assert secondary_contact['email'] is None  # Empty in sample data
         assert secondary_contact['contact_metadata']['phone_status'] == 'Active'
@@ -589,11 +589,11 @@ class TestPropertyRadarImportService:
         assert service.normalize_name('a-b') == 'A-B'
     
     def test_normalize_address_basic_conversion(self, service):
-        """Test basic address normalization to proper case"""
-        # Should fail - normalize_address method doesn't exist yet
+        """Test basic address normalization to proper case with suffix standardization"""
+        # Test standardized suffixes (abbreviated form)
         assert service.normalize_address('455 MIDDLE ST') == '455 Middle St'
-        assert service.normalize_address('123 MAIN STREET') == '123 Main Street'
-        assert service.normalize_address('789 OAK AVENUE') == '789 Oak Avenue'
+        assert service.normalize_address('123 MAIN STREET') == '123 Main St'  # STREET -> St
+        assert service.normalize_address('789 OAK AVENUE') == '789 Oak Ave'    # AVENUE -> Ave
     
     def test_normalize_address_standardizes_street_suffixes(self, service):
         """Test address normalization standardizes street suffixes"""

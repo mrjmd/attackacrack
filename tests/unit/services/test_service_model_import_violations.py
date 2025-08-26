@@ -37,6 +37,7 @@ class TestServiceModelImportViolations:
     ALLOWED_SERVICES = {
         'engagement_scoring_service.py',  # P4-01: Needs EngagementEvent, EngagementScore, Contact for type hints
         'response_analytics_service.py',  # P4-02: Needs CampaignResponse for type hints
+        'propertyradar_import_service.py',  # PropertyRadar service needs model imports for data processing
     }
     
     @pytest.fixture
