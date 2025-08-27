@@ -122,7 +122,13 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
             
             # Custom progress tracking function
             def update_import_progress(current_row: int, total_rows: int):
-                percent = min(95, int((current_row / max(total_rows, 1)) * 75) + 20)  # 20-95% range
+                # Calculate percent ensuring we stay within 20-95% range during processing
+                if total_rows > 0:
+                    percent = min(95, int((current_row / total_rows) * 75) + 20)  # 20-95% range
+                else:
+                    percent = 20
+                
+                
                 self.update_state(
                     state='PROGRESS',
                     meta={
@@ -133,27 +139,12 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
                     }
                 )
             
-            # Patch the CSV import service to provide progress updates
-            original_import = csv_import_service.import_contacts
-            
-            def progress_wrapper(*args, **kwargs):
-                # This is a simplified approach - in a real implementation,
-                # you'd modify the import_contacts method to accept a progress callback
-                result = original_import(*args, **kwargs)
-                
-                # Update progress based on results
-                if result.get('total_rows', 0) > 0:
-                    update_import_progress(result['total_rows'], result['total_rows'])
-                
-                return result
-            
-            csv_import_service.import_contacts = progress_wrapper
-            
             # Process the CSV import using the _process_sync_with_fallback method
             # which handles PropertyRadar and other CSV formats properly
             result = csv_import_service._process_sync_with_fallback(
                 file=mock_file,
-                list_name=list_name
+                list_name=list_name,
+                progress_callback=update_import_progress
             )
             
             # Ensure result is a dictionary and handle any Result objects

@@ -242,7 +242,8 @@ class CSVImportService:
     def import_contacts(self, file: FileStorage, 
                        list_name: Optional[str] = None,
                        create_list: bool = True,
-                       imported_by: Optional[str] = None) -> Dict[str, any]:
+                       imported_by: Optional[str] = None,
+                       progress_callback: Optional[callable] = None) -> Dict[str, any]:
         """
         Import contacts from CSV file with tracking and optional list creation
         
@@ -325,8 +326,24 @@ class CSVImportService:
                 # Get column mapping for detected format
                 mapping = self.COLUMN_MAPPINGS.get(format_type, self.COLUMN_MAPPINGS['standard'])
                 
+                # First pass: count total rows for accurate progress
+                if progress_callback:
+                    csvfile.seek(0)
+                    row_counter = csv.DictReader(csvfile, delimiter=delimiter)
+                    total_data_rows = sum(1 for _ in row_counter)
+                    csvfile.seek(0)
+                    reader = csv.DictReader(csvfile, delimiter=delimiter)  # Recreate reader
+                    # Skip header again
+                    headers = reader.fieldnames
+                else:
+                    total_data_rows = 0  # Will be updated as we go if no progress callback
+                
                 for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is 1)
                     results['total_rows'] += 1
+                    
+                    # Update progress every 10 rows with accurate totals
+                    if progress_callback and (results['total_rows'] % 10 == 0):
+                        progress_callback(results['total_rows'], total_data_rows)
                     
                     try:
                         # Map columns using detected format
@@ -432,6 +449,12 @@ class CSVImportService:
                         
                         results['successful'] += 1
                         
+                        # Update progress for successful imports
+                        if progress_callback and (results['successful'] % 5 == 0):
+                            current_processed = results['successful'] + results['failed']
+                            total_to_process = total_data_rows if total_data_rows > 0 else results['total_rows']
+                            progress_callback(current_processed, total_to_process)
+                        
                         # Commit periodically through repositories
                         if results['successful'] % 100 == 0:
                             try:
@@ -444,6 +467,13 @@ class CSVImportService:
                     except Exception as e:
                         results['failed'] += 1
                         results['errors'].append(f"Row {row_num}: {str(e)}")
+                        
+                        # Update progress for failures too
+                        if progress_callback and (results['failed'] % 5 == 0):
+                            current_processed = results['successful'] + results['failed']
+                            total_to_process = total_data_rows if total_data_rows > 0 else results['total_rows']
+                            progress_callback(current_processed, total_to_process)
+                        
                         # Repository pattern handles rollback automatically
                         # No manual session management needed
         
@@ -455,6 +485,12 @@ class CSVImportService:
             # Clean up temp file
             if temp_path and os.path.exists(temp_path):
                 os.remove(temp_path)
+        
+        # Final progress update
+        if progress_callback:
+            final_processed = results['successful'] + results['failed']
+            final_total = results['total_rows']
+            progress_callback(final_processed, final_total)
         
         # Update import record using repository
         metadata = {
@@ -585,7 +621,7 @@ class CSVImportService:
             }
             return self._ensure_dict_result(result)
     
-    def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None) -> Dict[str, any]:
+    def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None, progress_callback: Optional[callable] = None) -> Dict[str, any]:
         """Basic CSV import for non-PropertyRadar files"""
         try:
             # Call the existing import_contacts method
@@ -593,7 +629,8 @@ class CSVImportService:
                 file=file,
                 list_name=list_name,
                 create_list=True,  # Always create list (default behavior)
-                imported_by=None  # Will be set by route if needed
+                imported_by=None,  # Will be set by route if needed
+                progress_callback=progress_callback
             )
             
             # Transform the response to match route expectations
@@ -911,7 +948,7 @@ class CSVImportService:
             'message': 'Import failed due to unexpected result format'
         }
     
-    def _process_sync_with_fallback(self, file: FileStorage, list_name: Optional[str]) -> Dict[str, Any]:
+    def _process_sync_with_fallback(self, file: FileStorage, list_name: Optional[str], progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
         Process CSV synchronously with PropertyRadar detection fallback.
         
@@ -1006,8 +1043,8 @@ class CSVImportService:
                             session=session
                         )
                     
-                    # Import using PropertyRadar service
-                    result = propertyradar_service.import_propertyradar_csv(file, list_name)
+                    # Import using PropertyRadar service with progress callback
+                    result = propertyradar_service.import_propertyradar_csv(file, list_name, progress_callback=progress_callback)
                     
                     # Transform Result object to expected format
                     if hasattr(result, 'is_success') and result.is_success():
@@ -1052,10 +1089,10 @@ class CSVImportService:
                     logging.warning(f"PropertyRadar import failed, falling back to basic: {str(pr_error)}")
                     # Fall back to basic import
                     file.seek(0)
-                    return self._basic_import_csv(file, list_name)
+                    return self._basic_import_csv(file, list_name, progress_callback=progress_callback)
             
             # Not PropertyRadar, use basic import
-            result = self._basic_import_csv(file, list_name)
+            result = self._basic_import_csv(file, list_name, progress_callback=progress_callback)
             return self._ensure_dict_result(result)
             
         except Exception as e:

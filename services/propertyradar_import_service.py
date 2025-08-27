@@ -88,7 +88,7 @@ class PropertyRadarImportService:
         self.csv_import_repository = csv_import_repository
         self.session = session or db.session
         
-    def import_propertyradar_csv(self, file: FileStorage, list_name: Optional[str] = None) -> Result:
+    def import_propertyradar_csv(self, file: FileStorage, list_name: Optional[str] = None, progress_callback: Optional[callable] = None) -> Result:
         """Import PropertyRadar CSV file with dual contacts per row
         
         Args:
@@ -104,7 +104,7 @@ class PropertyRadarImportService:
             if isinstance(content, bytes):
                 content = content.decode('utf-8-sig')  # Handle BOM
                 
-            return self.import_csv(content, file.filename, list_name or 'system')
+            return self.import_csv(content, file.filename, list_name or 'system', progress_callback=progress_callback)
             
         except Exception as e:
             logger.error(f"Failed to import PropertyRadar CSV: {e}")
@@ -168,14 +168,31 @@ class PropertyRadarImportService:
                     self._merge_stats(stats, batch_stats)
                     batch = []
                     
-                    # Call progress callback if provided
+                    # Call progress callback if provided with current row and total processed
                     if progress_callback:
-                        progress_callback(row_num, stats)
+                        progress_callback(
+                            stats['contacts_created'] + stats['contacts_updated'], 
+                            row_num
+                        )
+                
+                # Also provide progress updates every 10 rows, even within batches
+                elif progress_callback and row_num % 10 == 0:
+                    progress_callback(
+                        stats['contacts_created'] + stats['contacts_updated'], 
+                        row_num
+                    )
             
             # Process remaining rows
             if batch:
                 batch_stats = self._process_batch(batch, csv_import)
                 self._merge_stats(stats, batch_stats)
+                
+                # Final progress update for remaining batch
+                if progress_callback:
+                    progress_callback(
+                        stats['contacts_created'] + stats['contacts_updated'], 
+                        stats['total_rows']
+                    )
             
             # Update import record
             self.csv_import_repository.update_import_status(

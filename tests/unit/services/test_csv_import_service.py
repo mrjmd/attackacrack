@@ -1386,7 +1386,7 @@ class TestImportCSVMethod:
             )
             
             # Assert that _basic_import_csv was called (non-PropertyRadar path)
-            mock_basic_import.assert_called_once_with(mock_file, 'Test List')
+            mock_basic_import.assert_called_once_with(mock_file, 'Test List', progress_callback=None)
     
     def test_import_csv_returns_expected_format(self, csv_import_service, mock_file_storage):
         """Test that import_csv returns the expected response format for the route"""
@@ -1515,7 +1515,7 @@ class TestImportCSVMethod:
             result = csv_import_service.import_csv(file=mock_file)
             
             # Assert that _basic_import_csv was called with sensible defaults
-            mock_basic_import.assert_called_once_with(mock_file, None)
+            mock_basic_import.assert_called_once_with(mock_file, None, progress_callback=None)
             # The assertion above confirms correct delegation
     
     def test_import_csv_with_custom_list_name(self, csv_import_service, mock_file_storage):
@@ -1541,7 +1541,7 @@ class TestImportCSVMethod:
             )
             
             # Assert custom list name was passed through
-            mock_basic_import.assert_called_once_with(mock_file, custom_list_name)
+            mock_basic_import.assert_called_once_with(mock_file, custom_list_name, progress_callback=None)
             # The assertion above confirms correct list name passing
     
     def test_import_csv_handles_exception_from_import_contacts(self, csv_import_service, mock_file_storage):
