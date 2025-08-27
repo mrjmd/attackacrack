@@ -22,7 +22,9 @@ from services.propertyradar_import_service import PropertyRadarImportService
 from repositories.property_repository import PropertyRepository
 from repositories.contact_repository import ContactRepository
 from repositories.csv_import_repository import CSVImportRepository
-from crm_database import Property, Contact, PropertyContact, CSVImport
+from repositories.campaign_list_repository import CampaignListRepository
+from repositories.campaign_list_member_repository import CampaignListMemberRepository
+from crm_database import Property, Contact, PropertyContact, CSVImport, CampaignList, CampaignListMember
 from services.common.result import Result
 
 
@@ -711,3 +713,342 @@ class TestPropertyRadarImportService:
         secondary_contact_args = contact_calls[1][1]
         assert secondary_contact_args['first_name'] == 'Mary-Jane'  # Normalized from MARY-JANE
         assert secondary_contact_args['last_name'] == 'McDonald'  # Normalized from MCDONALD
+
+
+class TestPropertyRadarImportServiceListAssociation:
+    """TDD tests for PropertyRadar import service list association functionality
+    
+    CRITICAL TDD REQUIREMENTS:
+    1. Tests written BEFORE implementation
+    2. Tests must fail initially with meaningful error messages  
+    3. Implementation must be MINIMAL to pass tests
+    4. NO test modifications to match bugs - fix implementation instead
+    
+    Test Coverage Areas:
+    1. Campaign list creation during import
+    2. Contact association with lists via CampaignListMember
+    3. Duplicate list name handling
+    4. List statistics and active contact counts
+    5. Integration with existing import functionality
+    """
+    
+    @pytest.fixture
+    def mock_property_repository(self):
+        """Mock property repository for dependency injection"""
+        mock_repo = Mock(spec=PropertyRepository)
+        mock_repo.create.return_value = Mock(spec=Property, id=1)
+        mock_repo.find_by_apn.return_value = None
+        mock_repo.find_by_address_and_zip.return_value = None
+        return mock_repo
+        
+    @pytest.fixture
+    def mock_contact_repository(self):
+        """Mock contact repository for dependency injection"""
+        mock_repo = Mock(spec=ContactRepository)
+        mock_repo.create.return_value = Mock(spec=Contact, id=1, phone='+15551234567')
+        mock_repo.find_by_phone.return_value = None
+        return mock_repo
+        
+    @pytest.fixture
+    def mock_csv_import_repository(self):
+        """Mock CSV import repository for tracking"""
+        mock_repo = Mock(spec=CSVImportRepository)
+        mock_csv_import = Mock(spec=CSVImport, id=1)
+        mock_csv_import.contacts = []
+        mock_repo.create.return_value = mock_csv_import
+        return mock_repo
+        
+    @pytest.fixture
+    def mock_campaign_list_repository(self):
+        """Mock campaign list repository - NEW dependency for list functionality"""
+        mock_repo = Mock(spec=CampaignListRepository)
+        # This will FAIL until we add this repository to the service
+        return mock_repo
+        
+    @pytest.fixture
+    def mock_campaign_list_member_repository(self):
+        """Mock campaign list member repository - NEW dependency for member management"""
+        mock_repo = Mock(spec=CampaignListMemberRepository)
+        # This will FAIL until we add this repository to the service
+        return mock_repo
+    
+    @pytest.fixture
+    def import_service(self, mock_property_repository, mock_contact_repository, 
+                       mock_csv_import_repository, mock_campaign_list_repository,
+                       mock_campaign_list_member_repository):
+        """Create import service with mocked dependencies including NEW list repositories"""
+        # This will FAIL until we enhance the constructor to accept list repositories
+        return PropertyRadarImportService(
+            property_repository=mock_property_repository,
+            contact_repository=mock_contact_repository,
+            csv_import_repository=mock_csv_import_repository,
+            campaign_list_repository=mock_campaign_list_repository,
+            campaign_list_member_repository=mock_campaign_list_member_repository
+        )
+        
+    @pytest.fixture
+    def valid_csv_content(self):
+        """Sample PropertyRadar CSV content for testing"""
+        return """Type,Address,City,ZIP,Subdivision,Longitude,Latitude,APN,Yr Built,Purchase Date,Purchase Mos Since,Sq Ft,Beds,Baths,Est Value,Est Equity $,Owner,Mail Address,Mail City,Mail State,Mail ZIP,Owner Occ?,Listed for Sale?,Listing Status,Foreclosure?,Est Equity %,High Equity?,Primary Name,Primary Mobile Phone1,Primary Mobile 1 Status,Primary Email1,Primary Email 1 Status,Primary Email1 Hash,Secondary Name,Secondary Mobile Phone1,Secondary Mobile 1 Status,Secondary Email1,Secondary Email 1 Status,Secondary Email1 Hash
+SFR,123 Main St,Anytown,12345,Oak Grove,12.345678,-34.567890,APN-123,1995,01/15/2020,48,1500,3,2,250000,125000,John Smith,123 Main St,Anytown,ST,12345,1,0,,0,50,1,John Smith,555-1234,Active,john@example.com,Active,hash1,Jane Smith,555-5678,Active,jane@example.com,Active,hash2
+SFR,456 Oak Ave,Anytown,12345,Oak Grove,12.345679,-34.567891,APN-456,2000,03/22/2019,56,1800,4,3,300000,150000,Bob Johnson,456 Oak Ave,Anytown,ST,12345,1,0,,0,50,1,Bob Johnson,555-9876,Active,bob@example.com,Active,hash3,,,,,,"""
+
+    def test_import_creates_campaign_list_when_list_name_provided(self, import_service, valid_csv_content,
+                                                                 mock_campaign_list_repository):
+        """Test that import creates a CampaignList when list_name is provided"""
+        # Arrange
+        list_name = "Q4 2024 PropertyRadar Import"
+        mock_campaign_list_repository.find_by_name.return_value = None  # No existing list
+        mock_list = Mock(spec=CampaignList, id=1, name=list_name)
+        mock_campaign_list_repository.create.return_value = mock_list
+        
+        # Act - This will FAIL until we implement list creation in import_csv
+        result = import_service.import_csv(
+            csv_content=valid_csv_content,
+            filename='test.csv',
+            imported_by='test_user',
+            list_name=list_name  # NEW parameter that doesn't exist yet
+        )
+        
+        # Assert
+        assert result.is_success, f"Import should succeed but failed: {result.error if result.is_failure else 'Unknown'}"
+        
+        # Verify campaign list was created
+        mock_campaign_list_repository.find_by_name.assert_called_once_with(list_name)
+        mock_campaign_list_repository.create.assert_called_once_with(
+            name=list_name,
+            description=f"PropertyRadar import from test.csv",
+            created_by='test_user',
+            is_dynamic=False
+        )
+        
+        # Verify result includes list_id
+        stats = result.data
+        assert 'list_id' in stats, "Result should include list_id"
+        assert stats['list_id'] == 1
+        
+    def test_import_uses_existing_campaign_list_when_duplicate_name(self, import_service, valid_csv_content,
+                                                                   mock_campaign_list_repository):
+        """Test that import uses existing CampaignList when duplicate name provided"""
+        # Arrange
+        list_name = "Existing List"
+        existing_list = Mock(spec=CampaignList, id=5, name=list_name)
+        mock_campaign_list_repository.find_by_name.return_value = existing_list
+        
+        # Act - This will FAIL until we implement duplicate handling
+        result = import_service.import_csv(
+            csv_content=valid_csv_content,
+            filename='test.csv',
+            imported_by='test_user',
+            list_name=list_name
+        )
+        
+        # Assert
+        assert result.is_success
+        
+        # Verify existing list was used, not created
+        mock_campaign_list_repository.find_by_name.assert_called_once_with(list_name)
+        mock_campaign_list_repository.create.assert_not_called()
+        
+        # Verify result includes existing list_id
+        stats = result.data
+        assert stats['list_id'] == 5
+        
+    def test_import_associates_all_contacts_with_campaign_list(self, import_service, valid_csv_content,
+                                                             mock_campaign_list_repository,
+                                                             mock_campaign_list_member_repository,
+                                                             mock_contact_repository):
+        """Test that all imported contacts are associated with the campaign list"""
+        # Arrange
+        list_name = "Test List"
+        mock_list = Mock(spec=CampaignList, id=1, name=list_name)
+        mock_campaign_list_repository.find_by_name.return_value = None
+        mock_campaign_list_repository.create.return_value = mock_list
+        
+        # Mock contacts creation (2 properties with 3 contacts total: 2 primary + 1 secondary)
+        contact1 = Mock(spec=Contact, id=1, phone='+15555551234', first_name='John', last_name='Smith')
+        contact2 = Mock(spec=Contact, id=2, phone='+15555555678', first_name='Jane', last_name='Smith') 
+        contact3 = Mock(spec=Contact, id=3, phone='+15555559876', first_name='Bob', last_name='Johnson')
+        
+        mock_contact_repository.create.side_effect = [contact1, contact2, contact3]
+        mock_contact_repository.find_by_phone.return_value = None  # No existing contacts
+        
+        # Mock list member repository to indicate no existing members
+        mock_campaign_list_member_repository.find_by_list_and_contact.return_value = None
+        
+        # Act - This will FAIL until we implement contact association
+        result = import_service.import_csv(
+            csv_content=valid_csv_content,
+            filename='test.csv',
+            imported_by='test_user',
+            list_name=list_name
+        )
+        
+        # Assert
+        assert result.is_success
+        
+        # This assertion will FAIL until we implement list member creation
+        assert mock_campaign_list_member_repository.create.call_count == 3
+        
+        # Verify the calls were made with correct data
+        calls = mock_campaign_list_member_repository.create.call_args_list
+        for i, call in enumerate(calls):
+            args, kwargs = call
+            assert kwargs['list_id'] == 1
+            assert kwargs['contact_id'] in [1, 2, 3]
+            assert kwargs['added_by'] == 'test_user'
+            assert kwargs['status'] == 'active'
+            assert 'import_metadata' in kwargs
+            assert kwargs['import_metadata']['source'] == 'propertyradar_csv'
+            assert kwargs['import_metadata']['filename'] == 'test.csv'
+
+    def test_import_without_list_name_skips_list_association(self, import_service, valid_csv_content,
+                                                           mock_campaign_list_repository,
+                                                           mock_campaign_list_member_repository):
+        """Test that import works normally when no list_name is provided"""
+        # Act - This should work as before (no list functionality)
+        result = import_service.import_csv(
+            csv_content=valid_csv_content,
+            filename='test.csv',
+            imported_by='test_user'
+            # No list_name parameter
+        )
+        
+        # Assert
+        assert result.is_success
+        
+        # Verify no list operations were performed
+        mock_campaign_list_repository.find_by_name.assert_not_called()
+        mock_campaign_list_repository.create.assert_not_called()
+        mock_campaign_list_member_repository.create.assert_not_called()
+        
+        # Verify result does NOT include list_id
+        stats = result.data
+        assert 'list_id' not in stats
+
+    def test_import_with_list_name_returns_comprehensive_stats(self, import_service, valid_csv_content,
+                                                             mock_campaign_list_repository,
+                                                             mock_campaign_list_member_repository):
+        """Test that import with list returns enhanced statistics"""
+        # Arrange
+        list_name = "Comprehensive Stats Test"
+        mock_list = Mock(spec=CampaignList, id=1)
+        mock_campaign_list_repository.find_by_name.return_value = None
+        mock_campaign_list_repository.create.return_value = mock_list
+        
+        # Mock list member repository to indicate no existing members
+        mock_campaign_list_member_repository.find_by_list_and_contact.return_value = None
+        
+        # Act - This will FAIL until we return enhanced stats
+        result = import_service.import_csv(
+            csv_content=valid_csv_content,
+            filename='test.csv',
+            imported_by='test_user',
+            list_name=list_name
+        )
+        
+        # Assert
+        assert result.is_success
+        stats = result.data
+        
+        # Verify enhanced statistics are returned
+        expected_fields = [
+            'list_id',
+            'list_name', 
+            'contacts_added_to_list',
+            'total_rows',
+            'properties_created',
+            'contacts_created',
+            'processing_time'
+        ]
+        
+        for field in expected_fields:
+            assert field in stats, f"Statistics should include {field}"
+            
+        # Verify specific values
+        assert stats['list_id'] == 1
+        assert stats['list_name'] == list_name
+        assert stats['contacts_added_to_list'] >= stats['contacts_created']
+        assert isinstance(stats['processing_time'], (int, float))
+
+    def test_list_creation_failure_handling(self, import_service, valid_csv_content,
+                                          mock_campaign_list_repository):
+        """Test that import handles campaign list creation failures gracefully"""
+        # Arrange
+        list_name = "Failed List Creation"
+        mock_campaign_list_repository.find_by_name.return_value = None
+        mock_campaign_list_repository.create.side_effect = Exception("Database error during list creation")
+        
+        # Act - This will FAIL until we implement proper error handling
+        result = import_service.import_csv(
+            csv_content=valid_csv_content,
+            filename='test.csv',
+            imported_by='test_user',
+            list_name=list_name
+        )
+        
+        # Assert
+        # Import should fail gracefully when list creation fails
+        assert result.is_failure
+        assert "list creation" in result.error.lower() or "database error" in result.error.lower()
+        assert result.code in ['LIST_CREATION_ERROR', 'DATABASE_ERROR']
+
+    def test_import_csv_file_with_list_name_integration(self, import_service, mock_campaign_list_repository):
+        """Test that FileStorage import also supports list_name parameter"""
+        # Arrange
+        from werkzeug.datastructures import FileStorage
+        from io import StringIO
+        
+        list_name = "File Upload Test"
+        mock_list = Mock(spec=CampaignList, id=1)
+        mock_campaign_list_repository.find_by_name.return_value = None
+        mock_campaign_list_repository.create.return_value = mock_list
+        
+        csv_content = "Type,Address,City,ZIP,Primary Name,Primary Mobile Phone1\nSFR,123 Test St,Test City,12345,Test User,555-1234"
+        mock_file = FileStorage(stream=StringIO(csv_content), filename='upload.csv')
+        
+        # Act - This will FAIL until we add list_name to import_propertyradar_csv method
+        result = import_service.import_propertyradar_csv(
+            file=mock_file,
+            list_name=list_name  # NEW parameter
+        )
+        
+        # Assert
+        assert result.is_success
+        stats = result.data
+        assert 'list_id' in stats
+        assert stats['list_id'] == 1
+
+    def test_import_with_list_preserves_existing_functionality(self, import_service, valid_csv_content,
+                                                             mock_campaign_list_repository,
+                                                             mock_property_repository,
+                                                             mock_contact_repository,
+                                                             mock_csv_import_repository):
+        """Test that adding list functionality doesn't break existing import behavior"""
+        # Arrange
+        list_name = "Compatibility Test"
+        mock_list = Mock(spec=CampaignList, id=1)
+        mock_campaign_list_repository.find_by_name.return_value = None
+        mock_campaign_list_repository.create.return_value = mock_list
+        
+        # Act
+        result = import_service.import_csv(
+            csv_content=valid_csv_content,
+            filename='test.csv',
+            imported_by='test_user',
+            list_name=list_name
+        )
+        
+        # Assert
+        assert result.is_success
+        
+        # Verify existing functionality still works
+        assert mock_property_repository.create.call_count >= 1
+        assert mock_contact_repository.create.call_count >= 1
+        assert mock_csv_import_repository.create.call_count == 1
+        
+        # Verify traditional stats are still present
+        stats = result.data
+        expected_legacy_fields = ['total_rows', 'properties_created', 'contacts_created', 'errors']
+        for field in expected_legacy_fields:
+            assert field in stats, f"Legacy field {field} should still be present"

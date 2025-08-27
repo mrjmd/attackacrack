@@ -24,7 +24,9 @@ from services.propertyradar_import_service import PropertyRadarImportService
 from repositories.property_repository import PropertyRepository
 from repositories.contact_repository import ContactRepository
 from repositories.csv_import_repository import CSVImportRepository
-from crm_database import Property, Contact, PropertyContact, CSVImport
+from repositories.campaign_list_repository import CampaignListRepository
+from repositories.campaign_list_member_repository import CampaignListMemberRepository
+from crm_database import Property, Contact, PropertyContact, CSVImport, CampaignList, CampaignListMember
 
 
 class TestPropertyRadarFullImport:
@@ -526,3 +528,299 @@ SFR,789 Another Good St,City,67890,,,APN-GOOD2,,,,,,,,200000,100000,Owner,789 An
         # With separate databases per thread, all imports should succeed
         successful_imports = [result for worker_id, result in results if result.is_success]
         assert len(successful_imports) == len(results), f"All imports should succeed with separate databases. Results: {[(w, r.error if r.is_failure else 'Success') for w, r in results]}"
+
+
+class TestPropertyRadarImportListIntegration:
+    """Integration tests for PropertyRadar import with campaign list functionality
+    
+    These tests verify end-to-end list association functionality:
+    1. List creation during import
+    2. Contact-list association
+    3. List statistics accuracy
+    4. List filtering functionality
+    """
+    
+    @pytest.fixture(scope='function')
+    def app(self):
+        """Create test application with separate database"""
+        app = create_app('testing')
+        with app.app_context():
+            db.create_all()
+            yield app
+            db.session.rollback()
+            db.drop_all()
+    
+    @pytest.fixture
+    def db_session(self, app):
+        """Create database session for testing"""
+        with app.app_context():
+            yield db.session
+    
+    @pytest.fixture
+    def repositories(self, db_session):
+        """Create repository instances with real database"""
+        return {
+            'property': PropertyRepository(session=db_session),
+            'contact': ContactRepository(session=db_session),
+            'csv_import': CSVImportRepository(session=db_session),
+            'campaign_list': CampaignListRepository(session=db_session),
+            'campaign_list_member': CampaignListMemberRepository(session=db_session)
+        }
+    
+    @pytest.fixture
+    def import_service(self, repositories):
+        """Create import service with real repositories including list support"""
+        # This will FAIL until we enhance the service constructor
+        return PropertyRadarImportService(
+            property_repository=repositories['property'],
+            contact_repository=repositories['contact'],
+            csv_import_repository=repositories['csv_import'],
+            campaign_list_repository=repositories['campaign_list'],
+            campaign_list_member_repository=repositories['campaign_list_member']
+        )
+    
+    @pytest.fixture
+    def sample_csv_with_dual_contacts(self):
+        """CSV content with both primary and secondary contacts"""
+        return '''Type,Address,City,ZIP,Subdivision,Longitude,Latitude,APN,Yr Built,Purchase Date,Purchase Mos Since,Sq Ft,Beds,Baths,Est Value,Est Equity $,Owner,Mail Address,Mail City,Mail State,Mail ZIP,Owner Occ?,Listed for Sale?,Listing Status,Foreclosure?,Est Equity %,High Equity?,Primary Name,Primary Mobile Phone1,Primary Mobile 1 Status,Primary Email1,Primary Email 1 Status,Primary Email1 Hash,Secondary Name,Secondary Mobile Phone1,Secondary Mobile 1 Status,Secondary Email1,Secondary Email 1 Status,Secondary Email1 Hash
+SFR,123 Main St,Testtown,12345,Oak Grove,12.345678,-34.567890,APN-123,1995,01/15/2020,48,1500,3,2,250000,125000,John Smith,123 Main St,Testtown,ST,12345,1,0,,0,50,1,John Smith,555-0001,Active,john@example.com,Active,hash1,Jane Smith,555-0002,Active,jane@example.com,Active,hash2
+SFR,456 Oak Ave,Testtown,12345,Oak Grove,12.345679,-34.567891,APN-456,2000,03/22/2019,56,1800,4,3,300000,150000,Bob Johnson,456 Oak Ave,Testtown,ST,12345,1,0,,0,50,1,Bob Johnson,555-0003,Active,bob@example.com,Active,hash3,,,,,,
+Condo,789 Pine Rd,Testtown,12346,Pine Hills,12.345680,-34.567892,APN-789,2010,06/10/2021,30,1200,2,2,180000,90000,Alice Wilson,789 Pine Rd,Testtown,ST,12346,1,0,,0,50,1,Alice Wilson,555-0004,Active,alice@example.com,Active,hash4,Charlie Wilson,555-0005,Active,charlie@example.com,Active,hash5'''
+    
+    def test_import_creates_campaign_list_and_associates_contacts(self, import_service, sample_csv_with_dual_contacts, db_session):
+        """Test that import creates a campaign list and associates all contacts"""
+        list_name = "Test PropertyRadar Import List"
+        
+        # Act - This will FAIL until list functionality is implemented
+        result = import_service.import_csv(
+            csv_content=sample_csv_with_dual_contacts,
+            filename='test_import.csv',
+            imported_by='integration_test',
+            list_name=list_name
+        )
+        
+        # Assert import succeeded
+        assert result.is_success, f"Import failed: {result.error if result.is_failure else 'Unknown'}"
+        
+        # Verify campaign list was created
+        from crm_database import CampaignList
+        campaign_list = db_session.query(CampaignList).filter_by(name=list_name).first()
+        assert campaign_list is not None, "Campaign list should be created"
+        assert campaign_list.description == "PropertyRadar import from test_import.csv"
+        assert campaign_list.created_by == 'integration_test'
+        assert campaign_list.is_dynamic is False
+        
+        # Verify contacts were created and associated
+        from crm_database import Contact, CampaignListMember
+        total_contacts = db_session.query(Contact).count()
+        assert total_contacts == 5, f"Expected 5 contacts (3 primary + 2 secondary), got {total_contacts}"
+        
+        # Verify all contacts are associated with the list
+        list_members = db_session.query(CampaignListMember).filter_by(list_id=campaign_list.id).all()
+        assert len(list_members) == 5, f"Expected 5 list members, got {len(list_members)}"
+        
+        # Verify all members have correct status and metadata
+        for member in list_members:
+            assert member.status == 'active'
+            assert member.added_by == 'integration_test'
+            assert member.import_metadata is not None
+            assert member.import_metadata['source'] == 'propertyradar_csv'
+            assert member.import_metadata['filename'] == 'test_import.csv'
+            assert member.import_metadata['contact_type'] in ['primary', 'secondary']
+        
+        # Verify result statistics
+        stats = result.data
+        assert 'list_id' in stats
+        assert stats['list_id'] == campaign_list.id
+        assert stats['list_name'] == list_name
+        assert stats['contacts_added_to_list'] == 5
+        assert stats['total_rows'] == 3  # 3 properties
+        assert stats['properties_created'] == 3
+        assert stats['contacts_created'] == 5
+    
+    def test_import_with_existing_list_adds_to_existing(self, import_service, sample_csv_with_dual_contacts, db_session):
+        """Test that import adds contacts to existing campaign list"""
+        # Create existing list
+        from crm_database import CampaignList
+        existing_list = CampaignList(
+            name="Existing Import List",
+            description="Previously created list",
+            created_by='previous_user',
+            is_dynamic=False
+        )
+        db_session.add(existing_list)
+        db_session.commit()
+        
+        # Act - Import with same list name
+        result = import_service.import_csv(
+            csv_content=sample_csv_with_dual_contacts,
+            filename='second_import.csv',
+            imported_by='integration_test',
+            list_name="Existing Import List"  # Same name as existing
+        )
+        
+        # Assert
+        assert result.is_success
+        
+        # Verify no new list was created
+        list_count = db_session.query(CampaignList).filter_by(name="Existing Import List").count()
+        assert list_count == 1, "Should use existing list, not create new one"
+        
+        # Verify contacts were added to existing list
+        from crm_database import CampaignListMember
+        list_members = db_session.query(CampaignListMember).filter_by(list_id=existing_list.id).all()
+        assert len(list_members) == 5, f"Expected 5 members in existing list, got {len(list_members)}"
+        
+        # Verify result uses existing list ID
+        stats = result.data
+        assert stats['list_id'] == existing_list.id
+    
+    def test_list_statistics_are_accurate_after_import(self, import_service, sample_csv_with_dual_contacts, db_session):
+        """Test that campaign list statistics reflect actual contact counts"""
+        list_name = "Statistics Test List"
+        
+        # Act
+        result = import_service.import_csv(
+            csv_content=sample_csv_with_dual_contacts,
+            filename='stats_test.csv',
+            imported_by='stats_tester',
+            list_name=list_name
+        )
+        
+        assert result.is_success
+        
+        # Get the created list
+        from crm_database import CampaignList, CampaignListMember, Contact
+        campaign_list = db_session.query(CampaignList).filter_by(name=list_name).first()
+        
+        # Calculate active contacts in list
+        active_members = db_session.query(CampaignListMember).filter_by(
+            list_id=campaign_list.id,
+            status='active'
+        ).count()
+        
+        # All imported contacts should be active
+        assert active_members == 5, f"Expected 5 active members, got {active_members}"
+        
+        # Verify all contacts are valid (have phone numbers)
+        contacts_in_list = db_session.query(Contact).join(CampaignListMember).filter(
+            CampaignListMember.list_id == campaign_list.id
+        ).all()
+        
+        for contact in contacts_in_list:
+            assert contact.phone is not None, f"Contact {contact.id} should have phone number"
+            assert contact.phone.startswith('+1555'), f"Contact {contact.id} should have normalized phone"
+    
+    def test_contacts_can_be_filtered_by_list(self, import_service, sample_csv_with_dual_contacts, db_session):
+        """Test that contacts can be filtered by campaign list membership"""
+        list_name = "Filter Test List"
+        
+        # Import with list
+        result = import_service.import_csv(
+            csv_content=sample_csv_with_dual_contacts,
+            filename='filter_test.csv',
+            imported_by='filter_tester',
+            list_name=list_name
+        )
+        
+        assert result.is_success
+        
+        # Get list ID from result
+        list_id = result.data['list_id']
+        
+        # Query contacts by list membership - This will FAIL until contact filtering by list is implemented
+        from crm_database import Contact, CampaignListMember
+        contacts_in_list = db_session.query(Contact).join(
+            CampaignListMember, Contact.id == CampaignListMember.contact_id
+        ).filter(
+            CampaignListMember.list_id == list_id,
+            CampaignListMember.status == 'active'
+        ).all()
+        
+        assert len(contacts_in_list) == 5, f"Should find 5 contacts in list, got {len(contacts_in_list)}"
+        
+        # Verify contact details
+        contact_names = [(c.first_name, c.last_name) for c in contacts_in_list]
+        expected_names = [
+            ('John', 'Smith'), ('Jane', 'Smith'),  # Property 1 - dual contacts
+            ('Bob', 'Johnson'),                     # Property 2 - single contact  
+            ('Alice', 'Wilson'), ('Charlie', 'Wilson')  # Property 3 - dual contacts
+        ]
+        
+        for expected_name in expected_names:
+            assert expected_name in contact_names, f"Expected contact {expected_name} not found in list"
+    
+    def test_duplicate_contacts_not_duplicated_in_list(self, import_service, db_session):
+        """Test that duplicate contacts (same phone) are not duplicated in campaign list"""
+        # CSV with duplicate phone numbers across properties
+        csv_with_duplicates = '''Type,Address,City,ZIP,Primary Name,Primary Mobile Phone1,Secondary Name,Secondary Mobile Phone1
+SFR,123 First St,Town,12345,John Smith,555-0001,Jane Smith,555-0002
+SFR,456 Second St,Town,12345,John Smith,555-0001,Different Person,555-0003
+Condo,789 Third St,Town,12345,Another Person,555-0004,Jane Smith,555-0002'''
+        
+        list_name = "Deduplication Test"
+        
+        # Act
+        result = import_service.import_csv(
+            csv_content=csv_with_duplicates,
+            filename='dedup_test.csv', 
+            imported_by='dedup_tester',
+            list_name=list_name
+        )
+        
+        assert result.is_success
+        
+        # Verify contacts are deduplicated by phone
+        from crm_database import Contact, CampaignListMember
+        total_contacts = db_session.query(Contact).count()
+        assert total_contacts == 4, f"Should have 4 unique contacts (deduplicated by phone), got {total_contacts}"
+        
+        # Verify all unique contacts are in the list
+        list_id = result.data['list_id'] 
+        list_members = db_session.query(CampaignListMember).filter_by(
+            list_id=list_id,
+            status='active'
+        ).count()
+        
+        assert list_members == 4, f"Should have 4 unique members in list, got {list_members}"
+        
+        # Verify statistics reflect deduplication
+        stats = result.data
+        assert stats['contacts_added_to_list'] == 4  # Only unique contacts added
+    
+    def test_import_without_list_name_works_as_before(self, import_service, sample_csv_with_dual_contacts, db_session):
+        """Test that import without list_name parameter works exactly as before"""
+        # Act - No list_name parameter
+        result = import_service.import_csv(
+            csv_content=sample_csv_with_dual_contacts,
+            filename='no_list_test.csv',
+            imported_by='no_list_tester'
+            # No list_name parameter
+        )
+        
+        # Assert import succeeds
+        assert result.is_success
+        
+        # Verify no campaign list was created
+        from crm_database import CampaignList
+        list_count = db_session.query(CampaignList).count()
+        assert list_count == 0, "No campaign list should be created when list_name not provided"
+        
+        # Verify no list members were created
+        from crm_database import CampaignListMember
+        member_count = db_session.query(CampaignListMember).count()
+        assert member_count == 0, "No list members should be created when list_name not provided"
+        
+        # Verify traditional import stats are present but no list fields
+        stats = result.data
+        assert 'total_rows' in stats
+        assert 'properties_created' in stats
+        assert 'contacts_created' in stats
+        assert 'list_id' not in stats
+        assert 'list_name' not in stats
+        assert 'contacts_added_to_list' not in stats
+        
+        # Verify contacts and properties were still created normally
+        from crm_database import Contact, Property
+        assert db_session.query(Contact).count() == 5
+        assert db_session.query(Property).count() == 3

@@ -168,13 +168,14 @@ class CampaignListServiceRefactored:
             self.member_repository.rollback()
             return Result.failure(f"Failed to remove contacts from list: {str(e)}")
     
-    def get_list_contacts(self, list_id: int, include_removed: bool = False) -> Result[List[Dict[str, Any]]]:
+    def get_list_contacts(self, list_id: int, include_removed: bool = False, limit: Optional[int] = None) -> Result[List[Dict[str, Any]]]:
         """
         Get all contacts in a list.
         
         Args:
             list_id: Campaign list ID
             include_removed: Whether to include removed contacts
+            limit: Optional limit on number of contacts to return
             
         Returns:
             Result[List[Contact]]: Success with contacts or failure
@@ -183,6 +184,11 @@ class CampaignListServiceRefactored:
             contact_ids = self.member_repository.get_contact_ids_in_list(
                 list_id, include_removed=include_removed
             )
+            
+            # Apply limit if specified
+            if limit and limit > 0:
+                contact_ids = contact_ids[:limit]
+            
             contacts = self.contact_repository.get_by_ids(contact_ids)
             return Result.success(contacts)
             
@@ -204,6 +210,10 @@ class CampaignListServiceRefactored:
             # Get membership stats
             member_stats = self.member_repository.get_membership_stats(list_id)
             
+            # Check if list exists
+            if member_stats is None:
+                return Result.failure(f"List with ID {list_id} not found")
+            
             # Get contact stats
             contacts_result = self.get_list_contacts(list_id)
             if contacts_result.is_failure:
@@ -212,9 +222,12 @@ class CampaignListServiceRefactored:
             contacts = contacts_result.data
             
             stats = {
-                'total_members': member_stats['total'],
+                'total': member_stats['total'],
+                'active': member_stats['active'],
+                'removed': member_stats['removed'],
                 'active_members': member_stats['active'],
                 'removed_members': member_stats['removed'],
+                'total_members': member_stats['total'],
                 'with_email': sum(1 for c in contacts if c.email),
                 'with_phone': sum(1 for c in contacts if c.phone)
             }

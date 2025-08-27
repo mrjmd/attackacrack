@@ -1346,6 +1346,8 @@ def _create_propertyradar_import_service(db_session):
     from repositories.property_repository import PropertyRepository
     from repositories.contact_repository import ContactRepository
     from repositories.csv_import_repository import CSVImportRepository
+    from repositories.campaign_list_repository import CampaignListRepository
+    from repositories.campaign_list_member_repository import CampaignListMemberRepository
     
     logger.info("Initializing PropertyRadarImportService")
     
@@ -1353,11 +1355,15 @@ def _create_propertyradar_import_service(db_session):
     property_repo = PropertyRepository(session=db_session)
     contact_repo = ContactRepository(session=db_session)
     csv_import_repo = CSVImportRepository(session=db_session)
+    campaign_list_repo = CampaignListRepository(session=db_session)
+    campaign_list_member_repo = CampaignListMemberRepository(session=db_session)
     
     return PropertyRadarImportService(
         property_repository=property_repo,
         contact_repository=contact_repo,
         csv_import_repository=csv_import_repo,
+        campaign_list_repository=campaign_list_repo,
+        campaign_list_member_repository=campaign_list_member_repo,
         session=db_session
     )
 

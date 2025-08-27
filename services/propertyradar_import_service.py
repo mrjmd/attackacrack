@@ -25,7 +25,9 @@ from services.common.result import Result
 from repositories.property_repository import PropertyRepository
 from repositories.contact_repository import ContactRepository
 from repositories.csv_import_repository import CSVImportRepository
-from crm_database import db, Property, Contact, PropertyContact, CSVImport
+from repositories.campaign_list_repository import CampaignListRepository
+from repositories.campaign_list_member_repository import CampaignListMemberRepository
+from crm_database import db, Property, Contact, PropertyContact, CSVImport, CampaignList, CampaignListMember
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -74,6 +76,8 @@ class PropertyRadarImportService:
                  property_repository: PropertyRepository,
                  contact_repository: ContactRepository,
                  csv_import_repository: CSVImportRepository,
+                 campaign_list_repository: Optional[CampaignListRepository] = None,
+                 campaign_list_member_repository: Optional[CampaignListMemberRepository] = None,
                  session: Optional[Session] = None):
         """Initialize service with repository dependencies
         
@@ -81,11 +85,15 @@ class PropertyRadarImportService:
             property_repository: Repository for property operations
             contact_repository: Repository for contact operations
             csv_import_repository: Repository for CSV import tracking
+            campaign_list_repository: Repository for campaign list operations
+            campaign_list_member_repository: Repository for campaign list member operations
             session: Optional database session
         """
         self.property_repository = property_repository
         self.contact_repository = contact_repository
         self.csv_import_repository = csv_import_repository
+        self.campaign_list_repository = campaign_list_repository
+        self.campaign_list_member_repository = campaign_list_member_repository
         self.session = session or db.session
         
     def import_propertyradar_csv(self, file: FileStorage, list_name: Optional[str] = None, progress_callback: Optional[callable] = None) -> Result:
@@ -104,20 +112,22 @@ class PropertyRadarImportService:
             if isinstance(content, bytes):
                 content = content.decode('utf-8-sig')  # Handle BOM
                 
-            return self.import_csv(content, file.filename, list_name or 'system', progress_callback=progress_callback)
+            # Pass list_name only if it's provided (not if it's None)
+            return self.import_csv(content, file.filename, 'system', list_name=list_name, progress_callback=progress_callback)
             
         except Exception as e:
             logger.error(f"Failed to import PropertyRadar CSV: {e}")
             return Result.failure(f"Import failed: {str(e)}", code="IMPORT_ERROR")
     
     def import_csv(self, csv_content: str, filename: str, imported_by: str, 
-                   batch_size: int = 100, progress_callback: Optional[callable] = None) -> Result:
+                   list_name: Optional[str] = None, batch_size: int = 100, progress_callback: Optional[callable] = None) -> Result:
         """Import CSV content with batch processing
         
         Args:
             csv_content: CSV file content as string
             filename: Name of the file being imported
             imported_by: User or system importing the file
+            list_name: Optional name for a campaign list to add contacts to
             batch_size: Number of rows to process in each batch
             progress_callback: Optional callback for progress updates
             
@@ -126,7 +136,28 @@ class PropertyRadarImportService:
         """
         import_start = datetime.utcnow()
         
+        # Track contacts for list association
+        imported_contacts = []
+        campaign_list = None
+        
         try:
+            # Handle list creation/lookup if list_name provided
+            if list_name and self.campaign_list_repository:
+                try:
+                    # Try to find existing list
+                    campaign_list = self.campaign_list_repository.find_by_name(list_name)
+                    if not campaign_list:
+                        # Create new list
+                        campaign_list = self.campaign_list_repository.create(
+                            name=list_name,
+                            description=f"PropertyRadar import from {filename}",
+                            created_by=imported_by,
+                            is_dynamic=False
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to create or find campaign list: {e}")
+                    return Result.failure(f"List creation failed: {str(e)}", code="LIST_CREATION_ERROR")
+            
             # Create import record with proper defaults
             csv_import = self.csv_import_repository.create(
                 filename=filename,
@@ -158,14 +189,22 @@ class PropertyRadarImportService:
                 'processing_time': 0
             }
             
+            # Add list-related stats if applicable
+            if campaign_list:
+                stats['list_id'] = campaign_list.id
+                stats['list_name'] = list_name
+                stats['contacts_added_to_list'] = 0
+            
             batch = []
             for row_num, row in enumerate(csv_reader, start=1):
                 batch.append(row)
                 
                 # Process batch when it reaches the size limit
                 if len(batch) >= batch_size:
-                    batch_stats = self._process_batch(batch, csv_import)
+                    batch_stats, batch_contacts = self._process_batch(batch, csv_import, return_contacts=bool(campaign_list))
                     self._merge_stats(stats, batch_stats)
+                    if campaign_list:
+                        imported_contacts.extend(batch_contacts)
                     batch = []
                     
                     # Call progress callback if provided with current row and total processed
@@ -184,8 +223,10 @@ class PropertyRadarImportService:
             
             # Process remaining rows
             if batch:
-                batch_stats = self._process_batch(batch, csv_import)
+                batch_stats, batch_contacts = self._process_batch(batch, csv_import, return_contacts=bool(campaign_list))
                 self._merge_stats(stats, batch_stats)
+                if campaign_list:
+                    imported_contacts.extend(batch_contacts)
                 
                 # Final progress update for remaining batch
                 if progress_callback:
@@ -202,6 +243,39 @@ class PropertyRadarImportService:
                 len(stats['errors']),
                 {'errors': stats['errors']} if stats['errors'] else None
             )
+            
+            # Add contacts to campaign list if applicable
+            if campaign_list and self.campaign_list_member_repository and imported_contacts:
+                logger.info(f"Adding {len(imported_contacts)} contacts to campaign list {campaign_list.id}")
+                for contact in imported_contacts:
+                    try:
+                        # Check if contact is already in the list
+                        existing_member = self.campaign_list_member_repository.find_by_list_and_contact(
+                            campaign_list.id, contact.id
+                        )
+                        if not existing_member:
+                            # Add contact to the list
+                            # Get contact_type from contact's metadata if available
+                            contact_type = 'unknown'
+                            if hasattr(contact, 'contact_metadata') and contact.contact_metadata:
+                                contact_type = contact.contact_metadata.get('import_type', 'unknown')
+                            
+                            self.campaign_list_member_repository.create(
+                                list_id=campaign_list.id,
+                                contact_id=contact.id,
+                                added_by=imported_by,
+                                status='active',
+                                import_metadata={
+                                    'source': 'propertyradar_csv',
+                                    'filename': filename,
+                                    'imported_at': import_start.isoformat(),
+                                    'contact_type': contact_type
+                                }
+                            )
+                            stats['contacts_added_to_list'] += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to add contact {contact.id} to list: {e}")
+                        stats['errors'].append(f"Failed to add contact to list: {str(e)}")
             
             # Calculate processing time
             stats['processing_time'] = (datetime.utcnow() - import_start).total_seconds()
@@ -791,8 +865,12 @@ class PropertyRadarImportService:
                 except Exception as e:
                     row_errors.append(f"Secondary contact error: {str(e)}")
             
-            # Return result with any errors captured
+            # Return result with any errors captured, including contact objects
             result_data = {'property': property_obj}
+            if primary_contact:
+                result_data['primary_contact'] = primary_contact
+            if secondary_contact:
+                result_data['secondary_contact'] = secondary_contact
             if row_errors:
                 result_data['errors'] = row_errors
             
@@ -979,15 +1057,16 @@ class PropertyRadarImportService:
             logger.warning(f"Failed to parse decimal value '{value}': {e}")
             return None
     
-    def _process_batch(self, batch: List[Dict], csv_import: CSVImport) -> Dict:
+    def _process_batch(self, batch: List[Dict], csv_import: CSVImport, return_contacts: bool = False) -> Tuple[Dict, List[Contact]]:
         """Process a batch of CSV rows with proper transaction management
         
         Args:
             batch: List of CSV row dictionaries
             csv_import: CSV import record
+            return_contacts: Whether to return the list of imported contacts
             
         Returns:
-            Statistics dictionary for the batch
+            Tuple of (Statistics dictionary for the batch, List of imported contacts)
         """
         stats = {
             'total_rows': len(batch),
@@ -997,6 +1076,7 @@ class PropertyRadarImportService:
             'contacts_updated': 0,
             'errors': []
         }
+        imported_contacts = [] if return_contacts else None
         
         # Process batch within a single transaction to maintain consistency
         try:
@@ -1011,13 +1091,21 @@ class PropertyRadarImportService:
                         stats['properties_created'] += 1
                         
                         # Count actual contact operations from row data
-                        primary_contact = self.extract_primary_contact(row)
-                        secondary_contact = self.extract_secondary_contact(row)
+                        primary_contact_data = self.extract_primary_contact(row)
+                        secondary_contact_data = self.extract_secondary_contact(row)
                         
-                        if primary_contact:
+                        if primary_contact_data:
                             stats['contacts_created'] += 1
-                        if secondary_contact:
+                            # Get actual contact object if we need to track for list
+                            if return_contacts and 'primary_contact' in result.value and result.value['primary_contact']:
+                                logger.debug(f"Adding primary contact to list: {result.value['primary_contact']}")
+                                imported_contacts.append(result.value['primary_contact'])
+                        if secondary_contact_data:
                             stats['contacts_created'] += 1
+                            # Get actual contact object if we need to track for list  
+                            if return_contacts and 'secondary_contact' in result.value and result.value['secondary_contact']:
+                                logger.debug(f"Adding secondary contact to list: {result.value['secondary_contact']}")
+                                imported_contacts.append(result.value['secondary_contact'])
                         
                         # Capture any validation errors from successful import
                         if 'errors' in result.value and result.value['errors']:
@@ -1042,7 +1130,9 @@ class PropertyRadarImportService:
             stats['errors'].append(error_msg)
             logger.error(error_msg)
                 
-        return stats
+        if return_contacts:
+            logger.debug(f"Batch processed {len(imported_contacts)} contacts for list association")
+        return stats, imported_contacts if return_contacts else []
     
     def _merge_stats(self, total_stats: Dict, batch_stats: Dict):
         """Merge batch statistics into total statistics
