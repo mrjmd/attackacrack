@@ -62,8 +62,8 @@
                 </div>
                 
                 <!-- Action Buttons -->
-                <div id="action-buttons" class="hidden mt-6 flex gap-3">
-                    <a id="view-list-btn" href="#" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-center transition-colors">
+                <div id="action-buttons" class="{% if list_id %}{% else %}hidden{% endif %} mt-6 flex gap-3">
+                    <a id="view-list-btn" href="{% if list_id %}{{ url_for('campaigns.campaign_list_detail', list_id=list_id) }}{% else %}#{% endif %}" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-center transition-colors{% if not list_id %} opacity-50 cursor-not-allowed{% endif %}">
                         View List
                     </a>
                     <a href="{{ url_for('campaigns.import_csv') }}" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-center transition-colors">
@@ -134,10 +134,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('updated-count').textContent = updated;
                         document.getElementById('error-count').textContent = errorCount;
                         
-                        if (data.result.list_id) {
+                        // FIXED: Only update View List button if we don't already have list_id from template
+                        if (data.result.list_id && viewListBtn.href === '#') {
                             viewListBtn.href = `/campaigns/lists/${data.result.list_id}`;
-                            actionButtons.classList.remove('hidden');
+                            viewListBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                         }
+                        actionButtons.classList.remove('hidden');
                     }
                     
                     // Determine if this is actually a successful import

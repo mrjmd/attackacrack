@@ -585,24 +585,75 @@ class CSVImportService:
             # Step 2: Route to appropriate processing method
             if should_async:
                 # Large file - process asynchronously
+                # CRITICAL FIX: Create campaign list immediately before starting async task
                 try:
+                    from utils.datetime_utils import utc_now
+                    from datetime import datetime
+                    
+                    # Create campaign list immediately so "View List" button works
+                    campaign_list = None
+                    csv_import = None
+                    
+                    if list_name:
+                        # Create the list now, task will populate it later
+                        campaign_list = self.campaign_list_repository.create(
+                            name=list_name,
+                            description=f"Contacts imported from {file.filename}",
+                            created_by=None,  # Could be enhanced to track user
+                            filter_criteria=None
+                        )
+                        
+                        # Create import record with list reference
+                        csv_import = self.csv_import_repository.create(
+                            filename=file.filename,
+                            imported_at=utc_now(),
+                            imported_by=None,
+                            import_type='contacts',
+                            import_metadata={'list_id': campaign_list.id, 'async': True},
+                            total_rows=0,  # Will be updated by task
+                            successful_imports=0,  # Will be updated by task
+                            failed_imports=0  # Will be updated by task
+                        )
+                    
+                    # Now create the async task
                     task_id = self.create_async_import_task(
                         file=file,
                         list_name=list_name,
                         imported_by=None  # Could be enhanced to track user
                     )
                     
-                    return {
+                    # FIXED: Return list_id immediately for "View List" button
+                    result = {
                         'async': True,
                         'task_id': task_id,
-                        'message': 'Large file detected. Import is being processed in the background. Use the task ID to track progress.',
-                        'status': 'queued'
+                        'message': 'Large file detected. List created and import is being processed in the background.',
+                        'status': 'queued',
+                        'list_id': campaign_list.id if campaign_list else None,
+                        'import_id': csv_import.id if csv_import else None
                     }
                     
+                    return result
+                    
                 except Exception as async_error:
-                    # If async task creation fails, fall back to sync
+                    # If async task creation fails, clean up and fall back to sync
                     import logging
                     logging.warning(f"Async task creation failed, falling back to sync: {str(async_error)}")
+                    
+                    # Clean up any partially created resources
+                    if campaign_list:
+                        try:
+                            # Remove the list that was created
+                            self.campaign_list_repository.delete(campaign_list.id)
+                        except Exception:
+                            pass  # Ignore cleanup errors
+                    
+                    if csv_import:
+                        try:
+                            # Remove the import record that was created
+                            self.csv_import_repository.delete(csv_import.id)
+                        except Exception:
+                            pass  # Ignore cleanup errors
+                    
                     return self._process_sync_with_fallback(file, list_name)
             else:
                 # Small file - process synchronously

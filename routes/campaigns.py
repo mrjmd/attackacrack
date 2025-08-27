@@ -452,11 +452,14 @@ def import_csv():
             # Handle async response (large files)
             if result.get('async'):
                 task_id = result.get('task_id')
+                list_id = result.get('list_id')  # FIXED: Get list_id from async result
                 flash(f"Large file detected. Import is processing in the background. Track progress: Task ID {task_id}", 'info')
                 return render_template('campaigns/import_progress.html', 
                                      task_id=task_id, 
                                      list_name=list_name,
+                                     list_id=list_id,  # FIXED: Pass list_id to template
                                      message=result.get('message', 'Import in progress...'))
+            
             
             # Handle sync response (small files)
             if result.get('success'):
