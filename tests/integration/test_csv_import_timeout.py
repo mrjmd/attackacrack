@@ -2,16 +2,10 @@
 
 import os
 import time
-import threading
 import pytest
 from unittest.mock import patch, MagicMock
 from flask import Flask
-from werkzeug.serving import make_server
 import signal
-try:
-    import requests
-except ImportError:
-    requests = None
 
 
 class TestCSVImportTimeout:
@@ -88,51 +82,6 @@ class TestCSVImportTimeout:
                 assert recommended_timeout > default_timeout, \
                     f"{description}: Requires custom timeout of {recommended_timeout}s"
 
-    @pytest.mark.slow
-    @pytest.mark.skip(reason="Long running test - may hang in CI environment")
-    @pytest.mark.skipif(requests is None, reason="requests library not installed")
-    def test_long_running_request_with_timeout(self, test_app):
-        """Test that long-running requests complete within configured timeout."""
-        # This test simulates what happens with different timeout settings
-        
-        import socket
-        
-        def get_free_port():
-            """Get a free port for testing."""
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('', 0))
-                return s.getsockname()[1]
-        
-        def run_server(app):
-            """Run the test server in a thread."""
-            port = get_free_port()
-            server = make_server('127.0.0.1', port, app)
-            server_thread = threading.Thread(target=server.serve_forever)
-            server_thread.daemon = True
-            server_thread.start()
-            return server, port
-        
-        # Start test server
-        server, port = run_server(test_app)
-        time.sleep(1)  # Give server time to start
-        
-        try:
-            # Test health endpoint (should be fast)
-            response = requests.get(f'http://127.0.0.1:{port}/health', timeout=5)
-            assert response.status_code == 200
-            assert response.json()['status'] == 'healthy'
-            
-            # Test simulated CSV import (long-running)
-            # In real scenario with Gunicorn timeout=300, this would complete
-            # Here we just test the endpoint exists and can be called
-            with pytest.raises(requests.exceptions.Timeout):
-                # This will timeout in our test (5s) but would work with Gunicorn timeout=300
-                response = requests.post(
-                    f'http://127.0.0.1:{port}/simulate-csv-import',
-                    timeout=5  # Short timeout for testing
-                )
-        finally:
-            server.shutdown()
 
     def test_timeout_environment_variable_precedence(self):
         """Test that environment variables take precedence over defaults."""
