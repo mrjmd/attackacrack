@@ -5,10 +5,13 @@ CSV Import Service - Enhanced CSV import with smart column detection and list ma
 import csv
 import os
 import re
+import logging
 from datetime import datetime
 from utils.datetime_utils import utc_now
 from typing import List, Dict, Optional, Tuple, Any
 from werkzeug.datastructures import FileStorage
+
+logger = logging.getLogger(__name__)
 # Model imports removed - using repositories only
 from services.contact_service_refactored import ContactService
 from repositories.csv_import_repository import CSVImportRepository
@@ -291,12 +294,21 @@ class CSVImportService:
             # Create campaign list if requested using repository
             if create_list:
                 list_name = list_name or f"Import: {filename} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                campaign_list = self.campaign_list_repository.create(
-                    name=list_name,
-                    description=f"Contacts imported from {filename}",
-                    created_by=imported_by,
-                    filter_criteria={'csv_import_id': csv_import.id}
-                )
+                logger.info(f"Creating campaign list: {list_name}")
+                try:
+                    campaign_list = self.campaign_list_repository.create(
+                        name=list_name,
+                        description=f"Contacts imported from {filename}",
+                        created_by=imported_by,
+                        filter_criteria={'csv_import_id': csv_import.id}
+                    )
+                    # CRITICAL FIX: Commit the session immediately to persist the campaign list
+                    from extensions import db
+                    db.session.commit()
+                    logger.info(f"Campaign list created and committed: ID={campaign_list.id}")
+                except Exception as e:
+                    logger.error(f"Campaign list creation failed: {e}")
+                    campaign_list = None
             with open(temp_path, mode='r', encoding='utf-8', errors='ignore') as csvfile:
                 # Try to detect delimiter
                 sample = csvfile.read(1024)
@@ -517,6 +529,8 @@ class CSVImportService:
         results['import_id'] = csv_import.id if csv_import else None
         results['list_id'] = campaign_list.id if campaign_list else None
         
+        logger.info(f"CSV import completed: import_id={results['import_id']}, list_id={results['list_id']}")
+        
         return results
     
     def _extract_metadata(self, row: Dict[str, str]) -> Dict[str, any]:
@@ -595,25 +609,36 @@ class CSVImportService:
                     csv_import = None
                     
                     if list_name:
-                        # Create the list now, task will populate it later
-                        campaign_list = self.campaign_list_repository.create(
-                            name=list_name,
-                            description=f"Contacts imported from {file.filename}",
-                            created_by=None,  # Could be enhanced to track user
-                            filter_criteria=None
-                        )
-                        
-                        # Create import record with list reference
-                        csv_import = self.csv_import_repository.create(
-                            filename=file.filename,
-                            imported_at=utc_now(),
-                            imported_by=None,
-                            import_type='contacts',
-                            import_metadata={'list_id': campaign_list.id, 'async': True},
-                            total_rows=0,  # Will be updated by task
-                            successful_imports=0,  # Will be updated by task
-                            failed_imports=0  # Will be updated by task
-                        )
+                        logger.info(f"ASYNC: Creating campaign list: {list_name}")
+                        try:
+                            # Create the list now, task will populate it later
+                            campaign_list = self.campaign_list_repository.create(
+                                name=list_name,
+                                description=f"Contacts imported from {file.filename}",
+                                created_by=None,  # Could be enhanced to track user
+                                filter_criteria=None
+                            )
+                            
+                            # Create import record with list reference
+                            csv_import = self.csv_import_repository.create(
+                                filename=file.filename,
+                                imported_at=utc_now(),
+                                imported_by=None,
+                                import_type='contacts',
+                                import_metadata={'list_id': campaign_list.id, 'async': True},
+                                total_rows=0,  # Will be updated by task
+                                successful_imports=0,  # Will be updated by task
+                                failed_imports=0  # Will be updated by task
+                            )
+                            
+                            # CRITICAL FIX: Commit both the campaign list and CSV import immediately
+                            from extensions import db
+                            db.session.commit()
+                            logger.info(f"ASYNC: Campaign list and import created and committed: list_id={campaign_list.id}, import_id={csv_import.id}")
+                        except Exception as e:
+                            logger.error(f"ASYNC: Campaign list/import creation failed: {e}")
+                            campaign_list = None
+                            csv_import = None
                     
                     # Now create the async task
                     task_id = self.create_async_import_task(
@@ -623,13 +648,17 @@ class CSVImportService:
                     )
                     
                     # FIXED: Return list_id immediately for "View List" button
+                    list_id = campaign_list.id if campaign_list else None
+                    import_id = csv_import.id if csv_import else None
+                    logger.info(f"ASYNC: Returning result with list_id={list_id}, import_id={import_id}")
+                    
                     result = {
                         'async': True,
                         'task_id': task_id,
                         'message': 'Large file detected. List created and import is being processed in the background.',
                         'status': 'queued',
-                        'list_id': campaign_list.id if campaign_list else None,
-                        'import_id': csv_import.id if csv_import else None
+                        'list_id': list_id,
+                        'import_id': import_id
                     }
                     
                     return result
