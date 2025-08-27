@@ -47,3 +47,11 @@ def init_app(app):
     # Register data normalization commands
     from scripts.normalize_existing_data import register_commands as register_normalization_commands
     register_normalization_commands(app)
+    
+    # Register CSV import fix commands
+    from scripts.fix_csv_import_records import register_commands as register_csv_fix_commands
+    register_csv_fix_commands(app)
+    
+    # Register specific CSV import fix commands
+    from scripts.fix_specific_csv_import import register_commands as register_specific_csv_commands
+    register_specific_csv_commands(app)

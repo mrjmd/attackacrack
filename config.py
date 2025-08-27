@@ -22,6 +22,10 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     FLASK_ENV = os.environ.get('FLASK_ENV')
     
+    # Gunicorn Configuration
+    GUNICORN_TIMEOUT = int(os.environ.get('GUNICORN_TIMEOUT', '300'))  # 5 minutes default for CSV imports
+    GUNICORN_WORKERS = int(os.environ.get('GUNICORN_WORKERS', '4'))  # Default 4 workers
+    
     @classmethod
     def validate_required_config(cls) -> None:
         """Validate that all required configuration is present"""

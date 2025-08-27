@@ -16,5 +16,9 @@ flask db upgrade
 unset SKIP_ENV_VALIDATION
 
 # Start the Gunicorn server
-echo "Starting Gunicorn..."
-exec gunicorn --workers=4 --bind=0.0.0.0:5000 "app:create_app()"
+# Set timeout with environment variable, default to 300 seconds (5 minutes) for CSV imports
+GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-300}
+GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
+
+echo "Starting Gunicorn with timeout=${GUNICORN_TIMEOUT}s and workers=${GUNICORN_WORKERS}..."
+exec gunicorn --workers=${GUNICORN_WORKERS} --bind=0.0.0.0:5000 --timeout=${GUNICORN_TIMEOUT} "app:create_app()"

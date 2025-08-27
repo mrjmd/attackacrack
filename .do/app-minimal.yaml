@@ -27,6 +27,10 @@ services:
         value: ${db.DATABASE_URL}
       - key: POSTGRES_URI
         value: ${db.DATABASE_URL}
+      - key: GUNICORN_TIMEOUT
+        value: "300"
+      - key: GUNICORN_WORKERS
+        value: "4"
       # All other env vars managed in DO UI
 
 workers:

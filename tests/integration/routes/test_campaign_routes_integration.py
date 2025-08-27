@@ -4,7 +4,7 @@ Tests the full request/response cycle with real database
 """
 import pytest
 from flask import url_for
-from crm_database import Campaign, CampaignMembership, Contact, CampaignList
+from crm_database import Campaign, CampaignMembership, Contact, CampaignList, CSVImport
 from unittest.mock import patch, Mock
 
 
@@ -296,3 +296,112 @@ class TestCampaignRoutesIntegration:
         
         # Assert - just check that refresh succeeded and we got redirected
         assert response.status_code == 200
+    
+    def test_campaign_lists_page_with_null_failed_imports(self, authenticated_client, db_session):
+        """Test campaign lists page handles CSV imports with null failed_imports
+        
+        This reproduces a production bug where failed_imports could be None/NULL
+        causing template crashes when checking 'import.failed_imports > 0'
+        """
+        from datetime import datetime
+        
+        # Create test lists
+        list1 = CampaignList(name="Test List", is_dynamic=False)
+        db_session.add(list1)
+        db_session.commit()
+        
+        # Create CSV import with failed_imports as None (reproduces production bug)
+        csv_import = CSVImport(
+            filename="test.csv",
+            imported_at=datetime.utcnow(),
+            total_rows=10,
+            successful_imports=8,
+            failed_imports=None  # This should cause template crash at line 101
+        )
+        db_session.add(csv_import)
+        db_session.commit()
+        
+        # Mock the CSV service to return our problematic import
+        with patch('services.csv_import_service.CSVImportService.get_import_history') as mock_history:
+            mock_history.return_value = [csv_import]
+            
+            # Request the page - this should crash with TypeError: 
+            # "unsupported operand type(s) for >: 'NoneType' and 'int'"
+            response = authenticated_client.get('/campaigns/lists')
+            
+            # This assertion will fail initially (RED phase) because template crashes
+            assert response.status_code == 200
+            assert b'test.csv' in response.data
+            assert b'Complete' in response.data  # Should show "Complete" when failed_imports is None
+    
+    def test_campaign_lists_page_with_zero_failed_imports(self, authenticated_client, db_session):
+        """Test campaign lists page correctly shows complete when failed_imports is 0
+        
+        This tests the edge case where failed_imports = 0 (not None)
+        """
+        from datetime import datetime
+        
+        # Create test lists
+        list1 = CampaignList(name="Test List", is_dynamic=False)
+        db_session.add(list1)
+        db_session.commit()
+        
+        # Create CSV import with failed_imports = 0
+        csv_import = CSVImport(
+            filename="success_test.csv",
+            imported_at=datetime.utcnow(),
+            total_rows=10,
+            successful_imports=10,
+            failed_imports=0  # This should show "Complete"
+        )
+        db_session.add(csv_import)
+        db_session.commit()
+        
+        # Mock the CSV service to return our successful import
+        with patch('services.csv_import_service.CSVImportService.get_import_history') as mock_history:
+            mock_history.return_value = [csv_import]
+            
+            # Request the page
+            response = authenticated_client.get('/campaigns/lists')
+            
+            # Assert that it shows complete
+            assert response.status_code == 200
+            assert b'success_test.csv' in response.data
+            assert b'Complete' in response.data  # Should show "Complete" when failed_imports = 0
+            assert b'failed' not in response.data  # Should NOT show any "failed" text
+    
+    def test_campaign_lists_page_with_failed_imports_value(self, authenticated_client, db_session):
+        """Test campaign lists page correctly shows failed imports when failed_imports has a value
+        
+        This ensures our fix doesn't break the normal case where failed_imports > 0
+        """
+        from datetime import datetime
+        
+        # Create test lists
+        list1 = CampaignList(name="Test List", is_dynamic=False)
+        db_session.add(list1)
+        db_session.commit()
+        
+        # Create CSV import with failed_imports > 0
+        csv_import = CSVImport(
+            filename="failed_test.csv",
+            imported_at=datetime.utcnow(),
+            total_rows=10,
+            successful_imports=7,
+            failed_imports=3  # This should show "3 failed" badge
+        )
+        db_session.add(csv_import)
+        db_session.commit()
+        
+        # Mock the CSV service to return our import with failures
+        with patch('services.csv_import_service.CSVImportService.get_import_history') as mock_history:
+            mock_history.return_value = [csv_import]
+            
+            # Request the page
+            response = authenticated_client.get('/campaigns/lists')
+            
+            # Assert that it shows the failed count
+            assert response.status_code == 200
+            assert b'failed_test.csv' in response.data
+            assert b'3 failed' in response.data  # Should show "3 failed" badge
+            assert b'Complete' not in response.data  # Should NOT show "Complete"

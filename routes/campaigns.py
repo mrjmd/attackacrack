@@ -446,8 +446,22 @@ def import_csv():
                 enrichment_mode=enrichment_mode
             )
             
-            if result['success']:
-                flash(f"Successfully imported {result['imported']} contacts. {result['updated']} updated, {result['errors']} errors.", 'success')
+            # Handle async response (large files)
+            if result.get('async'):
+                task_id = result.get('task_id')
+                flash(f"Large file detected. Import is processing in the background. Track progress: Task ID {task_id}", 'info')
+                return render_template('campaigns/import_progress.html', 
+                                     task_id=task_id, 
+                                     list_name=list_name,
+                                     message=result.get('message', 'Import in progress...'))
+            
+            # Handle sync response (small files)
+            if result.get('success'):
+                imported_count = result.get('imported', 0)
+                updated_count = result.get('updated', 0)
+                error_count = len(result.get('errors', []))
+                
+                flash(f"Successfully imported {imported_count} contacts. {updated_count} updated, {error_count} errors.", 'success')
                 if result.get('list_id'):
                     return redirect(url_for('campaigns.campaign_list_detail', list_id=result['list_id']))
             else:
@@ -463,6 +477,28 @@ def import_csv():
         recent_imports = csv_service.get_import_history(limit=10)
     
     return render_template('campaigns/import_csv.html', recent_imports=recent_imports)
+
+
+@campaigns_bp.route("/campaigns/import-progress/<task_id>")
+@login_required
+def import_progress(task_id):
+    """Get progress of async CSV import task"""
+    csv_service = current_app.services.get('csv_import')
+    if not csv_service:
+        return jsonify({'error': 'CSV import service not available'}), 500
+    
+    try:
+        progress = csv_service.get_import_progress(task_id)
+        return jsonify(progress)
+    except Exception as e:
+        return jsonify({'error': f'Error getting progress: {str(e)}'}), 500
+
+
+@campaigns_bp.route("/campaigns/import-status/<task_id>")
+@login_required
+def import_status_page(task_id):
+    """Display import progress page"""
+    return render_template('campaigns/import_progress.html', task_id=task_id)
 
 
 @campaigns_bp.route('/opt-out-report')

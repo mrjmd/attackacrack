@@ -118,6 +118,7 @@ try:
         import tasks.webhook_retry_tasks
         import tasks.reconciliation_tasks
         import tasks.campaign_scheduling_tasks
+        import tasks.csv_import_tasks
         print("Successfully imported tasks")
         print(f"Registered tasks: {list(celery.tasks.keys())}")
 except Exception as e:

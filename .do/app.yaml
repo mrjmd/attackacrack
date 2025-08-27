@@ -109,6 +109,12 @@ services:
     scope: RUN_AND_BUILD_TIME
     type: SECRET
     value: EV[1:Fkkrf3dyhRxdQdnXffYqM3vMv5/lU2W7:g2CxEI+6dCpujlqxsmqF/mldvTmDbl0egd6zytcM1DCVevUrnIz+ny6dfpFzktErw+Y2VnkDxgv6N0b8]
+  - key: GUNICORN_TIMEOUT
+    scope: RUN_AND_BUILD_TIME
+    value: "300"
+  - key: GUNICORN_WORKERS
+    scope: RUN_AND_BUILD_TIME
+    value: "4"
   health_check:
     http_path: /health
     port: 5000

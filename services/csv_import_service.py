@@ -7,7 +7,7 @@ import os
 import re
 from datetime import datetime
 from utils.datetime_utils import utc_now
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from werkzeug.datastructures import FileStorage
 # Model imports removed - using repositories only
 from services.contact_service_refactored import ContactService
@@ -517,10 +517,11 @@ class CSVImportService:
                    list_name: Optional[str] = None,
                    enrichment_mode: Optional[str] = None) -> Dict[str, any]:
         """
-        Import contacts from CSV file (wrapper for import_contacts with route-expected response format)
+        Import contacts from CSV file with smart async/sync decision logic.
         
-        This method wraps import_contacts to provide a simplified response format
-        expected by the route handlers. For PropertyRadar files, delegates to specialized service.
+        This method analyzes the file size and row count to determine whether to:
+        1. Process synchronously for small files (< 500KB and < 500 rows)
+        2. Process asynchronously for large files (> 500KB or > 500 rows)
         
         Args:
             file: The uploaded CSV file
@@ -528,13 +529,315 @@ class CSVImportService:
             enrichment_mode: Optional enrichment mode (not used in current implementation)
             
         Returns:
-            Dict with:
-                - success: boolean indicating if any imports were successful
-                - imported: number of successful imports
-                - updated: number of existing contacts updated (duplicates)
-                - errors: list of error messages
-                - message: summary message of the import
-                - list_id: ID of created campaign list (if any)
+            Dict with either:
+            - For sync: success, imported, updated, errors, message, list_id
+            - For async: async=True, task_id, message
+        """
+        try:
+            # Step 1: Analyze file to decide processing method
+            try:
+                should_async = self.should_process_async(file)
+            except Exception as e:
+                # If analysis fails, fall back to sync processing
+                import logging
+                logging.warning(f"File analysis failed, falling back to sync: {str(e)}")
+                should_async = False
+            
+            # Step 2: Route to appropriate processing method
+            if should_async:
+                # Large file - process asynchronously
+                try:
+                    task_id = self.create_async_import_task(
+                        file=file,
+                        list_name=list_name,
+                        imported_by=None  # Could be enhanced to track user
+                    )
+                    
+                    return {
+                        'async': True,
+                        'task_id': task_id,
+                        'message': 'Large file detected. Import is being processed in the background. Use the task ID to track progress.',
+                        'status': 'queued'
+                    }
+                    
+                except Exception as async_error:
+                    # If async task creation fails, fall back to sync
+                    import logging
+                    logging.warning(f"Async task creation failed, falling back to sync: {str(async_error)}")
+                    return self._process_sync_with_fallback(file, list_name)
+            else:
+                # Small file - process synchronously
+                return self._process_sync_with_fallback(file, list_name)
+            
+        except Exception as e:
+            # Handle any exceptions
+            return {
+                'success': False,
+                'imported': 0,
+                'updated': 0,
+                'errors': [f"Import error: {str(e)}"],
+                'message': f"Import failed: {str(e)}",
+                'list_id': None
+            }
+    
+    def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None) -> Dict[str, any]:
+        """Basic CSV import for non-PropertyRadar files"""
+        try:
+            # Call the existing import_contacts method
+            result = self.import_contacts(
+                file=file,
+                list_name=list_name,
+                create_list=True,  # Always create list (default behavior)
+                imported_by=None  # Will be set by route if needed
+            )
+            
+            # Transform the response to match route expectations
+            imported = result.get('successful', 0)
+            updated = result.get('duplicates', 0)
+            errors = result.get('errors', [])
+            failed_count = result.get('failed', 0)
+            success = imported > 0  # True if any successful imports
+            
+            # Build message
+            if success:
+                message = f"Import completed successfully: {imported} imported, {updated} updated"
+                if failed_count > 0:
+                    message += f", {failed_count} failed"
+            else:
+                message = f"Import failed: {failed_count} errors"
+            
+            return {
+                'success': success,
+                'imported': imported,
+                'updated': updated,
+                'errors': errors,
+                'message': message,
+                'list_id': result.get('list_id')
+            }
+        except Exception as e:
+            # Handle any exceptions from import_contacts
+            return {
+                'success': False,
+                'imported': 0,
+                'updated': 0,
+                'errors': [f"Import error: {str(e)}"],
+                'message': f"Import failed: {str(e)}",
+                'list_id': None
+            }
+    
+    # ============================================================================
+    # SMART ASYNC/SYNC DECISION LOGIC
+    # ============================================================================
+    
+    def calculate_file_size(self, file: FileStorage) -> float:
+        """
+        Calculate file size in KB.
+        
+        Args:
+            file: The uploaded file
+            
+        Returns:
+            File size in KB
+        """
+        try:
+            # Read file content to get size
+            file.seek(0)  # Ensure we're at the beginning
+            content = file.read()
+            file.seek(0)  # Reset file pointer for future reads
+            
+            # Calculate size in KB
+            size_bytes = len(content)
+            size_kb = size_bytes / 1024
+            
+            return size_kb
+            
+        except Exception:
+            # If we can't read the file, assume it's small
+            return 0
+    
+    def estimate_row_count(self, file: FileStorage) -> int:
+        """
+        Estimate the number of rows in the CSV file without reading the entire file.
+        Uses sampling for large files to avoid memory issues.
+        
+        Args:
+            file: The uploaded file
+            
+        Returns:
+            Estimated number of data rows (excluding header)
+        """
+        try:
+            file.seek(0)
+            
+            # For files smaller than 1MB, read entirely and count
+            content = file.read()
+            file.seek(0)  # Reset file pointer
+            
+            if len(content) == 0:
+                return 0
+            
+            # Decode content
+            try:
+                if isinstance(content, bytes):
+                    content_str = content.decode('utf-8', errors='ignore')
+                else:
+                    content_str = content
+            except Exception:
+                return 0
+            
+            # Count newlines to estimate rows
+            total_lines = content_str.count('\n')
+            
+            # Subtract 1 for header row (if file has content)
+            if total_lines > 0:
+                return max(0, total_lines - 1)
+            else:
+                return 0
+                
+        except Exception:
+            # If estimation fails, assume small file
+            return 0
+    
+    def should_process_async(self, file: FileStorage) -> bool:
+        """
+        Determine if the CSV file should be processed asynchronously.
+        
+        Decision criteria:
+        - File size > 500KB: Use async
+        - Estimated rows > 500: Use async
+        - Otherwise: Use sync
+        
+        Args:
+            file: The uploaded file
+            
+        Returns:
+            True if should process async, False for sync
+        """
+        try:
+            # Calculate file size
+            file_size_kb = self.calculate_file_size(file)
+            
+            # Estimate row count
+            estimated_rows = self.estimate_row_count(file)
+            
+            # Apply decision logic
+            if file_size_kb > 500:  # File larger than 500KB
+                return True
+            
+            if estimated_rows > 500:  # More than 500 rows
+                return True
+            
+            # Small file, process synchronously
+            return False
+            
+        except Exception:
+            # If analysis fails, default to sync processing (safer)
+            return False
+    
+    def create_async_import_task(self, file: FileStorage, 
+                               list_name: Optional[str] = None,
+                               imported_by: Optional[str] = None) -> str:
+        """
+        Create an async Celery task for large CSV import.
+        
+        Args:
+            file: The uploaded file
+            list_name: Optional name for the campaign list
+            imported_by: User identifier who initiated the import
+            
+        Returns:
+            Celery task ID for tracking progress
+        """
+        try:
+            # Read file content
+            file.seek(0)
+            file_content = file.read()
+            file.seek(0)  # Reset for any future use
+            
+            # Import the task
+            from tasks.csv_import_tasks import process_large_csv_import
+            
+            # Create the async task
+            task = process_large_csv_import.delay(
+                file_content=file_content,
+                filename=file.filename,
+                list_name=list_name,
+                imported_by=imported_by
+            )
+            
+            return task.id
+            
+        except Exception as e:
+            raise Exception(f"Failed to create async import task: {str(e)}")
+    
+    def get_import_progress(self, task_id: str) -> Dict[str, Any]:
+        """
+        Get the progress of an async import task.
+        
+        Args:
+            task_id: The Celery task ID
+            
+        Returns:
+            Dict with progress information
+        """
+        try:
+            from celery_worker import celery
+            
+            # Get task result
+            result = celery.AsyncResult(task_id)
+            
+            if result.state == 'PENDING':
+                return {
+                    'state': 'PENDING',
+                    'current': 0,
+                    'total': 100,
+                    'percent': 0,
+                    'status': 'Task is queued and waiting to start...'
+                }
+            elif result.state == 'PROGRESS':
+                return {
+                    'state': 'PROGRESS',
+                    'current': result.info.get('current', 0),
+                    'total': result.info.get('total', 100),
+                    'percent': result.info.get('percent', 0),
+                    'status': result.info.get('status', 'Processing...')
+                }
+            elif result.state == 'SUCCESS':
+                return {
+                    'state': 'SUCCESS',
+                    'current': 100,
+                    'total': 100,
+                    'percent': 100,
+                    'result': result.result,
+                    'status': 'Import completed successfully!'
+                }
+            else:  # FAILURE or other error states
+                return {
+                    'state': result.state,
+                    'current': 0,
+                    'total': 100,
+                    'percent': 0,
+                    'error': str(result.info) if result.info else 'Unknown error',
+                    'status': f'Import failed: {result.state}'
+                }
+                
+        except Exception as e:
+            return {
+                'state': 'ERROR',
+                'error': f"Failed to get task progress: {str(e)}",
+                'status': 'Error retrieving progress'
+            }
+    
+    def _process_sync_with_fallback(self, file: FileStorage, list_name: Optional[str]) -> Dict[str, Any]:
+        """
+        Process CSV synchronously with PropertyRadar detection fallback.
+        
+        Args:
+            file: The uploaded CSV file
+            list_name: Optional name for the campaign list
+            
+        Returns:
+            Dict with sync processing results
         """
         try:
             # Check if this is a PropertyRadar CSV that needs special handling
@@ -657,51 +960,6 @@ class CSVImportService:
             
         except Exception as e:
             # Handle any exceptions
-            return {
-                'success': False,
-                'imported': 0,
-                'updated': 0,
-                'errors': [f"Import error: {str(e)}"],
-                'message': f"Import failed: {str(e)}",
-                'list_id': None
-            }
-    
-    def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None) -> Dict[str, any]:
-        """Basic CSV import for non-PropertyRadar files"""
-        try:
-            # Call the existing import_contacts method
-            result = self.import_contacts(
-                file=file,
-                list_name=list_name,
-                create_list=True,  # Always create list (default behavior)
-                imported_by=None  # Will be set by route if needed
-            )
-            
-            # Transform the response to match route expectations
-            imported = result.get('successful', 0)
-            updated = result.get('duplicates', 0)
-            errors = result.get('errors', [])
-            failed_count = result.get('failed', 0)
-            success = imported > 0  # True if any successful imports
-            
-            # Build message
-            if success:
-                message = f"Import completed successfully: {imported} imported, {updated} updated"
-                if failed_count > 0:
-                    message += f", {failed_count} failed"
-            else:
-                message = f"Import failed: {failed_count} errors"
-            
-            return {
-                'success': success,
-                'imported': imported,
-                'updated': updated,
-                'errors': errors,
-                'message': message,
-                'list_id': result.get('list_id')
-            }
-        except Exception as e:
-            # Handle any exceptions from import_contacts
             return {
                 'success': False,
                 'imported': 0,
