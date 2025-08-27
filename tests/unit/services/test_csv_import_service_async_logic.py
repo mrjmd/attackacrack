@@ -538,16 +538,18 @@ class TestAsyncTaskCreation:
         assert callable(getattr(csv_import_service_with_async, 'create_async_import_task')), \
             "create_async_import_task should be callable"
     
-    @patch('services.csv_import_service.celery_app')
-    def test_create_async_import_task_creates_celery_task(self, mock_celery, csv_import_service_with_async):
+    @patch('tasks.csv_import_tasks.process_large_csv_import.delay')
+    def test_create_async_import_task_creates_celery_task(self, mock_delay, csv_import_service_with_async):
         """Test that async import task is properly created in Celery"""
         # Arrange
         mock_task = Mock()
         mock_task.id = 'test-task-id-12345'
-        mock_celery.send_task.return_value = mock_task
+        mock_delay.return_value = mock_task
         
         mock_file = Mock()
         mock_file.filename = 'test.csv'
+        mock_file.read.return_value = b'first_name,last_name,phone\nJohn,Doe,5551234567'
+        mock_file.seek = Mock()
         
         # Act
         task_id = csv_import_service_with_async.create_async_import_task(
@@ -558,18 +560,20 @@ class TestAsyncTaskCreation:
         
         # Assert
         assert task_id == 'test-task-id-12345', "Should return the Celery task ID"
-        mock_celery.send_task.assert_called_once(), "Should create Celery task"
+        mock_delay.assert_called_once(), "Should call delay method to create task"
     
-    @patch('services.csv_import_service.celery_app')
-    def test_create_async_import_task_passes_correct_parameters(self, mock_celery, csv_import_service_with_async):
+    @patch('tasks.csv_import_tasks.process_large_csv_import.delay')
+    def test_create_async_import_task_passes_correct_parameters(self, mock_delay, csv_import_service_with_async):
         """Test that correct parameters are passed to the Celery task"""
         # Arrange
         mock_task = Mock()
         mock_task.id = 'task-123'
-        mock_celery.send_task.return_value = mock_task
+        mock_delay.return_value = mock_task
         
         mock_file = Mock()
         mock_file.filename = 'large_file.csv'
+        mock_file.read.return_value = b'first_name,last_name,phone\nJohn,Doe,5551234567'
+        mock_file.seek = Mock()
         
         # Act
         task_id = csv_import_service_with_async.create_async_import_task(
@@ -579,21 +583,25 @@ class TestAsyncTaskCreation:
         )
         
         # Assert
-        args, kwargs = mock_celery.send_task.call_args
-        task_name = args[0]
-        task_args = kwargs.get('args', [])
+        mock_delay.assert_called_once()
+        call_args = mock_delay.call_args
+        kwargs = call_args[1] if call_args[1] else {}
         
-        assert 'csv_import' in task_name.lower(), "Task name should indicate CSV import"
-        assert len(task_args) >= 3, "Should pass file, list_name, and imported_by parameters"
+        assert kwargs['filename'] == 'large_file.csv', "Should pass filename"
+        assert kwargs['list_name'] == 'Large Import List', "Should pass list name"
+        assert kwargs['imported_by'] == 'admin_user', "Should pass imported_by"
+        assert 'file_content' in kwargs, "Should pass file content"
     
-    @patch('services.csv_import_service.celery_app')
-    def test_create_async_import_task_handles_celery_failure(self, mock_celery, csv_import_service_with_async):
+    @patch('tasks.csv_import_tasks.process_large_csv_import.delay')
+    def test_create_async_import_task_handles_celery_failure(self, mock_delay, csv_import_service_with_async):
         """Test handling of Celery task creation failure"""
         # Arrange
-        mock_celery.send_task.side_effect = Exception("Celery broker unavailable")
+        mock_delay.side_effect = Exception("Celery broker unavailable")
         
         mock_file = Mock()
         mock_file.filename = 'test.csv'
+        mock_file.read.return_value = b'first_name,last_name,phone\nJohn,Doe,5551234567'
+        mock_file.seek = Mock()
         
         # Act & Assert
         with pytest.raises(Exception) as exc_info:
@@ -620,7 +628,7 @@ class TestProgressTracking:
         assert callable(getattr(csv_import_service_with_async, 'get_import_progress')), \
             "get_import_progress should be callable"
     
-    @patch('services.csv_import_service.celery_app')
+    @patch('celery_worker.celery')
     def test_get_import_progress_returns_task_status(self, mock_celery, csv_import_service_with_async):
         """Test that import progress returns current task status"""
         # Arrange
@@ -644,7 +652,7 @@ class TestProgressTracking:
         assert progress['total'] == 500, "Should return total items"
         assert progress['percent'] == 30, "Should return percentage complete"
     
-    @patch('services.csv_import_service.celery_app')
+    @patch('celery_worker.celery')
     def test_get_import_progress_handles_completed_task(self, mock_celery, csv_import_service_with_async):
         """Test progress tracking for completed task"""
         # Arrange
@@ -669,7 +677,7 @@ class TestProgressTracking:
         assert 'result' in progress, "Should include final results"
         assert progress['result']['successful'] == 480, "Should include success count"
     
-    @patch('services.csv_import_service.celery_app')
+    @patch('celery_worker.celery')
     def test_get_import_progress_handles_failed_task(self, mock_celery, csv_import_service_with_async):
         """Test progress tracking for failed task"""
         # Arrange
@@ -687,7 +695,7 @@ class TestProgressTracking:
         assert progress['state'] == 'FAILURE', "Should indicate failure"
         assert 'error' in progress, "Should include error information"
     
-    @patch('services.csv_import_service.celery_app')
+    @patch('celery_worker.celery')
     def test_get_import_progress_handles_pending_task(self, mock_celery, csv_import_service_with_async):
         """Test progress tracking for pending/queued task"""
         # Arrange
@@ -705,7 +713,7 @@ class TestProgressTracking:
         assert progress['state'] == 'PENDING', "Should indicate task is queued"
         assert progress.get('current', 0) == 0, "Should show no progress for pending task"
     
-    @patch('services.csv_import_service.celery_app')
+    @patch('celery_worker.celery')
     def test_get_import_progress_handles_invalid_task_id(self, mock_celery, csv_import_service_with_async):
         """Test progress tracking with invalid task ID"""
         # Arrange
@@ -821,7 +829,7 @@ class TestEnhancedImportCSVMethod:
         
         assert result['async'] is True, "Should indicate async processing"
         assert result['task_id'] == 'task-id-789', "Should include task ID"
-        assert 'async' in result['message'].lower(), "Message should indicate async processing"
+        assert ('async' in result['message'].lower() or 'background' in result['message'].lower()), "Message should indicate async processing"
     
     @patch.object(CSVImportService, 'should_process_async')
     @patch.object(CSVImportService, 'create_async_import_task')
@@ -842,9 +850,16 @@ class TestEnhancedImportCSVMethod:
         )
         
         # Assert that async task creation received correct parameters
-        args, kwargs = mock_create_task.call_args
-        assert args[0] is mock_file, "Should pass file to async task"
-        assert 'list_name' in kwargs or len(args) > 1, "Should pass list_name"
+        mock_create_task.assert_called_once()
+        call_args = mock_create_task.call_args
+        args, kwargs = call_args if call_args else ([], {})
+        
+        # Check that file is passed (either as positional or keyword argument)
+        assert ('file' in kwargs and kwargs['file'] is mock_file) or (len(args) > 0 and args[0] is mock_file), "Should pass file to async task"
+        
+        # Check that list_name is passed
+        assert ('list_name' in kwargs and kwargs['list_name'] == 'Custom List Name') or (len(args) > 1), "Should pass list_name"
+        
         # Note: enrichment_mode may not be passed if not implemented yet
 
 
@@ -947,14 +962,14 @@ class TestAsyncLogicErrorHandling:
         mock_file.read = Mock(side_effect=IOError("File read error"))
         mock_file.seek = Mock()
         
-        with patch.object(csv_import_service_with_async, '_basic_import_csv') as mock_basic:
-            mock_basic.return_value = {'success': False, 'errors': ['File read error']}
+        with patch.object(csv_import_service_with_async, '_process_sync_with_fallback') as mock_sync:
+            mock_sync.return_value = {'success': False, 'errors': ['File read error']}
             
             # Act
             result = csv_import_service_with_async.import_csv(file=mock_file)
         
         # Assert fallback to sync processing
-        mock_basic.assert_called(), "Should fall back to sync processing on analysis error"
+        mock_sync.assert_called(), "Should fall back to sync processing on analysis error"
         assert 'task_id' not in result, "Error scenarios should not create async tasks"
     
     def test_async_task_creation_failure_falls_back_to_sync(self, csv_import_service_with_async, file_size_test_helper):
