@@ -149,20 +149,22 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
             
             csv_import_service.import_contacts = progress_wrapper
             
-            # Process the CSV import
-            result = csv_import_service.import_contacts(
+            # Process the CSV import using the _process_sync_with_fallback method
+            # which handles PropertyRadar and other CSV formats properly
+            result = csv_import_service._process_sync_with_fallback(
                 file=mock_file,
-                list_name=list_name,
-                create_list=True,
-                imported_by=imported_by
+                list_name=list_name
             )
+            
+            # The _process_sync_with_fallback method returns a dict already
+            # (it handles Result object transformation internally)
             
             # Final progress update
             self.update_state(
                 state='PROGRESS',
                 meta={
-                    'current': result.get('total_rows', 0),
-                    'total': result.get('total_rows', 0),
+                    'current': result.get('imported', 0) + result.get('updated', 0),
+                    'total': result.get('imported', 0) + result.get('updated', 0),
                     'percent': 100,
                     'status': 'Import completed successfully!'
                 }
@@ -174,17 +176,17 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
             except Exception:
                 pass
             
-            # Return success result
+            # Return success result (using the dict keys from _process_sync_with_fallback)
             return {
                 'status': 'success',
-                'imported': result.get('successful', 0),
-                'updated': result.get('duplicates', 0),
-                'failed': result.get('failed', 0),
+                'imported': result.get('imported', 0),
+                'updated': result.get('updated', 0),
+                'failed': len(result.get('errors', [])),
                 'errors': result.get('errors', []),
-                'total_rows': result.get('total_rows', 0),
+                'total_rows': result.get('imported', 0) + result.get('updated', 0),
                 'import_id': result.get('import_id'),
                 'list_id': result.get('list_id'),
-                'message': f"Import completed: {result.get('successful', 0)} imported, {result.get('duplicates', 0)} updated"
+                'message': result.get('message', f"Import completed: {result.get('imported', 0)} imported, {result.get('updated', 0)} updated")
             }
             
     except Retry:

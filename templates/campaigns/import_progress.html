@@ -1,0 +1,165 @@
+{% extends "base_authenticated.html" %}
+
+{% block title %}Import Progress{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div class="bg-gray-700 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-white">CSV Import Progress</h1>
+            <a href="{{ url_for('campaigns.campaign_lists') }}" class="text-gray-400 hover:text-white">
+                ← Back to Lists
+            </a>
+        </div>
+        
+        <!-- Progress Container -->
+        <div class="space-y-4">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-lg font-semibold text-white mb-4">
+                    {% if list_name %}
+                        Importing: {{ list_name }}
+                    {% else %}
+                        Processing CSV Import
+                    {% endif %}
+                </h2>
+                
+                <!-- Task ID Display -->
+                <div class="bg-gray-900 rounded-lg p-3 mb-4">
+                    <p class="text-sm text-gray-400 mb-1">Task ID:</p>
+                    <p class="text-sm font-mono text-blue-400">{{ task_id }}</p>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm text-gray-400 mb-2">
+                        <span>Progress</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-600 rounded-full h-3">
+                        <div id="progress-bar" class="bg-blue-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <!-- Status Message -->
+                <div id="status-message" class="bg-gray-900 rounded-lg p-3">
+                    <p class="text-sm text-gray-300">{{ message or 'Initializing import...' }}</p>
+                </div>
+                
+                <!-- Stats (hidden initially) -->
+                <div id="import-stats" class="hidden mt-4 grid grid-cols-3 gap-4">
+                    <div class="bg-gray-900 rounded-lg p-3 text-center">
+                        <p class="text-2xl font-bold text-green-400" id="imported-count">0</p>
+                        <p class="text-xs text-gray-400">Imported</p>
+                    </div>
+                    <div class="bg-gray-900 rounded-lg p-3 text-center">
+                        <p class="text-2xl font-bold text-blue-400" id="updated-count">0</p>
+                        <p class="text-xs text-gray-400">Updated</p>
+                    </div>
+                    <div class="bg-gray-900 rounded-lg p-3 text-center">
+                        <p class="text-2xl font-bold text-red-400" id="error-count">0</p>
+                        <p class="text-xs text-gray-400">Errors</p>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div id="action-buttons" class="hidden mt-6 flex gap-3">
+                    <a id="view-list-btn" href="#" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-center transition-colors">
+                        View List
+                    </a>
+                    <a href="{{ url_for('campaigns.import_csv') }}" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-center transition-colors">
+                        Import Another
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Tracking Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const taskId = '{{ task_id }}';
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercentage = document.getElementById('progress-percentage');
+    const statusMessage = document.getElementById('status-message');
+    const importStats = document.getElementById('import-stats');
+    const actionButtons = document.getElementById('action-buttons');
+    const viewListBtn = document.getElementById('view-list-btn');
+    
+    let checkInterval;
+    let retryCount = 0;
+    const maxRetries = 120; // 2 minutes at 1 second intervals
+    
+    function updateProgress() {
+        fetch(`/campaigns/import-progress/${taskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Progress error:', data.error);
+                    statusMessage.innerHTML = `<p class="text-sm text-red-400">Error: ${data.error}</p>`;
+                    clearInterval(checkInterval);
+                    return;
+                }
+                
+                // Update progress bar
+                const progress = data.progress || 0;
+                progressBar.style.width = progress + '%';
+                progressPercentage.textContent = progress + '%';
+                
+                // Update status message
+                if (data.status) {
+                    let statusHtml = `<p class="text-sm text-gray-300">${data.status}</p>`;
+                    if (data.current && data.total) {
+                        statusHtml += `<p class="text-xs text-gray-400 mt-1">Processing row ${data.current} of ${data.total}</p>`;
+                    }
+                    statusMessage.innerHTML = statusHtml;
+                }
+                
+                // Check if complete
+                if (data.state === 'SUCCESS' || data.complete) {
+                    clearInterval(checkInterval);
+                    progressBar.style.width = '100%';
+                    progressPercentage.textContent = '100%';
+                    progressBar.className = 'bg-green-500 h-3 rounded-full transition-all duration-500';
+                    
+                    // Show stats if available
+                    if (data.result) {
+                        importStats.classList.remove('hidden');
+                        document.getElementById('imported-count').textContent = data.result.imported || 0;
+                        document.getElementById('updated-count').textContent = data.result.updated || 0;
+                        document.getElementById('error-count').textContent = data.result.errors ? data.result.errors.length : 0;
+                        
+                        if (data.result.list_id) {
+                            viewListBtn.href = `/campaigns/lists/${data.result.list_id}`;
+                            actionButtons.classList.remove('hidden');
+                        }
+                    }
+                    
+                    statusMessage.innerHTML = '<p class="text-sm text-green-400">Import completed successfully!</p>';
+                } else if (data.state === 'FAILURE' || data.failed) {
+                    clearInterval(checkInterval);
+                    progressBar.className = 'bg-red-500 h-3 rounded-full transition-all duration-500';
+                    statusMessage.innerHTML = `<p class="text-sm text-red-400">Import failed: ${data.error || 'Unknown error'}</p>`;
+                    actionButtons.classList.remove('hidden');
+                }
+                
+                // Handle retry limit
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    clearInterval(checkInterval);
+                    statusMessage.innerHTML = '<p class="text-sm text-yellow-400">Import is taking longer than expected. The task may still be running in the background.</p>';
+                    actionButtons.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to fetch progress:', error);
+                // Don't stop checking on network errors, just log them
+            });
+    }
+    
+    // Start checking progress
+    updateProgress(); // Initial check
+    checkInterval = setInterval(updateProgress, 1000); // Check every second
+});
+</script>
+{% endblock %}
