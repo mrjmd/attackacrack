@@ -275,13 +275,16 @@ class CSVImportService:
             temp_path = f"/tmp/{filename}"
             file.save(temp_path)
             
-            # Create import record using repository
+            # Create import record using repository with proper defaults
             csv_import = self.csv_import_repository.create(
                 filename=filename,
                 imported_at=utc_now(),
                 imported_by=imported_by,
                 import_type='contacts',
-                import_metadata={}
+                import_metadata={},
+                total_rows=0,  # Will be updated later
+                successful_imports=0,  # Will be updated later
+                failed_imports=0  # Will be updated later
             )
             
             # Create campaign list if requested using repository
@@ -567,11 +570,12 @@ class CSVImportService:
                     return self._process_sync_with_fallback(file, list_name)
             else:
                 # Small file - process synchronously
-                return self._process_sync_with_fallback(file, list_name)
+                result = self._process_sync_with_fallback(file, list_name)
+                return self._ensure_dict_result(result)
             
         except Exception as e:
             # Handle any exceptions
-            return {
+            result = {
                 'success': False,
                 'imported': 0,
                 'updated': 0,
@@ -579,6 +583,7 @@ class CSVImportService:
                 'message': f"Import failed: {str(e)}",
                 'list_id': None
             }
+            return self._ensure_dict_result(result)
     
     def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None) -> Dict[str, any]:
         """Basic CSV import for non-PropertyRadar files"""
@@ -612,7 +617,8 @@ class CSVImportService:
                 'updated': updated,
                 'errors': errors,
                 'message': message,
-                'list_id': result.get('list_id')
+                'list_id': result.get('list_id'),
+                'import_id': result.get('import_id')
             }
         except Exception as e:
             # Handle any exceptions from import_contacts
@@ -622,7 +628,8 @@ class CSVImportService:
                 'updated': 0,
                 'errors': [f"Import error: {str(e)}"],
                 'message': f"Import failed: {str(e)}",
-                'list_id': None
+                'list_id': None,
+                'import_id': None
             }
     
     # ============================================================================
@@ -828,6 +835,82 @@ class CSVImportService:
                 'status': 'Error retrieving progress'
             }
     
+    def _ensure_dict_result(self, result: Any) -> Dict[str, Any]:
+        """
+        Ensure that any Result object is converted to a dictionary.
+        
+        Args:
+            result: Either a Result object or dictionary
+            
+        Returns:
+            Dictionary with standardized format
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # If it's already a dict, return as-is
+        if isinstance(result, dict):
+            return result
+        
+        # If it's a Result object, transform it
+        if hasattr(result, 'is_success') or hasattr(result, 'success'):
+            logger.debug(f"Converting Result object to dict: {type(result)}")
+            
+            # Check if it's a success (property, not method)
+            is_success = getattr(result, 'is_success', False)
+            if callable(is_success):  # Handle both property and method cases
+                is_success = is_success()
+            
+            if is_success:
+                # Success Result object
+                data = getattr(result, 'value', getattr(result, 'data', None))
+                if isinstance(data, dict):
+                    # Extract values from nested data
+                    return {
+                        'success': True,
+                        'imported': data.get('contacts_created', data.get('imported', 0)),
+                        'updated': data.get('contacts_updated', data.get('updated', 0)),
+                        'errors': data.get('errors', []),
+                        'list_id': data.get('list_id'),
+                        'import_id': data.get('import_id'),
+                        'message': data.get('message', 'Import completed')
+                    }
+                else:
+                    # Data is not a dict, create basic success response
+                    return {
+                        'success': True,
+                        'imported': 0,
+                        'updated': 0,
+                        'errors': [],
+                        'list_id': None,
+                        'import_id': None,
+                        'message': 'Import completed'
+                    }
+            else:
+                # Failure Result object
+                error_msg = str(getattr(result, 'error', 'Import failed'))
+                return {
+                    'success': False,
+                    'imported': 0,
+                    'updated': 0,
+                    'errors': [error_msg],
+                    'list_id': None,
+                    'import_id': None,
+                    'message': error_msg
+                }
+        
+        # If it's something else entirely, create an error response
+        logger.warning(f"Unexpected result type in CSV import: {type(result)}")
+        return {
+            'success': False,
+            'imported': 0,
+            'updated': 0,
+            'errors': [f'Unexpected result type: {type(result).__name__}'],
+            'list_id': None,
+            'import_id': None,
+            'message': 'Import failed due to unexpected result format'
+        }
+    
     def _process_sync_with_fallback(self, file: FileStorage, list_name: Optional[str]) -> Dict[str, Any]:
         """
         Process CSV synchronously with PropertyRadar detection fallback.
@@ -928,13 +1011,29 @@ class CSVImportService:
                     
                     # Transform Result object to expected format
                     if hasattr(result, 'is_success') and result.is_success():
-                        data = result.value
+                        data = result.value if hasattr(result, 'value') else result.data
+                        
+                        # Check if import actually had errors despite being "successful"
+                        errors = data.get('errors', [])
+                        imported = data.get('contacts_created', 0)
+                        updated = data.get('contacts_updated', 0)
+                        
+                        # Consider import failed if no contacts were processed and there are errors
+                        if imported == 0 and updated == 0 and len(errors) > 0:
+                            success = False
+                            message = f"PropertyRadar import failed: {len(errors)} errors"
+                        else:
+                            success = True
+                            message = f"PropertyRadar import completed: {imported} imported, {updated} updated"
+                            if len(errors) > 0:
+                                message += f", {len(errors)} errors"
+                        
                         return {
-                            'success': True,
-                            'imported': data.get('contacts_created', 0),
-                            'updated': data.get('contacts_updated', 0),
-                            'errors': data.get('errors', []),
-                            'message': data.get('message', 'PropertyRadar import completed'),
+                            'success': success,
+                            'imported': imported,
+                            'updated': updated,
+                            'errors': errors,
+                            'message': message,
                             'list_id': data.get('list_id')
                         }
                     else:
@@ -956,11 +1055,12 @@ class CSVImportService:
                     return self._basic_import_csv(file, list_name)
             
             # Not PropertyRadar, use basic import
-            return self._basic_import_csv(file, list_name)
+            result = self._basic_import_csv(file, list_name)
+            return self._ensure_dict_result(result)
             
         except Exception as e:
             # Handle any exceptions
-            return {
+            result = {
                 'success': False,
                 'imported': 0,
                 'updated': 0,
@@ -968,3 +1068,4 @@ class CSVImportService:
                 'message': f"Import failed: {str(e)}",
                 'list_id': None
             }
+            return self._ensure_dict_result(result)

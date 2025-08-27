@@ -156,19 +156,89 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
                 list_name=list_name
             )
             
-            # The _process_sync_with_fallback method returns a dict already
-            # (it handles Result object transformation internally)
+            # Ensure result is a dictionary and handle any Result objects
+            if hasattr(result, 'is_success') or hasattr(result, 'success'):
+                # This is a Result object - transform to dict
+                if hasattr(result, 'is_success') and result.is_success():
+                    data = result.value if hasattr(result, 'value') else result.data
+                    result = {
+                        'success': True,
+                        'imported': data.get('imported', 0) if data else 0,
+                        'updated': data.get('updated', 0) if data else 0,
+                        'errors': data.get('errors', []) if data else [],
+                        'list_id': data.get('list_id') if data else None,
+                        'message': data.get('message', 'Import completed') if data else 'Import completed'
+                    }
+                else:
+                    error_msg = str(result.error) if hasattr(result, 'error') else 'Import failed'
+                    result = {
+                        'success': False,
+                        'imported': 0,
+                        'updated': 0,
+                        'errors': [error_msg],
+                        'list_id': None,
+                        'message': error_msg
+                    }
             
-            # Final progress update
-            self.update_state(
-                state='PROGRESS',
-                meta={
-                    'current': result.get('imported', 0) + result.get('updated', 0),
-                    'total': result.get('imported', 0) + result.get('updated', 0),
-                    'percent': 100,
-                    'status': 'Import completed successfully!'
+            # Validate result is a proper dict with expected keys
+            if not isinstance(result, dict):
+                result = {
+                    'success': False,
+                    'imported': 0,
+                    'updated': 0,
+                    'errors': [f'Invalid result type: {type(result)}'],
+                    'list_id': None,
+                    'message': 'Import failed due to invalid result format'
                 }
-            )
+            
+            # Final progress update based on actual success/failure
+            imported = result.get('imported', 0)
+            updated = result.get('updated', 0)
+            errors = result.get('errors', [])
+            success = result.get('success', False)
+            
+            if success and (imported > 0 or updated > 0):
+                # True success - contacts were processed
+                status_message = f'Import completed successfully: {imported} imported, {updated} updated'
+                if len(errors) > 0:
+                    status_message += f', {len(errors)} errors'
+                    
+                self.update_state(
+                    state='PROGRESS',
+                    meta={
+                        'current': imported + updated,
+                        'total': imported + updated,
+                        'percent': 100,
+                        'status': status_message
+                    }
+                )
+            elif not success or (imported == 0 and updated == 0 and len(errors) > 0):
+                # Failure case - no contacts processed or explicit failure
+                error_message = f'Import failed: {len(errors)} errors'
+                self.update_state(
+                    state='FAILURE',
+                    meta={
+                        'current': 0,
+                        'total': 100,
+                        'percent': 0,
+                        'status': error_message,
+                        'error': error_message
+                    }
+                )
+                # Also update the result to reflect failure
+                result['success'] = False
+                result['message'] = error_message
+            else:
+                # Edge case - successful but no data
+                self.update_state(
+                    state='PROGRESS',
+                    meta={
+                        'current': 100,
+                        'total': 100,
+                        'percent': 100,
+                        'status': 'Import completed - no new data to process'
+                    }
+                )
             
             # Clean up temporary file
             try:
@@ -176,17 +246,22 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
             except Exception:
                 pass
             
-            # Return success result (using the dict keys from _process_sync_with_fallback)
+            # Return result with proper status based on success/failure
+            imported = result.get('imported', 0)
+            updated = result.get('updated', 0)
+            errors = result.get('errors', [])
+            success = result.get('success', False)
+            
             return {
-                'status': 'success',
-                'imported': result.get('imported', 0),
-                'updated': result.get('updated', 0),
-                'failed': len(result.get('errors', [])),
-                'errors': result.get('errors', []),
-                'total_rows': result.get('imported', 0) + result.get('updated', 0),
+                'status': 'success' if success else 'error',
+                'imported': imported,
+                'updated': updated,
+                'failed': len(errors),
+                'errors': errors,
+                'total_rows': imported + updated,
                 'import_id': result.get('import_id'),
                 'list_id': result.get('list_id'),
-                'message': result.get('message', f"Import completed: {result.get('imported', 0)} imported, {result.get('updated', 0)} updated")
+                'message': result.get('message', f"Import completed: {imported} imported, {updated} updated")
             }
             
     except Retry:

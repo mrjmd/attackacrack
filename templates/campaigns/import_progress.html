@@ -120,14 +120,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     clearInterval(checkInterval);
                     progressBar.style.width = '100%';
                     progressPercentage.textContent = '100%';
-                    progressBar.className = 'bg-green-500 h-3 rounded-full transition-all duration-500';
+                    
+                    // Check if it's actually a success or failure
+                    const imported = data.result ? (data.result.imported || 0) : 0;
+                    const updated = data.result ? (data.result.updated || 0) : 0;
+                    const errorCount = data.result ? (data.result.errors ? data.result.errors.length : 0) : 0;
+                    const isActualSuccess = data.result ? (data.result.status === 'success') : false;
                     
                     // Show stats if available
                     if (data.result) {
                         importStats.classList.remove('hidden');
-                        document.getElementById('imported-count').textContent = data.result.imported || 0;
-                        document.getElementById('updated-count').textContent = data.result.updated || 0;
-                        document.getElementById('error-count').textContent = data.result.errors ? data.result.errors.length : 0;
+                        document.getElementById('imported-count').textContent = imported;
+                        document.getElementById('updated-count').textContent = updated;
+                        document.getElementById('error-count').textContent = errorCount;
                         
                         if (data.result.list_id) {
                             viewListBtn.href = `/campaigns/lists/${data.result.list_id}`;
@@ -135,11 +140,46 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                     
-                    statusMessage.innerHTML = '<p class="text-sm text-green-400">Import completed successfully!</p>';
+                    // Determine if this is actually a successful import
+                    if (isActualSuccess && (imported > 0 || updated > 0)) {
+                        // True success - contacts were processed
+                        progressBar.className = 'bg-green-500 h-3 rounded-full transition-all duration-500';
+                        let message = 'Import completed successfully!';
+                        if (errorCount > 0) {
+                            message = `Import completed with ${errorCount} errors`;
+                            progressBar.className = 'bg-yellow-500 h-3 rounded-full transition-all duration-500';
+                        }
+                        statusMessage.innerHTML = `<p class="text-sm text-green-400">${message}</p>`;
+                    } else if (!isActualSuccess || (imported === 0 && updated === 0 && errorCount > 0)) {
+                        // Failed import - no contacts processed or explicit failure
+                        progressBar.className = 'bg-red-500 h-3 rounded-full transition-all duration-500';
+                        const errorMsg = data.result && data.result.message ? data.result.message : `Import failed: ${errorCount} errors`;
+                        statusMessage.innerHTML = `<p class="text-sm text-red-400">${errorMsg}</p>`;
+                    } else {
+                        // Edge case - completed but no data to process
+                        progressBar.className = 'bg-blue-500 h-3 rounded-full transition-all duration-500';
+                        statusMessage.innerHTML = '<p class="text-sm text-blue-400">Import completed - no new data to process</p>';
+                    }
                 } else if (data.state === 'FAILURE' || data.failed) {
                     clearInterval(checkInterval);
                     progressBar.className = 'bg-red-500 h-3 rounded-full transition-all duration-500';
-                    statusMessage.innerHTML = `<p class="text-sm text-red-400">Import failed: ${data.error || 'Unknown error'}</p>`;
+                    
+                    // Get error message from various possible sources
+                    let errorMsg = data.error || 'Unknown error';
+                    if (data.result && data.result.message) {
+                        errorMsg = data.result.message;
+                    }
+                    
+                    statusMessage.innerHTML = `<p class="text-sm text-red-400">Import failed: ${errorMsg}</p>`;
+                    
+                    // Show stats even for failures if available
+                    if (data.result) {
+                        importStats.classList.remove('hidden');
+                        document.getElementById('imported-count').textContent = data.result.imported || 0;
+                        document.getElementById('updated-count').textContent = data.result.updated || 0;
+                        document.getElementById('error-count').textContent = data.result.errors ? data.result.errors.length : 0;
+                    }
+                    
                     actionButtons.classList.remove('hidden');
                 }
                 

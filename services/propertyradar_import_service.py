@@ -127,12 +127,15 @@ class PropertyRadarImportService:
         import_start = datetime.utcnow()
         
         try:
-            # Create import record
+            # Create import record with proper defaults
             csv_import = self.csv_import_repository.create(
                 filename=filename,
                 imported_by=imported_by,
                 import_type='propertyradar',
-                imported_at=import_start
+                imported_at=import_start,
+                total_rows=0,  # Will be updated later
+                successful_imports=0,  # Will be updated later
+                failed_imports=0  # Will be updated later
             )
             
             # Parse CSV
