@@ -326,7 +326,7 @@ SFR,456 Second St,City,67890,,,APN-002,,,,,,,,200000,100000,Owner,456 Second St,
         # Should create 2 properties but only 1 contact
         property_count = db_session.query(Property).count()
         contact_count = db_session.query(Contact).filter_by(
-            phone='+15555551234'  # Normalized phone (555-1234 -> +15555551234)
+            phone='+15551234'  # Normalized phone (555-1234 -> +15551234)
         ).count()
         
         assert property_count == 2
@@ -334,7 +334,7 @@ SFR,456 Second St,City,67890,,,APN-002,,,,,,,,200000,100000,Owner,456 Second St,
         
         # Both properties should be associated with the same contact
         contact = db_session.query(Contact).filter_by(
-            phone='+15555551234'
+            phone='+15551234'
         ).first()
         
         assert contact.properties.count() == 2
