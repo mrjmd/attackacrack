@@ -55,24 +55,28 @@ class CampaignSchedulingService:
             if campaign.status not in ['draft', 'scheduled']:
                 return Result.failure(f"Cannot schedule campaign in status {campaign.status}")
                 
-            # Convert to UTC if needed
+            # Convert to UTC-aware datetime for proper timezone handling
             if scheduled_at.tzinfo is None:
                 # Naive datetime - treat as being in the specified timezone
-                scheduled_at = scheduled_at.replace(tzinfo=tz)
+                scheduled_at_with_tz = scheduled_at.replace(tzinfo=tz)
+            else:
+                # Already has timezone info
+                scheduled_at_with_tz = scheduled_at
                 
-            # Convert to naive UTC datetime for database storage
-            utc_scheduled = scheduled_at.astimezone(ZoneInfo("UTC")).replace(tzinfo=None) if scheduled_at.tzinfo else scheduled_at
+            # Convert to UTC for comparison and storage
+            utc_scheduled = scheduled_at_with_tz.astimezone(ZoneInfo("UTC"))
             
-            # Validate not in the past
-            current_time = utc_now().replace(tzinfo=None)
+            # Validate not in the past (compare timezone-aware datetimes)
+            current_time = utc_now()  # This returns timezone-aware UTC
             if utc_scheduled < current_time:
+                logger.debug(f"Scheduling failed: {utc_scheduled} < {current_time}")
                 return Result.failure("Cannot schedule campaign in the past")
                 
-            # Update campaign - store naive UTC datetime
+            # Update campaign - store naive UTC datetime for database
             campaign.status = "scheduled"
-            campaign.scheduled_at = utc_scheduled
+            campaign.scheduled_at = utc_scheduled.replace(tzinfo=None)
             campaign.timezone = timezone
-            campaign.next_run_at = utc_scheduled  # For recurring campaigns
+            campaign.next_run_at = utc_scheduled.replace(tzinfo=None)  # For recurring campaigns
             
             # Commit changes
             self.campaign_repository.commit()
@@ -109,12 +113,17 @@ class CampaignSchedulingService:
             if campaign.status not in ['draft', 'scheduled']:
                 return Result.failure(f"Cannot schedule campaign in status {campaign.status}")
                 
-            # For recurring campaigns, preserve timezone-aware datetimes
-            # Convert to timezone-aware UTC if needed
+            # Convert to UTC-aware datetime for proper timezone handling
             if start_at.tzinfo is None:
+                # Naive datetime - treat as being in the specified timezone
                 tz = ZoneInfo(timezone)
-                start_at = start_at.replace(tzinfo=tz)
-            utc_start = start_at.astimezone(ZoneInfo("UTC"))
+                start_at_with_tz = start_at.replace(tzinfo=tz)
+            else:
+                # Already has timezone info
+                start_at_with_tz = start_at
+                
+            # Convert to UTC for comparison and storage
+            utc_start = start_at_with_tz.astimezone(ZoneInfo("UTC"))
             
             # Validate recurrence pattern
             valid_types = ['daily', 'weekly', 'monthly']
@@ -124,9 +133,10 @@ class CampaignSchedulingService:
             if recurrence_pattern['type'] not in valid_types:
                 return Result.failure(f"Invalid recurrence type. Must be one of: {', '.join(valid_types)}")
             
-            # Validate not in the past
-            current_time = utc_now()
+            # Validate not in the past (compare timezone-aware datetimes)
+            current_time = utc_now()  # This returns timezone-aware UTC
             if utc_start < current_time:
+                logger.debug(f"Recurring scheduling failed: {utc_start} < {current_time}")
                 return Result.failure("Cannot schedule campaign in the past")
                 
             # Validate end date for recurring campaigns
@@ -141,13 +151,13 @@ class CampaignSchedulingService:
                 except (ValueError, TypeError):
                     return Result.failure("Invalid end date format")
                 
-            # Update campaign directly (not through schedule_campaign to preserve timezone-aware)
+            # Update campaign - store naive UTC datetime for database
             campaign.status = "scheduled"
-            campaign.scheduled_at = utc_start  # Keep timezone-aware for recurring
+            campaign.scheduled_at = utc_start.replace(tzinfo=None)  # Store as naive UTC for database
             campaign.timezone = timezone
             campaign.is_recurring = True
             campaign.recurrence_pattern = recurrence_pattern
-            campaign.next_run_at = utc_start  # Initial next_run_at same as scheduled_at
+            campaign.next_run_at = utc_start.replace(tzinfo=None)  # Initial next_run_at same as scheduled_at
                 
             self.campaign_repository.commit()
             

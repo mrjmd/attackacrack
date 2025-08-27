@@ -12,7 +12,7 @@ from crm_database import Contact, CampaignList, CampaignListMember
 class TestContactListFilteredCount:
     """Test that contact list displays filtered count, not total count"""
     
-    def test_displays_filtered_count_when_searching(self, authenticated_client, db_session):
+    def test_displays_filtered_count_when_searching(self, authenticated_client_with_clean_db, clean_db):
         """Test filtered count is shown when search query is applied"""
         # Arrange - Create test contacts with different names
         contact1 = Contact(
@@ -33,11 +33,11 @@ class TestContactListFilteredCount:
             phone='+15553333333',
             email='bob@example.com'
         )
-        db_session.add_all([contact1, contact2, contact3])
-        db_session.commit()
+        clean_db.add_all([contact1, contact2, contact3])
+        clean_db.commit()
         
         # Act - Search for 'John' (should match 2: John Smith and Bob Johnson)
-        response = authenticated_client.get('/contacts/?search=john')
+        response = authenticated_client_with_clean_db.get('/contacts/?search=john')
         
         # Assert - Should show "2 total contacts" not "3 total contacts"
         assert response.status_code == 200
@@ -49,7 +49,7 @@ class TestContactListFilteredCount:
         assert b'Bob Johnson' in response.data
         assert b'Jane Doe' not in response.data
     
-    def test_displays_filtered_count_with_filter_type(self, authenticated_client, db_session):
+    def test_displays_filtered_count_with_filter_type(self, authenticated_client_with_clean_db, clean_db):
         """Test filtered count is shown when filter type is applied"""
         # Arrange - Create contacts with and without phone numbers
         contact_with_phone = Contact(
@@ -64,11 +64,11 @@ class TestContactListFilteredCount:
             phone=None,  # No phone number
             email='nophone@example.com'
         )
-        db_session.add_all([contact_with_phone, contact_without_phone])
-        db_session.commit()
+        clean_db.add_all([contact_with_phone, contact_without_phone])
+        clean_db.commit()
         
         # Act - Filter by 'has_phone'
-        response = authenticated_client.get('/contacts/?filter=has_phone')
+        response = authenticated_client_with_clean_db.get('/contacts/?filter=has_phone')
         
         # Assert - Should show "1 total contacts" not "2 total contacts"
         assert response.status_code == 200
@@ -79,16 +79,16 @@ class TestContactListFilteredCount:
         assert b'HasPhone User' in response.data
         assert b'NoPhone User' not in response.data
     
-    def test_displays_full_count_when_no_filters_applied(self, authenticated_client, db_session):
+    def test_displays_full_count_when_no_filters_applied(self, authenticated_client_with_clean_db, clean_db):
         """Test full count is shown when no filters are applied"""
         # Arrange - Create multiple contacts
-        contacts = [Contact() for _ in range(5)]
+        contacts = [Contact(first_name=f'Contact{i}', last_name='Test') for i in range(5)]
         for contact in contacts:
-            db_session.add(contact)
-        db_session.commit()
+            clean_db.add(contact)
+        clean_db.commit()
         
         # Act - Visit contacts page with no filters
-        response = authenticated_client.get('/contacts/')
+        response = authenticated_client_with_clean_db.get('/contacts/')
         
         # Assert - Should show all contacts count (5 + any seeded contacts)
         assert response.status_code == 200
@@ -102,7 +102,7 @@ class TestContactListFilteredCount:
         displayed_count = int(count_match.group(1))
         assert displayed_count >= 5, f"Should show at least 5 contacts, got {displayed_count}"
     
-    def test_displays_filtered_count_with_combined_filters(self, authenticated_client, db_session):
+    def test_displays_filtered_count_with_combined_filters(self, authenticated_client_with_clean_db, clean_db):
         """Test filtered count with both search and filter type applied"""
         # Arrange - Create contacts with different combinations
         contact1 = Contact(
@@ -123,11 +123,11 @@ class TestContactListFilteredCount:
             phone='+15553333333',  # Has phone
             email='jane@example.com'
         )
-        db_session.add_all([contact1, contact2, contact3])
-        db_session.commit()
+        clean_db.add_all([contact1, contact2, contact3])
+        clean_db.commit()
         
         # Act - Search for 'John' AND filter by 'has_phone'
-        response = authenticated_client.get('/contacts/?search=john&filter=has_phone')
+        response = authenticated_client_with_clean_db.get('/contacts/?search=john&filter=has_phone')
         
         # Assert - Should show "1 total contacts" (only John Smith matches both)
         assert response.status_code == 200
@@ -138,15 +138,16 @@ class TestContactListFilteredCount:
         assert b'John Doe' not in response.data
         assert b'Jane Smith' not in response.data
     
-    def test_template_shows_filtered_vs_total_distinction(self, authenticated_client, db_session):
+    def test_template_shows_filtered_vs_total_distinction(self, authenticated_client_with_clean_db, clean_db):
         """Test that template clearly shows this is a filtered count when filters are applied"""
         # Arrange - Create test data
-        [Contact(phone='+15551111111') for _ in range(10)]
-        [Contact(phone=None) for _ in range(3)]
-        db_session.commit()
+        contacts_with_phone = [Contact(first_name=f'WithPhone{i}', last_name='Test', phone=f'+1555111111{i}') for i in range(10)]
+        contacts_without_phone = [Contact(first_name=f'WithoutPhone{i}', last_name='Test', phone=None) for i in range(3)]
+        clean_db.add_all(contacts_with_phone + contacts_without_phone)
+        clean_db.commit()
         
         # Act - Apply filter
-        response = authenticated_client.get('/contacts/?filter=has_phone')
+        response = authenticated_client_with_clean_db.get('/contacts/?filter=has_phone')
         response_text = response.data.decode('utf-8')
         
         # Assert - Should show count reflects current filter

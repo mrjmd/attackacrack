@@ -82,8 +82,8 @@ class TestCampaignSchedulingService:
         """Test scheduling with timezone conversion to UTC"""
         # Arrange
         campaign_id = 1
-        # 2 PM Eastern Time (tomorrow to ensure it's in the future)
-        local_time = datetime(2025, 8, 26, 14, 0, 0)
+        # 2 PM Eastern Time (use future time to ensure it's valid)
+        local_time = (utc_now() + timedelta(hours=3)).replace(tzinfo=None).replace(hour=14, minute=0, second=0, microsecond=0)
         timezone = "America/New_York"
         
         mock_campaign = Mock(spec=Campaign)
@@ -135,8 +135,9 @@ class TestCampaignSchedulingService:
         # Verify recurring configuration
         assert mock_campaign.is_recurring is True
         assert mock_campaign.recurrence_pattern == recurrence_config
-        assert mock_campaign.scheduled_at == start_time
-        assert mock_campaign.next_run_at == start_time
+        # Service stores naive UTC datetime, so compare without timezone
+        assert mock_campaign.scheduled_at == start_time.replace(tzinfo=None)
+        assert mock_campaign.next_run_at == start_time.replace(tzinfo=None)
         
     def test_create_recurring_campaign_weekly(self, scheduling_service, mock_campaign_repository):
         """Test creating weekly recurring campaign with specific days"""

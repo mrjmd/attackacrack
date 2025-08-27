@@ -61,7 +61,8 @@ class TestContactServicePagination:
             filter_type='all', 
             sort_by='name',
             page=1,
-            per_page=50
+            per_page=50,
+            list_filter=None
         )
     
     def test_get_contacts_page_with_search(self, contact_service, mock_repository):
@@ -91,7 +92,8 @@ class TestContactServicePagination:
             filter_type='all',
             sort_by='name',
             page=1,
-            per_page=20
+            per_page=20,
+            list_filter=None
         )
     
     def test_get_contacts_page_with_filters(self, contact_service, mock_repository):
@@ -121,7 +123,8 @@ class TestContactServicePagination:
             filter_type='has_email',
             sort_by='name',
             page=1,
-            per_page=50
+            per_page=50,
+            list_filter=None
         )
     
     def test_get_contacts_page_pagination_parameters(self, contact_service, mock_repository):
@@ -155,7 +158,8 @@ class TestContactServicePagination:
             filter_type='all',
             sort_by='created_at',
             page=2,
-            per_page=20
+            per_page=20,
+            list_filter=None
         )
     
     def test_get_contacts_page_method_exists(self, contact_service):

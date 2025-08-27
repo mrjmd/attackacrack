@@ -28,8 +28,9 @@ class TestContactRepositoryListFilter:
     
     def test_get_paginated_contacts_accepts_list_filter_parameter(self, repository, mock_session):
         """Test that get_paginated_contacts accepts list_filter parameter"""
-        # Arrange - Mock query chain
+        # Arrange - Mock query chain with distinct
         mock_query = Mock()
+        mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
@@ -59,6 +60,7 @@ class TestContactRepositoryListFilter:
         # Arrange
         list_id = 456
         mock_query = Mock()
+        mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
@@ -89,6 +91,7 @@ class TestContactRepositoryListFilter:
         # Arrange
         list_id = 789
         mock_query = Mock()
+        mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
@@ -130,6 +133,7 @@ class TestContactRepositoryListFilter:
         search_query = 'john'
         
         mock_query = Mock()
+        mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
@@ -163,6 +167,7 @@ class TestContactRepositoryListFilter:
         filter_type = 'has_phone'
         
         mock_query = Mock()
+        mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
@@ -195,6 +200,7 @@ class TestContactRepositoryListFilter:
         invalid_list_id = 99999  # Non-existent list
         
         mock_query = Mock()
+        mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
@@ -225,6 +231,7 @@ class TestContactRepositoryListFilter:
         list_id = 123
         
         mock_query = Mock()
+        mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query

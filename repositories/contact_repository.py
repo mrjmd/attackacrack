@@ -9,7 +9,7 @@ from utils.datetime_utils import utc_now
 from sqlalchemy import or_, and_, func, exists, desc, asc
 from sqlalchemy.orm import joinedload, selectinload, Query
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult, SortOrder
-from crm_database import Contact, ContactFlag, Conversation, Activity, CampaignMembership, Property, Job, PropertyContact
+from crm_database import Contact, ContactFlag, Conversation, Activity, CampaignMembership, Property, Job, PropertyContact, CampaignListMember
 import logging
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,8 @@ class ContactRepository(BaseRepository[Contact]):
         search_query: Optional[str] = None,
         sort_by: str = 'name',
         sort_order: SortOrder = SortOrder.ASC,
-        pagination: Optional[PaginationParams] = None
+        pagination: Optional[PaginationParams] = None,
+        list_filter: Optional[int] = None
     ) -> PaginatedResult[Contact]:
         """
         Get contacts with advanced filtering options.
@@ -124,11 +125,16 @@ class ContactRepository(BaseRepository[Contact]):
             sort_by: Field to sort by
             sort_order: Sort order
             pagination: Pagination parameters
+            list_filter: Optional campaign list ID to filter by
             
         Returns:
             PaginatedResult with filtered contacts
         """
         query = self.session.query(Contact)
+        
+        # Apply list filter first (join with CampaignListMember if needed)
+        if list_filter:
+            query = self._apply_list_filter(query, list_filter)
         
         # Apply search
         if search_query:
@@ -231,6 +237,24 @@ class ContactRepository(BaseRepository[Contact]):
         
         return query  # 'all' or unknown filter
     
+    def _apply_list_filter(self, query: Query, list_filter: int) -> Query:
+        """Apply list membership filter to query"""
+        # Check if the list exists first
+        from crm_database import CampaignList
+        list_exists = self.session.query(CampaignList).filter_by(id=list_filter).first()
+        
+        if not list_exists:
+            # If list doesn't exist, return query unchanged (show all contacts)
+            return query
+            
+        # Use distinct to avoid duplicates from JOIN
+        return query.join(CampaignListMember).filter(
+            and_(
+                CampaignListMember.list_id == list_filter,
+                CampaignListMember.status == 'active'
+            )
+        ).distinct()
+    
     def _apply_sorting(self, query: Query, sort_by: str, sort_order: SortOrder) -> Query:
         """Apply sorting to query"""
         order_func = desc if sort_order == SortOrder.DESC else asc
@@ -324,7 +348,8 @@ class ContactRepository(BaseRepository[Contact]):
         filter_type: str = 'all',
         sort_by: str = 'name',
         page: int = 1,
-        per_page: int = 50
+        per_page: int = 50,
+        list_filter: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Get paginated contacts with search and filtering.
@@ -335,6 +360,7 @@ class ContactRepository(BaseRepository[Contact]):
             sort_by: Field to sort by
             page: Page number (1-based)
             per_page: Items per page
+            list_filter: Optional campaign list ID to filter by
             
         Returns:
             Dictionary with pagination metadata and contacts
@@ -345,7 +371,8 @@ class ContactRepository(BaseRepository[Contact]):
             search_query=search_query,
             sort_by=sort_by,
             sort_order=SortOrder.ASC,
-            pagination=pagination_params
+            pagination=pagination_params,
+            list_filter=list_filter
         )
         
         # Convert PaginatedResult to dict format expected by service

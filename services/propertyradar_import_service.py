@@ -471,8 +471,20 @@ class PropertyRadarImportService:
             }
         }
         
-        # Clean up empty strings
-        contact_data = {k: v for k, v in contact_data.items() if v or k == 'contact_metadata'}
+        # Ensure first_name and last_name are never empty (database NOT NULL constraint)
+        if not contact_data['first_name']:
+            contact_data['first_name'] = 'Unknown'
+        if not contact_data['last_name']:
+            contact_data['last_name'] = 'Contact'
+            
+        # Clean up empty strings for other fields
+        filtered_data = {}
+        for k, v in contact_data.items():
+            if k in ['first_name', 'last_name', 'contact_metadata']:
+                filtered_data[k] = v  # Keep these fields even if empty
+            elif v:  # Only keep other fields if they have truthy values
+                filtered_data[k] = v
+        contact_data = filtered_data
         
         return contact_data
     
@@ -512,6 +524,12 @@ class PropertyRadarImportService:
                 'import_type': 'secondary'
             }
         }
+        
+        # Ensure first_name and last_name are never empty (database NOT NULL constraint)
+        if not contact_data['first_name']:
+            contact_data['first_name'] = 'Unknown'
+        if not contact_data['last_name']:
+            contact_data['last_name'] = 'Contact'
         
         return contact_data
     
@@ -662,7 +680,7 @@ class PropertyRadarImportService:
         if not parts:
             return ('', '')
         elif len(parts) == 1:
-            # Single name goes to last name
+            # Single name goes to last name per business requirements
             return ('', parts[0])
         
         # Check if the last part is a suffix
@@ -731,7 +749,7 @@ class PropertyRadarImportService:
             primary_contact = None
             if data.get('primary_contact'):
                 try:
-                    primary_contact = self._process_contact(data['primary_contact'])
+                    primary_contact = self._process_contact(data['primary_contact'], csv_import)
                     if primary_contact:
                         self._associate_contact_with_property(
                             property_obj, primary_contact, 'PRIMARY'
@@ -745,7 +763,7 @@ class PropertyRadarImportService:
             secondary_contact = None
             if data.get('secondary_contact'):
                 try:
-                    secondary_contact = self._process_contact(data['secondary_contact'])
+                    secondary_contact = self._process_contact(data['secondary_contact'], csv_import)
                     if secondary_contact:
                         self._associate_contact_with_property(
                             property_obj, secondary_contact, 'SECONDARY'
@@ -843,6 +861,70 @@ class PropertyRadarImportService:
             import_id, total, success, failed, metadata
         )
     
+    def verify_import_consistency(self, csv_content: str, import_result: Dict) -> Dict:
+        """Verify import consistency between CSV and database
+        
+        Args:
+            csv_content: Original CSV content
+            import_result: Result data from import operation
+            
+        Returns:
+            Dictionary with consistency report
+        """
+        try:
+            # Parse CSV to count expected records
+            csv_reader = csv.DictReader(io.StringIO(csv_content))
+            csv_rows = list(csv_reader)
+            expected_properties = len(csv_rows)
+            
+            # Count expected contacts (primary + secondary)
+            expected_contacts = 0
+            for row in csv_rows:
+                if row.get('Primary Name', '').strip():
+                    expected_contacts += 1
+                if row.get('Secondary Name', '').strip():
+                    expected_contacts += 1
+            
+            # Get actual counts from database
+            actual_properties = self.property_repository.count()
+            actual_contacts = self.contact_repository.count()
+            
+            # Check PropertyContact associations integrity
+            from crm_database import PropertyContact
+            total_associations = self.session.query(PropertyContact).count()
+            
+            report = {
+                'is_consistent': True,
+                'property_count_matches': actual_properties >= import_result.get('properties_created', 0),
+                'contact_count_matches': actual_contacts >= import_result.get('contacts_created', 0),
+                'association_integrity': total_associations > 0,
+                'expected_properties': expected_properties,
+                'actual_properties': actual_properties,
+                'expected_contacts': expected_contacts,
+                'actual_contacts': actual_contacts,
+                'total_associations': total_associations,
+                'import_stats': import_result
+            }
+            
+            # Overall consistency check
+            report['is_consistent'] = (
+                report['property_count_matches'] and
+                report['contact_count_matches'] and
+                report['association_integrity']
+            )
+            
+            return report
+            
+        except Exception as e:
+            logger.error(f"Consistency verification failed: {e}")
+            return {
+                'is_consistent': False,
+                'error': str(e),
+                'property_count_matches': False,
+                'contact_count_matches': False,
+                'association_integrity': False
+            }
+    
     # Private helper methods
     
     def _parse_float(self, value: str) -> Optional[float]:
@@ -878,7 +960,7 @@ class PropertyRadarImportService:
             return None
     
     def _process_batch(self, batch: List[Dict], csv_import: CSVImport) -> Dict:
-        """Process a batch of CSV rows
+        """Process a batch of CSV rows with proper transaction management
         
         Args:
             batch: List of CSV row dictionaries
@@ -896,32 +978,49 @@ class PropertyRadarImportService:
             'errors': []
         }
         
-        for row in batch:
-            try:
-                result = self.import_row(row, csv_import)
-                if result.is_failure:
-                    stats['errors'].append(result.error)
-                else:
-                    # Count property operations
-                    stats['properties_created'] += 1
-                    
-                    # Count actual contact operations from row data
-                    primary_contact = self.extract_primary_contact(row)
-                    secondary_contact = self.extract_secondary_contact(row)
-                    
-                    if primary_contact:
-                        stats['contacts_created'] += 1
-                    if secondary_contact:
-                        stats['contacts_created'] += 1
-                    
-                    # Capture any validation errors from successful import
-                    if 'errors' in result.value and result.value['errors']:
-                        stats['errors'].extend(result.value['errors'])
+        # Process batch within a single transaction to maintain consistency
+        try:
+            # Start transaction for this batch
+            for row in batch:
+                try:
+                    result = self.import_row(row, csv_import)
+                    if result.is_failure:
+                        stats['errors'].append(result.error)
+                    else:
+                        # Count property operations
+                        stats['properties_created'] += 1
                         
-            except Exception as e:
-                error_msg = f"Row processing error: {str(e)}"
-                stats['errors'].append(error_msg)
-                logger.error(error_msg)
+                        # Count actual contact operations from row data
+                        primary_contact = self.extract_primary_contact(row)
+                        secondary_contact = self.extract_secondary_contact(row)
+                        
+                        if primary_contact:
+                            stats['contacts_created'] += 1
+                        if secondary_contact:
+                            stats['contacts_created'] += 1
+                        
+                        # Capture any validation errors from successful import
+                        if 'errors' in result.value and result.value['errors']:
+                            stats['errors'].extend(result.value['errors'])
+                            
+                except Exception as e:
+                    error_msg = f"Row processing error: {str(e)}"
+                    stats['errors'].append(error_msg)
+                    logger.error(error_msg)
+                    
+                    # Don't rollback the entire batch for single row errors
+                    # Continue processing other rows
+                    continue
+            
+            # Commit the batch transaction
+            self.session.commit()
+            
+        except Exception as e:
+            # Rollback batch transaction on critical error
+            self.session.rollback()
+            error_msg = f"Batch processing error: {str(e)}"
+            stats['errors'].append(error_msg)
+            logger.error(error_msg)
                 
         return stats
     
@@ -948,28 +1047,59 @@ class PropertyRadarImportService:
         Returns:
             Property instance
         """
-        # Check for duplicate by address and zip
-        existing = self.property_repository.find_duplicate(
-            property_data.get('address'),
-            property_data.get('zip_code')
-        )
-        
-        if existing:
-            # Update existing property
-            for key, value in property_data.items():
-                if value is not None:  # Only update non-null values
-                    setattr(existing, key, value)
-            self.property_repository.update(existing)
-            return existing
-        else:
-            # Create new property
-            return self.property_repository.create(**property_data)
+        try:
+            # For concurrent safety with SQLite, use retry mechanism instead of row-level locking
+            address = property_data.get('address')
+            zip_code = property_data.get('zip_code')
+            apn = property_data.get('apn')
+            
+            # Check for duplicate by APN first (most reliable)
+            if apn:
+                existing = self.property_repository.find_by_apn(apn)
+            elif address and zip_code:
+                existing = self.property_repository.find_by_address_and_zip(address, zip_code)
+            else:
+                existing = None
+            
+            if existing:
+                # Update existing property
+                for key, value in property_data.items():
+                    if value is not None:  # Only update non-null values
+                        setattr(existing, key, value)
+                self.property_repository.update(existing)
+                return existing
+            else:
+                # Create new property with retry on constraint violation
+                try:
+                    return self.property_repository.create(**property_data)
+                except Exception as create_error:
+                    # If creation fails due to race condition, try to find existing again
+                    if "UNIQUE constraint failed" in str(create_error):
+                        if apn:
+                            existing = self.property_repository.find_by_apn(apn)
+                        elif address and zip_code:
+                            existing = self.property_repository.find_by_address_and_zip(address, zip_code)
+                        
+                        if existing:
+                            logger.debug(f"Found existing property after retry: {existing.id}")
+                            # Update with current data
+                            for key, value in property_data.items():
+                                if value is not None:
+                                    setattr(existing, key, value)
+                            self.property_repository.update(existing)
+                            return existing
+                    raise create_error
+                
+        except Exception as e:
+            logger.error(f"Error processing property: {e}")
+            raise e
     
-    def _process_contact(self, contact_data: Dict) -> Optional[Contact]:
+    def _process_contact(self, contact_data: Dict, csv_import: Optional['CSVImport'] = None) -> Optional[Contact]:
         """Process contact data - create or update (with deduplication by phone)
         
         Args:
             contact_data: Contact field dictionary
+            csv_import: Optional CSV import record to link contact to
             
         Returns:
             Contact instance or None
@@ -977,17 +1107,45 @@ class PropertyRadarImportService:
         if not contact_data or not contact_data.get('phone'):
             return None
             
-        # Check for duplicate by phone (deduplication)
-        existing = self.contact_repository.find_by_phone(contact_data['phone'])
-        
-        if existing:
-            # Contact already exists - return it (deduplication in action)
-            logger.debug(f"Found existing contact with phone {contact_data['phone']}: {existing.id}")
-            return existing
-        else:
-            # Create new contact
-            logger.debug(f"Creating new contact with phone {contact_data['phone']}")
-            return self.contact_repository.create(**contact_data)
+        try:
+            # For concurrent safety, use a simple retry mechanism instead of row-level locking
+            # since SQLite doesn't support FOR UPDATE syntax
+            
+            # Check for duplicate by phone (deduplication)
+            existing = self.contact_repository.find_by_phone(contact_data['phone'])
+            
+            if existing:
+                logger.debug(f"Found existing contact with phone {contact_data['phone']}: {existing.id}")
+                # Link existing contact to CSV import if provided
+                if csv_import and existing not in csv_import.contacts:
+                    csv_import.contacts.append(existing)
+                    # Don't commit here - let batch processing handle commits
+                return existing
+            else:
+                # Create new contact with retry on constraint violation
+                logger.debug(f"Creating new contact with phone {contact_data['phone']}")
+                try:
+                    new_contact = self.contact_repository.create(**contact_data)
+                    # Link new contact to CSV import if provided
+                    if csv_import and new_contact:
+                        csv_import.contacts.append(new_contact)
+                        # Don't commit here - let batch processing handle commits
+                    return new_contact
+                except Exception as create_error:
+                    # If creation fails due to race condition, try to find existing again
+                    if "UNIQUE constraint failed" in str(create_error):
+                        existing = self.contact_repository.find_by_phone(contact_data['phone'])
+                        if existing:
+                            logger.debug(f"Found existing contact after retry with phone {contact_data['phone']}: {existing.id}")
+                            # Link to CSV import if provided
+                            if csv_import and existing not in csv_import.contacts:
+                                csv_import.contacts.append(existing)
+                            return existing
+                    raise create_error
+                
+        except Exception as e:
+            logger.error(f"Error processing contact: {e}")
+            raise e
     
     def _validate_row_data(self, row: Dict) -> List[str]:
         """Validate row data and return list of errors

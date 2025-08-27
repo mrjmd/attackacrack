@@ -9,7 +9,7 @@ from utils.datetime_utils import utc_now
 from sqlalchemy import and_, or_, func, desc, asc
 from sqlalchemy.orm import joinedload, selectinload, Query
 from repositories.base_repository import BaseRepository, PaginationParams, PaginatedResult, SortOrder
-from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity
+from crm_database import Campaign, CampaignMembership, Contact, ContactFlag, Activity, CampaignList
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1485,3 +1485,12 @@ class CampaignRepository(BaseRepository[Campaign]):
             Campaign.status == 'scheduled',
             Campaign.name.ilike(f'%{query}%')
         ).all()
+    
+    def get_all_lists(self) -> List[CampaignList]:
+        """
+        Get all campaign lists for dropdown filtering.
+        
+        Returns:
+            List of all CampaignList objects
+        """
+        return self.session.query(CampaignList).order_by(CampaignList.name).all()

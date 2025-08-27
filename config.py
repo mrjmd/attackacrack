@@ -225,16 +225,24 @@ class TestingConfig(Config):
         import logging
         logger = logging.getLogger(__name__)
         
-        # Use filesystem sessions for testing to avoid Redis dependency
-        app.config['SESSION_TYPE'] = 'filesystem'
-        app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
+        # Use cachelib sessions for testing to avoid Redis dependency and deprecation warnings
+        app.config['SESSION_TYPE'] = 'cachelib'
         app.config['SESSION_PERMANENT'] = False
         app.config['SESSION_KEY_PREFIX'] = 'test_session:'
         
-        # Initialize Flask-Session with filesystem backend
+        # Initialize Flask-Session with CacheLib backend
         from flask_session import Session
+        from cachelib import FileSystemCache
+        import tempfile
+        import os
+        
+        # Use a temporary directory for test sessions
+        temp_dir = os.path.join(tempfile.gettempdir(), 'flask_test_sessions')
+        os.makedirs(temp_dir, exist_ok=True)
+        app.config['SESSION_CACHELIB'] = FileSystemCache(temp_dir, threshold=500, default_timeout=300)
+        
         Session(app)
-        logger.info("Testing mode: Using filesystem sessions")
+        logger.info("Testing mode: Using cachelib filesystem sessions")
         
         # Disable foreign keys for SQLite in tests to avoid cascading issues
         # This matches the behavior of many ORMs where foreign keys are not enforced

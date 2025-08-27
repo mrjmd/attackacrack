@@ -170,8 +170,8 @@ class TestCampaignSchedulingIntegration:
         
     def test_timezone_conversion_integration(self, scheduling_service, sample_campaign, db_session):
         """Test timezone conversion works end-to-end"""
-        # Schedule in Eastern Time (tomorrow to ensure it's in the future)
-        local_time = datetime(2025, 8, 26, 14, 0, 0)  # 2 PM ET tomorrow
+        # Schedule in Eastern Time (use future time to ensure it's valid)
+        local_time = (utc_now() + timedelta(hours=3)).replace(tzinfo=None).replace(hour=14, minute=0, second=0, microsecond=0)  # 2 PM ET in the future
         timezone = "America/New_York"
         
         # This will FAIL until timezone conversion is implemented

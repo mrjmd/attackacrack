@@ -7,6 +7,7 @@ This directory contains administrative utilities and data management scripts for
 ### Essential Scripts (Main Directory)
 - `commands.py` - Flask CLI commands for admin user creation and password management
 - `fix_password_hashes.py` - Utility for fixing and verifying password hashes
+- `normalize_existing_data.py` - Data normalization reconciliation for existing contacts and properties
 - `lint_check.py` - Code linting and style checking utility
 - `celery_utils.py` - Shared Celery utilities used by data management scripts
 - `script_logger.py` - Logging utilities for script execution
@@ -56,7 +57,7 @@ Development and debugging utilities:
 
 ## Usage Examples
 
-### Data Import
+### Data Import & Normalization
 ```bash
 # Run interactive import manager
 python scripts/data_management/imports/import_manager.py
@@ -66,6 +67,11 @@ python scripts/data_management/csv_importer.py
 
 # Large-scale production import
 ./scripts/data_management/imports/run_large_import.sh
+
+# Normalize existing data (dry run first to preview changes)
+flask normalize-existing-data --dry-run
+flask normalize-existing-data --properties-only
+flask normalize-existing-data --contacts-only --batch-size 50
 ```
 
 ### Development Tools
@@ -96,6 +102,8 @@ python scripts/data_management/media/fix_existing_media_urls.py
 - Always run data modification scripts in a test environment first
 - The `large_scale_import.py` is the recommended script for production imports
 - Use dry run options when available to preview changes before execution
+- The `normalize_existing_data.py` script is idempotent and safe to run multiple times
+- Data normalization uses the same logic as PropertyRadar imports for consistency
 
 ## Removed Scripts
 

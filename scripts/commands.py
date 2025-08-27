@@ -41,5 +41,9 @@ def init_app(app):
     app.cli.add_command(create_admin)
     
     # Register password fix commands
-    from scripts.fix_password_hashes import register_commands
-    register_commands(app)
+    from scripts.fix_password_hashes import register_commands as register_password_commands
+    register_password_commands(app)
+    
+    # Register data normalization commands
+    from scripts.normalize_existing_data import register_commands as register_normalization_commands
+    register_normalization_commands(app)
