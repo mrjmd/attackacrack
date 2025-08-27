@@ -372,10 +372,13 @@ def campaign_list_detail(list_id):
     """Show campaign list details"""
     list_service = current_app.services.get('campaign_list')
     
-    campaign_list = list_service.get_campaign_list_by_id(list_id)
-    if not campaign_list:
+    # get_campaign_list_by_id returns a Result object
+    list_result = list_service.get_campaign_list_by_id(list_id)
+    if not list_result.is_success or not list_result.data:
         from flask import abort
         abort(404)
+    
+    campaign_list = list_result.data
     stats_result = list_service.get_list_stats(list_id)
     stats = stats_result.data if stats_result.is_success else {}
     
