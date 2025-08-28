@@ -328,10 +328,16 @@ class TestPropertyRadarImportService:
             # Should process one row (excluding header)
             mock_import_row.assert_called_once()
             
-            # Should update import status
-            mock_csv_import_repository.update_import_status.assert_called_once_with(
-                mock_csv_import.id, 1, 1, 0, None  # total=1, success=1, failed=0
-            )
+            # Should update import status - now includes detailed statistics
+            # Extract call args to verify the structure
+            call_args = mock_csv_import_repository.update_import_status.call_args
+            assert call_args[0][:4] == (mock_csv_import.id, 1, 1, 0)  # id, total, success, failed
+            # Verify metadata structure
+            metadata = call_args[0][4]
+            assert isinstance(metadata, dict)
+            assert 'errors' in metadata
+            assert 'properties_created' in metadata
+            assert 'duplicate_strategy' in metadata
     
     def test_import_csv_handles_processing_errors(self, service, mock_csv_import_repository, sample_csv_content):
         """Test error handling during CSV processing"""
@@ -347,10 +353,15 @@ class TestPropertyRadarImportService:
             
             assert result.is_success  # Overall import succeeds even with row failures
             
-            # Should update import status with failures
-            mock_csv_import_repository.update_import_status.assert_called_once_with(
-                mock_csv_import.id, 1, 0, 1, {'errors': ['Processing error']}  # 0 success, 1 failed
-            )
+            # Should update import status with failures - now includes detailed statistics
+            # Extract call args to verify the structure
+            call_args = mock_csv_import_repository.update_import_status.call_args
+            assert call_args[0][:4] == (mock_csv_import.id, 1, 0, 1)  # id, total, success, failed
+            # Verify metadata structure includes errors
+            metadata = call_args[0][4]
+            assert isinstance(metadata, dict)
+            assert 'errors' in metadata
+            assert len(metadata['errors']) > 0
     
     def test_validate_csv_headers(self, service):
         """Test CSV header validation"""

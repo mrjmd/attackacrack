@@ -128,7 +128,7 @@ Bob,Johnson,+12345559999,bob@example.com"""
             # Force the task to use the basic import path
             with patch('services.csv_import_service.CSVImportService._process_sync_with_fallback') as mock_fallback:
                 # Make fallback actually create a list by calling real import_contacts
-                def real_fallback(file, list_name, progress_callback=None):
+                def real_fallback(file, list_name, duplicate_strategy='merge', progress_callback=None):
                     from services.csv_import_service import CSVImportService
                     from repositories.csv_import_repository import CSVImportRepository
                     from repositories.contact_csv_import_repository import ContactCSVImportRepository
@@ -152,6 +152,7 @@ Bob,Johnson,+12345559999,bob@example.com"""
                         list_name=list_name,
                         create_list=True,  # CRITICAL: This should create the list
                         imported_by="test_user",
+                        duplicate_strategy=duplicate_strategy,
                         progress_callback=progress_callback
                     )
                 
