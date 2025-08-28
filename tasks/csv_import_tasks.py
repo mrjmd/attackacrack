@@ -13,10 +13,13 @@ Features:
 
 import os
 import tempfile
+import logging
 from celery import current_app as celery_app
 from celery.exceptions import Retry
 from typing import Dict, Any
 from utils.datetime_utils import utc_now
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(
@@ -231,6 +234,22 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
                     }
                 )
             
+            # CRITICAL: Ensure all database changes are committed in Celery context
+            try:
+                # Get the database session from the service registry
+                db_session = app.services.get('db_session')
+                if db_session:
+                    db_session.commit()
+                    logger.info("Database session committed in Celery task")
+                else:
+                    # Fallback: try to commit through the CSV import service's repositories
+                    if hasattr(csv_import_service, 'csv_import_repository') and csv_import_service.csv_import_repository:
+                        csv_import_service.csv_import_repository.commit()
+                        logger.info("Database committed through CSV import repository")
+            except Exception as commit_error:
+                logger.error(f"Failed to commit database in Celery task: {commit_error}")
+                # Don't fail the entire task due to commit issues, but log it
+                
             # Clean up temporary file
             try:
                 file_stream.close()
@@ -261,6 +280,21 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
     except Exception as exc:
         # Log error and update task state
         error_message = f"Import failed: {str(exc)}"
+        logger.error(f"Celery CSV import task failed: {error_message}", exc_info=True)
+        
+        # Try to rollback any partial database changes
+        try:
+            # Create app context if we don't have one yet
+            if not hasattr(app, 'services'):
+                app = create_app()
+            
+            with app.app_context():
+                db_session = app.services.get('db_session')
+                if db_session:
+                    db_session.rollback()
+                    logger.info("Database session rolled back due to task failure")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback database in failed Celery task: {rollback_error}")
         
         self.update_state(
             state='FAILURE',

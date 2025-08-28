@@ -176,6 +176,73 @@ Bob,Johnson,+12345559999,bob@example.com"""
                 assert result.get('list_id') is not None, f"Task result should include list_id, got: {result}"
                 assert result.get('list_id') == created_list.id
     
+    def test_celery_task_propertyradar_import(self, app, db_session):
+        """
+        Test that Celery task properly imports PropertyRadar CSV and creates lists.
+        This specifically tests the PropertyRadar import path through Celery.
+        """
+        with app.app_context():
+            # PropertyRadar CSV content with proper headers
+            propertyradar_csv = """Type,Address,City,ZIP,Primary Name,Primary First Name,Primary Last Name,Primary Mobile Phone1,Secondary Name,Secondary First Name,Secondary Last Name,Secondary Mobile Phone1,APN,Est Value,Est Equity,Owner Occ?
+Single Family Residence,123 Main St,Boston,02101,John Doe,John,Doe,+15551234567,Jane Doe,Jane,Doe,+15559876543,001-002-003,500000,200000,Y
+Townhouse,456 Oak Ave,Cambridge,02139,Bob Smith,Bob,Smith,+15551111111,,,,002-003-004,350000,150000,N"""
+            
+            list_name = "PropertyRadar-Celery-Test"
+            filename = "propertyradar_cleaned_data.csv"  # Filename that triggers PropertyRadar detection
+            
+            # Clean up any existing test data
+            db_session.query(CampaignListMember).delete()
+            db_session.query(CampaignList).delete()
+            db_session.query(Contact).delete()
+            db_session.commit()
+            
+            # Verify clean state
+            initial_list_count = db_session.query(CampaignList).count()
+            initial_contact_count = db_session.query(Contact).count()
+            assert initial_list_count == 0, "Should start with no campaign lists"
+            assert initial_contact_count == 0, "Should start with no contacts"
+            
+            # Mock Celery task state updates
+            mock_task = MagicMock()
+            mock_task.update_state = MagicMock()
+            
+            # Call the Celery task function directly
+            with patch.object(process_large_csv_import, 'update_state'):
+                result = process_large_csv_import.run(
+                    file_content=propertyradar_csv.encode('utf-8'),
+                    filename=filename,
+                    list_name=list_name,
+                    imported_by="test_user"
+                )
+            
+            # Verify task result
+            assert result is not None, "Task should return result"
+            assert isinstance(result, dict), "Task should return dictionary"
+            assert result.get('status') == 'success', f"Task should succeed, got: {result}"
+            
+            # Verify PropertyRadar import created contacts
+            final_contact_count = db_session.query(Contact).count()
+            assert final_contact_count > 0, f"PropertyRadar import should create contacts, found {final_contact_count}"
+            
+            # Verify campaign list was created
+            final_list_count = db_session.query(CampaignList).count()
+            assert final_list_count == 1, f"Task should create 1 campaign list, found {final_list_count}"
+            
+            created_list = db_session.query(CampaignList).filter_by(name=list_name).first()
+            assert created_list is not None, f"Campaign list '{list_name}' should exist in database"
+            
+            # Verify task result includes list_id
+            task_list_id = result.get('list_id')
+            assert task_list_id is not None, f"Task result should include list_id, got: {result}"
+            assert task_list_id == created_list.id, f"Task list_id {task_list_id} should match database ID {created_list.id}"
+            
+            # Verify contacts are associated with the list
+            list_members = db_session.query(CampaignListMember).filter_by(list_id=created_list.id).all()
+            assert len(list_members) > 0, f"List should have contacts associated, found {len(list_members)} members"
+            
+            # Log success
+            print(f"✅ PropertyRadar Celery import test passed: {final_contact_count} contacts, {len(list_members)} list members")
+    
     def test_celery_task_parameter_passing(self, app, db_session):
         """
         Test that the Celery task passes list_name correctly to the import service.

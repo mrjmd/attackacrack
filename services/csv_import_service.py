@@ -974,10 +974,15 @@ class CSVImportService:
         if hasattr(result, 'is_success') or hasattr(result, 'success'):
             logger.debug(f"Converting Result object to dict: {type(result)}")
             
-            # Check if it's a success (property, not method)
-            is_success = getattr(result, 'is_success', False)
-            if callable(is_success):  # Handle both property and method cases
-                is_success = is_success()
+            # Check if it's a success - handle both property and method cases
+            if hasattr(result, 'is_success'):
+                is_success_attr = getattr(result, 'is_success')
+                if callable(is_success_attr):
+                    is_success = is_success_attr()
+                else:
+                    is_success = bool(is_success_attr)
+            else:
+                is_success = False
             
             if is_success:
                 # Success Result object
@@ -1110,6 +1115,8 @@ class CSVImportService:
                                 property_repository=property_repo,
                                 contact_repository=contact_repo,
                                 csv_import_repository=csv_import_repo,
+                                campaign_list_repository=self.campaign_list_repository,
+                                campaign_list_member_repository=self.campaign_list_member_repository,
                                 session=session
                             )
                     else:
@@ -1121,6 +1128,8 @@ class CSVImportService:
                             property_repository=property_repo,
                             contact_repository=self.contact_repository,
                             csv_import_repository=csv_import_repo,
+                            campaign_list_repository=self.campaign_list_repository,
+                            campaign_list_member_repository=self.campaign_list_member_repository,
                             session=session
                         )
                     
@@ -1128,7 +1137,16 @@ class CSVImportService:
                     result = propertyradar_service.import_propertyradar_csv(file, list_name, progress_callback=progress_callback)
                     
                     # Transform Result object to expected format
-                    if hasattr(result, 'is_success') and result.is_success():
+                    # Handle is_success as both property and method
+                    is_success = False
+                    if hasattr(result, 'is_success'):
+                        is_success_attr = getattr(result, 'is_success')
+                        if callable(is_success_attr):
+                            is_success = is_success_attr()
+                        else:
+                            is_success = bool(is_success_attr)
+                    
+                    if is_success:
                         data = result.value if hasattr(result, 'value') else result.data
                         
                         # Check if import actually had errors despite being "successful"
