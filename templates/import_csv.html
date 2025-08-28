@@ -36,13 +36,28 @@
                 <p id="file-name" class="text-sm text-gray-400 mt-2"></p>
             </div>
             
+            <div>
+                <label for="duplicate_strategy" class="block text-sm font-medium mb-2">Duplicate Handling:</label>
+                <select id="duplicate_strategy" name="duplicate_strategy" 
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                    <option value="merge" selected>Merge - Only add missing fields (recommended)</option>
+                    <option value="replace">Replace - Overwrite existing data with new data</option>
+                    <option value="skip">Skip - Don't modify existing contacts</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">
+                    <span class="font-semibold">Merge:</span> Updates existing contacts only where data is missing<br>
+                    <span class="font-semibold">Replace:</span> Overwrites all fields with new data<br>
+                    <span class="font-semibold">Skip:</span> Ignores rows with existing phone numbers
+                </p>
+            </div>
+            
             <!-- Features -->
             <div class="bg-gray-800 rounded-lg p-4">
                 <p class="text-sm font-medium text-gray-300 mb-2">This import will:</p>
                 <ul class="text-sm text-gray-400 space-y-1">
                     <li>✓ Automatically detect CSV format</li>
                     <li>✓ Normalize phone numbers to +1XXXXXXXXXX format</li>
-                    <li>✓ Enrich existing contacts without creating duplicates</li>
+                    <li>✓ Handle duplicates based on your selected strategy</li>
                     <li>✓ Add missing names, emails, and company info</li>
                     <li>✓ Store additional data in contact metadata</li>
                 </ul>

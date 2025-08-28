@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
     retry_jitter=True
 )
 def process_large_csv_import(self, file_content: bytes, filename: str, 
-                           list_name: str = None, imported_by: str = None) -> Dict[str, Any]:
+                           list_name: str = None, imported_by: str = None,
+                           duplicate_strategy: str = 'merge') -> Dict[str, Any]:
     """
     Process large CSV imports asynchronously with progress tracking.
     
@@ -40,6 +41,7 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
         filename: Original filename for format detection
         list_name: Optional name for the campaign list
         imported_by: User identifier who initiated the import
+        duplicate_strategy: How to handle duplicates ('merge', 'replace', 'skip'). Default: 'merge'
         
     Returns:
         Dict with import results and statistics
@@ -125,12 +127,14 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
             
             # Custom progress tracking function
             def update_import_progress(current_row: int, total_rows: int):
-                # Calculate percent ensuring we stay within 20-95% range during processing
+                # Calculate actual percentage based on rows processed
                 if total_rows > 0:
-                    percent = min(95, int((current_row / total_rows) * 75) + 20)  # 20-95% range
+                    # Calculate true percentage (0-100%)
+                    actual_percent = int((current_row / total_rows) * 100)
+                    # Ensure we don't exceed 100%
+                    percent = min(100, actual_percent)
                 else:
-                    percent = 20
-                
+                    percent = 0
                 
                 self.update_state(
                     state='PROGRESS',
@@ -147,6 +151,7 @@ def process_large_csv_import(self, file_content: bytes, filename: str,
             result = csv_import_service._process_sync_with_fallback(
                 file=mock_file,
                 list_name=list_name,
+                duplicate_strategy=duplicate_strategy,
                 progress_callback=update_import_progress
             )
             

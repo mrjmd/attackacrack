@@ -246,6 +246,7 @@ class CSVImportService:
                        list_name: Optional[str] = None,
                        create_list: bool = True,
                        imported_by: Optional[str] = None,
+                       duplicate_strategy: Optional[str] = 'merge',
                        progress_callback: Optional[callable] = None) -> Dict[str, any]:
         """
         Import contacts from CSV file with tracking and optional list creation
@@ -255,6 +256,8 @@ class CSVImportService:
             list_name: Name for the campaign list (defaults to filename)
             create_list: Whether to create a campaign list for these contacts
             imported_by: User identifier who performed the import
+            duplicate_strategy: How to handle duplicates ('merge', 'replace', 'skip'). Default: 'merge'
+            progress_callback: Optional callback for progress updates
             
         Returns:
             Dict with import results and statistics
@@ -353,7 +356,7 @@ class CSVImportService:
                 for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is 1)
                     results['total_rows'] += 1
                     
-                    # Update progress every 10 rows with accurate totals
+                    # Update progress every 10 rows using row numbers (not contact counts)
                     if progress_callback and (results['total_rows'] % 10 == 0):
                         progress_callback(results['total_rows'], total_data_rows)
                     
@@ -388,31 +391,59 @@ class CSVImportService:
                             results['duplicates'] += 1
                             contact = existing
                             
-                            # Enrich existing contact data
-                            if mapped_row.get('first_name'):
-                                # Update if missing or is a phone number
-                                if not existing.first_name or '+1' in existing.first_name:
+                            # Handle duplicate based on strategy
+                            if duplicate_strategy == 'skip':
+                                # Skip this contact entirely
+                                is_new = False
+                                # Don't update any data
+                                data_updated = {}
+                            elif duplicate_strategy == 'replace':
+                                # Replace all fields with new data
+                                if mapped_row.get('first_name'):
                                     existing.first_name = mapped_row['first_name'][:50]
                                     data_updated['first_name'] = mapped_row['first_name']
-                            
-                            if mapped_row.get('last_name') and not existing.last_name:
-                                existing.last_name = mapped_row['last_name'][:50]
-                                data_updated['last_name'] = mapped_row['last_name']
-                            
-                            if mapped_row.get('email') and not existing.email:
-                                existing.email = mapped_row['email']
-                                data_updated['email'] = mapped_row['email']
-                            
-                            # Merge metadata - extract extra fields
-                            new_metadata = self._extract_metadata_from_mapped(mapped_row)
-                            if new_metadata:
-                                if existing.contact_metadata:
-                                    existing.contact_metadata.update(new_metadata)
-                                else:
+                                
+                                if mapped_row.get('last_name'):
+                                    existing.last_name = mapped_row['last_name'][:50]
+                                    data_updated['last_name'] = mapped_row['last_name']
+                                
+                                if mapped_row.get('email'):
+                                    existing.email = mapped_row['email']
+                                    data_updated['email'] = mapped_row['email']
+                                
+                                # Replace metadata completely
+                                new_metadata = self._extract_metadata_from_mapped(mapped_row)
+                                if new_metadata:
                                     existing.contact_metadata = new_metadata
-                                data_updated['metadata'] = new_metadata
-                            
-                            is_new = False
+                                    data_updated['metadata'] = new_metadata
+                                
+                                is_new = False
+                            else:  # merge (default)
+                                # Enrich existing contact data (only update missing fields)
+                                if mapped_row.get('first_name'):
+                                    # Update if missing or is a phone number
+                                    if not existing.first_name or '+1' in existing.first_name:
+                                        existing.first_name = mapped_row['first_name'][:50]
+                                        data_updated['first_name'] = mapped_row['first_name']
+                                
+                                if mapped_row.get('last_name') and not existing.last_name:
+                                    existing.last_name = mapped_row['last_name'][:50]
+                                    data_updated['last_name'] = mapped_row['last_name']
+                                
+                                if mapped_row.get('email') and not existing.email:
+                                    existing.email = mapped_row['email']
+                                    data_updated['email'] = mapped_row['email']
+                                
+                                # Merge metadata - extract extra fields
+                                new_metadata = self._extract_metadata_from_mapped(mapped_row)
+                                if new_metadata:
+                                    if existing.contact_metadata:
+                                        existing.contact_metadata.update(new_metadata)
+                                    else:
+                                        existing.contact_metadata = new_metadata
+                                    data_updated['metadata'] = new_metadata
+                                
+                                is_new = False
                         else:
                             # Create new contact using repository
                             contact = self.contact_repository.create(
@@ -461,11 +492,10 @@ class CSVImportService:
                         
                         results['successful'] += 1
                         
-                        # Update progress for successful imports
+                        # Update progress based on rows processed (every 5 successful rows)
                         if progress_callback and (results['successful'] % 5 == 0):
-                            current_processed = results['successful'] + results['failed']
-                            total_to_process = total_data_rows if total_data_rows > 0 else results['total_rows']
-                            progress_callback(current_processed, total_to_process)
+                            # Use row number for progress, not contact count
+                            progress_callback(results['total_rows'], total_data_rows)
                         
                         # Commit periodically through repositories
                         if results['successful'] % 100 == 0:
@@ -480,11 +510,10 @@ class CSVImportService:
                         results['failed'] += 1
                         results['errors'].append(f"Row {row_num}: {str(e)}")
                         
-                        # Update progress for failures too
+                        # Update progress based on rows processed (every 5 failed rows)
                         if progress_callback and (results['failed'] % 5 == 0):
-                            current_processed = results['successful'] + results['failed']
-                            total_to_process = total_data_rows if total_data_rows > 0 else results['total_rows']
-                            progress_callback(current_processed, total_to_process)
+                            # Use row number for progress, not contact count
+                            progress_callback(results['total_rows'], total_data_rows)
                         
                         # Repository pattern handles rollback automatically
                         # No manual session management needed
@@ -498,11 +527,10 @@ class CSVImportService:
             if temp_path and os.path.exists(temp_path):
                 os.remove(temp_path)
         
-        # Final progress update
+        # Final progress update - ensure we show completion
         if progress_callback:
-            final_processed = results['successful'] + results['failed']
-            final_total = results['total_rows']
-            progress_callback(final_processed, final_total)
+            # Use total rows for both processed and total to show 100% completion
+            progress_callback(results['total_rows'], results['total_rows'])
         
         # Update import record using repository
         metadata = {
@@ -569,7 +597,8 @@ class CSVImportService:
     
     def import_csv(self, file: FileStorage, 
                    list_name: Optional[str] = None,
-                   enrichment_mode: Optional[str] = None) -> Dict[str, any]:
+                   enrichment_mode: Optional[str] = None,
+                   duplicate_strategy: Optional[str] = 'merge') -> Dict[str, any]:
         """
         Import contacts from CSV file with smart async/sync decision logic.
         
@@ -581,6 +610,7 @@ class CSVImportService:
             file: The uploaded CSV file
             list_name: Optional name for the campaign list
             enrichment_mode: Optional enrichment mode (not used in current implementation)
+            duplicate_strategy: How to handle duplicates ('merge', 'replace', 'skip'). Default: 'merge'
             
         Returns:
             Dict with either:
@@ -645,7 +675,8 @@ class CSVImportService:
                     task_id = self.create_async_import_task(
                         file=file,
                         list_name=list_name,
-                        imported_by=None  # Could be enhanced to track user
+                        imported_by=None,  # Could be enhanced to track user
+                        duplicate_strategy=duplicate_strategy
                     )
                     
                     # FIXED: Return list_id immediately for "View List" button
@@ -684,10 +715,10 @@ class CSVImportService:
                         except Exception:
                             pass  # Ignore cleanup errors
                     
-                    return self._process_sync_with_fallback(file, list_name)
+                    return self._process_sync_with_fallback(file, list_name, duplicate_strategy=duplicate_strategy)
             else:
                 # Small file - process synchronously
-                result = self._process_sync_with_fallback(file, list_name)
+                result = self._process_sync_with_fallback(file, list_name, duplicate_strategy=duplicate_strategy)
                 return self._ensure_dict_result(result)
             
         except Exception as e:
@@ -702,7 +733,7 @@ class CSVImportService:
             }
             return self._ensure_dict_result(result)
     
-    def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None, progress_callback: Optional[callable] = None) -> Dict[str, any]:
+    def _basic_import_csv(self, file: FileStorage, list_name: Optional[str] = None, duplicate_strategy: Optional[str] = 'merge', progress_callback: Optional[callable] = None) -> Dict[str, any]:
         """Basic CSV import for non-PropertyRadar files"""
         try:
             # Call the existing import_contacts method
@@ -711,6 +742,7 @@ class CSVImportService:
                 list_name=list_name,
                 create_list=True,  # Always create list (default behavior)
                 imported_by=None,  # Will be set by route if needed
+                duplicate_strategy=duplicate_strategy,
                 progress_callback=progress_callback
             )
             
@@ -861,7 +893,8 @@ class CSVImportService:
     
     def create_async_import_task(self, file: FileStorage, 
                                list_name: Optional[str] = None,
-                               imported_by: Optional[str] = None) -> str:
+                               imported_by: Optional[str] = None,
+                               duplicate_strategy: Optional[str] = 'merge') -> str:
         """
         Create an async Celery task for large CSV import.
         
@@ -869,6 +902,7 @@ class CSVImportService:
             file: The uploaded file
             list_name: Optional name for the campaign list
             imported_by: User identifier who initiated the import
+            duplicate_strategy: How to handle duplicates ('merge', 'replace', 'skip'). Default: 'merge'
             
         Returns:
             Celery task ID for tracking progress
@@ -887,7 +921,8 @@ class CSVImportService:
                 file_content=file_content,
                 filename=file.filename,
                 list_name=list_name,
-                imported_by=imported_by
+                imported_by=imported_by,
+                duplicate_strategy=duplicate_strategy
             )
             
             return task.id
@@ -1034,7 +1069,7 @@ class CSVImportService:
             'message': 'Import failed due to unexpected result format'
         }
     
-    def _process_sync_with_fallback(self, file: FileStorage, list_name: Optional[str], progress_callback: Optional[callable] = None) -> Dict[str, Any]:
+    def _process_sync_with_fallback(self, file: FileStorage, list_name: Optional[str], duplicate_strategy: Optional[str] = 'merge', progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
         Process CSV synchronously with PropertyRadar detection fallback.
         
@@ -1133,8 +1168,10 @@ class CSVImportService:
                             session=session
                         )
                     
-                    # Import using PropertyRadar service with progress callback
-                    result = propertyradar_service.import_propertyradar_csv(file, list_name, progress_callback=progress_callback)
+                    # Import using PropertyRadar service with progress callback and duplicate strategy
+                    # Map 'merge' strategy to PropertyRadar's 'update' strategy
+                    pr_duplicate_strategy = 'update' if duplicate_strategy == 'merge' else duplicate_strategy
+                    result = propertyradar_service.import_propertyradar_csv(file, list_name, duplicate_strategy=pr_duplicate_strategy, progress_callback=progress_callback)
                     
                     # Transform Result object to expected format
                     # Handle is_success as both property and method
@@ -1188,10 +1225,10 @@ class CSVImportService:
                     logging.warning(f"PropertyRadar import failed, falling back to basic: {str(pr_error)}")
                     # Fall back to basic import
                     file.seek(0)
-                    return self._basic_import_csv(file, list_name, progress_callback=progress_callback)
+                    return self._basic_import_csv(file, list_name, duplicate_strategy=duplicate_strategy, progress_callback=progress_callback)
             
             # Not PropertyRadar, use basic import
-            result = self._basic_import_csv(file, list_name, progress_callback=progress_callback)
+            result = self._basic_import_csv(file, list_name, duplicate_strategy=duplicate_strategy, progress_callback=progress_callback)
             return self._ensure_dict_result(result)
             
         except Exception as e:

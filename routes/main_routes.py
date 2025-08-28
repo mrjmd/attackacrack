@@ -178,11 +178,15 @@ def import_csv():
             flash('Please upload a CSV file', 'error')
             return redirect(request.url)
         
+        # Get duplicate strategy from form
+        duplicate_strategy = request.form.get('duplicate_strategy', 'merge')
+        
         # Import the CSV with smart detection
         results = csv_service.import_contacts(
             file=file,
             create_list=False,  # Don't create campaign list from settings import
-            imported_by='settings_import'
+            imported_by='settings_import',
+            duplicate_strategy=duplicate_strategy
         )
         
         # Show results
@@ -220,12 +224,16 @@ def import_property_radar():
             flash('Please upload a CSV file', 'error')
             return redirect(request.url)
         
+        # Get duplicate strategy from form
+        duplicate_strategy = request.form.get('duplicate_strategy', 'update')
+        
         # Import PropertyRadar CSV with smart detection
         # The service will automatically detect it's PropertyRadar format
         results = csv_service.import_contacts(
             file=file,
             create_list=False,  # Don't create campaign list from settings import
-            imported_by='propertyradar_import'
+            imported_by='propertyradar_import',
+            duplicate_strategy=duplicate_strategy
         )
         
         # Show results

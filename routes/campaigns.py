@@ -442,11 +442,13 @@ def import_csv():
             # Process the CSV
             list_name = request.form.get('list_name', f'Import {datetime.now().strftime("%Y-%m-%d")}')
             enrichment_mode = request.form.get('enrichment_mode', 'enrich_missing')
+            duplicate_strategy = request.form.get('duplicate_strategy', 'merge')
             
             result = csv_service.import_csv(
                 file=file,
                 list_name=list_name,
-                enrichment_mode=enrichment_mode
+                enrichment_mode=enrichment_mode,
+                duplicate_strategy=duplicate_strategy
             )
             
             # Handle async response (large files)

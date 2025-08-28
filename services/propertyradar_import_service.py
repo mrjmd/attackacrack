@@ -100,12 +100,14 @@ class PropertyRadarImportService:
         self.session = session
         self.current_duplicate_strategy = 'update'  # Default strategy
         
-    def import_propertyradar_csv(self, file: FileStorage, list_name: Optional[str] = None, progress_callback: Optional[callable] = None) -> Result:
+    def import_propertyradar_csv(self, file: FileStorage, list_name: Optional[str] = None, duplicate_strategy: Optional[str] = 'update', progress_callback: Optional[callable] = None) -> Result:
         """Import PropertyRadar CSV file with dual contacts per row
         
         Args:
             file: Uploaded CSV file
             list_name: Optional name for the import list
+            duplicate_strategy: How to handle duplicates ('update', 'skip', 'replace'). Default: 'update'
+            progress_callback: Optional callback for progress updates
             
         Returns:
             Result with import statistics or error
@@ -117,7 +119,7 @@ class PropertyRadarImportService:
                 content = content.decode('utf-8-sig')  # Handle BOM
                 
             # Pass list_name only if it's provided (not if it's None)
-            return self.import_csv(content, file.filename, 'system', list_name=list_name, progress_callback=progress_callback)
+            return self.import_csv(content, file.filename, 'system', list_name=list_name, duplicate_strategy=duplicate_strategy, progress_callback=progress_callback)
             
         except Exception as e:
             logger.error(f"Failed to import PropertyRadar CSV: {e}")
@@ -247,13 +249,25 @@ class PropertyRadarImportService:
                 if progress_callback:
                     progress_callback(total_csv_rows, total_csv_rows)
             
-            # Update import record
+            # Update import record with correct statistics
+            # successful_imports should be the number of CSV rows successfully processed
+            # not the total number of entities created/updated
+            successful_rows = stats['total_rows'] - len(stats['errors'])
             self.csv_import_repository.update_import_status(
                 csv_import.id,
                 stats['total_rows'],
-                stats['properties_created'] + stats['properties_updated'],
+                successful_rows,
                 len(stats['errors']),
-                {'errors': stats['errors']} if stats['errors'] else None
+                {
+                    'errors': stats['errors'] if stats['errors'] else [],
+                    'properties_created': stats['properties_created'],
+                    'properties_updated': stats['properties_updated'],
+                    'properties_skipped': stats['properties_skipped'],
+                    'contacts_created': stats['contacts_created'],
+                    'contacts_updated': stats['contacts_updated'],
+                    'contacts_skipped': stats['contacts_skipped'],
+                    'duplicate_strategy': self.current_duplicate_strategy
+                }
             )
             
             # Add contacts to campaign list if applicable
@@ -875,7 +889,7 @@ class PropertyRadarImportService:
             
             # Handle primary contact
             primary_contact = None
-            primary_contact_operation = 'skipped'
+            primary_contact_operation = None  # Don't default to skipped
             if data.get('primary_contact'):
                 try:
                     primary_contact, primary_contact_operation = self._process_contact(data['primary_contact'], csv_import)
@@ -887,10 +901,11 @@ class PropertyRadarImportService:
                         row_errors.append(f"Failed to create primary contact for {row.get('Address', 'Unknown')}")
                 except Exception as e:
                     row_errors.append(f"Primary contact error: {str(e)}")
+                    primary_contact_operation = 'error'
             
             # Handle secondary contact
             secondary_contact = None
-            secondary_contact_operation = 'skipped'
+            secondary_contact_operation = None  # Don't default to skipped
             if data.get('secondary_contact'):
                 try:
                     secondary_contact, secondary_contact_operation = self._process_contact(data['secondary_contact'], csv_import)
@@ -900,6 +915,7 @@ class PropertyRadarImportService:
                         )
                 except Exception as e:
                     row_errors.append(f"Secondary contact error: {str(e)}")
+                    secondary_contact_operation = 'error'
             
             # Return result with any errors captured, including contact objects and operation types
             result_data = {
@@ -1144,40 +1160,49 @@ class PropertyRadarImportService:
                         elif property_operation == 'updated':
                             stats['properties_updated'] += 1
                         elif property_operation == 'existing':
-                            # Property exists - count as update for statistics purposes
-                            stats['properties_updated'] += 1
+                            # Property exists - handle based on duplicate strategy
+                            if self.current_duplicate_strategy == 'skip':
+                                stats['properties_skipped'] += 1
+                            else:
+                                stats['properties_updated'] += 1
                         elif property_operation == 'skipped':
                             stats['properties_skipped'] += 1
                         
                         # Count ACTUAL contact operations using operation types
-                        primary_operation = result.value.get('primary_contact_operation', 'skipped')
+                        primary_operation = result.value.get('primary_contact_operation')
                         if primary_operation == 'created':
                             stats['contacts_created'] += 1
                         elif primary_operation == 'existing':
-                            # For 'replace' strategy, existing contacts count as updated
-                            if self.current_duplicate_strategy == 'replace':
+                            # Handle based on duplicate strategy
+                            if self.current_duplicate_strategy == 'skip':
+                                stats['contacts_skipped'] += 1
+                            elif self.current_duplicate_strategy in ['update', 'replace']:
                                 stats['contacts_updated'] += 1
                             else:
                                 stats['contacts_updated'] += 1
                         elif primary_operation == 'skipped':
                             stats['contacts_skipped'] += 1
+                        # If primary_operation is None, don't count it (no contact data)
                         
                         # Get primary contact for list tracking
                         if return_contacts and 'primary_contact' in result.value and result.value['primary_contact']:
                             logger.debug(f"Adding primary contact to list: {result.value['primary_contact']}")
                             imported_contacts.append(result.value['primary_contact'])
                         
-                        secondary_operation = result.value.get('secondary_contact_operation', 'skipped')
+                        secondary_operation = result.value.get('secondary_contact_operation')
                         if secondary_operation == 'created':
                             stats['contacts_created'] += 1
                         elif secondary_operation == 'existing':
-                            # For 'replace' strategy, existing contacts count as updated
-                            if self.current_duplicate_strategy == 'replace':
+                            # Handle based on duplicate strategy
+                            if self.current_duplicate_strategy == 'skip':
+                                stats['contacts_skipped'] += 1
+                            elif self.current_duplicate_strategy in ['update', 'replace']:
                                 stats['contacts_updated'] += 1
                             else:
                                 stats['contacts_updated'] += 1
                         elif secondary_operation == 'skipped':
                             stats['contacts_skipped'] += 1
+                        # If secondary_operation is None, don't count it (no contact data)
                             
                         # Get secondary contact for list tracking
                         if return_contacts and 'secondary_contact' in result.value and result.value['secondary_contact']:
@@ -1261,18 +1286,17 @@ class PropertyRadarImportService:
             if existing:
                 # Handle existing property based on duplicate strategy
                 if self.current_duplicate_strategy == 'skip':
-                    operation_type = 'skipped'
+                    return existing, 'skipped'
                 elif self.current_duplicate_strategy in ['update', 'replace']:
                     # Update existing property
                     for key, value in property_data.items():
                         if value is not None:  # Only update non-null values
                             setattr(existing, key, value)
                     self.property_repository.update(existing)
-                    operation_type = 'updated'
+                    return existing, 'updated'
                 else:
-                    # For any other strategy (like 'existing'), just return existing without update
-                    operation_type = 'existing'
-                return existing, operation_type
+                    # For any other strategy, just return existing without update
+                    return existing, 'existing'
             else:
                 # Create new property with retry on constraint violation
                 try:
@@ -1290,18 +1314,17 @@ class PropertyRadarImportService:
                             logger.debug(f"Found existing property after retry: {existing.id}")
                             # Handle existing property based on duplicate strategy
                             if self.current_duplicate_strategy == 'skip':
-                                operation_type = 'skipped'
+                                return existing, 'skipped'
                             elif self.current_duplicate_strategy in ['update', 'replace']:
                                 # Update with current data
                                 for key, value in property_data.items():
                                     if value is not None:
                                         setattr(existing, key, value)
                                 self.property_repository.update(existing)
-                                operation_type = 'updated'
+                                return existing, 'updated'
                             else:
-                                # For any other strategy (like 'existing'), just return existing without update
-                                operation_type = 'existing'
-                            return existing, operation_type
+                                # For any other strategy, just return existing without update
+                                return existing, 'existing'
                     raise create_error
                 
         except Exception as e:
@@ -1336,11 +1359,13 @@ class PropertyRadarImportService:
                     # Don't commit here - let batch processing handle commits
                 # Return operation type based on duplicate strategy
                 if self.current_duplicate_strategy == 'skip':
-                    operation_type = 'skipped'
+                    return existing, 'skipped'
+                elif self.current_duplicate_strategy in ['update', 'replace']:
+                    # For PropertyRadar, we don't actually update contact data, just link to property
+                    # But we still count it as updated for statistics
+                    return existing, 'existing'  # Will be counted as updated in batch processing
                 else:
-                    # For 'update' or any other strategy, return 'existing' to indicate found existing contact
-                    operation_type = 'existing'
-                return existing, operation_type
+                    return existing, 'existing'
             else:
                 # Create new contact with retry on constraint violation
                 logger.debug(f"Creating new contact with phone {contact_data['phone']}")
@@ -1362,11 +1387,13 @@ class PropertyRadarImportService:
                                 csv_import.contacts.append(existing)
                             # Return operation type based on duplicate strategy
                             if self.current_duplicate_strategy == 'skip':
-                                operation_type = 'skipped'
+                                return existing, 'skipped'
+                            elif self.current_duplicate_strategy in ['update', 'replace']:
+                                # For PropertyRadar, we don't actually update contact data, just link to property
+                                # But we still count it as updated for statistics
+                                return existing, 'existing'  # Will be counted as updated in batch processing
                             else:
-                                # For 'update' or any other strategy, return 'existing' to indicate found existing contact
-                                operation_type = 'existing'
-                            return existing, operation_type
+                                return existing, 'existing'
                     raise create_error
                 
         except Exception as e:
