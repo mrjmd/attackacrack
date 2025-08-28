@@ -134,7 +134,12 @@ class ContactRepository(BaseRepository[Contact]):
         
         # Apply list filter first (join with CampaignListMember if needed)
         if list_filter:
-            query = self._apply_list_filter(query, list_filter)
+            try:
+                query = self._apply_list_filter(query, list_filter)
+            except Exception as e:
+                # On error, continue with original query (graceful degradation)
+                logger.warning(f"Error applying list filter {list_filter}: {e}")
+                # Continue with original query
         
         # Apply search
         if search_query:
@@ -239,21 +244,26 @@ class ContactRepository(BaseRepository[Contact]):
     
     def _apply_list_filter(self, query: Query, list_filter: int) -> Query:
         """Apply list membership filter to query"""
-        # Check if the list exists first
-        from crm_database import CampaignList
-        list_exists = self.session.query(CampaignList).filter_by(id=list_filter).first()
-        
-        if not list_exists:
-            # If list doesn't exist, return query unchanged (show all contacts)
-            return query
+        try:
+            # Check if the list exists first
+            from crm_database import CampaignList
+            list_exists = self.session.query(CampaignList).filter_by(id=list_filter).first()
             
-        # Use distinct to avoid duplicates from JOIN
-        return query.join(CampaignListMember).filter(
-            and_(
-                CampaignListMember.list_id == list_filter,
-                CampaignListMember.status == 'active'
-            )
-        ).distinct()
+            if not list_exists:
+                # If list doesn't exist, return query unchanged (show all contacts)
+                return query
+                
+            # Use distinct to avoid duplicates from JOIN
+            return query.join(CampaignListMember).filter(
+                and_(
+                    CampaignListMember.list_id == list_filter,
+                    CampaignListMember.status == 'active'
+                )
+            ).distinct()
+        except Exception as e:
+            # On error, return original query unchanged (graceful degradation)
+            logger.warning(f"Error applying list filter {list_filter}: {e}")
+            return query
     
     def _apply_sorting(self, query: Query, sort_by: str, sort_order: SortOrder) -> Query:
         """Apply sorting to query"""

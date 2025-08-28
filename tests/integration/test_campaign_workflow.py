@@ -48,8 +48,13 @@ class TestCampaignCreationToSendWorkflow:
             campaign_service = app.services.get('campaign')
             openphone_service = app.services.get('openphone')
             
-            # Mock OpenPhone service to simulate successful sends
-            openphone_service.send_message = Mock(return_value={'success': True, 'message_id': 'msg_123'})
+            # Mock OpenPhone service to simulate successful sends with unique message IDs
+            import itertools
+            message_id_counter = itertools.count(1)
+            openphone_service.send_message = Mock(side_effect=lambda phone, message: {
+                'success': True, 
+                'message_id': f'msg_{next(message_id_counter)}'
+            })
             
             # Step 1: Create campaign
             result = campaign_service.create_campaign(

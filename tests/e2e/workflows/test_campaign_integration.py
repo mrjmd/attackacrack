@@ -14,8 +14,10 @@ from crm_database import Campaign, CampaignMembership, Contact, CampaignList, Ca
 
 def mock_openphone_service(campaign_service):
     """Helper to mock OpenPhone service on a campaign service instance"""
+    import itertools
     mock = MagicMock()
-    mock.send_message.return_value = {'success': True, 'message_id': 'MSG123'}
+    message_id_counter = itertools.count(1)
+    mock.send_message.side_effect = lambda phone, message: {'success': True, 'message_id': f'MSG{next(message_id_counter)}'}
     campaign_service.openphone_service = mock
     return mock
 
@@ -335,6 +337,7 @@ class TestCampaignErrorHandling:
         # Mock the OpenPhone service to fail
         mock_openphone = mock_openphone_service(campaign_service)
         mock_openphone.reset_mock()  # Clear any previous calls
+        mock_openphone.send_message.side_effect = None  # Clear side_effect first
         mock_openphone.send_message.return_value = {'success': False, 'error': 'API Error'}
         # Create and start campaign
         campaign_result = campaign_service.create_campaign(

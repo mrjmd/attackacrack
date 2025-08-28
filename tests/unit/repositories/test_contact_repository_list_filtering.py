@@ -27,32 +27,34 @@ from repositories.base_repository import PaginationParams, PaginatedResult, Sort
 from crm_database import Contact, CampaignList, CampaignListMember
 
 
+# Module-level fixtures that can be shared across all test classes
+@pytest.fixture
+def mock_session():
+    """Mock database session"""
+    return Mock()
+
+@pytest.fixture
+def repository(mock_session):
+    """ContactRepository instance with mocked session"""
+    return ContactRepository(mock_session)
+
+@pytest.fixture
+def mock_query():
+    """Mock query object with all necessary methods"""
+    mock = Mock(spec=Query)
+    mock.join.return_value = mock
+    mock.filter.return_value = mock
+    mock.distinct.return_value = mock
+    mock.order_by.return_value = mock
+    mock.count.return_value = 0
+    mock.offset.return_value = mock
+    mock.limit.return_value = mock
+    mock.all.return_value = []
+    return mock
+
+
 class TestContactRepositoryListFiltering:
     """TDD tests for ContactRepository list filtering functionality"""
-    
-    @pytest.fixture
-    def mock_session(self):
-        """Mock database session"""
-        return Mock()
-    
-    @pytest.fixture
-    def repository(self, mock_session):
-        """ContactRepository instance with mocked session"""
-        return ContactRepository(mock_session)
-    
-    @pytest.fixture
-    def mock_query(self):
-        """Mock query object with all necessary methods"""
-        mock = Mock(spec=Query)
-        mock.join.return_value = mock
-        mock.filter.return_value = mock
-        mock.distinct.return_value = mock
-        mock.order_by.return_value = mock
-        mock.count.return_value = 0
-        mock.offset.return_value = mock
-        mock.limit.return_value = mock
-        mock.all.return_value = []
-        return mock
     
     def test_apply_list_filter_joins_with_campaign_list_member_table(self, repository, mock_query, mock_session):
         """

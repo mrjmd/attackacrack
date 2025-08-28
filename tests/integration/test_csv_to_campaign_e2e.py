@@ -19,6 +19,7 @@ import io
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
 from decimal import Decimal
+from sqlalchemy import text
 
 from app import create_app
 from extensions import db
@@ -75,11 +76,13 @@ class TestCSVToCampaignEndToEnd:
     @pytest.fixture
     def services(self, repositories, db_session):
         """Create service instances with mocked external dependencies"""
-        # Mock OpenPhone service
+        # Mock OpenPhone service with unique message IDs
+        import itertools
         openphone_service = Mock()
-        openphone_service.send_message = Mock(return_value={
+        message_id_counter = itertools.count(1)
+        openphone_service.send_message = Mock(side_effect=lambda phone, message: {
             'success': True, 
-            'message_id': 'test_msg_123',
+            'message_id': f'test_msg_{next(message_id_counter)}',
             'status': 'delivered'
         })
         
@@ -662,31 +665,31 @@ SFR,789 Another Good St,Town,67890,Another Good,555-2222,good2@example.com'''
         
         # Verify no orphaned records
         # Check CampaignMembership referential integrity
-        orphaned_memberships = db_session.execute('''
+        orphaned_memberships = db_session.execute(text('''
             SELECT cm.id FROM campaign_membership cm 
             LEFT JOIN campaign c ON cm.campaign_id = c.id 
             LEFT JOIN contact ct ON cm.contact_id = ct.id
             WHERE c.id IS NULL OR ct.id IS NULL
-        ''').fetchall()
+        ''')).fetchall()
         assert len(orphaned_memberships) == 0
         
         # Check Activity referential integrity
-        orphaned_activities = db_session.execute('''
+        orphaned_activities = db_session.execute(text('''
             SELECT a.id FROM activity a 
             LEFT JOIN contact c ON a.contact_id = c.id
             LEFT JOIN campaign camp ON a.campaign_id = camp.id
             WHERE (a.contact_id IS NOT NULL AND c.id IS NULL) 
                OR (a.campaign_id IS NOT NULL AND camp.id IS NULL)
-        ''').fetchall()
+        ''')).fetchall()
         assert len(orphaned_activities) == 0
         
         # Check PropertyContact associations integrity  
-        orphaned_property_contacts = db_session.execute('''
+        orphaned_property_contacts = db_session.execute(text('''
             SELECT pc.id FROM property_contact pc
             LEFT JOIN property p ON pc.property_id = p.id
             LEFT JOIN contact c ON pc.contact_id = c.id
             WHERE p.id IS NULL OR c.id IS NULL
-        ''').fetchall()
+        ''')).fetchall()
         assert len(orphaned_property_contacts) == 0
         
         # Phase 4: Verify campaign analytics accuracy

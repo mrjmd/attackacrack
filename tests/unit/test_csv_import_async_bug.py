@@ -77,13 +77,14 @@ def test_async_import_bug_reproduction():
         mock_task.update_state = MagicMock()
         
         # Execute the task synchronously for testing
-        task_result = process_large_csv_import(
-            mock_task,
-            file_content=csv_content.encode('utf-8'),
-            filename='async-test.csv',
-            list_name=list_name,
-            imported_by="test_user"
-        )
+        # We need to mock the update_state calls since we're calling .run()
+        with patch.object(process_large_csv_import, 'update_state'):
+            task_result = process_large_csv_import.run(
+                file_content=csv_content.encode('utf-8'),
+                filename='async-test.csv',
+                list_name=list_name,
+                imported_by="test_user"
+            )
         
         print(f"Task result: {task_result}")
         
@@ -142,13 +143,13 @@ Jane,Smith,+15559876543"""
         
         # Get the original function (before Celery decoration)
         # Call it directly with the right parameters
-        result = task_module.process_large_csv_import(
-            self=mock_task,
-            file_content=csv_content.encode('utf-8'),
-            filename='direct-test.csv',
-            list_name=list_name,
-            imported_by="test_user"
-        )
+        with patch.object(task_module.process_large_csv_import, 'update_state'):
+            result = task_module.process_large_csv_import.run(
+                file_content=csv_content.encode('utf-8'),
+                filename='direct-test.csv',
+                list_name=list_name,
+                imported_by="test_user"
+            )
         
         print(f"Direct task result: {result}")
         

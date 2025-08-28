@@ -918,8 +918,18 @@ class CampaignService:
                                         membership.variant_sent = variant
                                         self.campaign_repository.session.flush()
                                 
-                                # TODO: Create activity record (Activity model needs campaign_id field)
-                                # For now, skip activity creation to focus on message sending
+                                # Create activity record for successful message send
+                                from datetime import datetime
+                                self.activity_repository.create(
+                                    contact_id=contact.id,
+                                    campaign_id=campaign_id,
+                                    activity_type='campaign_message_sent',
+                                    body=message,
+                                    direction='outgoing',
+                                    status='sent',
+                                    created_at=datetime.utcnow(),
+                                    openphone_id=send_result.get('message_id')
+                                )
                                 
                                 stats['messages_sent'] += 1
                                 logger.info(f"Sent message to {contact.phone}")

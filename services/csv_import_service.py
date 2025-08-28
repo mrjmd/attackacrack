@@ -12,7 +12,7 @@ from typing import List, Dict, Optional, Tuple, Any
 from werkzeug.datastructures import FileStorage
 
 logger = logging.getLogger(__name__)
-# Model imports removed - using repositories only
+# Using repositories only - no direct model or database imports
 from services.contact_service_refactored import ContactService
 from repositories.csv_import_repository import CSVImportRepository
 from repositories.contact_csv_import_repository import ContactCSVImportRepository
@@ -303,8 +303,8 @@ class CSVImportService:
                         filter_criteria={'csv_import_id': csv_import.id}
                     )
                     # CRITICAL FIX: Commit the session immediately to persist the campaign list
-                    from extensions import db
-                    db.session.commit()
+                    # Use repository's commit method instead of direct database access
+                    self.campaign_list_repository.commit()
                     logger.info(f"Campaign list created and committed: ID={campaign_list.id}")
                 except Exception as e:
                     logger.error(f"Campaign list creation failed: {e}")
@@ -509,7 +509,8 @@ class CSVImportService:
             'errors': results['errors'][:10],  # Store first 10 errors
             'duplicates': results['duplicates'],
             'new_contacts': len(results['contacts_created']),
-            'enriched_contacts': results['duplicates']  # All duplicates were enriched
+            'enriched_contacts': results['duplicates'],  # All duplicates were enriched
+            'list_id': campaign_list.id if campaign_list else None  # CRITICAL FIX: Store list_id in metadata for UI
         }
         
         # Final update with error handling
@@ -632,8 +633,8 @@ class CSVImportService:
                             )
                             
                             # CRITICAL FIX: Commit both the campaign list and CSV import immediately
-                            from extensions import db
-                            db.session.commit()
+                            # Use repository's commit method instead of direct database access
+                            self.campaign_list_repository.commit()
                             logger.info(f"ASYNC: Campaign list and import created and committed: list_id={campaign_list.id}, import_id={csv_import.id}")
                         except Exception as e:
                             logger.error(f"ASYNC: Campaign list/import creation failed: {e}")

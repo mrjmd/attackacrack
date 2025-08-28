@@ -95,19 +95,32 @@ def test_real_csv_import_scenario():
         
         print(f"Final lists: {final_list_count}, imports: {final_import_count}")
         
-        # This should demonstrate the bug
-        assert result.get('success', False), f"Import should succeed, got: {result}"
+        # Handle both sync and async responses
+        is_async = result.get('async', False)
+        is_success = result.get('success', False)
         
-        imported = result.get('imported', 0)
-        updated = result.get('updated', 0)
+        # For async processing, success means the list was created and task queued
+        if is_async:
+            assert result.get('status') == 'queued', f"Async import should be queued, got: {result}"
+            assert result.get('task_id'), f"Async import should have task_id, got: {result}"
+            imported = 0  # Async doesn't report these immediately
+            updated = 0
+            print(f"Async processing: task_id={result.get('task_id')}, list_id={result.get('list_id')}")
+        else:
+            # Sync processing
+            assert is_success, f"Sync import should succeed, got: {result}"
+            imported = result.get('imported', 0)
+            updated = result.get('updated', 0)
+            print(f"Sync processing: {imported} imported, {updated} updated")
         
-        print(f"Reported: {imported} imported, {updated} updated")
-        
-        # The user reported success but no list was created
+        # The key test: was a list actually created?
         if final_list_count == initial_list_count:
             # BUG CONFIRMED: Import succeeded but no list created
             list_id = result.get('list_id')
-            pytest.fail(f"BUG CONFIRMED: Import succeeded ({imported} imported, {updated} updated) but no campaign list was created. list_id returned: {list_id}")
+            if is_async:
+                pytest.fail(f"BUG CONFIRMED: Async import queued but no campaign list was created. list_id returned: {list_id}")
+            else:
+                pytest.fail(f"BUG CONFIRMED: Import succeeded ({imported} imported, {updated} updated) but no campaign list was created. list_id returned: {list_id}")
         
         # If we get here, a list was created (bug not reproduced)
         created_lists = db.session.query(CampaignList).filter_by(name=list_name).all()

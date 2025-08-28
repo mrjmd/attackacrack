@@ -27,7 +27,8 @@ from repositories.contact_repository import ContactRepository
 from repositories.csv_import_repository import CSVImportRepository
 from repositories.campaign_list_repository import CampaignListRepository
 from repositories.campaign_list_member_repository import CampaignListMemberRepository
-from crm_database import db, Property, Contact, PropertyContact, CSVImport, CampaignList, CampaignListMember
+# Model imports needed for type hints
+from crm_database import Contact, Property, CSVImport
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,9 @@ class PropertyRadarImportService:
         self.csv_import_repository = csv_import_repository
         self.campaign_list_repository = campaign_list_repository
         self.campaign_list_member_repository = campaign_list_member_repository
-        self.session = session or db.session
+        # Session is optional since repositories handle their own sessions
+        # Only kept for backwards compatibility during migration
+        self.session = session
         self.current_duplicate_strategy = 'update'  # Default strategy
         
     def import_propertyradar_csv(self, file: FileStorage, list_name: Optional[str] = None, progress_callback: Optional[callable] = None) -> Result:
@@ -288,11 +291,20 @@ class PropertyRadarImportService:
                 
                 # Ensure list member associations are committed to database
                 try:
-                    self.session.commit()
+                    # Commit through session to ensure test compatibility
+                    if self.session:
+                        self.session.commit()
+                    elif self.campaign_list_member_repository:
+                        # Fallback to repository commit if no session available
+                        self.campaign_list_member_repository.commit()
                     logger.debug(f"Committed {stats.get('contacts_added_to_list', 0)} list member associations to database")
                 except Exception as e:
                     logger.error(f"Failed to commit list member associations: {e}")
-                    self.session.rollback()
+                    # Rollback through session or repository
+                    if self.session:
+                        self.session.rollback()
+                    elif self.campaign_list_member_repository:
+                        self.campaign_list_member_repository.rollback()
                     raise
             
             # Calculate processing time
@@ -969,7 +981,14 @@ class PropertyRadarImportService:
     def rollback_transaction(self):
         """Rollback current database transaction"""
         try:
-            db.session.rollback()
+            # Use session rollback when available for better test compatibility
+            if self.session:
+                self.session.rollback()
+            elif self.property_repository:
+                # Fallback to repository rollback if no session available
+                self.property_repository.rollback()
+            else:
+                logger.warning("No session or repository available for rollback")
         except Exception as e:
             logger.error(f"Failed to rollback transaction: {e}")
     
@@ -1018,7 +1037,7 @@ class PropertyRadarImportService:
             
             # Check PropertyContact associations integrity
             from crm_database import PropertyContact
-            total_associations = self.session.query(PropertyContact).count()
+            total_associations = PropertyContact.query.count()
             
             report = {
                 'is_consistent': True,
@@ -1178,12 +1197,20 @@ class PropertyRadarImportService:
                     # Continue processing other rows
                     continue
             
-            # Commit the batch transaction
-            self.session.commit()
+            # Commit the batch transaction through session when available
+            if self.session:
+                self.session.commit()
+            elif self.property_repository:
+                # Fallback to repository commit if no session available
+                self.property_repository.commit()
             
         except Exception as e:
-            # Rollback batch transaction on critical error
-            self.session.rollback()
+            # Rollback batch transaction on critical error through session when available
+            if self.session:
+                self.session.rollback()
+            elif self.property_repository:
+                # Fallback to repository rollback if no session available
+                self.property_repository.rollback()
             error_msg = f"Batch processing error: {str(e)}"
             stats['errors'].append(error_msg)
             logger.error(error_msg)
@@ -1499,8 +1526,8 @@ class PropertyRadarImportService:
                     return getattr(members, 'count', lambda: 0)()
             else:
                 # Fallback to direct database query
-                from crm_database import CampaignListMember
-                count = self.session.query(CampaignListMember).filter_by(list_id=list_id).count()
+                # Use repository instead of direct model access
+                count = self.campaign_list_member_repository.count(list_id=list_id) if self.campaign_list_member_repository else 0
                 return count
         except Exception as e:
             logger.error(f"Failed to get list member count for list {list_id}: {e}")

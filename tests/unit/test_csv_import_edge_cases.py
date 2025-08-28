@@ -105,13 +105,13 @@ class TestCSVImportEdgeCaseBugs:
             mock_task.update_state = MagicMock()
             
             # Call Celery task with None list_name (common in real usage)
-            result = process_large_csv_import(
-                mock_task,
-                file_content=csv_content.encode('utf-8'),
-                filename="test.csv",
-                list_name=None,  # This might be the bug!
-                imported_by="test_user"
-            )
+            with patch.object(process_large_csv_import, 'update_state'):
+                result = process_large_csv_import.run(
+                    file_content=csv_content.encode('utf-8'),
+                    filename="test.csv",
+                    list_name=None,  # This might be the bug!
+                    imported_by="test_user"
+                )
             
             # Check if import succeeded but no list was created
             assert result.get('status') == 'success', f"Task should succeed, got: {result}"
@@ -314,13 +314,13 @@ class TestCSVImportParameterHandling:
             mock_task.update_state = MagicMock()
             
             with patch('services.csv_import_service.CSVImportService._process_sync_with_fallback', side_effect=track_service_call):
-                result = process_large_csv_import(
-                    mock_task,
-                    file_content=csv_content.encode('utf-8'),
-                    filename="test.csv",
-                    list_name="Celery-Test-List",  # Pass explicit list_name
-                    imported_by="test_user"
-                )
+                with patch.object(process_large_csv_import, 'update_state'):
+                    result = process_large_csv_import.run(
+                        file_content=csv_content.encode('utf-8'),
+                        filename="test.csv",
+                        list_name="Celery-Test-List",  # Pass explicit list_name
+                        imported_by="test_user"
+                    )
                 
                 print(f"Service calls from Celery: {service_calls}")
                 

@@ -42,13 +42,14 @@ Bob,Johnson,+12345559999,bob@example.com"""
             mock_task.update_state = MagicMock()
             
             # Call the Celery task function directly (bypassing Celery infrastructure)
-            result = process_large_csv_import(
-                mock_task,  # self parameter for task binding
-                file_content=csv_content.encode('utf-8'),
-                filename=filename,
-                list_name=list_name,
-                imported_by="test_user"
-            )
+            # Mock update_state since we're bypassing Celery infrastructure
+            with patch.object(process_large_csv_import, 'update_state'):
+                result = process_large_csv_import.run(
+                    file_content=csv_content.encode('utf-8'),
+                    filename=filename,
+                    list_name=list_name,
+                    imported_by="test_user"
+                )
             
             # Check result
             assert result is not None, "Task should return result"
@@ -90,13 +91,13 @@ Bob,Johnson,+12345559999,bob@example.com"""
                     'message': 'Import completed'
                 }
                 
-                result = process_large_csv_import(
-                    mock_task,
-                    file_content=csv_content.encode('utf-8'),
-                    filename="test.csv",
-                    list_name=list_name,
-                    imported_by="test_user"
-                )
+                with patch.object(process_large_csv_import, 'update_state'):
+                    result = process_large_csv_import.run(
+                        file_content=csv_content.encode('utf-8'),
+                        filename="test.csv",
+                        list_name=list_name,
+                        imported_by="test_user"
+                    )
                 
                 # Verify the service method was called
                 assert mock_process.called, "Task should call _process_sync_with_fallback"
@@ -156,13 +157,13 @@ Bob,Johnson,+12345559999,bob@example.com"""
                 
                 mock_fallback.side_effect = real_fallback
                 
-                result = process_large_csv_import(
-                    mock_task,
-                    file_content=csv_content.encode('utf-8'),
-                    filename="test.csv",
-                    list_name=list_name,
-                    imported_by="test_user"
-                )
+                with patch.object(process_large_csv_import, 'update_state'):
+                    result = process_large_csv_import.run(
+                        file_content=csv_content.encode('utf-8'),
+                        filename="test.csv",
+                        list_name=list_name,
+                        imported_by="test_user"
+                    )
                 
                 # CRITICAL TEST: Verify list was created
                 list_count = db_session.query(CampaignList).count()
@@ -204,13 +205,13 @@ Bob,Johnson,+12345559999,bob@example.com"""
                 }
             
             with patch('services.csv_import_service.CSVImportService._process_sync_with_fallback', side_effect=capture_params):
-                result = process_large_csv_import(
-                    mock_task,
-                    file_content=csv_content.encode('utf-8'),
-                    filename="test.csv",
-                    list_name=list_name,
-                    imported_by="test_user"
-                )
+                with patch.object(process_large_csv_import, 'update_state'):
+                    result = process_large_csv_import.run(
+                        file_content=csv_content.encode('utf-8'),
+                        filename="test.csv",
+                        list_name=list_name,
+                        imported_by="test_user"
+                    )
                 
                 # Check if list_name was passed to the service
                 assert 'list_name' in captured_params or list_name in str(captured_params), \

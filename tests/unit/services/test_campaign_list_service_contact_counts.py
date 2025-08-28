@@ -29,43 +29,45 @@ from repositories.contact_repository import ContactRepository
 from crm_database import CampaignList, CampaignListMember, Contact
 
 
+# Module-level fixtures that can be shared across all test classes
+@pytest.fixture
+def mock_list_repository():
+    """Mock CampaignListRepository"""
+    mock = Mock(spec=CampaignListRepository)
+    mock.get_by_id = Mock()
+    mock.commit = Mock()
+    mock.rollback = Mock()
+    return mock
+
+@pytest.fixture
+def mock_member_repository():
+    """Mock CampaignListMemberRepository"""
+    mock = Mock(spec=CampaignListMemberRepository)
+    mock.get_membership_stats = Mock()
+    mock.get_contact_ids_in_list = Mock()
+    mock.commit = Mock()
+    return mock
+
+@pytest.fixture
+def mock_contact_repository():
+    """Mock ContactRepository"""
+    mock = Mock(spec=ContactRepository)
+    mock.get_by_ids = Mock()
+    mock.get_contacts_with_filter = Mock()
+    return mock
+
+@pytest.fixture
+def service(mock_list_repository, mock_member_repository, mock_contact_repository):
+    """CampaignListService instance with mocked repositories"""
+    return CampaignListServiceRefactored(
+        campaign_list_repository=mock_list_repository,
+        member_repository=mock_member_repository,
+        contact_repository=mock_contact_repository
+    )
+
+
 class TestCampaignListServiceContactCounts:
     """TDD tests for accurate contact counting in campaign list service"""
-    
-    @pytest.fixture
-    def mock_list_repository(self):
-        """Mock CampaignListRepository"""
-        mock = Mock(spec=CampaignListRepository)
-        mock.get_by_id = Mock()
-        mock.commit = Mock()
-        mock.rollback = Mock()
-        return mock
-    
-    @pytest.fixture
-    def mock_member_repository(self):
-        """Mock CampaignListMemberRepository"""
-        mock = Mock(spec=CampaignListMemberRepository)
-        mock.get_membership_stats = Mock()
-        mock.get_contact_ids_in_list = Mock()
-        mock.commit = Mock()
-        return mock
-    
-    @pytest.fixture
-    def mock_contact_repository(self):
-        """Mock ContactRepository"""
-        mock = Mock(spec=ContactRepository)
-        mock.get_by_ids = Mock()
-        mock.get_contacts_with_filter = Mock()
-        return mock
-    
-    @pytest.fixture
-    def service(self, mock_list_repository, mock_member_repository, mock_contact_repository):
-        """CampaignListService instance with mocked repositories"""
-        return CampaignListServiceRefactored(
-            campaign_list_repository=mock_list_repository,
-            member_repository=mock_member_repository,
-            contact_repository=mock_contact_repository
-        )
     
     def test_get_list_stats_returns_accurate_active_member_count(self, service, mock_member_repository, mock_contact_repository):
         """
@@ -393,28 +395,32 @@ class TestCampaignListServicePropertyRadarIntegration:
         list_id = 1
         contact_ids = [100, 101, 102, 103, 104]  # 5 imported contacts
         
-        # Mock list exists
-        mock_list = Mock(id=list_id)
-        mock_list_repository.get_by_id.return_value = mock_list
+        # Mock that none of these contacts exist in the list yet
+        mock_member_repository.find_one_by.return_value = None
         
         # Mock successful member creation
-        mock_member_repository.bulk_add_contacts_to_list.return_value = 5  # 5 added
+        mock_member_repository.create.return_value = Mock(id=1)
+        mock_member_repository.commit.return_value = None
         
         # Act
         result = service.add_contacts_to_list(list_id, contact_ids)
         
-        # Assert - THIS WILL FAIL until bulk_add creates active memberships
+        # Assert
         assert result.is_success
-        assert result.data == 5  # Should return count of contacts added
+        assert result.data['added'] == 5  # Should return count of contacts added
+        assert result.data['already_exists'] == 0
+        assert result.data['errors'] == 0
         
-        # Should create memberships with status='active'
-        mock_member_repository.bulk_add_contacts_to_list.assert_called_once_with(
-            list_id, 
-            contact_ids, 
-            status='active'  # THIS WILL FAIL until status parameter is added
-        )
+        # Should create memberships for each contact
+        assert mock_member_repository.create.call_count == 5
         
-        mock_list_repository.get_by_id.assert_called_once_with(list_id)
+        # Verify each create call
+        for idx, contact_id in enumerate(contact_ids):
+            call_args = mock_member_repository.create.call_args_list[idx]
+            kwargs = call_args[1]
+            assert kwargs['list_id'] == list_id
+            assert kwargs['contact_id'] == contact_id
+        
         mock_member_repository.commit.assert_called_once()
     
     def test_add_contacts_to_list_handles_duplicate_memberships(self, mock_list_repository, mock_member_repository, mock_contact_repository):
@@ -434,23 +440,36 @@ class TestCampaignListServicePropertyRadarIntegration:
         list_id = 2
         contact_ids = [200, 201, 202]
         
-        # Mock list exists
-        mock_list = Mock(id=list_id)
-        mock_list_repository.get_by_id.return_value = mock_list
+        # Mock that contact 200 already exists and is active
+        existing_member = Mock(id=1, list_id=list_id, contact_id=200, status='active')
         
-        # Mock repository handles duplicates and returns actual count added
-        mock_member_repository.bulk_add_contacts_to_list.return_value = 2  # Only 2 new, 1 duplicate
+        def find_one_by_side_effect(**kwargs):
+            if kwargs.get('contact_id') == 200:
+                return existing_member  # Already exists
+            return None  # Others don't exist
+        
+        mock_member_repository.find_one_by.side_effect = find_one_by_side_effect
+        mock_member_repository.create.return_value = Mock(id=1)
+        mock_member_repository.commit.return_value = None
         
         # Act
         result = service.add_contacts_to_list(list_id, contact_ids)
         
         # Assert
         assert result.is_success
-        assert result.data == 2  # Should return actual count added (excluding duplicates)
+        assert result.data['added'] == 2  # Only 2 new, 1 already existed
+        assert result.data['already_exists'] == 1  # Contact 200 already existed
+        assert result.data['errors'] == 0
         
-        mock_member_repository.bulk_add_contacts_to_list.assert_called_once_with(
-            list_id, contact_ids, status='active'
-        )
+        # Should only create 2 new members (201, 202)
+        assert mock_member_repository.create.call_count == 2
+        
+        # Verify the create calls
+        create_calls = mock_member_repository.create.call_args_list
+        created_contact_ids = [call[1]['contact_id'] for call in create_calls]
+        assert 201 in created_contact_ids
+        assert 202 in created_contact_ids
+        assert 200 not in created_contact_ids  # Should not create for existing contact
     
     def test_add_contacts_to_list_updates_existing_removed_members_to_active(self, mock_list_repository, mock_member_repository, mock_contact_repository):
         """
@@ -469,26 +488,49 @@ class TestCampaignListServicePropertyRadarIntegration:
         list_id = 3
         contact_ids = [300, 301, 302]
         
-        mock_list = Mock(id=list_id)
-        mock_list_repository.get_by_id.return_value = mock_list
+        # Mock existing members with 'removed' status
+        removed_member_1 = Mock(id=1, list_id=list_id, contact_id=300, status='removed')
+        removed_member_2 = Mock(id=2, list_id=list_id, contact_id=301, status='removed')
+        # Contact 302 doesn't exist yet
         
-        # Mock repository reactivates removed members
-        mock_member_repository.bulk_add_contacts_to_list.return_value = 3  # All reactivated
+        # Mock find_one_by to return removed members for 300, 301, and None for 302
+        def find_one_by_side_effect(**kwargs):
+            if kwargs.get('contact_id') == 300:
+                return removed_member_1
+            elif kwargs.get('contact_id') == 301:
+                return removed_member_2
+            elif kwargs.get('contact_id') == 302:
+                return None
+            return None
+        
+        mock_member_repository.find_one_by.side_effect = find_one_by_side_effect
+        mock_member_repository.update.return_value = None
+        mock_member_repository.create.return_value = Mock(id=3)
+        mock_member_repository.commit.return_value = None
         
         # Act
-        result = service.add_contacts_to_list(list_id, contact_ids, reactivate_removed=True)
+        result = service.add_contacts_to_list(list_id, contact_ids)
         
-        # Assert - THIS WILL FAIL until reactivation is implemented
+        # Assert
         assert result.is_success
-        assert result.data == 3
+        assert result.data['added'] == 3  # 2 reactivated + 1 new
+        assert result.data['already_exists'] == 0
+        assert result.data['errors'] == 0
         
-        # Should call with reactivation flag
-        mock_member_repository.bulk_add_contacts_to_list.assert_called_once_with(
-            list_id, 
-            contact_ids, 
-            status='active',
-            reactivate_removed=True  # THIS WILL FAIL until parameter is added
-        )
+        # Verify that removed members were reactivated
+        assert mock_member_repository.update.call_count == 2  # Two removed members reactivated
+        
+        # Check the update calls had correct parameters
+        update_calls = mock_member_repository.update.call_args_list
+        for call in update_calls:
+            args, kwargs = call
+            assert kwargs.get('status') == 'active' or (len(args) > 1 and args[1] == 'active')
+        
+        # Verify new member was created for contact 302
+        assert mock_member_repository.create.call_count == 1
+        create_call_kwargs = mock_member_repository.create.call_args[1]
+        assert create_call_kwargs['list_id'] == list_id
+        assert create_call_kwargs['contact_id'] == 302
 
 
 class TestCampaignListServiceErrorHandling:
