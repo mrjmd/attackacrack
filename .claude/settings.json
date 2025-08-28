@@ -151,7 +151,9 @@
       "📋 TDD is MANDATORY - Write tests before implementation",
       "🔧 Use service registry: current_app.services.get('service_name')",
       "🧪 Target: 95% test coverage for new code",
-      "📝 Update CHANGELOG.md for all changes"
+      "📝 Update CHANGELOG.md for all changes",
+      "Always use proper subagents",
+      "ALWAYS ensure all tests pass before finishing a phase of work or committing"
     ],
     "on_file_edit": [
       "Run tests after changes: docker-compose exec web pytest tests/ -v",

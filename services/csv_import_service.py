@@ -500,10 +500,12 @@ class CSVImportService:
                         # Commit periodically through repositories
                         if results['successful'] % 100 == 0:
                             try:
-                                # Repositories handle their own session management
-                                # No direct session commits needed
-                                pass
+                                # CRITICAL FIX: Commit database changes periodically
+                                # This ensures CampaignListMember records are persisted
+                                self.campaign_list_member_repository.commit()
+                                logger.debug(f"Committed batch at {results['successful']} successful imports")
                             except Exception as commit_error:
+                                logger.error(f"Commit error at row {row_num}: {str(commit_error)}")
                                 results['errors'].append(f"Commit error at row {row_num}: {str(commit_error)}")
                         
                     except Exception as e:
@@ -551,7 +553,12 @@ class CSVImportService:
                     results['failed'],
                     metadata
                 )
+                # CRITICAL FIX: Ensure all changes are committed
+                # This final commit ensures any remaining CampaignListMember records are persisted
+                self.campaign_list_member_repository.commit()
+                logger.info(f"Final commit completed for {results['successful']} total imports")
             except Exception as final_error:
+                logger.error(f"Final update/commit error: {str(final_error)}")
                 results['errors'].append(f"Final update error: {str(final_error)}")
                 # Repository pattern handles error recovery
         
